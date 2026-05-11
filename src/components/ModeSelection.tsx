@@ -23,54 +23,54 @@ export function ModeSelection({ onSelect }: ModeSelectionProps) {
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
           onClick={() => onSelect('situation')}
-          className="bg-white border-2 border-trebol-border p-8 rounded-sm text-left space-y-4 hover:border-trebol-primary transition-colors group relative overflow-hidden"
+          className="bg-white shadow-md rounded-xl p-8 text-left space-y-4 hover:shadow-lg transition-shadow group relative overflow-hidden"
         >
-          <div className="bg-trebol-secondary/20 p-4 rounded-sm w-fit group-hover:bg-trebol-primary group-hover:text-white transition-colors">
-            <MessageSquare size={32} />
+          <div className="bg-trebol-secondary/20 p-4 rounded-lg w-fit group-hover:bg-trebol-primary group-hover:text-white transition-colors">
+            <MessageSquare size={32} className="text-trebol-primary group-hover:text-white transition-colors" />
           </div>
           <div>
             <h3 className="text-xl font-black text-trebol-text">Práctica de Situación</h3>
-            <p className="text-trebol-text opacity-70 font-medium">
+            <p className="text-trebol-text opacity-70 font-medium mt-1">
               Practica frases útiles para situaciones reales personalizadas por ti.
             </p>
           </div>
-          <Sparkles className="absolute -bottom-4 -right-4 text-trebol-secondary opacity-20 group-hover:opacity-100 transition-opacity" size={80} />
+          <Sparkles className="absolute -bottom-4 -right-4 text-trebol-secondary opacity-10 group-hover:opacity-30 transition-opacity" size={96} />
         </motion.button>
 
         <motion.button
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
           onClick={() => onSelect('image')}
-          className="bg-white border-2 border-trebol-border p-8 rounded-sm text-left space-y-4 hover:border-trebol-primary transition-colors group relative overflow-hidden"
+          className="bg-white shadow-md rounded-xl p-8 text-left space-y-4 hover:shadow-lg transition-shadow group relative overflow-hidden"
         >
-          <div className="bg-trebol-secondary/20 p-4 rounded-sm w-fit group-hover:bg-trebol-primary group-hover:text-white transition-colors">
-            <ImageIcon size={32} />
+          <div className="bg-trebol-secondary/20 p-4 rounded-lg w-fit group-hover:bg-trebol-primary group-hover:text-white transition-colors">
+            <ImageIcon size={32} className="text-trebol-primary group-hover:text-white transition-colors" />
           </div>
           <div>
             <h3 className="text-xl font-black text-trebol-text">Descripción de Imagen</h3>
-            <p className="text-trebol-text opacity-70 font-medium">
+            <p className="text-trebol-text opacity-70 font-medium mt-1">
               Prepárate para el examen B1 describiendo escenas generadas por IA.
             </p>
           </div>
-          <Sparkles className="absolute -bottom-4 -right-4 text-trebol-secondary opacity-20 group-hover:opacity-100 transition-opacity" size={80} />
+          <Sparkles className="absolute -bottom-4 -right-4 text-trebol-secondary opacity-10 group-hover:opacity-30 transition-opacity" size={96} />
         </motion.button>
 
         <motion.button
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
           onClick={() => onSelect('conversation')}
-          className="bg-white border-2 border-trebol-border p-8 rounded-sm text-left space-y-4 hover:border-trebol-primary transition-colors group relative overflow-hidden"
+          className="bg-white shadow-md rounded-xl p-8 text-left space-y-4 hover:shadow-lg transition-shadow group relative overflow-hidden"
         >
-          <div className="bg-trebol-secondary/20 p-4 rounded-sm w-fit group-hover:bg-trebol-primary group-hover:text-white transition-colors">
-            <Mic2 size={32} />
+          <div className="bg-trebol-secondary/20 p-4 rounded-lg w-fit group-hover:bg-trebol-primary group-hover:text-white transition-colors">
+            <Mic2 size={32} className="text-trebol-primary group-hover:text-white transition-colors" />
           </div>
           <div>
             <h3 className="text-xl font-black text-trebol-text">Conversación Fluida</h3>
-            <p className="text-trebol-text opacity-70 font-medium">
+            <p className="text-trebol-text opacity-70 font-medium mt-1">
               Interactúa en una conversación real con IA sobre cualquier tema.
             </p>
           </div>
-          <Sparkles className="absolute -bottom-4 -right-4 text-trebol-secondary opacity-20 group-hover:opacity-100 transition-opacity" size={80} />
+          <Sparkles className="absolute -bottom-4 -right-4 text-trebol-secondary opacity-10 group-hover:opacity-30 transition-opacity" size={96} />
         </motion.button>
       </div>
     </div>
