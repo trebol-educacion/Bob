@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { motion } from 'motion/react';
 import { Mail, Lock, Loader2 } from 'lucide-react';
 import ParticlesCanvas from '@/components/ParticlesCanvas';
+import { createSupabaseBrowser } from '@/lib/supabase/browser-client';
 
 const BG = '#3660AB';
 const GREEN = '#F8AC37';
@@ -24,9 +25,18 @@ export default function LoginPage() {
       return;
     }
     setLoading(true);
-    await new Promise((r) => setTimeout(r, 800));
-    setLoading(false);
+    const supabase = createSupabaseBrowser();
+    const { error: authError } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+    if (authError) {
+      setError('Credenciales incorrectas. Por favor, inténtalo de nuevo.');
+      setLoading(false);
+      return;
+    }
     router.push('/');
+    router.refresh();
   };
 
   return (

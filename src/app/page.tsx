@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { PhraseCard } from '@/components/PhraseCard';
 import { ResultCard } from '@/components/ResultCard';
@@ -22,10 +22,11 @@ import {
   chatConversationAction 
 } from '@/actions/gemini';
 import { blobToBase64 } from '@/lib/audio';
+import { createSupabaseBrowser } from '@/lib/supabase/browser-client';
 import { Loader2, Mic2, Sparkles, Send, Image as ImageIcon } from 'lucide-react';
+import { Navbar } from '@/components/Navbar';
 
-type AppState = 
-  | 'welcome' 
+type AppState =
   | 'mode-selection'
   | 'topic-selection' 
   | 'generating-phrases' 
@@ -40,7 +41,15 @@ type AppState =
   | 'finished';
 
 export default function App() {
-  const [appState, setAppState] = useState<AppState>('welcome');
+  const [appState, setAppState] = useState<AppState>('mode-selection');
+  const [userEmail, setUserEmail] = useState<string | undefined>();
+
+  useEffect(() => {
+    const supabase = createSupabaseBrowser();
+    supabase.auth.getUser().then(({ data }) => {
+      setUserEmail(data.user?.email ?? undefined);
+    });
+  }, []);
   const [mode, setMode] = useState<'situation' | 'image' | 'conversation' | null>(null);
   const [topic, setTopic] = useState('');
   const [dynamicPhrases, setDynamicPhrases] = useState<string[]>([]);
@@ -147,8 +156,9 @@ export default function App() {
   const isDuringPractice = ['practicing', 'image-practicing', 'evaluating', 'result'].includes(appState);
 
   return (
-    <div className="min-h-screen bg-trebol-bg flex flex-col items-center justify-center p-4">
-      <div className="w-full max-w-4xl mx-auto flex-1 flex flex-col py-8">
+    <div className="min-h-screen bg-trebol-bg flex flex-col">
+      <Navbar userEmail={userEmail} />
+      <div className="w-full max-w-4xl mx-auto flex-1 flex flex-col py-8 px-4">
         
         {/* Header / Progress */}
         {isDuringPractice && mode === 'situation' && (
@@ -160,35 +170,6 @@ export default function App() {
         {/* Main Content Area */}
         <div className="flex-1 flex flex-col justify-center items-center w-full">
           <AnimatePresence mode="wait">
-            {appState === 'welcome' && (
-              <motion.div
-                key="welcome"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                className="text-center space-y-8 w-full max-w-md"
-              >
-                <div className="bg-trebol-secondary p-6 rounded-sm inline-block mb-6 shadow-md">
-                  <Mic2 size={64} className="text-trebol-primary" />
-                </div>
-                <h1 className="text-4xl font-black text-trebol-text tracking-tight">
-                  Pronuncia con MIA
-                </h1>
-                <p className="text-xl text-trebol-text font-semibold opacity-80">
-                  Aprende inglés con situaciones personalizadas por IA.
-                </p>
-                <div className="pt-8">
-                  <Button
-                    variant="primary"
-                    size="lg"
-                    className="w-full py-4 text-xl"
-                    onClick={startModeSelection}
-                  >
-                    ¡Comenzar!
-                  </Button>
-                </div>
-              </motion.div>
-            )}
 
             {appState === 'mode-selection' && (
               <motion.div
@@ -356,7 +337,7 @@ export default function App() {
                     className="w-full py-4 text-xl"
                     onClick={() => {
                       setTopic('');
-                      setAppState('welcome');
+                      setAppState('mode-selection');
                       setMode(null);
                       setCurrentScene(null);
                     }}
