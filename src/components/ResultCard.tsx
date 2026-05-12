@@ -3,6 +3,7 @@ import { motion } from 'motion/react';
 import { Button } from './Button';
 import { CheckCircle2, ArrowRight, MessageCircle, Clock, Lightbulb, Zap } from 'lucide-react';
 import { EvaluationResult } from '@/actions/gemini';
+import { getScoreColor } from '@/lib/score';
 
 interface ResultCardProps {
   result: EvaluationResult;
@@ -11,12 +12,6 @@ interface ResultCardProps {
 
 export function ResultCard({ result, onNext }: ResultCardProps) {
   const { score, feedback, transcribed_text, details } = result;
-
-  const getScoreColor = (score: number) => {
-    if (score >= 90) return 'text-trebol-primary';
-    if (score >= 70) return 'text-trebol-secondary';
-    return 'text-trebol-primary opacity-70';
-  };
 
   return (
     <motion.div
@@ -78,7 +73,7 @@ export function ResultCard({ result, onNext }: ResultCardProps) {
                   <span>Consejos Pro</span>
                 </h3>
                 <ul className="space-y-3">
-                  {details.improvement_tips.map((tip, idx) => (
+                  {(details.improvement_tips ?? []).map((tip, idx) => (
                     <li key={idx} className="text-sm font-medium text-trebol-text opacity-80 flex items-start space-x-2">
                       <span className="text-trebol-secondary font-bold">•</span>
                       <span>{tip}</span>
@@ -106,7 +101,7 @@ export function ResultCard({ result, onNext }: ResultCardProps) {
   );
 }
 
-function DetailItem({ icon, title, text }: { icon: React.ReactNode, title: string, text: string }) {
+function DetailItem({ icon, title, text }: { icon: React.ReactNode, title: string, text: string | undefined }) {
   return (
     <div className="space-y-1">
       <div className="flex items-center space-x-2 text-xs font-black text-trebol-text/40 uppercase tracking-tighter">

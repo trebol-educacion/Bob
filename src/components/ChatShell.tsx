@@ -15,6 +15,19 @@ interface ChatShellProps {
   children: React.ReactNode;
 }
 
+/**
+ * ChatShell — Unified visual wrapper for practice mode layouts.
+ *
+ * Provides a consistent shell (header with back button, optional progress bar,
+ * scrollable content area) shared across practice modes.
+ *
+ * **Why it exists:** Target of future visual unification — any layout change
+ * to the practice shell only needs to happen in one place.
+ *
+ * **Current usage:** Used by PhraseCard (situation mode) wrappers and
+ * ConversationPractice. BobPracticeChat and ConversationPractice currently
+ * render their own layout independently and do NOT use ChatShell yet.
+ */
 export function ChatShell({
   mode,
   title,
@@ -26,7 +39,7 @@ export function ChatShell({
 }: ChatShellProps) {
   const innerContent = (
     <>
-      <header className="bg-[#3660AB] text-white px-6 py-4 flex items-center gap-3 shrink-0">
+      <header className="bg-bob-brand text-white px-6 py-4 flex items-center gap-3 shrink-0">
         {onBack && (
           <button
             type="button"

@@ -7,7 +7,7 @@ import { Mail, Lock, Loader2 } from 'lucide-react';
 import ParticlesCanvas from '@/components/ParticlesCanvas';
 import { createSupabaseBrowser } from '@/lib/supabase/browser-client';
 
-const BG = '#3660AB';
+const BG = 'var(--color-bob-brand)';
 const GREEN = '#F8AC37';
 
 export default function LoginPage() {

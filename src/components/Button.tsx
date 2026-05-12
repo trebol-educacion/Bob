@@ -20,7 +20,7 @@ export function Button({
     primary:
       'bg-trebol-primary text-white hover:bg-trebol-primary-dark',
     secondary:
-      'bg-trebol-primary text-white hover:bg-trebol-primary-dark',
+      'bg-white text-trebol-primary border-2 border-trebol-primary hover:bg-trebol-primary hover:text-white transition-colors',
     danger:
       'bg-red-500 text-white hover:bg-red-600',
     outline:

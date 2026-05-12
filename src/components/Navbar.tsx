@@ -6,8 +6,6 @@ import { motion, AnimatePresence } from 'motion/react';
 import { LogOut, User } from 'lucide-react';
 import { createSupabaseBrowser } from '@/lib/supabase/browser-client';
 
-const BG = '#3660AB';
-
 interface NavbarProps {
   userEmail?: string;
 }
@@ -29,8 +27,7 @@ export function Navbar({ userEmail }: NavbarProps) {
       initial={{ y: -100, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={{ duration: 0.4, ease: 'easeOut' }}
-      className="w-full px-6 py-3 shadow-md"
-      style={{ backgroundColor: BG }}
+      className="w-full px-6 py-3 shadow-md bg-bob-brand"
     >
       <div className="flex items-center justify-between">
         {/* Logo */}
