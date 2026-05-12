@@ -13,6 +13,7 @@ import {
   EvaluationResult,
   ImageScene,
 } from '@/actions/gemini';
+import { saveMessageAction, StoredMessage } from '@/actions/messages';
 import { blobToBase64, pcmToWavBase64 } from '@/lib/audio';
 
 type ChatPhase =
@@ -35,11 +36,95 @@ interface BobPracticeChatProps {
   mode: 'situation' | 'image';
   onBack: () => void;
   onSessionStart: (title: string) => void;
+  sessionId?: string | null;
+  initialMessages?: StoredMessage[];
 }
 
-export function BobPracticeChat({ mode, onBack, onSessionStart }: BobPracticeChatProps) {
-  const [messages, setMessages] = useState<ChatMsg[]>([]);
-  const [phase, setPhase] = useState<ChatPhase>(mode === 'image' ? 'image-config' : 'topic-input');
+function restoreMessages(stored: StoredMessage[]): ChatMsg[] {
+  return stored.map((m) => {
+    let content: React.ReactNode;
+
+    if (m.msg_type === 'phrase') {
+      const j = m.content_json as { phrase: string; index: number; total: number } | null;
+      content = j ? (
+        <div className="space-y-3">
+          <p className="text-xs font-black uppercase tracking-widest text-trebol-text/50">
+            Frase {j.index + 1} de {j.total}
+          </p>
+          <div className="bg-trebol-bg border-2 border-trebol-primary/30 rounded-xl p-4">
+            <p className="text-xl font-extrabold text-trebol-text leading-relaxed">{j.phrase}</p>
+          </div>
+          <p className="text-sm text-trebol-text/60">Escucha la frase y luego grábate pronunciándola.</p>
+        </div>
+      ) : <span>{m.content_text}</span>;
+    } else if (m.msg_type === 'image_scene') {
+      const j = m.content_json as { description: string; image_data?: string } | null;
+      content = (
+        <div className="space-y-3">
+          <p className="text-sm text-trebol-text/60">
+            Describe lo que ves en esta imagen en inglés. Tienes 60 segundos.
+          </p>
+          {j?.image_data && (
+            <img
+              src={j.image_data}
+              alt="Scene to describe"
+              className="w-full rounded-xl border-2 border-trebol-border shadow-md"
+            />
+          )}
+        </div>
+      );
+    } else if (m.msg_type === 'evaluation') {
+      const j = m.content_json as { score: number; feedback: string; transcribed_text?: string } | null;
+      if (j) {
+        const scoreColor =
+          j.score >= 90 ? 'text-green-600' : j.score >= 70 ? 'text-yellow-600' : 'text-gray-500';
+        content = (
+          <div className="space-y-3">
+            <div className="flex items-center gap-3">
+              <span className={`text-4xl font-black ${scoreColor}`}>{j.score}</span>
+              <span className="text-trebol-text/60 text-sm font-medium">/ 100</span>
+            </div>
+            {j.transcribed_text && (
+              <div className="bg-trebol-bg rounded-lg px-3 py-2 text-sm text-trebol-text/80 italic">
+                &quot;{j.transcribed_text}&quot;
+              </div>
+            )}
+            <p className="text-sm text-trebol-text/80">{j.feedback}</p>
+          </div>
+        );
+      } else {
+        content = <span>{m.content_text}</span>;
+      }
+    } else if (m.msg_type === 'user_audio') {
+      content = (
+        <span className="flex items-center gap-2 text-sm">
+          <Mic size={14} /> Audio grabado
+        </span>
+      );
+    } else {
+      content = <span>{m.content_text}</span>;
+    }
+
+    return { id: m.id, role: m.role, content };
+  });
+}
+
+export function BobPracticeChat({
+  mode,
+  onBack,
+  onSessionStart,
+  sessionId,
+  initialMessages,
+}: BobPracticeChatProps) {
+  const isHistory = !!initialMessages && initialMessages.length > 0;
+
+  const [messages, setMessages] = useState<ChatMsg[]>(() =>
+    isHistory ? restoreMessages(initialMessages) : []
+  );
+  const [phase, setPhase] = useState<ChatPhase>(() => {
+    if (isHistory) return 'finished';
+    return mode === 'image' ? 'image-config' : 'topic-input';
+  });
   const [topic, setTopic] = useState('');
   const [inputText, setInputText] = useState('');
   const [dynamicPhrases, setDynamicPhrases] = useState<string[]>([]);
@@ -56,6 +141,17 @@ export function BobPracticeChat({ mode, onBack, onSessionStart }: BobPracticeCha
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  const sessionIdRef = useRef<string | null>(sessionId ?? null);
+  useEffect(() => {
+    if (sessionId) sessionIdRef.current = sessionId;
+  }, [sessionId]);
+
+  const saveMsg = async (input: Omit<Parameters<typeof saveMessageAction>[0], 'session_id'>) => {
+    const sid = sessionIdRef.current;
+    if (!sid) return;
+    await saveMessageAction({ ...input, session_id: sid });
+  };
+
   const addBobMessage = (content: React.ReactNode) => {
     setMessages(prev => [...prev, { id: crypto.randomUUID(), role: 'bob', content }]);
   };
@@ -65,6 +161,7 @@ export function BobPracticeChat({ mode, onBack, onSessionStart }: BobPracticeCha
   };
 
   useEffect(() => {
+    if (isHistory) return;
     if (mode === 'situation') {
       addBobMessage(
         <p>
@@ -75,6 +172,11 @@ export function BobPracticeChat({ mode, onBack, onSessionStart }: BobPracticeCha
           </span>
         </p>
       );
+      saveMsg({
+        role: 'bob',
+        msg_type: 'text',
+        content_text: '¡Hola! Soy BOB, tu coach de pronunciación. ¿Sobre qué situación quieres practicar hoy?',
+      });
     } else {
       addBobMessage(
         <div className="space-y-3">
@@ -82,6 +184,11 @@ export function BobPracticeChat({ mode, onBack, onSessionStart }: BobPracticeCha
           <ImageConfigSelection onConfirm={handleImageConfig} />
         </div>
       );
+      saveMsg({
+        role: 'bob',
+        msg_type: 'text',
+        content_text: '¡Vamos a practicar descripción de imágenes! Configura tu escena:',
+      });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -162,6 +269,7 @@ export function BobPracticeChat({ mode, onBack, onSessionStart }: BobPracticeCha
     setTopic(t);
     setInputText('');
     addUserMessage(<span>{t}</span>);
+    saveMsg({ role: 'user', msg_type: 'text', content_text: t });
     setPhase('generating');
     addBobMessage(
       <span className="flex items-center gap-2 text-trebol-text/70">
@@ -178,6 +286,7 @@ export function BobPracticeChat({ mode, onBack, onSessionStart }: BobPracticeCha
       setCurrentIndex(0);
       setMessages(prev => prev.slice(0, -1));
       addBobMessage(renderPhrase(generated[0], 0, generated.length));
+      saveMsg({ role: 'bob', msg_type: 'phrase', content_json: { phrase: generated[0], index: 0, total: generated.length } });
       setPhase('phrase-ready');
     } catch {
       setMessages(prev => prev.slice(0, -1));
@@ -194,6 +303,7 @@ export function BobPracticeChat({ mode, onBack, onSessionStart }: BobPracticeCha
         {config.topic} · {config.difficulty}
       </span>
     );
+    saveMsg({ role: 'user', msg_type: 'text', content_text: `${config.topic} · ${config.difficulty}` });
     setPhase('generating');
     addBobMessage(
       <span className="flex items-center gap-2 text-trebol-text/70">
@@ -211,6 +321,7 @@ export function BobPracticeChat({ mode, onBack, onSessionStart }: BobPracticeCha
       setCurrentScene(fullScene);
       setMessages(prev => prev.slice(0, -1));
       addBobMessage(renderScene(fullScene));
+      saveMsg({ role: 'bob', msg_type: 'image_scene', content_json: { description: scene.description, image_data: imageData } });
       setPhase('phrase-ready');
     } catch {
       setMessages(prev => prev.slice(0, -1));
@@ -266,6 +377,7 @@ export function BobPracticeChat({ mode, onBack, onSessionStart }: BobPracticeCha
         <Mic size={14} /> Audio grabado
       </span>
     );
+    saveMsg({ role: 'user', msg_type: 'user_audio', content_text: 'Audio grabado' });
     setPhase('evaluating');
     addBobMessage(
       <span className="flex items-center gap-2 text-trebol-text/70">
@@ -286,6 +398,15 @@ export function BobPracticeChat({ mode, onBack, onSessionStart }: BobPracticeCha
       setCurrentResult(result);
       setMessages(prev => prev.slice(0, -1));
       addBobMessage(renderResult(result));
+      saveMsg({
+        role: 'bob',
+        msg_type: 'evaluation',
+        content_json: {
+          score: result.score,
+          feedback: result.feedback,
+          transcribed_text: result.transcribed_text ?? null,
+        },
+      });
       setPhase('result');
     } catch {
       setMessages(prev => prev.slice(0, -1));
@@ -302,8 +423,14 @@ export function BobPracticeChat({ mode, onBack, onSessionStart }: BobPracticeCha
         const nextIndex = currentIndex + 1;
         setCurrentIndex(nextIndex);
         addBobMessage(renderPhrase(dynamicPhrases[nextIndex], nextIndex, dynamicPhrases.length));
+        saveMsg({
+          role: 'bob',
+          msg_type: 'phrase',
+          content_json: { phrase: dynamicPhrases[nextIndex], index: nextIndex, total: dynamicPhrases.length },
+        });
         setPhase('phrase-ready');
       } else {
+        const completionText = `¡Sesión completada! Has practicado ${dynamicPhrases.length} frases sobre "${topic}". ¡Sigue así!`;
         addBobMessage(
           <div className="space-y-1">
             <p className="font-black text-trebol-primary">¡Sesión completada! 🎉</p>
@@ -312,6 +439,7 @@ export function BobPracticeChat({ mode, onBack, onSessionStart }: BobPracticeCha
             </p>
           </div>
         );
+        saveMsg({ role: 'bob', msg_type: 'text', content_text: completionText });
         setPhase('finished');
       }
     } else {
@@ -321,6 +449,7 @@ export function BobPracticeChat({ mode, onBack, onSessionStart }: BobPracticeCha
           <p className="text-sm text-trebol-text/70">Has completado la descripción de imagen.</p>
         </div>
       );
+      saveMsg({ role: 'bob', msg_type: 'text', content_text: '¡Bien hecho! Has completado la descripción de imagen.' });
       setPhase('finished');
     }
   };

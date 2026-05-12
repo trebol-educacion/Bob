@@ -8,6 +8,7 @@ import { ConversationPractice } from '@/components/ConversationPractice';
 import { SessionSidebar } from '@/components/SessionSidebar';
 import { BobPracticeChat } from '@/components/BobPracticeChat';
 import { createSessionAction, getSessionsAction, deleteSessionAction, BobSession } from '@/actions/sessions';
+import { getMessagesAction, StoredMessage } from '@/actions/messages';
 import { createSupabaseBrowser } from '@/lib/supabase/browser-client';
 import { Sparkles, Send } from 'lucide-react';
 import { Navbar } from '@/components/Navbar';
@@ -32,6 +33,8 @@ export default function App() {
   const [sessions, setSessions] = useState<BobSession[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [sessionsLoading, setSessionsLoading] = useState(true);
+  const [selectedSession, setSelectedSession] = useState<BobSession | null>(null);
+  const [selectedMessages, setSelectedMessages] = useState<StoredMessage[]>([]);
 
   useEffect(() => {
     if (!userEmail) return;
@@ -51,16 +54,32 @@ export default function App() {
     setAppState('mode-selection');
     setMode(null);
     setTopic('');
+    setSelectedMessages([]);
+    setSelectedSession(null);
   }, []);
 
   const handleNewSession = useCallback(() => {
     setActiveSessionId(null);
+    setSelectedMessages([]);
+    setSelectedSession(null);
     resetToModeSelection();
   }, [resetToModeSelection]);
 
-  const handleSelectSession = useCallback((id: string) => {
+  const handleSelectSession = useCallback(async (id: string) => {
+    const session = sessions.find(s => s.id === id);
+    if (!session) return;
     setActiveSessionId(id);
-  }, []);
+    setSelectedSession(session);
+    const { data } = await getMessagesAction(id);
+    setSelectedMessages(data ?? []);
+    setMode(session.mode as 'situation' | 'image' | 'conversation');
+    if (session.mode === 'conversation') {
+      setTopic(session.topic ?? '');
+      setAppState('conversation-practicing');
+    } else {
+      setAppState('practicing');
+    }
+  }, [sessions]);
 
   const handleDeleteSession = useCallback(async (id: string) => {
     const snapshot = sessions;
@@ -155,7 +174,7 @@ export default function App() {
 
             {appState === 'practicing' && mode && mode !== 'conversation' && (
               <motion.div
-                key={`practicing-${mode}`}
+                key={`practicing-${mode}-${activeSessionId ?? 'new'}`}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
@@ -170,6 +189,8 @@ export default function App() {
                         if (data) { setActiveSessionId(data.id); setSessions(prev => [data, ...prev]); }
                       });
                   }}
+                  sessionId={activeSessionId}
+                  initialMessages={selectedMessages.length > 0 ? selectedMessages : undefined}
                 />
               </motion.div>
             )}
