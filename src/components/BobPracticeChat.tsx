@@ -136,6 +136,7 @@ export function BobPracticeChat({
   const chunksRef = useRef<Blob[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const sessionStartedRef = useRef(false);
+  const greetingAddedRef = useRef(false);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -161,7 +162,8 @@ export function BobPracticeChat({
   };
 
   useEffect(() => {
-    if (isHistory) return;
+    if (isHistory || greetingAddedRef.current) return;
+    greetingAddedRef.current = true;
     if (mode === 'situation') {
       addBobMessage(
         <p>

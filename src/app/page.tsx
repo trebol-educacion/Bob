@@ -174,7 +174,7 @@ export default function App() {
 
             {appState === 'practicing' && mode && mode !== 'conversation' && (
               <motion.div
-                key={`practicing-${mode}-${activeSessionId ?? 'new'}`}
+                key={`practicing-${mode}-${selectedMessages.length > 0 ? activeSessionId : 'new'}`}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
