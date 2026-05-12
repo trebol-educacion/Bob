@@ -8,6 +8,7 @@ import {
   buildImageDescriptionEvaluationPrompt,
   buildImageGenerationPrompt,
   buildImageScenePrompt,
+  buildB2ImageEvaluationContext,
   buildInitialChatPrompt,
   buildSimulateConversationPrompt,
   buildGenerateQuestionsPrompt,
@@ -170,13 +171,15 @@ export async function generateImageAction(prompt: string): Promise<string> {
 }
 
 /**
- * Generates a daily life scene for B1 Speaking description practice.
+ * Generates a scene for Speaking description practice.
+ * Supports B1 (default) and B2 First difficulty levels.
  */
 export async function generateImageSceneAction(
   topic: string = 'Daily Life',
-  difficulty: string = 'intermediate'
+  difficulty: string = 'intermediate',
+  level: 'b1' | 'b2' = 'b1'
 ): Promise<ImageScene> {
-  const prompt = buildImageScenePrompt(topic, difficulty);
+  const prompt = buildImageScenePrompt(topic, difficulty, level);
 
   try {
     const response = await ai.models.generateContent({
@@ -207,9 +210,14 @@ export async function generateImageSceneAction(
 export async function evaluateImageDescriptionAction(
   audioBase64: string,
   mimeType: string,
-  sceneDescription: string
+  sceneDescription: string,
+  level: 'b1' | 'b2' = 'b1'
 ): Promise<EvaluationResult> {
-  const prompt = buildImageDescriptionEvaluationPrompt(sceneDescription);
+  const basePrompt = buildImageDescriptionEvaluationPrompt(sceneDescription);
+  const prompt =
+    level === 'b2'
+      ? `${basePrompt}\n\n${buildB2ImageEvaluationContext()}`
+      : basePrompt;
 
   try {
     const response = await ai.models.generateContent({
