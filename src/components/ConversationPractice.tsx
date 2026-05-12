@@ -1,21 +1,24 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useCallback } from 'react';
 import { Button } from './Button';
 import { Mic, Square, Loader2, Sparkles, Volume2, HelpCircle, CheckCircle, ArrowRight, Send, Wand2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { 
-  ChatMessage, 
-  chatConversationAction, 
+import {
+  ChatMessage,
+  chatConversationAction,
   chatTextConversationAction,
   simulateUserResponseAction,
-  EvaluationResult, 
-  generateInitialChatAction, 
-  generateSpeechAction, 
-  generateQuestionsAction, 
-  simulateConversationAction, 
-  Question 
+  EvaluationResult,
+  generateInitialChatAction,
+  generateSpeechAction,
+  generateQuestionsAction,
+  simulateConversationAction,
+  Question
 } from '@/actions/gemini';
 import { blobToBase64, pcmToWavBase64 } from '@/lib/audio';
 import { ResultCard } from './ResultCard';
+import { useAudioRecorder } from '@/hooks/useAudioRecorder';
+import { useConversationState } from '@/hooks/useConversationState';
+import { useQuestionsFlow } from '@/hooks/useQuestionsFlow';
 
 interface ConversationPracticeProps {
   topic?: string;
@@ -25,99 +28,75 @@ interface ConversationPracticeProps {
   onSessionStart?: (topic: string) => void;
 }
 
-type Phase = 'topic-input' | 'conversation' | 'questions' | 'finished';
-
 export function ConversationPractice({ topic: topicProp = '', onFinish, noFrame, onPhaseChange, onSessionStart }: ConversationPracticeProps) {
-  const [phase, setPhase] = useState<Phase>(topicProp ? 'conversation' : 'topic-input');
-  const [internalTopic, setInternalTopic] = useState(topicProp);
-  const [topicInput, setTopicInput] = useState('');
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [framing, setFraming] = useState<string>('');
-  const [isRecording, setIsRecording] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [isGeneratingAudio, setIsGeneratingAudio] = useState<number | null>(null);
-  const [currentEvaluation, setCurrentEvaluation] = useState<EvaluationResult | null>(null);
-  const [showEvaluation, setShowEvaluation] = useState(false);
-  
-  // New listening practice states
-  const [playCounts, setPlayCounts] = useState<Record<number, number>>({});
-  const [visibleTexts, setVisibleTexts] = useState<Record<number, boolean>>({});
-  
-  // Question phase states
-  const [questions, setQuestions] = useState<Question[]>([]);
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [questionAnswers, setQuestionAnswers] = useState<Record<number, EvaluationResult>>({});
+  const conv = useConversationState(topicProp);
+  const qf = useQuestionsFlow();
 
-  // Input state
-  const [inputText, setInputText] = useState('');
+  // Stable ref so useAudioRecorder never captures a stale callback
+  const onRecordedRef = useRef<(blob: Blob) => void>(() => {});
 
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
+  const { isRecording, startRecording, stopRecording } = useAudioRecorder({
+    onRecorded: useCallback((blob: Blob) => onRecordedRef.current(blob), []),
+    onError: useCallback(() => {
+      alert('Por favor, permite el acceso al micrófono.');
+    }, []),
+  });
+
   const scrollRef = useRef<HTMLDivElement>(null);
-  const initializedRef = useRef(false);
 
   const MAX_TURNS = 12; // ~6 iterations
 
   useEffect(() => {
     if (!onPhaseChange) return;
-    if (phase === 'conversation') {
-      const iter = Math.floor(messages.length / 2);
+    if (conv.phase === 'conversation') {
+      const iter = Math.floor(conv.messages.length / 2);
       onPhaseChange('Listening & Speaking', iter > 0 ? `Turno ${iter}` : undefined);
-    } else if (phase === 'questions') {
+    } else if (conv.phase === 'questions') {
       onPhaseChange('Comprensión', undefined);
     }
-  }, [phase, messages.length, onPhaseChange]);
+  }, [conv.phase, conv.messages.length, onPhaseChange]);
 
-  // Initialize conversation (fires when internalTopic is first set)
+  // Initialize conversation (fires once when internalTopic is first set)
+  // Using a ref to track initialization avoids double-init without initializedRef
+  const initDoneRef = useRef(false);
   useEffect(() => {
-    if (initializedRef.current || !internalTopic) return;
-    initializedRef.current = true;
+    if (initDoneRef.current || !conv.internalTopic) return;
+    initDoneRef.current = true;
 
     const initChat = async () => {
-      setIsProcessing(true);
+      conv.setIsProcessing(true);
       try {
-        const result = await generateInitialChatAction(internalTopic);
-        setFraming(result.framing);
-        setMessages([{ role: 'model', text: result.message }]);
+        const result = await generateInitialChatAction(conv.internalTopic);
+        conv.setFraming(result.framing);
+        conv.setMessages([{ role: 'model', text: result.message }]);
         setTimeout(() => handleListen(result.message, 0), 500);
       } catch (error) {
         console.error('Failed to init chat:', error);
       } finally {
-        setIsProcessing(false);
+        conv.setIsProcessing(false);
       }
     };
     initChat();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [internalTopic]);
+  }, [conv.internalTopic]);
 
   const handleListen = async (text: string, index: number) => {
-    if (isGeneratingAudio !== null) return;
-    
-    setIsGeneratingAudio(index);
+    if (conv.isGeneratingAudio !== null) return;
+
+    conv.setIsGeneratingAudio(index);
     try {
       const { data, mimeType } = await generateSpeechAction(text);
       const audioUrl = pcmToWavBase64(data, mimeType);
       const audio = new Audio(audioUrl);
-      
-      // Update play count
-      setPlayCounts(prev => ({
-        ...prev,
-        [index]: (prev[index] || 0) + 1
-      }));
+
+      conv.incrementPlayCount(index);
 
       await audio.play();
     } catch (error) {
       console.error('Error playing audio:', error);
     } finally {
-      setIsGeneratingAudio(null);
+      conv.setIsGeneratingAudio(null);
     }
-  };
-
-  const toggleHint = (index: number) => {
-    setVisibleTexts(prev => ({
-      ...prev,
-      [index]: !prev[index]
-    }));
   };
 
   // Auto-scroll to bottom
@@ -125,71 +104,28 @@ export function ConversationPractice({ topic: topicProp = '', onFinish, noFrame,
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [messages, isProcessing, phase]);
-
-  const startRecording = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-        } 
-      });
-      
-      const mediaRecorder = new MediaRecorder(stream);
-      mediaRecorderRef.current = mediaRecorder;
-      audioChunksRef.current = [];
-
-      mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) audioChunksRef.current.push(event.data);
-      };
-
-      mediaRecorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        if (phase === 'conversation') {
-          await handleSendMessage(audioBlob);
-        } else if (phase === 'questions') {
-          await handleAnswerQuestion(audioBlob);
-        }
-        stream.getTracks().forEach((track) => track.stop());
-      };
-
-      mediaRecorder.start();
-      setIsRecording(true);
-    } catch (error) {
-      console.error('Microphone error:', error);
-      alert('Por favor, permite el acceso al micrófono.');
-    }
-  };
-
-  const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop();
-      setIsRecording(false);
-    }
-  };
+  }, [conv.messages, conv.isProcessing, conv.phase]);
 
   const handleSendMessage = async (audioBlob: Blob) => {
-    setIsProcessing(true);
+    conv.setIsProcessing(true);
     try {
       const base64Audio = await blobToBase64(audioBlob);
       const mimeType = (audioBlob.type || 'audio/webm').split(';')[0];
-      
+
       const result = await chatConversationAction(
         base64Audio,
         mimeType,
-        messages,
-        internalTopic
+        conv.messages,
+        conv.internalTopic
       );
 
       const userMsg: ChatMessage = { role: 'user', text: result.evaluation.transcribed_text };
       const modelMsg: ChatMessage = { role: 'model', text: result.ai_response };
 
-      const newMessages = [...messages, userMsg, modelMsg];
-      setMessages(newMessages);
-      setCurrentEvaluation(result.evaluation);
-      setShowEvaluation(true);
+      const newMessages = [...conv.messages, userMsg, modelMsg];
+      conv.setMessages(newMessages);
+      conv.setCurrentEvaluation(result.evaluation);
+      conv.setShowEvaluation(true);
 
       // Auto-play the model's response
       const modelMsgIndex = newMessages.length - 1;
@@ -199,31 +135,31 @@ export function ConversationPractice({ topic: topicProp = '', onFinish, noFrame,
       console.error('Conversation error:', error);
       alert('Error en la conversación. Inténtalo de nuevo.');
     } finally {
-      setIsProcessing(false);
+      conv.setIsProcessing(false);
     }
   };
 
   const handleSendTextMessage = async () => {
-    if (!inputText.trim() || isProcessing) return;
-    
-    setIsProcessing(true);
-    const textToSend = inputText.trim();
-    setInputText('');
+    if (!conv.inputText.trim() || conv.isProcessing) return;
+
+    conv.setIsProcessing(true);
+    const textToSend = conv.inputText.trim();
+    conv.setInputText('');
 
     try {
       const result = await chatTextConversationAction(
         textToSend,
-        messages,
-        internalTopic
+        conv.messages,
+        conv.internalTopic
       );
 
       const userMsg: ChatMessage = { role: 'user', text: textToSend };
       const modelMsg: ChatMessage = { role: 'model', text: result.ai_response };
 
-      const newMessages = [...messages, userMsg, modelMsg];
-      setMessages(newMessages);
-      setCurrentEvaluation(result.evaluation);
-      setShowEvaluation(true);
+      const newMessages = [...conv.messages, userMsg, modelMsg];
+      conv.setMessages(newMessages);
+      conv.setCurrentEvaluation(result.evaluation);
+      conv.setShowEvaluation(true);
 
       const modelMsgIndex = newMessages.length - 1;
       setTimeout(() => handleListen(modelMsg.text, modelMsgIndex), 500);
@@ -231,101 +167,106 @@ export function ConversationPractice({ topic: topicProp = '', onFinish, noFrame,
       console.error('Text conversation error:', error);
       alert('Error al enviar el mensaje. Inténtalo de nuevo.');
     } finally {
-      setIsProcessing(false);
+      conv.setIsProcessing(false);
     }
   };
 
   const handleSimulateResponse = async () => {
-    if (isProcessing) return;
-    setIsProcessing(true);
+    if (conv.isProcessing) return;
+    conv.setIsProcessing(true);
 
     try {
-      const simulatedText = await simulateUserResponseAction(messages, internalTopic);
-      
+      const simulatedText = await simulateUserResponseAction(conv.messages, conv.internalTopic);
+
       const result = await chatTextConversationAction(
         simulatedText,
-        messages,
-        internalTopic
+        conv.messages,
+        conv.internalTopic
       );
 
       const userMsg: ChatMessage = { role: 'user', text: simulatedText };
       const modelMsg: ChatMessage = { role: 'model', text: result.ai_response };
 
-      const newMessages = [...messages, userMsg, modelMsg];
-      setMessages(newMessages);
-      setCurrentEvaluation(result.evaluation);
-      setShowEvaluation(true);
+      const newMessages = [...conv.messages, userMsg, modelMsg];
+      conv.setMessages(newMessages);
+      conv.setCurrentEvaluation(result.evaluation);
+      conv.setShowEvaluation(true);
 
       const modelMsgIndex = newMessages.length - 1;
       setTimeout(() => handleListen(modelMsg.text, modelMsgIndex), 500);
     } catch (error) {
       console.error('Simulation error:', error);
     } finally {
-      setIsProcessing(false);
+      conv.setIsProcessing(false);
     }
   };
 
   const handleGoToQuestions = async () => {
-    setIsProcessing(true);
+    conv.setIsProcessing(true);
     try {
-      let finalHistory = messages;
-      if (messages.length < MAX_TURNS) {
+      let finalHistory = conv.messages;
+      if (conv.messages.length < MAX_TURNS) {
         // Simulate missing turns
-        finalHistory = await simulateConversationAction(messages, internalTopic);
-        setMessages(finalHistory);
+        finalHistory = await simulateConversationAction(conv.messages, conv.internalTopic);
+        conv.setMessages(finalHistory);
       }
 
-      const aiQuestions = await generateQuestionsAction(finalHistory, internalTopic);
-      setQuestions(aiQuestions);
-      setPhase('questions');
+      const aiQuestions = await generateQuestionsAction(finalHistory, conv.internalTopic);
+      qf.setQuestions(aiQuestions);
+      conv.setPhase('questions');
     } catch (error) {
       console.error('Error switching to questions:', error);
     } finally {
-      setIsProcessing(false);
+      conv.setIsProcessing(false);
     }
   };
 
   const handleAnswerQuestion = async (audioBlob: Blob) => {
-    setIsProcessing(true);
+    conv.setIsProcessing(true);
     try {
       const base64Audio = await blobToBase64(audioBlob);
       const mimeType = (audioBlob.type || 'audio/webm').split(';')[0];
-      
-      const currentQuestion = questions[currentQuestionIndex];
-      
+
+      const currentQuestion = qf.questions[qf.currentQuestionIndex];
+
       const result = await chatConversationAction(
         base64Audio,
         mimeType,
-        messages,
+        conv.messages,
         `Evaluating answer to: ${currentQuestion.question}. Correct info: ${currentQuestion.correct_answer}`
       );
 
-      setQuestionAnswers(prev => ({
-        ...prev,
-        [currentQuestionIndex]: result.evaluation
-      }));
+      qf.recordAnswer(qf.currentQuestionIndex, result.evaluation);
 
-      if (currentQuestionIndex < questions.length - 1) {
-        setCurrentQuestionIndex(prev => prev + 1);
-      } else {
-        setPhase('finished');
+      const hasMore = qf.advanceQuestion();
+      if (!hasMore) {
+        conv.setPhase('finished');
       }
     } catch (error) {
       console.error('Error answering question:', error);
     } finally {
-      setIsProcessing(false);
+      conv.setIsProcessing(false);
+    }
+  };
+
+  // Keep the ref in sync — dispatches to conversation or question handler based on current phase
+  onRecordedRef.current = async (blob: Blob) => {
+    if (conv.phase === 'conversation') {
+      await handleSendMessage(blob);
+    } else if (conv.phase === 'questions') {
+      await handleAnswerQuestion(blob);
     }
   };
 
   const handleTopicConfirm = () => {
-    const t = topicInput.trim();
+    const t = conv.topicInput.trim();
     if (!t) return;
-    setInternalTopic(t);
+    conv.setInternalTopic(t);
     onSessionStart?.(t);
-    setPhase('conversation');
+    conv.setPhase('conversation');
   };
 
-  if (phase === 'finished') {
+  if (conv.phase === 'finished') {
     return (
       <div className="w-full max-w-2xl mx-auto flex flex-col items-center justify-center p-12 bg-white border-2 border-trebol-border rounded-sm shadow-xl space-y-8">
         <div className="bg-trebol-primary/10 p-6 rounded-full">
@@ -348,23 +289,23 @@ export function ConversationPractice({ topic: topicProp = '', onFinish, noFrame,
       {!noFrame && (
         <div className="bg-trebol-primary text-white px-6 py-2 flex justify-between items-center">
           <span className="text-xs font-black uppercase tracking-widest">
-            {phase === 'conversation' ? 'Práctica de Listening y Speaking' : phase === 'questions' ? 'Evaluación de Comprensión' : 'Conversación'}
+            {conv.phase === 'conversation' ? 'Práctica de Listening y Speaking' : conv.phase === 'questions' ? 'Evaluación de Comprensión' : 'Conversación'}
           </span>
-          {phase === 'conversation' && (
+          {conv.phase === 'conversation' && (
             <span className="text-xs font-bold">
-              Iteración {Math.floor(messages.length / 2) + 1} de {MAX_TURNS / 2}
+              Iteración {Math.floor(conv.messages.length / 2) + 1} de {MAX_TURNS / 2}
             </span>
           )}
         </div>
       )}
 
       {/* Main Content Area */}
-      <div 
+      <div
         ref={scrollRef}
         className="flex-1 overflow-y-auto px-4 py-6 space-y-4 bg-slate-50/40"
       >
         <AnimatePresence mode="wait">
-          {phase === 'topic-input' && (
+          {conv.phase === 'topic-input' && (
             <motion.div
               key="topic-input"
               initial={{ opacity: 0, y: 10 }}
@@ -386,7 +327,7 @@ export function ConversationPractice({ topic: topicProp = '', onFinish, noFrame,
               </div>
             </motion.div>
           )}
-          {phase === 'conversation' && (
+          {conv.phase === 'conversation' && (
             <motion.div
               key="chat"
               initial={{ opacity: 0 }}
@@ -394,14 +335,14 @@ export function ConversationPractice({ topic: topicProp = '', onFinish, noFrame,
               exit={{ opacity: 0 }}
               className="space-y-4"
             >
-              {framing && (
+              {conv.framing && (
                 <div className="bg-trebol-secondary/10 border-2 border-dashed border-trebol-secondary/30 p-4 rounded-sm text-center mb-6">
                   <p className="text-sm font-bold text-trebol-text/70 uppercase tracking-widest mb-1">Escenario</p>
-                  <p className="text-trebol-text font-medium italic">"{framing}"</p>
+                  <p className="text-trebol-text font-medium italic">"{conv.framing}"</p>
                 </div>
               )}
 
-              {messages.map((msg, i) => (
+              {conv.messages.map((msg, i) => (
                 <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                   <div className={`max-w-[85%] p-4 rounded-sm shadow-sm relative group ${
                     msg.role === 'user'
@@ -410,7 +351,7 @@ export function ConversationPractice({ topic: topicProp = '', onFinish, noFrame,
                   }`}>
                     {msg.role === 'model' ? (
                       <div className="flex flex-col space-y-2">
-                        {visibleTexts[i] ? (
+                        {conv.visibleTexts[i] ? (
                           <p className="animate-in fade-in slide-in-from-top-1 duration-300">{msg.text}</p>
                         ) : (
                           <div className="flex items-center space-x-2 py-2 text-trebol-text/40">
@@ -421,24 +362,24 @@ export function ConversationPractice({ topic: topicProp = '', onFinish, noFrame,
                         <div className="flex items-center justify-between mt-2 pt-2 border-t border-trebol-border/10">
                           <button
                             onClick={() => handleListen(msg.text, i)}
-                            disabled={isGeneratingAudio !== null}
+                            disabled={conv.isGeneratingAudio !== null}
                             className="flex items-center space-x-2 bg-trebol-secondary text-white px-3 py-1 rounded-sm text-xs font-black uppercase hover:bg-trebol-secondary-dark transition-colors disabled:opacity-50"
                           >
-                            {isGeneratingAudio === i ? (
+                            {conv.isGeneratingAudio === i ? (
                               <Loader2 size={12} className="animate-spin" />
                             ) : (
                               <Volume2 size={12} />
                             )}
-                            <span>{playCounts[i] > 0 ? 'Repetir' : 'Reproducir'}</span>
+                            <span>{conv.playCounts[i] > 0 ? 'Repetir' : 'Reproducir'}</span>
                           </button>
-                          {playCounts[i] >= 2 && (
+                          {conv.playCounts[i] >= 2 && (
                             <button
-                              onClick={() => toggleHint(i)}
+                              onClick={() => conv.toggleVisibleText(i)}
                               className="flex items-center space-x-1 text-trebol-primary hover:text-trebol-primary-dark transition-colors"
                             >
                               <HelpCircle size={14} />
                               <span className="text-[10px] font-black uppercase tracking-tighter">
-                                {visibleTexts[i] ? 'Ocultar Texto' : 'Ver Pista'}
+                                {conv.visibleTexts[i] ? 'Ocultar Texto' : 'Ver Pista'}
                               </span>
                             </button>
                           )}
@@ -453,7 +394,7 @@ export function ConversationPractice({ topic: topicProp = '', onFinish, noFrame,
             </motion.div>
           )}
 
-          {phase === 'questions' && (
+          {conv.phase === 'questions' && (
             <motion.div
               key="questions"
               initial={{ opacity: 0, x: 20 }}
@@ -463,32 +404,32 @@ export function ConversationPractice({ topic: topicProp = '', onFinish, noFrame,
             >
               <div className="text-center space-y-4">
                 <div className="inline-block bg-trebol-secondary text-white px-4 py-1 rounded-full text-xs font-black uppercase tracking-widest">
-                  Pregunta {currentQuestionIndex + 1} de {questions.length}
+                  Pregunta {qf.currentQuestionIndex + 1} de {qf.questions.length}
                 </div>
                 <h3 className="text-2xl font-black text-trebol-text leading-tight">
-                  {questions[currentQuestionIndex]?.question}
+                  {qf.questions[qf.currentQuestionIndex]?.question}
                 </h3>
               </div>
-              {questionAnswers[currentQuestionIndex] && (
+              {qf.questionAnswers[qf.currentQuestionIndex] && (
                 <div className="bg-white p-4 border-2 border-trebol-secondary/20 rounded-sm">
                   <div className="flex items-center space-x-2 mb-2">
                     <CheckCircle size={16} className="text-green-500" />
                     <span className="font-black text-xs uppercase text-green-600">Feedback</span>
                   </div>
                   <p className="text-trebol-text font-medium italic">
-                    "{questionAnswers[currentQuestionIndex].feedback}"
+                    "{qf.questionAnswers[qf.currentQuestionIndex].feedback}"
                   </p>
                 </div>
               )}
             </motion.div>
           )}
 
-          {isProcessing && (
+          {conv.isProcessing && (
             <div className="flex justify-start">
               <div className="bg-white border border-trebol-border p-4 rounded-sm shadow-sm flex items-center space-x-2">
                 <Loader2 size={20} className="animate-spin text-trebol-primary" />
                 <span className="text-sm font-semibold text-trebol-text opacity-60">
-                  {phase === 'conversation' ? 'MIA está pensando...' : 'Evaluando respuesta...'}
+                  {conv.phase === 'conversation' ? 'MIA está pensando...' : 'Evaluando respuesta...'}
                 </span>
               </div>
             </div>
@@ -498,7 +439,7 @@ export function ConversationPractice({ topic: topicProp = '', onFinish, noFrame,
 
       {/* Evaluation Feedback Overlay */}
       <AnimatePresence>
-        {showEvaluation && currentEvaluation && !isRecording && !isProcessing && phase === 'conversation' && (
+        {conv.showEvaluation && conv.currentEvaluation && !isRecording && !conv.isProcessing && conv.phase === 'conversation' && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -507,14 +448,14 @@ export function ConversationPractice({ topic: topicProp = '', onFinish, noFrame,
           >
             <div className="flex items-center space-x-3">
               <div className="bg-trebol-secondary text-white font-black text-sm px-2 py-1 rounded-sm">
-                {currentEvaluation.score}/100
+                {conv.currentEvaluation.score}/100
               </div>
               <p className="text-sm font-bold text-trebol-text italic">
-                "{currentEvaluation.feedback}"
+                "{conv.currentEvaluation.feedback}"
               </p>
             </div>
-            <button 
-              onClick={() => setShowEvaluation(false)}
+            <button
+              onClick={() => conv.setShowEvaluation(false)}
               className="text-xs font-black text-trebol-primary uppercase tracking-wider hover:underline"
             >
               Entendido
@@ -525,44 +466,44 @@ export function ConversationPractice({ topic: topicProp = '', onFinish, noFrame,
 
       {/* Controls */}
       <div className="shrink-0 border-t border-trebol-border bg-white px-4 py-3 space-y-3">
-        {phase === 'topic-input' && (
+        {conv.phase === 'topic-input' && (
           <form
             onSubmit={(e) => { e.preventDefault(); handleTopicConfirm(); }}
             className="flex gap-2"
           >
             <input
-              value={topicInput}
-              onChange={(e) => setTopicInput(e.target.value)}
+              value={conv.topicInput}
+              onChange={(e) => conv.setTopicInput(e.target.value)}
               placeholder="Escribe aquí tu tema..."
               className="flex-1 px-4 py-2.5 rounded-xl border-2 border-trebol-border focus:border-trebol-primary focus:outline-none text-sm bg-slate-50"
               autoFocus
             />
             <button
               type="submit"
-              disabled={!topicInput.trim()}
+              disabled={!conv.topicInput.trim()}
               className="px-4 py-2.5 bg-trebol-primary text-white rounded-xl font-bold text-sm disabled:opacity-40 hover:opacity-90 transition-opacity"
             >
               <Send size={18} />
             </button>
           </form>
         )}
-        {phase === 'conversation' && (
+        {conv.phase === 'conversation' && (
           <div className="flex flex-col space-y-4">
             {/* Input row */}
             <div className="flex items-center space-x-2">
               <div className="flex-1 relative">
                 <input
                   type="text"
-                  value={inputText}
-                  onChange={(e) => setInputText(e.target.value)}
+                  value={conv.inputText}
+                  onChange={(e) => conv.setInputText(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleSendTextMessage()}
                   placeholder="Escribe tu respuesta..."
-                  disabled={isProcessing || isRecording}
+                  disabled={conv.isProcessing || isRecording}
                   className="w-full pl-4 pr-12 py-3 bg-gray-100 border-2 border-trebol-border rounded-full focus:outline-none focus:border-trebol-primary font-medium"
                 />
                 <button
                   onClick={handleSendTextMessage}
-                  disabled={!inputText.trim() || isProcessing || isRecording}
+                  disabled={!conv.inputText.trim() || conv.isProcessing || isRecording}
                   className="absolute right-2 top-1/2 -translate-y-1/2 bg-trebol-primary text-white p-2 rounded-full hover:scale-105 transition-transform disabled:opacity-30"
                 >
                   <Send size={18} />
@@ -573,7 +514,7 @@ export function ConversationPractice({ topic: topicProp = '', onFinish, noFrame,
                 {!isRecording ? (
                   <button
                     onClick={startRecording}
-                    disabled={isProcessing}
+                    disabled={conv.isProcessing}
                     className="bg-trebol-primary text-white p-4 rounded-full shadow-lg hover:scale-110 transition-transform disabled:opacity-50"
                   >
                     <Mic size={24} />
@@ -594,7 +535,7 @@ export function ConversationPractice({ topic: topicProp = '', onFinish, noFrame,
               <Button
                 variant="secondary"
                 onClick={handleGoToQuestions}
-                disabled={isProcessing}
+                disabled={conv.isProcessing}
                 className="px-4 py-2 text-xs flex items-center space-x-2"
               >
                 <ArrowRight size={14} />
@@ -603,14 +544,14 @@ export function ConversationPractice({ topic: topicProp = '', onFinish, noFrame,
 
               <button
                 onClick={handleSimulateResponse}
-                disabled={isProcessing || isRecording}
+                disabled={conv.isProcessing || isRecording}
                 className="flex items-center space-x-2 text-trebol-secondary font-black text-xs uppercase tracking-widest hover:text-trebol-secondary-dark disabled:opacity-30"
               >
                 <Wand2 size={16} />
                 <span>Simular Respuesta</span>
               </button>
 
-              {messages.length >= MAX_TURNS && !isProcessing && (
+              {conv.messages.length >= MAX_TURNS && !conv.isProcessing && (
                 <button
                   onClick={handleGoToQuestions}
                   className="bg-green-600 text-white px-4 py-2 rounded-sm font-bold uppercase text-[10px] flex items-center space-x-2 hover:bg-green-700"
@@ -622,12 +563,12 @@ export function ConversationPractice({ topic: topicProp = '', onFinish, noFrame,
             </div>
           </div>
         )}
-        {phase === 'questions' && (
+        {conv.phase === 'questions' && (
           <div className="flex items-center justify-center">
             {!isRecording ? (
               <Button
                 variant="primary"
-                disabled={isProcessing}
+                disabled={conv.isProcessing}
                 onClick={startRecording}
                 className="w-full max-w-[200px] flex items-center justify-center space-x-2 py-4 rounded-full shadow-lg"
               >

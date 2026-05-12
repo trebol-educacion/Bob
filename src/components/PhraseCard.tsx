@@ -1,9 +1,10 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import { Button } from './Button';
 import { Volume2, Mic, Square, Loader2 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { generateSpeechAction } from '@/actions/gemini';
 import { pcmToWavBase64 } from '@/lib/audio';
+import { useAudioRecorder } from '@/hooks/useAudioRecorder';
 
 interface PhraseCardProps {
   phrase: string;
@@ -11,10 +12,14 @@ interface PhraseCardProps {
 }
 
 export function PhraseCard({ phrase, onAudioRecorded }: PhraseCardProps) {
-  const [isRecording, setIsRecording] = useState(false);
   const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
+
+  const { isRecording, startRecording, stopRecording } = useAudioRecorder({
+    onRecorded: onAudioRecorded,
+    onError: () => {
+      alert('Por favor, permite el acceso al micrófono para practicar.');
+    },
+  });
 
   const handleListen = async () => {
     if (isGeneratingAudio) return;
@@ -33,53 +38,6 @@ export function PhraseCard({ phrase, onAudioRecorded }: PhraseCardProps) {
       window.speechSynthesis.speak(utterance);
     } finally {
       setIsGeneratingAudio(false);
-    }
-  };
-
-  const startRecording = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-          sampleRate: 48000
-        } 
-      });
-      
-      const options = {
-        mimeType: 'audio/webm;codecs=opus',
-        bitsPerSecond: 128000
-      };
-      
-      const mediaRecorder = new MediaRecorder(stream, options);
-      mediaRecorderRef.current = mediaRecorder;
-      audioChunksRef.current = [];
-
-      mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          audioChunksRef.current.push(event.data);
-        }
-      };
-
-      mediaRecorder.onstop = () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        onAudioRecorded(audioBlob);
-        stream.getTracks().forEach((track) => track.stop());
-      };
-
-      mediaRecorder.start();
-      setIsRecording(true);
-    } catch (error) {
-      console.error('Error accessing microphone:', error);
-      alert('Por favor, permite el acceso al micrófono para practicar.');
-    }
-  };
-
-  const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop();
-      setIsRecording(false);
     }
   };
 
