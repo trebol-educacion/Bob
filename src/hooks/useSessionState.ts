@@ -53,7 +53,7 @@ export function useSessionState(userEmail: string | undefined): UseSessionStateR
     setSelectedSession(session);
     const { data } = await getMessagesAction(id);
     setSelectedMessages(data ?? []);
-    onSelected(session.mode, session.topic ?? '');
+    onSelected(session.mode ?? '', session.topic ?? '');
   }, [sessions]);
 
   const handleDeleteSession = useCallback(async (
