@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Loader2, Mic, Square, Send, Volume2, ArrowRight } from 'lucide-react';
-import { ImageConfigSelection, SceneConfig } from '@/components/ImageConfigSelection';
+import { ImageConfigSelection, SceneConfig, Difficulty } from '@/components/ImageConfigSelection';
 import {
   generateTopicPhrasesAction,
   generateImageSceneAction,
@@ -121,25 +121,61 @@ export function BobPracticeChat({
 }: BobPracticeChatProps) {
   const isHistory = !!initialMessages && initialMessages.length > 0;
 
+  const inferPhaseFromHistory = (msgs: StoredMessage[]): ChatPhase => {
+    if (!msgs.length) return mode === 'image' ? 'image-config' : 'topic-input';
+    const last = msgs[msgs.length - 1];
+    if (last.role === 'bob') {
+      if (last.msg_type === 'image_scene') return 'phrase-ready';
+      if (last.msg_type === 'phrase') return 'phrase-ready';
+      if (last.msg_type === 'evaluation') return 'result';
+    }
+    if (last.role === 'user' && last.msg_type === 'user_audio') return 'phrase-ready';
+    return 'finished';
+  };
+
   const [messages, setMessages] = useState<ChatMsg[]>(() =>
     isHistory ? restoreMessages(initialMessages) : []
   );
   const [phase, setPhase] = useState<ChatPhase>(() => {
-    if (isHistory) return 'finished';
+    if (isHistory) return inferPhaseFromHistory(initialMessages ?? []);
     return mode === 'image' ? 'image-config' : 'topic-input';
   });
-  const [topic, setTopic] = useState('');
+  const [topic, setTopic] = useState(() => {
+    if (!isHistory || !initialMessages) return '';
+    const firstUser = initialMessages.find(m => m.role === 'user' && m.msg_type === 'text');
+    return firstUser?.content_text ?? '';
+  });
   const [inputText, setInputText] = useState('');
-  const [dynamicPhrases, setDynamicPhrases] = useState<string[]>([]);
+  const [dynamicPhrases, setDynamicPhrases] = useState<string[]>(() => {
+    if (!isHistory || !initialMessages) return [];
+    const lastPhrase = [...initialMessages].reverse().find(m => m.msg_type === 'phrase');
+    if (!lastPhrase) return [];
+    const j = lastPhrase.content_json as { phrase: string } | null;
+    return j?.phrase ? [j.phrase] : [];
+  });
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [currentScene, setCurrentScene] = useState<(ImageScene & { image_data?: string }) | null>(null);
-  const [currentSceneConfig, setCurrentSceneConfig] = useState<SceneConfig | null>(null);
+  const [currentScene, setCurrentScene] = useState<(ImageScene & { image_data?: string }) | null>(() => {
+    if (!isHistory || !initialMessages) return null;
+    const lastImg = [...initialMessages].reverse().find(m => m.msg_type === 'image_scene');
+    if (!lastImg) return null;
+    const j = lastImg.content_json as { description: string } | null;
+    return { topic: '', description: j?.description ?? '', image_prompt: '', image_data: lastImg.content_text ?? undefined };
+  });
+  const [currentSceneConfig, setCurrentSceneConfig] = useState<SceneConfig | null>(() => {
+    if (!isHistory || !initialMessages) return null;
+    const configMsg = initialMessages.find(m => m.role === 'user' && m.msg_type === 'text');
+    if (!configMsg?.content_json) return null;
+    const j = configMsg.content_json as { topic?: string; difficulty?: string } | null;
+    if (!j?.topic || !j?.difficulty) return null;
+    if (!(['basic', 'intermediate', 'advanced'] as string[]).includes(j.difficulty)) return null;
+    return { topic: j.topic, difficulty: j.difficulty as Difficulty };
+  });
   const [currentResult, setCurrentResult] = useState<EvaluationResult | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const sessionStartedRef = useRef(false);
+  const sessionStartedRef = useRef(isHistory);
   const greetingAddedRef = useRef(false);
 
   useEffect(() => {
@@ -320,41 +356,14 @@ export function BobPracticeChat({
 
   const handleImageConfig = async (config: SceneConfig) => {
     setCurrentSceneConfig(config);
-    addUserMessage(
-      <span>
-        {config.topic} · {config.difficulty}
-      </span>
-    );
-    saveMsg({ role: 'user', msg_type: 'text', content_text: `${config.topic} · ${config.difficulty}` });
-    setPhase('generating');
-    addBobMessage(
-      <span className="flex items-center gap-2 text-trebol-text/70">
-        <Loader2 size={16} className="animate-spin" /> Generando tu escena...
-      </span>
-    );
+    addUserMessage(<span>{config.topic} · {config.difficulty}</span>);
+    saveMsg({ role: 'user', msg_type: 'text', content_text: `${config.topic} · ${config.difficulty}`, content_json: { topic: config.topic, difficulty: config.difficulty } });
     if (!sessionStartedRef.current) {
       sessionStartedRef.current = true;
       const id = await onSessionStart(config.topic.slice(0, 60) || 'Describe la escena');
       if (id) sessionIdRef.current = id;
     }
-    try {
-      const scene = await generateImageSceneAction(config.topic, config.difficulty);
-      const imageData = await generateImageAction(scene.image_prompt);
-      const fullScene = { ...scene, image_data: imageData };
-      setCurrentScene(fullScene);
-      setMessages(prev => prev.slice(0, -1));
-      addBobMessage(renderScene(fullScene));
-      const imageUrl = await uploadImageToStorage(imageData);
-      saveMsg({ role: 'bob', msg_type: 'image_scene', content_text: imageUrl, content_json: { description: scene.description } });
-      setPhase('phrase-ready');
-    } catch (err) {
-      console.error('[handleImageConfig]', err);
-      setMessages(prev => prev.slice(0, -1));
-      addBobMessage(
-        <span className="text-red-500">Error al generar la imagen. Intenta de nuevo.</span>
-      );
-      setPhase('image-config');
-    }
+    await handleNextImage(config);
   };
 
   const startRecording = async () => {
@@ -442,8 +451,18 @@ export function BobPracticeChat({
     }
   };
 
-  const handleNextImage = async () => {
-    if (!currentSceneConfig) return;
+  const handleNextImage = async (config?: SceneConfig) => {
+    const cfg = config ?? currentSceneConfig;
+    if (!cfg) {
+      addBobMessage(
+        <div className="space-y-3">
+          <p>¡Elige la próxima escena!</p>
+          <ImageConfigSelection onConfirm={handleImageConfig} />
+        </div>
+      );
+      setPhase('image-config');
+      return;
+    }
     setPhase('generating');
     addBobMessage(
       <span className="flex items-center gap-2 text-trebol-text/70">
@@ -451,7 +470,7 @@ export function BobPracticeChat({
       </span>
     );
     try {
-      const scene = await generateImageSceneAction(currentSceneConfig.topic, currentSceneConfig.difficulty);
+      const scene = await generateImageSceneAction(cfg.topic, cfg.difficulty);
       const imageData = await generateImageAction(scene.image_prompt);
       const fullScene = { ...scene, image_data: imageData };
       setCurrentScene(fullScene);
@@ -494,14 +513,7 @@ export function BobPracticeChat({
         setPhase('finished');
       }
     } else {
-      addBobMessage(
-        <div className="space-y-1">
-          <p className="font-black text-trebol-primary">¡Bien hecho! 🎉</p>
-          <p className="text-sm text-trebol-text/70">Has completado la descripción de imagen.</p>
-        </div>
-      );
-      saveMsg({ role: 'bob', msg_type: 'text', content_text: '¡Bien hecho! Has completado la descripción de imagen.' });
-      setPhase('finished');
+      handleNextImage();
     }
   };
 
@@ -606,25 +618,18 @@ export function BobPracticeChat({
         )}
 
         {phase === 'result' && mode === 'image' && (
-          <div className="flex justify-center gap-3">
+          <div className="flex justify-center">
             <button
               type="button"
-              onClick={handleNextImage}
-              className="flex items-center gap-2 px-6 py-2.5 bg-trebol-primary text-white rounded-xl font-bold text-sm hover:opacity-90 transition-opacity"
+              onClick={() => handleNextImage()}
+              className="flex items-center gap-2 px-6 py-2.5 bg-trebol-primary text-white rounded-full font-bold text-sm hover:opacity-90 transition-opacity shadow-lg"
             >
-              Nueva imagen <ArrowRight size={16} />
-            </button>
-            <button
-              type="button"
-              onClick={handleNext}
-              className="px-6 py-2.5 border-2 border-trebol-border text-trebol-text rounded-xl font-bold text-sm hover:opacity-70 transition-opacity"
-            >
-              Finalizar sesión
+              <ArrowRight size={18} /> Nueva imagen
             </button>
           </div>
         )}
 
-        {phase === 'finished' && (
+        {phase === 'finished' && mode === 'situation' && (
           <div className="flex justify-center">
             <button
               type="button"
