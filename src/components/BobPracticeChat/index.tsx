@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { ChevronLeft } from 'lucide-react';
 import { usePracticeChat, UsePracticeChatProps } from '@/hooks/usePracticeChat';
 import { PhrasePhase } from './PhrasePhase';
 import { ImagePhase } from './ImagePhase';
@@ -55,6 +56,11 @@ function SaveErrorBanner({ error }: { error: string | null }) {
 export function BobPracticeChat(props: UsePracticeChatProps) {
   const chat = usePracticeChat(props);
 
+  const handleBackWithRecordingGuard = () => {
+    if (chat.isRecording) chat.stopRecording();
+    props.onBack();
+  };
+
   const inputArea =
     props.mode === 'situation' ? (
       <PhrasePhase
@@ -66,6 +72,7 @@ export function BobPracticeChat(props: UsePracticeChatProps) {
         stopRecording={chat.stopRecording}
         isRecording={chat.isRecording}
         handleNext={chat.handleNext}
+        handleRetry={chat.handleRetry}
         dynamicPhrases={chat.dynamicPhrases}
         currentIndex={chat.currentIndex}
         onBack={chat.onBack}
@@ -77,11 +84,25 @@ export function BobPracticeChat(props: UsePracticeChatProps) {
         handleAudioStart={chat.handleAudioStart}
         stopRecording={chat.stopRecording}
         handleNextImage={chat.handleNextImage}
+        isRecording={chat.isRecording}
+        onStopRecording={chat.stopRecording}
+        handleRetry={chat.handleRetry}
       />
     );
 
   return (
     <div className="flex flex-col h-full bg-white">
+      <div className="flex items-center gap-2 px-4 py-3 border-b border-trebol-border bg-white shrink-0">
+        <button
+          onClick={handleBackWithRecordingGuard}
+          className="p-1 hover:bg-gray-100 rounded-full transition-colors"
+        >
+          <ChevronLeft className="w-5 h-5 text-trebol-text" />
+        </button>
+        <span className="text-sm font-semibold text-trebol-text">
+          {props.mode === 'situation' ? 'Phrase Practice' : 'Image Description'}
+        </span>
+      </div>
       <MessagesArea messages={chat.messages} messagesEndRef={chat.messagesEndRef} />
       <SaveErrorBanner error={chat.saveError} />
       {inputArea}
