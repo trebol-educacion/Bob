@@ -6,10 +6,10 @@ import { ModeSelection } from '@/components/ModeSelection';
 import { ConversationPractice } from '@/components/ConversationPractice';
 import { SessionSidebar } from '@/components/SessionSidebar';
 import { BobPracticeChat } from '@/components/BobPracticeChat';
-import { createSessionAction, getSessionsAction, deleteSessionAction, BobSession } from '@/actions/sessions';
-import { getMessagesAction, StoredMessage } from '@/actions/messages';
+import { createSessionAction } from '@/actions/sessions';
 import { createSupabaseBrowser } from '@/lib/supabase/browser-client';
 import { Navbar } from '@/components/Navbar';
+import { useSessionState } from '@/hooks/useSessionState';
 
 type AppState =
   | 'mode-selection'
@@ -27,23 +27,6 @@ export default function App() {
     });
   }, []);
 
-  const [sessions, setSessions] = useState<BobSession[]>([]);
-  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
-  const [sessionsLoading, setSessionsLoading] = useState(true);
-  const [selectedSession, setSelectedSession] = useState<BobSession | null>(null);
-  const [selectedMessages, setSelectedMessages] = useState<StoredMessage[]>([]);
-
-  useEffect(() => {
-    if (!userEmail) return;
-    let cancelled = false;
-    getSessionsAction().then(({ data }) => {
-      if (cancelled) return;
-      setSessions(data ?? []);
-      setSessionsLoading(false);
-    });
-    return () => { cancelled = true; };
-  }, [userEmail]);
-
   const [mode, setMode] = useState<'situation' | 'image' | 'conversation' | null>(null);
   const [topic, setTopic] = useState('');
 
@@ -51,53 +34,58 @@ export default function App() {
     setAppState('mode-selection');
     setMode(null);
     setTopic('');
-    setSelectedMessages([]);
-    setSelectedSession(null);
   }, []);
 
-  const handleNewSession = useCallback(() => {
-    setActiveSessionId(null);
-    setSelectedMessages([]);
-    setSelectedSession(null);
-    resetToModeSelection();
-  }, [resetToModeSelection]);
+  const {
+    sessions,
+    activeSessionId,
+    sessionsLoading,
+    selectedMessages,
+    setSessions,
+    setActiveSessionId,
+    setSelectedMessages,
+    setSelectedSession,
+    handleNewSession,
+    handleSelectSession,
+    handleDeleteSession,
+    handleConversationSessionStart,
+  } = useSessionState(userEmail);
 
-  const handleSelectSession = useCallback(async (id: string) => {
-    const session = sessions.find(s => s.id === id);
-    if (!session) return;
-    setActiveSessionId(id);
-    setSelectedSession(session);
-    const { data } = await getMessagesAction(id);
-    setSelectedMessages(data ?? []);
-    setMode(session.mode as 'situation' | 'image' | 'conversation');
-    if (session.mode === 'conversation') {
-      setTopic(session.topic ?? '');
-      setAppState('conversation-practicing');
-    } else {
-      setAppState('practicing');
-    }
-  }, [sessions]);
+  const onNewSession = useCallback(() => {
+    handleNewSession(resetToModeSelection);
+  }, [handleNewSession, resetToModeSelection]);
 
-  const handleDeleteSession = useCallback(async (id: string) => {
-    const snapshot = sessions;
-    setSessions(s => s.filter(x => x.id !== id));
-    if (activeSessionId === id) { setActiveSessionId(null); resetToModeSelection(); }
-    const { error } = await deleteSessionAction(id);
-    if (error) { console.error('deleteSessionAction:', error); setSessions(snapshot); }
-  }, [sessions, activeSessionId, resetToModeSelection]);
+  const onSelectSession = useCallback(async (id: string) => {
+    await handleSelectSession(id, (sessionMode, sessionTopic) => {
+      setMode(sessionMode as 'situation' | 'image' | 'conversation');
+      if (sessionMode === 'conversation') {
+        setTopic(sessionTopic);
+        setAppState('conversation-practicing');
+      } else {
+        setAppState('practicing');
+      }
+    });
+  }, [handleSelectSession]);
+
+  const onDeleteSession = useCallback(async (id: string) => {
+    await handleDeleteSession(id, activeSessionId, resetToModeSelection);
+  }, [handleDeleteSession, activeSessionId, resetToModeSelection]);
 
   const handleModeSelect = (m: 'situation' | 'image' | 'conversation') => {
     setMode(m);
     setAppState(m === 'conversation' ? 'conversation-practicing' : 'practicing');
   };
 
-  const handleConversationSessionStart = useCallback((t: string) => {
+  const onConversationSessionStart = useCallback((t: string) => {
     setTopic(t);
-    createSessionAction({ mode: 'conversation', topic: t, title: t.slice(0, 60) || 'Conversación' })
-      .then(({ data }) => {
-        if (data) { setActiveSessionId(data.id); setSessions(prev => [data, ...prev]); }
-      });
-  }, []);
+    handleConversationSessionStart(t);
+  }, [handleConversationSessionStart]);
+
+  const onFinish = useCallback(() => {
+    setSelectedMessages([]);
+    setSelectedSession(null);
+    resetToModeSelection();
+  }, [resetToModeSelection, setSelectedMessages, setSelectedSession]);
 
   return (
     <div className="h-screen bg-trebol-bg flex flex-col overflow-hidden">
@@ -106,9 +94,9 @@ export default function App() {
         <SessionSidebar
           sessions={sessions}
           activeSessionId={activeSessionId}
-          onSelectSession={handleSelectSession}
-          onNewSession={handleNewSession}
-          onDeleteSession={handleDeleteSession}
+          onSelectSession={onSelectSession}
+          onNewSession={onNewSession}
+          onDeleteSession={onDeleteSession}
           loading={sessionsLoading}
         />
         <main className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden">
@@ -137,7 +125,7 @@ export default function App() {
               >
                 <BobPracticeChat
                   mode={mode as 'situation' | 'image'}
-                  onBack={resetToModeSelection}
+                  onBack={onFinish}
                   onSessionStart={async (title) => {
                     const { data } = await createSessionAction({ mode: mode as 'situation' | 'image', topic: title, title });
                     if (data) { setActiveSessionId(data.id); setSessions(prev => [data, ...prev]); }
@@ -159,9 +147,9 @@ export default function App() {
               >
                 <ConversationPractice
                   topic={selectedMessages.length > 0 ? topic : ''}
-                  onFinish={resetToModeSelection}
+                  onFinish={onFinish}
                   noFrame={true}
-                  onSessionStart={handleConversationSessionStart}
+                  onSessionStart={onConversationSessionStart}
                 />
               </motion.div>
             )}
