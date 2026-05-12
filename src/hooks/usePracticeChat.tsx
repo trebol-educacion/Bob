@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
-import { Loader2, Mic, Square, Send, Volume2, ArrowRight } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Loader2, Mic, Volume2 } from 'lucide-react';
 import { ImageConfigSelection, SceneConfig, Difficulty } from '@/components/ImageConfigSelection';
 import {
   generateTopicPhrasesAction,
@@ -16,8 +16,12 @@ import {
 import { saveMessageAction, StoredMessage } from '@/actions/messages';
 import { blobToBase64, pcmToWavBase64 } from '@/lib/audio';
 import { createSupabaseBrowser } from '@/lib/supabase/browser-client';
+import { useAudioRecorder } from '@/hooks/useAudioRecorder';
+import { getScoreColor } from '@/lib/score';
 
-type ChatPhase =
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+export type ChatPhase =
   | 'topic-input'
   | 'image-config'
   | 'generating'
@@ -27,21 +31,37 @@ type ChatPhase =
   | 'result'
   | 'finished';
 
-type ChatMsg = {
+export type ChatMsg = {
   id: string;
   role: 'bob' | 'user';
   content: React.ReactNode;
 };
 
-interface BobPracticeChatProps {
-  mode: 'situation' | 'image';
-  onBack: () => void;
-  onSessionStart: (title: string) => Promise<string | undefined>;
-  sessionId?: string | null;
-  initialMessages?: StoredMessage[];
+// ─── Shared render helpers ────────────────────────────────────────────────────
+
+export function renderEvaluationContent(
+  score: number,
+  feedback: string,
+  transcribed_text?: string,
+): React.ReactNode {
+  const scoreColor = getScoreColor(score);
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-3">
+        <span className={`text-4xl font-black ${scoreColor}`}>{score}</span>
+        <span className="text-trebol-text/60 text-sm font-medium">/ 100</span>
+      </div>
+      {transcribed_text && (
+        <div className="bg-trebol-bg rounded-lg px-3 py-2 text-sm text-trebol-text/80 italic">
+          &quot;{transcribed_text}&quot;
+        </div>
+      )}
+      <p className="text-sm text-trebol-text/80">{feedback}</p>
+    </div>
+  );
 }
 
-function restoreMessages(stored: StoredMessage[]): ChatMsg[] {
+export function restoreMessages(stored: StoredMessage[]): ChatMsg[] {
   return stored.map((m) => {
     let content: React.ReactNode;
 
@@ -78,26 +98,9 @@ function restoreMessages(stored: StoredMessage[]): ChatMsg[] {
       );
     } else if (m.msg_type === 'evaluation') {
       const j = m.content_json as { score: number; feedback: string; transcribed_text?: string } | null;
-      if (j) {
-        const scoreColor =
-          j.score >= 90 ? 'text-green-600' : j.score >= 70 ? 'text-yellow-600' : 'text-gray-500';
-        content = (
-          <div className="space-y-3">
-            <div className="flex items-center gap-3">
-              <span className={`text-4xl font-black ${scoreColor}`}>{j.score}</span>
-              <span className="text-trebol-text/60 text-sm font-medium">/ 100</span>
-            </div>
-            {j.transcribed_text && (
-              <div className="bg-trebol-bg rounded-lg px-3 py-2 text-sm text-trebol-text/80 italic">
-                &quot;{j.transcribed_text}&quot;
-              </div>
-            )}
-            <p className="text-sm text-trebol-text/80">{j.feedback}</p>
-          </div>
-        );
-      } else {
-        content = <span>{m.content_text}</span>;
-      }
+      content = j
+        ? renderEvaluationContent(j.score, j.feedback, j.transcribed_text)
+        : <span>{m.content_text}</span>;
     } else if (m.msg_type === 'user_audio') {
       content = (
         <span className="flex items-center gap-2 text-sm">
@@ -112,13 +115,54 @@ function restoreMessages(stored: StoredMessage[]): ChatMsg[] {
   });
 }
 
-export function BobPracticeChat({
+// ─── Hook interface ───────────────────────────────────────────────────────────
+
+export interface UsePracticeChatProps {
+  mode: 'situation' | 'image';
+  onBack: () => void;
+  onSessionStart: (title: string) => Promise<string | undefined>;
+  sessionId?: string | null;
+  initialMessages?: StoredMessage[];
+}
+
+export interface UsePracticeChatReturn {
+  // State
+  phase: ChatPhase;
+  messages: ChatMsg[];
+  topic: string;
+  inputText: string;
+  dynamicPhrases: string[];
+  currentIndex: number;
+  currentScene: (ImageScene & { image_data?: string }) | null;
+  currentResult: EvaluationResult | null;
+  isRecording: boolean;
+  saveError: string | null;
+  // Setters needed by sub-components
+  setInputText: (v: string) => void;
+  // Handlers
+  handleTopicSubmit: () => Promise<void>;
+  handleNextImage: (config?: SceneConfig) => Promise<void>;
+  handleAudioStart: () => Promise<void>;
+  stopRecording: () => void;
+  handleNext: () => void;
+  handleListen: (text: string) => Promise<void>;
+  handleImageConfig: (config: SceneConfig) => Promise<void>;
+  // Refs needed by JSX
+  messagesEndRef: React.RefObject<HTMLDivElement | null>;
+  // Props passthrough
+  mode: 'situation' | 'image';
+  onBack: () => void;
+}
+
+// ─── Hook ─────────────────────────────────────────────────────────────────────
+
+export function usePracticeChat({
   mode,
   onBack,
   onSessionStart,
   sessionId,
   initialMessages,
-}: BobPracticeChatProps) {
+}: UsePracticeChatProps): UsePracticeChatReturn {
   const isHistory = !!initialMessages && initialMessages.length > 0;
 
   const inferPhaseFromHistory = (msgs: StoredMessage[]): ChatPhase => {
@@ -171,28 +215,43 @@ export function BobPracticeChat({
     return { topic: j.topic, difficulty: j.difficulty as Difficulty };
   });
   const [currentResult, setCurrentResult] = useState<EvaluationResult | null>(null);
-  const [isRecording, setIsRecording] = useState(false);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const chunksRef = useRef<Blob[]>([]);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const sessionStartedRef = useRef(isHistory);
   const greetingAddedRef = useRef(false);
-
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
-
   const sessionIdRef = useRef<string | null>(sessionId ?? null);
+
+  // Sync sessionId prop → ref
   useEffect(() => {
     if (sessionId) sessionIdRef.current = sessionId;
   }, [sessionId]);
 
-  const saveMsg = async (input: Omit<Parameters<typeof saveMessageAction>[0], 'session_id'>) => {
-    const sid = sessionIdRef.current;
-    if (!sid) return;
-    const { error } = await saveMessageAction({ ...input, session_id: sid });
-    if (error) console.error('[saveMsg] failed:', error, 'msg_type:', input.msg_type);
-  };
+  // Scroll to bottom on new messages
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  // ── Audio recorder ────────────────────────────────────────────────────────
+
+  // Stable ref so useAudioRecorder never captures a stale callback
+  const onRecordedRef = useRef<(blob: Blob) => void>(() => {});
+
+  const { isRecording, startRecording: startRecordingHook, stopRecording } = useAudioRecorder({
+    onRecorded: useCallback((blob: Blob) => onRecordedRef.current(blob), []),
+    onError: useCallback(() => {
+      setMessages(prev => [
+        ...prev,
+        {
+          id: crypto.randomUUID(),
+          role: 'bob' as const,
+          content: <span className="text-red-500">No pude acceder al micrófono. Revisa los permisos.</span>,
+        },
+      ]);
+    }, []),
+  });
+
+  // ── Message helpers ───────────────────────────────────────────────────────
 
   const addBobMessage = (content: React.ReactNode) => {
     setMessages(prev => [...prev, { id: crypto.randomUUID(), role: 'bob', content }]);
@@ -202,39 +261,19 @@ export function BobPracticeChat({
     setMessages(prev => [...prev, { id: crypto.randomUUID(), role: 'user', content }]);
   };
 
-  useEffect(() => {
-    if (isHistory || greetingAddedRef.current) return;
-    greetingAddedRef.current = true;
-    if (mode === 'situation') {
-      addBobMessage(
-        <p>
-          ¡Hola! Soy <strong>BOB</strong>, tu coach de pronunciación. ¿Sobre qué situación quieres practicar hoy?
-          <br />
-          <span className="text-trebol-text/60 text-sm">
-            Ej: &quot;En una entrevista de trabajo&quot; o &quot;Pidiendo direcciones en la calle&quot;.
-          </span>
-        </p>
-      );
-      saveMsg({
-        role: 'bob',
-        msg_type: 'text',
-        content_text: '¡Hola! Soy BOB, tu coach de pronunciación. ¿Sobre qué situación quieres practicar hoy?',
-      });
-    } else {
-      addBobMessage(
-        <div className="space-y-3">
-          <p>¡Vamos a practicar descripción de imágenes! Configura tu escena:</p>
-          <ImageConfigSelection onConfirm={handleImageConfig} />
-        </div>
-      );
-      saveMsg({
-        role: 'bob',
-        msg_type: 'text',
-        content_text: '¡Vamos a practicar descripción de imágenes! Configura tu escena:',
-      });
+  const saveMsg = async (input: Omit<Parameters<typeof saveMessageAction>[0], 'session_id'>) => {
+    const sid = sessionIdRef.current;
+    if (!sid) return;
+    const { error } = await saveMessageAction({ ...input, session_id: sid });
+    if (error) {
+      console.error('[saveMsg] failed:', error, 'msg_type:', input.msg_type);
+      setSaveError(`Error al guardar mensaje (${input.msg_type})`);
+      // Auto-clear after 4 seconds
+      setTimeout(() => setSaveError(null), 4000);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  };
+
+  // ── Render helpers (phrase / scene / result) ──────────────────────────────
 
   const renderPhrase = (phrase: string, index: number, total: number) => (
     <div className="space-y-3">
@@ -270,28 +309,43 @@ export function BobPracticeChat({
     </div>
   );
 
-  const renderResult = (result: EvaluationResult) => {
-    const scoreColor =
-      result.score >= 90
-        ? 'text-green-600'
-        : result.score >= 70
-        ? 'text-yellow-600'
-        : 'text-gray-500';
-    return (
-      <div className="space-y-3">
-        <div className="flex items-center gap-3">
-          <span className={`text-4xl font-black ${scoreColor}`}>{result.score}</span>
-          <span className="text-trebol-text/60 text-sm font-medium">/ 100</span>
+  // ── Initial greeting ──────────────────────────────────────────────────────
+
+  useEffect(() => {
+    if (isHistory || greetingAddedRef.current) return;
+    greetingAddedRef.current = true;
+    if (mode === 'situation') {
+      addBobMessage(
+        <p>
+          ¡Hola! Soy <strong>BOB</strong>, tu coach de pronunciación. ¿Sobre qué situación quieres practicar hoy?
+          <br />
+          <span className="text-trebol-text/60 text-sm">
+            Ej: &quot;En una entrevista de trabajo&quot; o &quot;Pidiendo direcciones en la calle&quot;.
+          </span>
+        </p>
+      );
+      saveMsg({
+        role: 'bob',
+        msg_type: 'text',
+        content_text: '¡Hola! Soy BOB, tu coach de pronunciación. ¿Sobre qué situación quieres practicar hoy?',
+      });
+    } else {
+      addBobMessage(
+        <div className="space-y-3">
+          <p>¡Vamos a practicar descripción de imágenes! Configura tu escena:</p>
+          <ImageConfigSelection onConfirm={handleImageConfig} />
         </div>
-        {result.transcribed_text && (
-          <div className="bg-trebol-bg rounded-lg px-3 py-2 text-sm text-trebol-text/80 italic">
-            &quot;{result.transcribed_text}&quot;
-          </div>
-        )}
-        <p className="text-sm text-trebol-text/80">{result.feedback}</p>
-      </div>
-    );
-  };
+      );
+      saveMsg({
+        role: 'bob',
+        msg_type: 'text',
+        content_text: '¡Vamos a practicar descripción de imágenes! Configura tu escena:',
+      });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ── Handlers ──────────────────────────────────────────────────────────────
 
   const handleListen = async (text: string) => {
     try {
@@ -354,103 +408,6 @@ export function BobPracticeChat({
     return supabase.storage.from('bob-images').getPublicUrl(filename).data.publicUrl;
   };
 
-  const handleImageConfig = async (config: SceneConfig) => {
-    setCurrentSceneConfig(config);
-    addUserMessage(<span>{config.topic} · {config.difficulty}</span>);
-    saveMsg({ role: 'user', msg_type: 'text', content_text: `${config.topic} · ${config.difficulty}`, content_json: { topic: config.topic, difficulty: config.difficulty } });
-    if (!sessionStartedRef.current) {
-      sessionStartedRef.current = true;
-      const id = await onSessionStart(config.topic.slice(0, 60) || 'Describe la escena');
-      if (id) sessionIdRef.current = id;
-    }
-    await handleNextImage(config);
-  };
-
-  const startRecording = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-          sampleRate: 48000,
-        } as MediaTrackConstraints,
-      });
-      const mr = new MediaRecorder(stream, {
-        mimeType: 'audio/webm;codecs=opus',
-        audioBitsPerSecond: 128000,
-      });
-      chunksRef.current = [];
-      mr.ondataavailable = (e) => {
-        if (e.data.size > 0) chunksRef.current.push(e.data);
-      };
-      mr.onstop = () => {
-        stream.getTracks().forEach((t) => t.stop());
-        const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
-        handleAudioRecorded(blob);
-      };
-      mr.start();
-      mediaRecorderRef.current = mr;
-      setIsRecording(true);
-      setPhase('recording');
-    } catch {
-      addBobMessage(
-        <span className="text-red-500">No pude acceder al micrófono. Revisa los permisos.</span>
-      );
-    }
-  };
-
-  const stopRecording = () => {
-    mediaRecorderRef.current?.stop();
-    setIsRecording(false);
-  };
-
-  const handleAudioRecorded = async (audioBlob: Blob) => {
-    addUserMessage(
-      <span className="flex items-center gap-2 text-sm">
-        <Mic size={14} /> Audio grabado
-      </span>
-    );
-    saveMsg({ role: 'user', msg_type: 'user_audio', content_text: 'Audio grabado' });
-    setPhase('evaluating');
-    addBobMessage(
-      <span className="flex items-center gap-2 text-trebol-text/70">
-        <Loader2 size={16} className="animate-spin" /> Analizando tu pronunciación...
-      </span>
-    );
-    try {
-      const base64Audio = await blobToBase64(audioBlob);
-      const mimeType = (audioBlob.type || 'audio/webm').split(';')[0];
-      const result =
-        mode === 'situation'
-          ? await evaluatePronunciationAction(base64Audio, mimeType, dynamicPhrases[currentIndex])
-          : await evaluateImageDescriptionAction(
-              base64Audio,
-              mimeType,
-              currentScene?.description || ''
-            );
-      setCurrentResult(result);
-      setMessages(prev => prev.slice(0, -1));
-      addBobMessage(renderResult(result));
-      saveMsg({
-        role: 'bob',
-        msg_type: 'evaluation',
-        content_json: {
-          score: result.score,
-          feedback: result.feedback,
-          transcribed_text: result.transcribed_text ?? null,
-        },
-      });
-      setPhase('result');
-    } catch {
-      setMessages(prev => prev.slice(0, -1));
-      addBobMessage(
-        <span className="text-red-500">Error al evaluar. ¿Intentamos de nuevo?</span>
-      );
-      setPhase('phrase-ready');
-    }
-  };
-
   const handleNextImage = async (config?: SceneConfig) => {
     const cfg = config ?? currentSceneConfig;
     if (!cfg) {
@@ -487,6 +444,72 @@ export function BobPracticeChat({
     }
   };
 
+  const handleImageConfig = async (config: SceneConfig) => {
+    setCurrentSceneConfig(config);
+    addUserMessage(<span>{config.topic} · {config.difficulty}</span>);
+    saveMsg({ role: 'user', msg_type: 'text', content_text: `${config.topic} · ${config.difficulty}`, content_json: { topic: config.topic, difficulty: config.difficulty } });
+    if (!sessionStartedRef.current) {
+      sessionStartedRef.current = true;
+      const id = await onSessionStart(config.topic.slice(0, 60) || 'Describe la escena');
+      if (id) sessionIdRef.current = id;
+    }
+    await handleNextImage(config);
+  };
+
+  const handleAudioRecorded = async (audioBlob: Blob) => {
+    addUserMessage(
+      <span className="flex items-center gap-2 text-sm">
+        <Mic size={14} /> Audio grabado
+      </span>
+    );
+    saveMsg({ role: 'user', msg_type: 'user_audio', content_text: 'Audio grabado' });
+    setPhase('evaluating');
+    addBobMessage(
+      <span className="flex items-center gap-2 text-trebol-text/70">
+        <Loader2 size={16} className="animate-spin" /> Analizando tu pronunciación...
+      </span>
+    );
+    try {
+      const base64Audio = await blobToBase64(audioBlob);
+      const mimeType = (audioBlob.type || 'audio/webm').split(';')[0];
+      const result =
+        mode === 'situation'
+          ? await evaluatePronunciationAction(base64Audio, mimeType, dynamicPhrases[currentIndex])
+          : await evaluateImageDescriptionAction(
+              base64Audio,
+              mimeType,
+              currentScene?.description || ''
+            );
+      setCurrentResult(result);
+      setMessages(prev => prev.slice(0, -1));
+      addBobMessage(renderEvaluationContent(result.score, result.feedback, result.transcribed_text));
+      saveMsg({
+        role: 'bob',
+        msg_type: 'evaluation',
+        content_json: {
+          score: result.score,
+          feedback: result.feedback,
+          transcribed_text: result.transcribed_text ?? null,
+        },
+      });
+      setPhase('result');
+    } catch {
+      setMessages(prev => prev.slice(0, -1));
+      addBobMessage(
+        <span className="text-red-500">Error al evaluar. ¿Intentamos de nuevo?</span>
+      );
+      setPhase('phrase-ready');
+    }
+  };
+
+  // Keep the ref in sync so the hook always calls the latest version
+  onRecordedRef.current = handleAudioRecorded;
+
+  const handleAudioStart = async () => {
+    await startRecordingHook();
+    setPhase('recording');
+  };
+
   const handleNext = () => {
     if (mode === 'situation') {
       if (currentIndex < dynamicPhrases.length - 1) {
@@ -517,136 +540,27 @@ export function BobPracticeChat({
     }
   };
 
-  return (
-    <div className="flex flex-col h-full bg-white">
-      {/* Messages area */}
-      <div className="flex-1 overflow-y-auto px-4 py-6 space-y-4 bg-slate-50/40">
-        {messages.map((msg) => (
-          <div
-            key={msg.id}
-            className={`flex items-start gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}
-          >
-            {msg.role === 'bob' && (
-              <div className="w-8 h-8 rounded-full bg-trebol-primary text-white text-xs font-black flex items-center justify-center shrink-0 mt-0.5">
-                B
-              </div>
-            )}
-            <div
-              className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm shadow-sm ${
-                msg.role === 'bob'
-                  ? 'bg-white border border-trebol-border rounded-tl-none text-trebol-text'
-                  : 'bg-trebol-primary text-white rounded-tr-none'
-              }`}
-            >
-              {msg.content}
-            </div>
-          </div>
-        ))}
-        <div ref={messagesEndRef} />
-      </div>
-
-      {/* Fixed input area */}
-      <div className="shrink-0 border-t border-trebol-border bg-white px-4 py-3">
-        {phase === 'topic-input' && (
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              handleTopicSubmit();
-            }}
-            className="flex gap-2"
-          >
-            <input
-              value={inputText}
-              onChange={(e) => setInputText(e.target.value)}
-              placeholder="Escribe aquí tu situación..."
-              className="flex-1 px-4 py-2.5 rounded-xl border-2 border-trebol-border focus:border-trebol-primary focus:outline-none text-sm bg-slate-50"
-              autoFocus
-            />
-            <button
-              type="submit"
-              disabled={!inputText.trim()}
-              className="px-4 py-2.5 bg-trebol-primary text-white rounded-xl font-bold text-sm disabled:opacity-40 hover:opacity-90 transition-opacity"
-            >
-              <Send size={18} />
-            </button>
-          </form>
-        )}
-
-        {phase === 'phrase-ready' && (
-          <div className="flex justify-center">
-            <button
-              type="button"
-              onClick={startRecording}
-              className="flex items-center gap-3 px-8 py-3 bg-trebol-primary text-white rounded-full font-bold text-sm hover:opacity-90 transition-opacity shadow-lg"
-            >
-              <Mic size={20} /> Grabar respuesta
-            </button>
-          </div>
-        )}
-
-        {phase === 'recording' && (
-          <div className="flex justify-center">
-            <button
-              type="button"
-              onClick={stopRecording}
-              className="flex items-center gap-3 px-8 py-3 bg-red-500 text-white rounded-full font-bold text-sm hover:opacity-90 transition-opacity shadow-lg animate-pulse"
-            >
-              <Square size={18} /> Detener grabación
-            </button>
-          </div>
-        )}
-
-        {(phase === 'generating' || phase === 'evaluating') && (
-          <div className="flex justify-center py-1">
-            <span className="text-sm text-trebol-text/50 flex items-center gap-2">
-              <Loader2 size={14} className="animate-spin" /> Procesando...
-            </span>
-          </div>
-        )}
-
-        {phase === 'result' && mode === 'situation' && (
-          <div className="flex justify-center">
-            <button
-              type="button"
-              onClick={handleNext}
-              className="flex items-center gap-2 px-6 py-2.5 bg-trebol-primary text-white rounded-xl font-bold text-sm hover:opacity-90 transition-opacity"
-            >
-              {currentIndex < dynamicPhrases.length - 1 ? 'Siguiente frase' : 'Finalizar sesión'}
-              <ArrowRight size={16} />
-            </button>
-          </div>
-        )}
-
-        {phase === 'result' && mode === 'image' && (
-          <div className="flex justify-center">
-            <button
-              type="button"
-              onClick={() => handleNextImage()}
-              className="flex items-center gap-2 px-6 py-2.5 bg-trebol-primary text-white rounded-full font-bold text-sm hover:opacity-90 transition-opacity shadow-lg"
-            >
-              <ArrowRight size={18} /> Nueva imagen
-            </button>
-          </div>
-        )}
-
-        {phase === 'finished' && mode === 'situation' && (
-          <div className="flex justify-center">
-            <button
-              type="button"
-              onClick={onBack}
-              className="flex items-center gap-2 px-6 py-2.5 bg-trebol-secondary text-trebol-text rounded-xl font-bold text-sm hover:opacity-90 transition-opacity"
-            >
-              Nueva sesión
-            </button>
-          </div>
-        )}
-
-        {phase === 'image-config' && (
-          <p className="text-xs text-trebol-text/50 text-center py-1">
-            Configura la escena arriba para comenzar
-          </p>
-        )}
-      </div>
-    </div>
-  );
+  return {
+    phase,
+    messages,
+    topic,
+    inputText,
+    dynamicPhrases,
+    currentIndex,
+    currentScene,
+    currentResult,
+    isRecording,
+    saveError,
+    setInputText,
+    handleTopicSubmit,
+    handleNextImage,
+    handleAudioStart,
+    stopRecording,
+    handleNext,
+    handleListen,
+    handleImageConfig,
+    messagesEndRef,
+    mode,
+    onBack,
+  };
 }
