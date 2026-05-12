@@ -133,6 +133,7 @@ export function BobPracticeChat({
   const [dynamicPhrases, setDynamicPhrases] = useState<string[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [currentScene, setCurrentScene] = useState<(ImageScene & { image_data?: string }) | null>(null);
+  const [currentSceneConfig, setCurrentSceneConfig] = useState<SceneConfig | null>(null);
   const [currentResult, setCurrentResult] = useState<EvaluationResult | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -318,6 +319,7 @@ export function BobPracticeChat({
   };
 
   const handleImageConfig = async (config: SceneConfig) => {
+    setCurrentSceneConfig(config);
     addUserMessage(
       <span>
         {config.topic} · {config.difficulty}
@@ -437,6 +439,32 @@ export function BobPracticeChat({
         <span className="text-red-500">Error al evaluar. ¿Intentamos de nuevo?</span>
       );
       setPhase('phrase-ready');
+    }
+  };
+
+  const handleNextImage = async () => {
+    if (!currentSceneConfig) return;
+    setPhase('generating');
+    addBobMessage(
+      <span className="flex items-center gap-2 text-trebol-text/70">
+        <Loader2 size={16} className="animate-spin" /> Generando nueva escena...
+      </span>
+    );
+    try {
+      const scene = await generateImageSceneAction(currentSceneConfig.topic, currentSceneConfig.difficulty);
+      const imageData = await generateImageAction(scene.image_prompt);
+      const fullScene = { ...scene, image_data: imageData };
+      setCurrentScene(fullScene);
+      setMessages(prev => prev.slice(0, -1));
+      addBobMessage(renderScene(fullScene));
+      const imageUrl = await uploadImageToStorage(imageData);
+      saveMsg({ role: 'bob', msg_type: 'image_scene', content_text: imageUrl, content_json: { description: scene.description } });
+      setPhase('phrase-ready');
+    } catch (err) {
+      console.error('[handleNextImage]', err);
+      setMessages(prev => prev.slice(0, -1));
+      addBobMessage(<span className="text-red-500">Error al generar la imagen. Intenta de nuevo.</span>);
+      setPhase('result');
     }
   };
 
@@ -564,17 +592,34 @@ export function BobPracticeChat({
           </div>
         )}
 
-        {phase === 'result' && (
+        {phase === 'result' && mode === 'situation' && (
           <div className="flex justify-center">
             <button
               type="button"
               onClick={handleNext}
               className="flex items-center gap-2 px-6 py-2.5 bg-trebol-primary text-white rounded-xl font-bold text-sm hover:opacity-90 transition-opacity"
             >
-              {mode === 'situation' && currentIndex < dynamicPhrases.length - 1
-                ? 'Siguiente frase'
-                : 'Finalizar sesión'}
+              {currentIndex < dynamicPhrases.length - 1 ? 'Siguiente frase' : 'Finalizar sesión'}
               <ArrowRight size={16} />
+            </button>
+          </div>
+        )}
+
+        {phase === 'result' && mode === 'image' && (
+          <div className="flex justify-center gap-3">
+            <button
+              type="button"
+              onClick={handleNextImage}
+              className="flex items-center gap-2 px-6 py-2.5 bg-trebol-primary text-white rounded-xl font-bold text-sm hover:opacity-90 transition-opacity"
+            >
+              Nueva imagen <ArrowRight size={16} />
+            </button>
+            <button
+              type="button"
+              onClick={handleNext}
+              className="px-6 py-2.5 border-2 border-trebol-border text-trebol-text rounded-xl font-bold text-sm hover:opacity-70 transition-opacity"
+            >
+              Finalizar sesión
             </button>
           </div>
         )}
