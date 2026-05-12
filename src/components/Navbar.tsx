@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'motion/react';
 import { LogOut, User } from 'lucide-react';
 import { createSupabaseBrowser } from '@/lib/supabase/browser-client';
+import { useOrganization } from '@/hooks/useOrganization';
 
 interface NavbarProps {
   userEmail?: string;
@@ -13,6 +14,7 @@ interface NavbarProps {
 export function Navbar({ userEmail }: NavbarProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const { organization } = useOrganization();
 
   const handleLogout = async () => {
     const supabase = createSupabaseBrowser();
@@ -31,11 +33,19 @@ export function Navbar({ userEmail }: NavbarProps) {
     >
       <div className="flex items-center justify-between">
         {/* Logo */}
-        <img
-          src="/bob_logo.png"
-          alt="BOB"
-          className="h-8 w-auto object-contain"
-        />
+        {organization?.logo_url ? (
+          <img
+            src={organization.logo_url}
+            alt={organization.name}
+            className="h-8 w-auto object-contain"
+          />
+        ) : (
+          <img
+            src="/bob_logo.png"
+            alt="BOB"
+            className="h-8 w-auto object-contain"
+          />
+        )}
 
         {/* User menu */}
         <div className="relative">

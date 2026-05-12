@@ -10,6 +10,7 @@ import { createSessionAction } from '@/actions/sessions';
 import { createSupabaseBrowser } from '@/lib/supabase/browser-client';
 import { Navbar } from '@/components/Navbar';
 import { useSessionState } from '@/hooks/useSessionState';
+import { useOrganization } from '@/hooks/useOrganization';
 
 type AppState =
   | 'mode-selection'
@@ -19,6 +20,7 @@ type AppState =
 export default function App() {
   const [appState, setAppState] = useState<AppState>('mode-selection');
   const [userEmail, setUserEmail] = useState<string | undefined>();
+  const { organization } = useOrganization();
 
   useEffect(() => {
     const supabase = createSupabaseBrowser();
@@ -110,6 +112,9 @@ export default function App() {
                 exit={{ opacity: 0, y: -20 }}
                 className="w-full max-w-4xl mx-auto flex-1 flex flex-col justify-center items-center py-8 px-4"
               >
+                {organization && (
+                  <p className="text-sm text-trebol-text/50 mb-4 text-center">{organization.name}</p>
+                )}
                 <ModeSelection onSelect={handleModeSelect} />
               </motion.div>
             )}

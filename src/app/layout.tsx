@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Poppins } from "next/font/google";
 import "./globals.css";
+import { OrganizationProvider } from '@/contexts/OrganizationContext';
+import { BrandingProvider } from '@/components/BrandingProvider';
 
 const poppins = Poppins({
   weight: ['300', '400', '500', '600', '700', '800', '900'],
@@ -21,7 +23,13 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="es" className={`${poppins.variable} h-full`}>
-      <body className="font-sans antialiased h-full">{children}</body>
+      <body className="font-sans antialiased h-full">
+        <OrganizationProvider>
+          <BrandingProvider>
+            {children}
+          </BrandingProvider>
+        </OrganizationProvider>
+      </body>
     </html>
   );
 }
