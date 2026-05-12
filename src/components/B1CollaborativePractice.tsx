@@ -394,11 +394,9 @@ export function B1CollaborativePractice({ onBack }: B1CollaborativePracticeProps
               disabled={loadingScenario}
               className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-dashed border-trebol-secondary/50 text-trebol-primary font-semibold hover:bg-trebol-secondary/10 transition-colors disabled:opacity-50"
             >
-              {loadingScenario ? (
-                <Loader2 size={16} className="animate-spin" />
-              ) : (
-                <Shuffle size={16} />
-              )}
+              <span className="flex items-center justify-center w-4 h-4">
+                {loadingScenario ? <Loader2 size={16} className="animate-spin" /> : <Shuffle size={16} />}
+              </span>
               {loadingScenario ? 'Generating scenario…' : 'Surprise me (AI generated)'}
             </button>
           </div>
