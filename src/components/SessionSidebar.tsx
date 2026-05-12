@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { MessageSquare, Image as ImageIcon, MessagesSquare, Plus, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react';
+import { MessageSquare, Image as ImageIcon, MessagesSquare, Users, BookOpen, Headphones, Mic, Plus, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react';
 import { BobSession, SessionMode } from '@/actions/sessions';
 import { cn } from '@/lib/utils';
 
@@ -14,10 +14,15 @@ interface SessionSidebarProps {
   loading?: boolean;
 }
 
-const MODE_ICON: Record<SessionMode, React.ElementType> = {
+const MODE_ICON: Record<NonNullable<SessionMode>, React.ElementType> = {
   situation: MessageSquare,
   image: ImageIcon,
   conversation: MessagesSquare,
+  b1_collaborative: Users,
+  a2_part1: BookOpen,
+  toefl_listen_repeat: Headphones,
+  toefl_interview: Mic,
+  b2_speaking: ImageIcon,
 };
 
 function relativeDate(dateStr: string): string {
@@ -94,7 +99,7 @@ export function SessionSidebar({
           </div>
         )}
         {sessions.map((s) => {
-          const Icon = MODE_ICON[s.mode];
+          const Icon = s.mode ? MODE_ICON[s.mode] : MessageSquare;
           const isActive = s.id === activeSessionId;
           return (
             <div
