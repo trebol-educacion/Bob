@@ -11,11 +11,17 @@ import { createSupabaseBrowser } from '@/lib/supabase/browser-client';
 import { Navbar } from '@/components/Navbar';
 import { useSessionState } from '@/hooks/useSessionState';
 import { useOrganization } from '@/hooks/useOrganization';
+import { B1CollaborativePractice } from '@/components/B1CollaborativePractice';
+import { A2Part1Practice } from '@/components/A2Part1Practice';
+import { ToeflListenRepeatPractice } from '@/components/ToeflListenRepeatPractice';
+import { ToeflInterviewPractice } from '@/components/ToeflInterviewPractice';
+import type { PracticeMode } from '@/lib/types/practice';
 
 type AppState =
   | 'mode-selection'
   | 'practicing'
-  | 'conversation-practicing';
+  | 'conversation-practicing'
+  | 'exam-practicing';
 
 export default function App() {
   const [appState, setAppState] = useState<AppState>('mode-selection');
@@ -29,7 +35,7 @@ export default function App() {
     });
   }, []);
 
-  const [mode, setMode] = useState<'situation' | 'image' | 'conversation' | null>(null);
+  const [mode, setMode] = useState<PracticeMode>(null);
   const [topic, setTopic] = useState('');
 
   const resetToModeSelection = useCallback(() => {
@@ -59,10 +65,17 @@ export default function App() {
 
   const onSelectSession = useCallback(async (id: string) => {
     await handleSelectSession(id, (sessionMode, sessionTopic) => {
-      setMode(sessionMode as 'situation' | 'image' | 'conversation');
+      setMode(sessionMode as PracticeMode);
       if (sessionMode === 'conversation') {
         setTopic(sessionTopic);
         setAppState('conversation-practicing');
+      } else if (
+        sessionMode === 'b1_collaborative' ||
+        sessionMode === 'a2_part1' ||
+        sessionMode === 'toefl_listen_repeat' ||
+        sessionMode === 'toefl_interview'
+      ) {
+        setAppState('exam-practicing');
       } else {
         setAppState('practicing');
       }
@@ -73,9 +86,20 @@ export default function App() {
     await handleDeleteSession(id, activeSessionId, resetToModeSelection);
   }, [handleDeleteSession, activeSessionId, resetToModeSelection]);
 
-  const handleModeSelect = (m: 'situation' | 'image' | 'conversation') => {
+  const handleModeSelect = (m: PracticeMode) => {
     setMode(m);
-    setAppState(m === 'conversation' ? 'conversation-practicing' : 'practicing');
+    if (m === 'conversation') {
+      setAppState('conversation-practicing');
+    } else if (
+      m === 'b1_collaborative' ||
+      m === 'a2_part1' ||
+      m === 'toefl_listen_repeat' ||
+      m === 'toefl_interview'
+    ) {
+      setAppState('exam-practicing');
+    } else {
+      setAppState('practicing');
+    }
   };
 
   const onConversationSessionStart = useCallback((t: string) => {
@@ -128,17 +152,32 @@ export default function App() {
                 exit={{ opacity: 0 }}
                 className="flex-1 flex flex-col min-h-0"
               >
-                <BobPracticeChat
-                  mode={mode as 'situation' | 'image'}
-                  onBack={onFinish}
-                  onSessionStart={async (title) => {
-                    const { data } = await createSessionAction({ mode: mode as 'situation' | 'image', topic: title, title });
-                    if (data) { setActiveSessionId(data.id); setSessions(prev => [data, ...prev]); }
-                    return data?.id;
-                  }}
-                  sessionId={activeSessionId}
-                  initialMessages={selectedMessages.length > 0 ? selectedMessages : undefined}
-                />
+                {mode === 'b2_speaking' ? (
+                  <BobPracticeChat
+                    mode="image"
+                    level="b2"
+                    onBack={onFinish}
+                    onSessionStart={async (title) => {
+                      const { data } = await createSessionAction({ mode: 'image', topic: title, title });
+                      if (data) { setActiveSessionId(data.id); setSessions(prev => [data, ...prev]); }
+                      return data?.id;
+                    }}
+                    sessionId={activeSessionId}
+                    initialMessages={selectedMessages.length > 0 ? selectedMessages : undefined}
+                  />
+                ) : (
+                  <BobPracticeChat
+                    mode={mode as 'situation' | 'image'}
+                    onBack={onFinish}
+                    onSessionStart={async (title) => {
+                      const { data } = await createSessionAction({ mode: mode as 'situation' | 'image', topic: title, title });
+                      if (data) { setActiveSessionId(data.id); setSessions(prev => [data, ...prev]); }
+                      return data?.id;
+                    }}
+                    sessionId={activeSessionId}
+                    initialMessages={selectedMessages.length > 0 ? selectedMessages : undefined}
+                  />
+                )}
               </motion.div>
             )}
 
@@ -156,6 +195,29 @@ export default function App() {
                   noFrame={true}
                   onSessionStart={onConversationSessionStart}
                 />
+              </motion.div>
+            )}
+
+            {appState === 'exam-practicing' && mode && (
+              <motion.div
+                key={`exam-practicing-${mode}`}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="flex-1 flex flex-col min-h-0"
+              >
+                {mode === 'b1_collaborative' && (
+                  <B1CollaborativePractice onBack={() => setAppState('mode-selection')} />
+                )}
+                {mode === 'a2_part1' && (
+                  <A2Part1Practice onBack={() => setAppState('mode-selection')} />
+                )}
+                {mode === 'toefl_listen_repeat' && (
+                  <ToeflListenRepeatPractice onBack={() => setAppState('mode-selection')} />
+                )}
+                {mode === 'toefl_interview' && (
+                  <ToeflInterviewPractice onBack={() => setAppState('mode-selection')} />
+                )}
               </motion.div>
             )}
           </AnimatePresence>
