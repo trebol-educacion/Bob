@@ -1,0 +1,136 @@
+'use client';
+
+import React, { useState } from 'react';
+import { MessageSquare, Image as ImageIcon, MessagesSquare, Plus, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react';
+import { BobSession, SessionMode } from '@/actions/sessions';
+import { cn } from '@/lib/utils';
+
+interface SessionSidebarProps {
+  sessions: BobSession[];
+  activeSessionId: string | null;
+  onSelectSession: (id: string) => void;
+  onNewSession: () => void;
+  onDeleteSession: (id: string) => void;
+  loading?: boolean;
+}
+
+const MODE_ICON: Record<SessionMode, React.ElementType> = {
+  situation: MessageSquare,
+  image: ImageIcon,
+  conversation: MessagesSquare,
+};
+
+function relativeDate(dateStr: string): string {
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  if (diffMins < 1) return 'Ahora mismo';
+  if (diffMins < 60) return `Hace ${diffMins}m`;
+  const diffHours = Math.floor(diffMins / 60);
+  if (diffHours < 24) return `Hace ${diffHours}h`;
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays < 7) return `Hace ${diffDays}d`;
+  return date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+}
+
+export function SessionSidebar({
+  sessions,
+  activeSessionId,
+  onSelectSession,
+  onNewSession,
+  onDeleteSession,
+  loading,
+}: SessionSidebarProps) {
+  const [collapsed, setCollapsed] = useState(false);
+
+  return (
+    <aside className={cn(
+      'shrink-0 h-full bg-white border-r-2 border-trebol-border flex flex-col transition-[width] duration-200 ease-out overflow-hidden',
+      collapsed ? 'w-14' : 'w-72'
+    )}>
+      {/* Header */}
+      <div className="flex items-center gap-2 px-3 py-3 border-b border-trebol-border shrink-0 min-h-[52px]">
+        {!collapsed && (
+          <span className="flex-1 text-[11px] font-black uppercase tracking-widest text-trebol-text/60">
+            Sesiones
+          </span>
+        )}
+        <button
+          type="button"
+          onClick={() => setCollapsed(v => !v)}
+          aria-label={collapsed ? 'Expandir' : 'Colapsar'}
+          className="p-1.5 rounded-sm hover:bg-trebol-bg transition-colors text-trebol-text/70"
+        >
+          {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+        </button>
+      </div>
+
+      {/* New session button */}
+      <div className="px-2 py-2 shrink-0">
+        <button
+          type="button"
+          onClick={onNewSession}
+          aria-label="Nueva sesión"
+          title="Nueva sesión"
+          className={cn(
+            'w-full flex items-center gap-2 rounded-sm bg-trebol-primary text-white font-bold text-sm transition-opacity hover:opacity-90',
+            collapsed ? 'justify-center p-2' : 'justify-start px-3 py-2'
+          )}
+        >
+          <Plus size={18} className="shrink-0" />
+          {!collapsed && <span>Nueva sesión</span>}
+        </button>
+      </div>
+
+      {/* List */}
+      <nav aria-label="Sesiones" className="flex-1 overflow-y-auto px-2 pb-3 space-y-0.5">
+        {loading && !collapsed && (
+          <div className="text-xs text-trebol-text/50 px-2 py-3">Cargando…</div>
+        )}
+        {!loading && sessions.length === 0 && !collapsed && (
+          <div className="text-xs text-trebol-text/50 px-2 py-6 text-center leading-relaxed">
+            Aún no tienes sesiones.<br />Empieza una práctica para crear tu primera.
+          </div>
+        )}
+        {sessions.map((s) => {
+          const Icon = MODE_ICON[s.mode];
+          const isActive = s.id === activeSessionId;
+          return (
+            <div
+              key={s.id}
+              role="listitem"
+              className={cn(
+                'group w-full flex items-center gap-2 rounded-sm transition-colors cursor-pointer',
+                collapsed ? 'justify-center p-2' : 'px-2 py-2',
+                isActive
+                  ? 'bg-trebol-primary/10 border border-trebol-primary'
+                  : 'border border-transparent hover:bg-trebol-bg'
+              )}
+              onClick={() => onSelectSession(s.id)}
+              title={s.title}
+            >
+              <Icon size={18} className={cn('shrink-0', isActive ? 'text-trebol-primary' : 'text-trebol-text/60')} />
+              {!collapsed && (
+                <>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-semibold text-trebol-text truncate">{s.title}</div>
+                    <div className="text-[10px] text-trebol-text/50">{relativeDate(s.created_at)}</div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); onDeleteSession(s.id); }}
+                    aria-label="Eliminar sesión"
+                    className="opacity-0 group-hover:opacity-100 p-1 rounded-sm hover:bg-red-50 text-trebol-text/40 hover:text-red-500 transition-all"
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                </>
+              )}
+            </div>
+          );
+        })}
+      </nav>
+    </aside>
+  );
+}

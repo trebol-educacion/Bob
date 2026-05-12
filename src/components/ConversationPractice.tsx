@@ -20,11 +20,13 @@ import { ResultCard } from './ResultCard';
 interface ConversationPracticeProps {
   topic: string;
   onFinish: () => void;
+  noFrame?: boolean;
+  onPhaseChange?: (label: string, iter?: string) => void;
 }
 
 type Phase = 'conversation' | 'questions' | 'finished';
 
-export function ConversationPractice({ topic, onFinish }: ConversationPracticeProps) {
+export function ConversationPractice({ topic, onFinish, noFrame, onPhaseChange }: ConversationPracticeProps) {
   const [phase, setPhase] = useState<Phase>('conversation');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [framing, setFraming] = useState<string>('');
@@ -52,6 +54,16 @@ export function ConversationPractice({ topic, onFinish }: ConversationPracticePr
   const initializedRef = useRef(false);
 
   const MAX_TURNS = 12; // ~6 iterations
+
+  useEffect(() => {
+    if (!onPhaseChange) return;
+    if (phase === 'conversation') {
+      const iter = Math.floor(messages.length / 2);
+      onPhaseChange('Listening & Speaking', iter > 0 ? `Turno ${iter}` : undefined);
+    } else if (phase === 'questions') {
+      onPhaseChange('Comprensión', undefined);
+    }
+  }, [phase, messages.length, onPhaseChange]);
 
   // Initialize conversation
   useEffect(() => {
@@ -320,18 +332,20 @@ export function ConversationPractice({ topic, onFinish }: ConversationPracticePr
   }
 
   return (
-    <div className="w-full max-w-2xl mx-auto flex flex-col h-[75vh] bg-white border-2 border-trebol-border rounded-sm shadow-xl overflow-hidden">
+    <div className={noFrame ? "w-full h-full flex flex-col bg-transparent" : "w-full max-w-2xl mx-auto flex flex-col h-[75vh] bg-white border-2 border-trebol-border rounded-sm shadow-xl overflow-hidden"}>
       {/* Header Info */}
-      <div className="bg-trebol-primary text-white px-6 py-2 flex justify-between items-center">
-        <span className="text-xs font-black uppercase tracking-widest">
-          {phase === 'conversation' ? 'Práctica de Listening y Speaking' : 'Evaluación de Comprensión'}
-        </span>
-        {phase === 'conversation' && (
-          <span className="text-xs font-bold">
-            Iteración {Math.floor(messages.length / 2) + 1} de {MAX_TURNS / 2}
+      {!noFrame && (
+        <div className="bg-trebol-primary text-white px-6 py-2 flex justify-between items-center">
+          <span className="text-xs font-black uppercase tracking-widest">
+            {phase === 'conversation' ? 'Práctica de Listening y Speaking' : 'Evaluación de Comprensión'}
           </span>
-        )}
-      </div>
+          {phase === 'conversation' && (
+            <span className="text-xs font-bold">
+              Iteración {Math.floor(messages.length / 2) + 1} de {MAX_TURNS / 2}
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Main Content Area */}
       <div 
