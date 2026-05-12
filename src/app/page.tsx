@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Button } from '@/components/Button';
 import { ModeSelection } from '@/components/ModeSelection';
 import { ConversationPractice } from '@/components/ConversationPractice';
 import { SessionSidebar } from '@/components/SessionSidebar';
@@ -10,12 +9,10 @@ import { BobPracticeChat } from '@/components/BobPracticeChat';
 import { createSessionAction, getSessionsAction, deleteSessionAction, BobSession } from '@/actions/sessions';
 import { getMessagesAction, StoredMessage } from '@/actions/messages';
 import { createSupabaseBrowser } from '@/lib/supabase/browser-client';
-import { Sparkles, Send } from 'lucide-react';
 import { Navbar } from '@/components/Navbar';
 
 type AppState =
   | 'mode-selection'
-  | 'topic-selection'
   | 'practicing'
   | 'conversation-practicing';
 
@@ -91,22 +88,16 @@ export default function App() {
 
   const handleModeSelect = (m: 'situation' | 'image' | 'conversation') => {
     setMode(m);
-    if (m === 'conversation') {
-      setAppState('topic-selection');
-    } else {
-      setAppState('practicing');
-    }
+    setAppState(m === 'conversation' ? 'conversation-practicing' : 'practicing');
   };
 
-  const handleTopicSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!topic.trim()) return;
-    setAppState('conversation-practicing');
-    createSessionAction({ mode: 'conversation', topic, title: topic.trim().slice(0, 60) || 'Conversación' })
+  const handleConversationSessionStart = useCallback((t: string) => {
+    setTopic(t);
+    createSessionAction({ mode: 'conversation', topic: t, title: t.slice(0, 60) || 'Conversación' })
       .then(({ data }) => {
         if (data) { setActiveSessionId(data.id); setSessions(prev => [data, ...prev]); }
       });
-  };
+  }, []);
 
   return (
     <div className="h-screen bg-trebol-bg flex flex-col overflow-hidden">
@@ -135,42 +126,6 @@ export default function App() {
               </motion.div>
             )}
 
-            {appState === 'topic-selection' && (
-              <motion.div
-                key="topic-selection"
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.9 }}
-                className="w-full max-w-md mx-auto flex-1 flex flex-col justify-center items-center py-8 px-4 space-y-6"
-              >
-                <div className="text-center space-y-2">
-                  <Sparkles size={48} className="text-trebol-secondary mx-auto" />
-                  <h2 className="text-2xl font-black text-trebol-text">¿Qué quieres practicar?</h2>
-                  <p className="text-trebol-text font-semibold opacity-60">
-                    Ej: &quot;En una entrevista de trabajo&quot; o &quot;Programando en equipo&quot;.
-                  </p>
-                </div>
-                <form onSubmit={handleTopicSubmit} className="w-full space-y-4">
-                  <textarea
-                    value={topic}
-                    onChange={(e) => setTopic(e.target.value)}
-                    placeholder="Escribe aquí tu situación..."
-                    className="w-full p-4 text-lg border-2 border-trebol-border rounded-sm focus:border-trebol-primary focus:outline-none min-h-[120px] font-medium bg-white"
-                    autoFocus
-                  />
-                  <Button
-                    type="submit"
-                    variant="primary"
-                    size="lg"
-                    className="w-full flex items-center justify-center space-x-2 py-4 text-xl"
-                    disabled={!topic.trim()}
-                  >
-                    <span>Generar Lección</span>
-                    <Send size={20} />
-                  </Button>
-                </form>
-              </motion.div>
-            )}
 
             {appState === 'practicing' && mode && mode !== 'conversation' && (
               <motion.div
@@ -183,11 +138,10 @@ export default function App() {
                 <BobPracticeChat
                   mode={mode as 'situation' | 'image'}
                   onBack={resetToModeSelection}
-                  onSessionStart={(title) => {
-                    createSessionAction({ mode: mode as 'situation' | 'image', topic: title, title })
-                      .then(({ data }) => {
-                        if (data) { setActiveSessionId(data.id); setSessions(prev => [data, ...prev]); }
-                      });
+                  onSessionStart={async (title) => {
+                    const { data } = await createSessionAction({ mode: mode as 'situation' | 'image', topic: title, title });
+                    if (data) { setActiveSessionId(data.id); setSessions(prev => [data, ...prev]); }
+                    return data?.id;
                   }}
                   sessionId={activeSessionId}
                   initialMessages={selectedMessages.length > 0 ? selectedMessages : undefined}
@@ -201,12 +155,13 @@ export default function App() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="flex-1 flex flex-col min-h-0 p-4 max-w-4xl mx-auto w-full"
+                className="flex-1 flex flex-col min-h-0"
               >
                 <ConversationPractice
-                  topic={topic}
+                  topic={selectedMessages.length > 0 ? topic : ''}
                   onFinish={resetToModeSelection}
-                  noFrame={false}
+                  noFrame={true}
+                  onSessionStart={handleConversationSessionStart}
                 />
               </motion.div>
             )}

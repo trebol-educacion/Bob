@@ -18,16 +18,19 @@ import { blobToBase64, pcmToWavBase64 } from '@/lib/audio';
 import { ResultCard } from './ResultCard';
 
 interface ConversationPracticeProps {
-  topic: string;
+  topic?: string;
   onFinish: () => void;
   noFrame?: boolean;
   onPhaseChange?: (label: string, iter?: string) => void;
+  onSessionStart?: (topic: string) => void;
 }
 
-type Phase = 'conversation' | 'questions' | 'finished';
+type Phase = 'topic-input' | 'conversation' | 'questions' | 'finished';
 
-export function ConversationPractice({ topic, onFinish, noFrame, onPhaseChange }: ConversationPracticeProps) {
-  const [phase, setPhase] = useState<Phase>('conversation');
+export function ConversationPractice({ topic: topicProp = '', onFinish, noFrame, onPhaseChange, onSessionStart }: ConversationPracticeProps) {
+  const [phase, setPhase] = useState<Phase>(topicProp ? 'conversation' : 'topic-input');
+  const [internalTopic, setInternalTopic] = useState(topicProp);
+  const [topicInput, setTopicInput] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [framing, setFraming] = useState<string>('');
   const [isRecording, setIsRecording] = useState(false);
@@ -65,18 +68,17 @@ export function ConversationPractice({ topic, onFinish, noFrame, onPhaseChange }
     }
   }, [phase, messages.length, onPhaseChange]);
 
-  // Initialize conversation
+  // Initialize conversation (fires when internalTopic is first set)
   useEffect(() => {
-    if (initializedRef.current) return;
+    if (initializedRef.current || !internalTopic) return;
     initializedRef.current = true;
 
     const initChat = async () => {
       setIsProcessing(true);
       try {
-        const result = await generateInitialChatAction(topic);
+        const result = await generateInitialChatAction(internalTopic);
         setFraming(result.framing);
         setMessages([{ role: 'model', text: result.message }]);
-        // Automatically play the first message
         setTimeout(() => handleListen(result.message, 0), 500);
       } catch (error) {
         console.error('Failed to init chat:', error);
@@ -85,7 +87,8 @@ export function ConversationPractice({ topic, onFinish, noFrame, onPhaseChange }
       }
     };
     initChat();
-  }, [topic]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [internalTopic]);
 
   const handleListen = async (text: string, index: number) => {
     if (isGeneratingAudio !== null) return;
@@ -177,7 +180,7 @@ export function ConversationPractice({ topic, onFinish, noFrame, onPhaseChange }
         base64Audio,
         mimeType,
         messages,
-        topic
+        internalTopic
       );
 
       const userMsg: ChatMessage = { role: 'user', text: result.evaluation.transcribed_text };
@@ -211,7 +214,7 @@ export function ConversationPractice({ topic, onFinish, noFrame, onPhaseChange }
       const result = await chatTextConversationAction(
         textToSend,
         messages,
-        topic
+        internalTopic
       );
 
       const userMsg: ChatMessage = { role: 'user', text: textToSend };
@@ -237,12 +240,12 @@ export function ConversationPractice({ topic, onFinish, noFrame, onPhaseChange }
     setIsProcessing(true);
 
     try {
-      const simulatedText = await simulateUserResponseAction(messages, topic);
+      const simulatedText = await simulateUserResponseAction(messages, internalTopic);
       
       const result = await chatTextConversationAction(
         simulatedText,
         messages,
-        topic
+        internalTopic
       );
 
       const userMsg: ChatMessage = { role: 'user', text: simulatedText };
@@ -268,11 +271,11 @@ export function ConversationPractice({ topic, onFinish, noFrame, onPhaseChange }
       let finalHistory = messages;
       if (messages.length < MAX_TURNS) {
         // Simulate missing turns
-        finalHistory = await simulateConversationAction(messages, topic);
+        finalHistory = await simulateConversationAction(messages, internalTopic);
         setMessages(finalHistory);
       }
-      
-      const aiQuestions = await generateQuestionsAction(finalHistory, topic);
+
+      const aiQuestions = await generateQuestionsAction(finalHistory, internalTopic);
       setQuestions(aiQuestions);
       setPhase('questions');
     } catch (error) {
@@ -314,6 +317,14 @@ export function ConversationPractice({ topic, onFinish, noFrame, onPhaseChange }
     }
   };
 
+  const handleTopicConfirm = () => {
+    const t = topicInput.trim();
+    if (!t) return;
+    setInternalTopic(t);
+    onSessionStart?.(t);
+    setPhase('conversation');
+  };
+
   if (phase === 'finished') {
     return (
       <div className="w-full max-w-2xl mx-auto flex flex-col items-center justify-center p-12 bg-white border-2 border-trebol-border rounded-sm shadow-xl space-y-8">
@@ -332,12 +343,12 @@ export function ConversationPractice({ topic, onFinish, noFrame, onPhaseChange }
   }
 
   return (
-    <div className={noFrame ? "w-full h-full flex flex-col bg-transparent" : "w-full max-w-2xl mx-auto flex flex-col h-[75vh] bg-white border-2 border-trebol-border rounded-sm shadow-xl overflow-hidden"}>
+    <div className={noFrame ? "w-full h-full flex flex-col bg-white" : "w-full max-w-2xl mx-auto flex flex-col h-[75vh] bg-white border-2 border-trebol-border rounded-sm shadow-xl overflow-hidden"}>
       {/* Header Info */}
       {!noFrame && (
         <div className="bg-trebol-primary text-white px-6 py-2 flex justify-between items-center">
           <span className="text-xs font-black uppercase tracking-widest">
-            {phase === 'conversation' ? 'Práctica de Listening y Speaking' : 'Evaluación de Comprensión'}
+            {phase === 'conversation' ? 'Práctica de Listening y Speaking' : phase === 'questions' ? 'Evaluación de Comprensión' : 'Conversación'}
           </span>
           {phase === 'conversation' && (
             <span className="text-xs font-bold">
@@ -350,11 +361,33 @@ export function ConversationPractice({ topic, onFinish, noFrame, onPhaseChange }
       {/* Main Content Area */}
       <div 
         ref={scrollRef}
-        className="flex-1 overflow-y-auto p-6 space-y-4 bg-gray-50/50"
+        className="flex-1 overflow-y-auto px-4 py-6 space-y-4 bg-slate-50/40"
       >
         <AnimatePresence mode="wait">
-          {phase === 'conversation' ? (
-            <motion.div 
+          {phase === 'topic-input' && (
+            <motion.div
+              key="topic-input"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="flex items-start gap-3"
+            >
+              <div className="w-8 h-8 rounded-full bg-trebol-primary text-white text-xs font-black flex items-center justify-center shrink-0 mt-0.5">
+                B
+              </div>
+              <div className="max-w-[80%] rounded-2xl px-4 py-3 text-sm shadow-sm bg-white border border-trebol-border rounded-tl-none text-trebol-text">
+                <p>
+                  ¡Hola! Vamos a tener una conversación en inglés. ¿Sobre qué tema quieres practicar hoy?
+                  <br />
+                  <span className="text-trebol-text/60 text-xs">
+                    Ej: &quot;En una reunión de trabajo&quot; o &quot;Hablando con un cliente&quot;.
+                  </span>
+                </p>
+              </div>
+            </motion.div>
+          )}
+          {phase === 'conversation' && (
+            <motion.div
               key="chat"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -371,8 +404,8 @@ export function ConversationPractice({ topic, onFinish, noFrame, onPhaseChange }
               {messages.map((msg, i) => (
                 <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                   <div className={`max-w-[85%] p-4 rounded-sm shadow-sm relative group ${
-                    msg.role === 'user' 
-                      ? 'bg-trebol-primary text-white font-medium' 
+                    msg.role === 'user'
+                      ? 'bg-trebol-primary text-white font-medium'
                       : 'bg-white border border-trebol-border text-trebol-text font-medium min-w-[200px]'
                   }`}>
                     {msg.role === 'model' ? (
@@ -385,7 +418,6 @@ export function ConversationPractice({ topic, onFinish, noFrame, onPhaseChange }
                             <span className="text-sm font-bold italic">Escucha el audio...</span>
                           </div>
                         )}
-                        
                         <div className="flex items-center justify-between mt-2 pt-2 border-t border-trebol-border/10">
                           <button
                             onClick={() => handleListen(msg.text, i)}
@@ -399,7 +431,6 @@ export function ConversationPractice({ topic, onFinish, noFrame, onPhaseChange }
                             )}
                             <span>{playCounts[i] > 0 ? 'Repetir' : 'Reproducir'}</span>
                           </button>
-
                           {playCounts[i] >= 2 && (
                             <button
                               onClick={() => toggleHint(i)}
@@ -420,7 +451,9 @@ export function ConversationPractice({ topic, onFinish, noFrame, onPhaseChange }
                 </div>
               ))}
             </motion.div>
-          ) : (
+          )}
+
+          {phase === 'questions' && (
             <motion.div
               key="questions"
               initial={{ opacity: 0, x: 20 }}
@@ -436,7 +469,6 @@ export function ConversationPractice({ topic, onFinish, noFrame, onPhaseChange }
                   {questions[currentQuestionIndex]?.question}
                 </h3>
               </div>
-
               {questionAnswers[currentQuestionIndex] && (
                 <div className="bg-white p-4 border-2 border-trebol-secondary/20 rounded-sm">
                   <div className="flex items-center space-x-2 mb-2">
@@ -492,8 +524,29 @@ export function ConversationPractice({ topic, onFinish, noFrame, onPhaseChange }
       </AnimatePresence>
 
       {/* Controls */}
-      <div className="p-4 bg-white border-t-2 border-trebol-border space-y-4">
-        {phase === 'conversation' ? (
+      <div className="shrink-0 border-t border-trebol-border bg-white px-4 py-3 space-y-3">
+        {phase === 'topic-input' && (
+          <form
+            onSubmit={(e) => { e.preventDefault(); handleTopicConfirm(); }}
+            className="flex gap-2"
+          >
+            <input
+              value={topicInput}
+              onChange={(e) => setTopicInput(e.target.value)}
+              placeholder="Escribe aquí tu tema..."
+              className="flex-1 px-4 py-2.5 rounded-xl border-2 border-trebol-border focus:border-trebol-primary focus:outline-none text-sm bg-slate-50"
+              autoFocus
+            />
+            <button
+              type="submit"
+              disabled={!topicInput.trim()}
+              className="px-4 py-2.5 bg-trebol-primary text-white rounded-xl font-bold text-sm disabled:opacity-40 hover:opacity-90 transition-opacity"
+            >
+              <Send size={18} />
+            </button>
+          </form>
+        )}
+        {phase === 'conversation' && (
           <div className="flex flex-col space-y-4">
             {/* Input row */}
             <div className="flex items-center space-x-2">
@@ -568,7 +621,8 @@ export function ConversationPractice({ topic, onFinish, noFrame, onPhaseChange }
               )}
             </div>
           </div>
-        ) : (
+        )}
+        {phase === 'questions' && (
           <div className="flex items-center justify-center">
             {!isRecording ? (
               <Button

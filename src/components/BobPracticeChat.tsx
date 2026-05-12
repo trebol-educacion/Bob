@@ -15,6 +15,7 @@ import {
 } from '@/actions/gemini';
 import { saveMessageAction, StoredMessage } from '@/actions/messages';
 import { blobToBase64, pcmToWavBase64 } from '@/lib/audio';
+import { createSupabaseBrowser } from '@/lib/supabase/browser-client';
 
 type ChatPhase =
   | 'topic-input'
@@ -35,7 +36,7 @@ type ChatMsg = {
 interface BobPracticeChatProps {
   mode: 'situation' | 'image';
   onBack: () => void;
-  onSessionStart: (title: string) => void;
+  onSessionStart: (title: string) => Promise<string | undefined>;
   sessionId?: string | null;
   initialMessages?: StoredMessage[];
 }
@@ -58,19 +59,21 @@ function restoreMessages(stored: StoredMessage[]): ChatMsg[] {
         </div>
       ) : <span>{m.content_text}</span>;
     } else if (m.msg_type === 'image_scene') {
-      const j = m.content_json as { description: string; image_data?: string } | null;
+      const j = m.content_json as { description: string } | null;
       content = (
         <div className="space-y-3">
           <p className="text-sm text-trebol-text/60">
             Describe lo que ves en esta imagen en inglés. Tienes 60 segundos.
           </p>
-          {j?.image_data && (
+          {m.content_text ? (
             <img
-              src={j.image_data}
+              src={m.content_text}
               alt="Scene to describe"
               className="w-full rounded-xl border-2 border-trebol-border shadow-md"
             />
-          )}
+          ) : j?.description ? (
+            <p className="text-xs text-trebol-text/50 italic">{j.description}</p>
+          ) : null}
         </div>
       );
     } else if (m.msg_type === 'evaluation') {
@@ -150,7 +153,8 @@ export function BobPracticeChat({
   const saveMsg = async (input: Omit<Parameters<typeof saveMessageAction>[0], 'session_id'>) => {
     const sid = sessionIdRef.current;
     if (!sid) return;
-    await saveMessageAction({ ...input, session_id: sid });
+    const { error } = await saveMessageAction({ ...input, session_id: sid });
+    if (error) console.error('[saveMsg] failed:', error, 'msg_type:', input.msg_type);
   };
 
   const addBobMessage = (content: React.ReactNode) => {
@@ -280,7 +284,8 @@ export function BobPracticeChat({
     );
     if (!sessionStartedRef.current) {
       sessionStartedRef.current = true;
-      onSessionStart(t.slice(0, 60) || 'Práctica de frases');
+      const id = await onSessionStart(t.slice(0, 60) || 'Práctica de frases');
+      if (id) sessionIdRef.current = id;
     }
     try {
       const generated = await generateTopicPhrasesAction(t);
@@ -299,6 +304,19 @@ export function BobPracticeChat({
     }
   };
 
+  const uploadImageToStorage = async (imageDataUrl: string): Promise<string> => {
+    const supabase = createSupabaseBrowser();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Not authenticated');
+    const res = await fetch(imageDataUrl);
+    const blob = await res.blob();
+    const ext = blob.type.includes('png') ? 'png' : 'jpg';
+    const filename = `${user.id}/${crypto.randomUUID()}.${ext}`;
+    const { error } = await supabase.storage.from('bob-images').upload(filename, blob, { contentType: blob.type });
+    if (error) throw error;
+    return supabase.storage.from('bob-images').getPublicUrl(filename).data.publicUrl;
+  };
+
   const handleImageConfig = async (config: SceneConfig) => {
     addUserMessage(
       <span>
@@ -314,7 +332,8 @@ export function BobPracticeChat({
     );
     if (!sessionStartedRef.current) {
       sessionStartedRef.current = true;
-      onSessionStart(config.topic.slice(0, 60) || 'Describe la escena');
+      const id = await onSessionStart(config.topic.slice(0, 60) || 'Describe la escena');
+      if (id) sessionIdRef.current = id;
     }
     try {
       const scene = await generateImageSceneAction(config.topic, config.difficulty);
@@ -323,9 +342,11 @@ export function BobPracticeChat({
       setCurrentScene(fullScene);
       setMessages(prev => prev.slice(0, -1));
       addBobMessage(renderScene(fullScene));
-      saveMsg({ role: 'bob', msg_type: 'image_scene', content_json: { description: scene.description, image_data: imageData } });
+      const imageUrl = await uploadImageToStorage(imageData);
+      saveMsg({ role: 'bob', msg_type: 'image_scene', content_text: imageUrl, content_json: { description: scene.description } });
       setPhase('phrase-ready');
-    } catch {
+    } catch (err) {
+      console.error('[handleImageConfig]', err);
       setMessages(prev => prev.slice(0, -1));
       addBobMessage(
         <span className="text-red-500">Error al generar la imagen. Intenta de nuevo.</span>
