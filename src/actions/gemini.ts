@@ -1,6 +1,30 @@
 'use server';
 
-import { GoogleGenAI, Type } from '@google/genai';
+import { GoogleGenAI, Type, Part } from '@google/genai';
+import { MODELS } from '@/lib/models';
+import {
+  buildTopicPhrasesPrompt,
+  buildPronunciationEvaluationPrompt,
+  buildImageDescriptionEvaluationPrompt,
+  buildImageGenerationPrompt,
+  buildImageScenePrompt,
+  buildInitialChatPrompt,
+  buildSimulateConversationPrompt,
+  buildGenerateQuestionsPrompt,
+  buildSimulateUserResponsePrompt,
+  buildChatConversationPrompt,
+  buildChatTextConversationPrompt,
+} from '@/lib/prompts';
+import {
+  PhraseGenerationSchema,
+  ImageSceneSchema,
+  PronunciationEvaluationSchema,
+  ImageDescriptionEvaluationSchema,
+  ChatTurnSchema,
+  InitialChatResponse,
+  SimulatedConversationResponse,
+  QuestionsResponse,
+} from '@/lib/types/gemini';
 
 const apiKey = process.env.GEMINI_API_KEY;
 
@@ -46,7 +70,7 @@ export interface ImageScene {
 export async function generateSpeechAction(text: string): Promise<{ data: string; mimeType: string }> {
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash-preview-tts',
+      model: MODELS.TTS,
       contents: [{ role: 'user', parts: [{ text: `Read this phrase aloud with clear pronunciation: "${text}"` }] }],
       config: {
         responseModalities: ['audio'],
@@ -60,7 +84,7 @@ export async function generateSpeechAction(text: string): Promise<{ data: string
       },
     });
 
-    const audioPart = response.candidates?.[0]?.content?.parts?.find((p: any) => p.inlineData);
+    const audioPart = response.candidates?.[0]?.content?.parts?.find((p: Part) => p.inlineData);
 
     if (!audioPart?.inlineData?.data) {
       throw new Error('No audio data received from Gemini');
@@ -80,21 +104,11 @@ export async function generateSpeechAction(text: string): Promise<{ data: string
  * Generates 10 progressive phrases based on a user-provided topic.
  */
 export async function generateTopicPhrasesAction(topic: string): Promise<string[]> {
-  const prompt = `
-    Eres un diseñador de currículos de inglés experto.
-    Genera una lista de 10 frases en inglés para practicar, basadas en el siguiente tema: "${topic}".
-    
-    Instrucciones:
-    1. Las frases deben formar una progresión lógica o una pequeña historia relacionada con el tema.
-    2. Deben variar en dificultad, empezando por algo sencillo y aumentando gradualmente.
-    3. Asegúrate de que el lenguaje sea natural y útil para el contexto solicitado.
-    
-    Devuelve la respuesta estrictamente en formato JSON.
-  `;
+  const prompt = buildTopicPhrasesPrompt(topic);
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3.1-flash-lite-preview',
+      model: MODELS.FLASH_LITE_PREVIEW,
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
       config: {
         responseMimeType: 'application/json',
@@ -116,7 +130,7 @@ export async function generateTopicPhrasesAction(topic: string): Promise<string[
       throw new Error('No response from Gemini');
     }
 
-    const result = JSON.parse(response.text) as { phrases: string[] };
+    const result = PhraseGenerationSchema.parse(JSON.parse(response.text));
     return result.phrases.slice(0, 10);
   } catch (error) {
     console.error('Error generating topic phrases:', error);
@@ -125,32 +139,31 @@ export async function generateTopicPhrasesAction(topic: string): Promise<string[
 }
 
 /**
- * Generates an image using NanoBanana 2 (Gemini 3.1 Flash Image)
+ * Generates an image using Gemini Image model.
  */
 export async function generateImageAction(prompt: string): Promise<string> {
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3.1-flash-image-preview',
-      contents: [{ 
-        role: 'user', 
-        parts: [{ text: `Generate a high-quality, realistic photograph of this scene for an English B1 exam description: ${prompt}` }] 
+      model: MODELS.IMAGE,
+      contents: [{
+        role: 'user',
+        parts: [{ text: buildImageGenerationPrompt(prompt) }]
       }],
       config: {
-        // @ts-ignore
         responseModalities: ['IMAGE'],
       },
     });
 
     const candidate = response.candidates?.[0];
-    const imagePart = candidate?.content?.parts?.find((p: any) => p.inlineData);
+    const imagePart = candidate?.content?.parts?.find((p: Part) => p.inlineData);
 
     if (!imagePart?.inlineData?.data) {
-      throw new Error('No image data received from Gemini NanoBanana');
+      throw new Error('No image data received from Gemini');
     }
 
     return `data:${imagePart.inlineData.mimeType || 'image/png'};base64,${imagePart.inlineData.data}`;
   } catch (error) {
-    console.error('Error generating image with NanoBanana:', error);
+    console.error('Error generating image:', error);
     throw error;
   }
 }
@@ -162,22 +175,11 @@ export async function generateImageSceneAction(
   topic: string = 'Daily Life',
   difficulty: string = 'intermediate'
 ): Promise<ImageScene> {
-  const prompt = `
-    Eres un examinador de Cambridge B1.
-    Describe una escena relacionada con el tema "${topic}" con una dificultad "${difficulty}".
-    
-    Instrucciones de Respuesta:
-    1. La escena debe ser perfecta para el "Speaking Part 2" (Describing a photo).
-    2. Genera un "topic" corto y descriptivo.
-    3. Genera una "description" detallada en INGLÉS de lo que ocurre en la imagen.
-    4. Genera un "image_prompt" optimizado para un generador de imágenes IA.
-    
-    Devuelve la respuesta estrictamente en formato JSON.
-  `;
+  const prompt = buildImageScenePrompt(topic, difficulty);
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-flash-lite-latest',
+      model: MODELS.FLASH_LITE_LATEST,
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
       config: {
         responseMimeType: 'application/json',
@@ -194,7 +196,7 @@ export async function generateImageSceneAction(
     });
 
     if (!response.text) throw new Error('No response from Gemini');
-    return JSON.parse(response.text) as ImageScene;
+    return ImageSceneSchema.parse(JSON.parse(response.text));
   } catch (error) {
     console.error('Error generating image scene:', error);
     throw error;
@@ -206,16 +208,11 @@ export async function evaluateImageDescriptionAction(
   mimeType: string,
   sceneDescription: string
 ): Promise<EvaluationResult> {
-  const prompt = `
-    Eres un examinador de Cambridge B1 experto.
-    Evalúa la descripción de una imagen realizada por el usuario en audio.
-    Contexto de la imagen: "${sceneDescription}"
-    Devuelve la respuesta estrictamente en formato JSON.
-  `;
+  const prompt = buildImageDescriptionEvaluationPrompt(sceneDescription);
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3.1-flash-lite-preview',
+      model: MODELS.FLASH_LITE_PREVIEW,
       contents: {
         parts: [
           { inlineData: { data: audioBase64, mimeType: mimeType } },
@@ -247,7 +244,7 @@ export async function evaluateImageDescriptionAction(
     });
 
     if (!response.text) throw new Error('No response from Gemini');
-    return JSON.parse(response.text) as EvaluationResult;
+    return ImageDescriptionEvaluationSchema.parse(JSON.parse(response.text));
   } catch (error) {
     console.error('Error evaluating image description:', error);
     throw error;
@@ -259,15 +256,11 @@ export async function evaluatePronunciationAction(
   mimeType: string,
   targetPhrase: string
 ): Promise<EvaluationResult> {
-  const prompt = `
-    Eres un profesor de inglés experto y amigable, estilo Duolingo.
-    Evalúa la pronunciación en inglés del usuario para la siguiente frase: "${targetPhrase}".
-    Devuelve la respuesta estrictamente en formato JSON.
-  `;
+  const prompt = buildPronunciationEvaluationPrompt(targetPhrase);
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3.1-flash-lite-preview',
+      model: MODELS.FLASH_LITE_PREVIEW,
       contents: {
         parts: [
           { inlineData: { data: audioBase64, mimeType: mimeType } },
@@ -289,7 +282,7 @@ export async function evaluatePronunciationAction(
     });
 
     if (!response.text) throw new Error('No response from Gemini');
-    return JSON.parse(response.text) as EvaluationResult;
+    return PronunciationEvaluationSchema.parse(JSON.parse(response.text));
   } catch (error) {
     console.error('Error evaluating pronunciation:', error);
     throw error;
@@ -303,21 +296,14 @@ export interface InitialChatResult {
 
 /**
  * Generates a structured initial framing and first message for the simulation.
+ * Falls back gracefully — intentional fallback, do NOT convert to throw.
  */
 export async function generateInitialChatAction(topic: string): Promise<InitialChatResult> {
-  const prompt = `
-    Eres un diseñador de simulaciones de conversación en inglés. El usuario quiere practicar: "${topic}".
-    
-    Tu tarea es crear el escenario inicial en dos partes:
-    1. "framing": Una breve descripción en ESPAÑOL que sitúe al usuario (ej: "Estás en el backstage de un evento tecnológico, el moderador se acerca a ti...").
-    2. "message": La primera frase que el personaje dice en INGLÉS para iniciar la conversación. DEBE ser natural y directa, sin introducciones de IA.
-    
-    Devuelve la respuesta estrictamente en formato JSON.
-  `;
+  const prompt = buildInitialChatPrompt(topic);
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3.1-flash-lite-preview',
+      model: MODELS.FLASH_LITE_PREVIEW,
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
       config: {
         responseMimeType: 'application/json',
@@ -333,7 +319,7 @@ export async function generateInitialChatAction(topic: string): Promise<InitialC
     });
 
     if (!response.text) throw new Error('No response from Gemini');
-    return JSON.parse(response.text) as InitialChatResult;
+    return JSON.parse(response.text) as InitialChatResponse;
   } catch (error) {
     console.error('Error generating initial chat:', error);
     return {
@@ -351,25 +337,17 @@ export interface Question {
 
 /**
  * Simulates the remaining turns of a conversation if it was finished early.
+ * Falls back gracefully — intentional fallback, do NOT convert to throw.
  */
 export async function simulateConversationAction(
   history: ChatMessage[],
   topic: string
 ): Promise<ChatMessage[]> {
-  const prompt = `
-    Eres un experto en simulaciones de inglés. El usuario ha terminado una conversación sobre "${topic}" antes de tiempo.
-    Basado en el historial actual, simula de 3 a 4 turnos adicionales (intercambios entre 'user' y 'model') para completar una conversación natural de unos 6 turnos en total.
-    
-    Importante:
-    - Mantén la coherencia con lo que ya se ha hablado.
-    - Devuelve el historial COMPLETO (los mensajes originales + los simulados).
-    
-    Devuelve la respuesta estrictamente en formato JSON.
-  `;
+  const prompt = buildSimulateConversationPrompt(topic);
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3.1-flash-lite-preview',
+      model: MODELS.FLASH_LITE_PREVIEW,
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
       config: {
         responseMimeType: 'application/json',
@@ -394,7 +372,7 @@ export async function simulateConversationAction(
     });
 
     if (!response.text) throw new Error('No response from Gemini');
-    const result = JSON.parse(response.text) as { full_history: ChatMessage[] };
+    const result = JSON.parse(response.text) as SimulatedConversationResponse;
     return result.full_history;
   } catch (error) {
     console.error('Error simulating conversation:', error);
@@ -404,28 +382,17 @@ export async function simulateConversationAction(
 
 /**
  * Generates comprehension questions based on the conversation history.
+ * Falls back gracefully — intentional fallback, do NOT convert to throw.
  */
 export async function generateQuestionsAction(
   history: ChatMessage[],
   topic: string
 ): Promise<Question[]> {
-  const prompt = `
-    Eres un examinador de inglés. Basado en la siguiente conversación sobre "${topic}", genera 3 o 4 preguntas de comprensión auditiva.
-    
-    Historial:
-    ${history.map(m => `${m.role}: ${m.text}`).join('\n')}
-    
-    Instrucciones:
-    1. Las preguntas deben ser en INGLÉS.
-    2. Deben evaluar si el usuario ha entendido los detalles de la conversación.
-    3. Proporciona también la respuesta correcta esperada (muy breve).
-    
-    Devuelve la respuesta estrictamente en formato JSON.
-  `;
+  const prompt = buildGenerateQuestionsPrompt(history, topic);
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3.1-flash-lite-preview',
+      model: MODELS.FLASH_LITE_PREVIEW,
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
       config: {
         responseMimeType: 'application/json',
@@ -451,7 +418,7 @@ export async function generateQuestionsAction(
     });
 
     if (!response.text) throw new Error('No response from Gemini');
-    const result = JSON.parse(response.text) as { questions: Question[] };
+    const result = JSON.parse(response.text) as QuestionsResponse;
     return result.questions;
   } catch (error) {
     console.error('Error generating questions:', error);
@@ -461,23 +428,17 @@ export async function generateQuestionsAction(
 
 /**
  * Simulates a response from the user's perspective to continue the conversation.
+ * Falls back gracefully — intentional fallback, do NOT convert to throw.
  */
 export async function simulateUserResponseAction(
   history: ChatMessage[],
   topic: string
 ): Promise<string> {
-  const prompt = `
-    Eres el usuario en una simulación de conversación sobre "${topic}".
-    Basado en el historial actual, genera una respuesta natural y breve en INGLÉS que tú (como usuario) dirías para continuar la conversación.
-    
-    Importante:
-    - Responde solo con el texto de la respuesta.
-    - Que sea una respuesta realista para un estudiante de nivel B1/B2.
-  `;
+  const prompt = buildSimulateUserResponsePrompt(topic);
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3.1-flash-lite-preview',
+      model: MODELS.FLASH_LITE_PREVIEW,
       contents: [
         ...history.map(msg => ({
           role: msg.role,
@@ -502,23 +463,11 @@ export async function chatTextConversationAction(
   history: ChatMessage[],
   topic: string
 ): Promise<ChatTurnResult> {
-  const prompt = `
-    Eres un interlocutor nativo de inglés en una SIMULACIÓN REAL sobre: "${topic}".
-    
-    Tu tarea:
-    1. Evalúa el texto enviado por el usuario:
-       - Puntuación (0-100): Basada en gramática, vocabulario y adecuación al contexto "${topic}".
-       - Feedback: Muy breve y motivador.
-    2. Responde para continuar la simulación:
-       - MANTÉN EL PERSONAJE.
-       - Responde en INGLÉS natural.
-    
-    Devuelve la respuesta estrictamente en formato JSON.
-  `;
+  const prompt = buildChatTextConversationPrompt(topic, userText);
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3.1-flash-lite-preview',
+      model: MODELS.FLASH_LITE_PREVIEW,
       contents: [
         ...history.map(msg => ({
           role: msg.role,
@@ -526,7 +475,7 @@ export async function chatTextConversationAction(
         })),
         {
           role: 'user',
-          parts: [{ text: `User says: "${userText}"\n\n${prompt}` }]
+          parts: [{ text: prompt }]
         }
       ],
       config: {
@@ -551,7 +500,7 @@ export async function chatTextConversationAction(
     });
 
     if (!response.text) throw new Error('No response from Gemini');
-    const result = JSON.parse(response.text) as { evaluation: EvaluationResult, ai_response: string };
+    const result = ChatTurnSchema.parse(JSON.parse(response.text));
 
     // Generate AI Speech for the response
     const speech = await generateSpeechAction(result.ai_response);
@@ -579,26 +528,12 @@ export async function chatConversationAction(
   history: ChatMessage[],
   topic: string
 ): Promise<ChatTurnResult> {
-  const prompt = `
-    Eres un interlocutor nativo de inglés en una SIMULACIÓN REAL sobre: "${topic}".
-    
-    Tu tarea:
-    1. Evalúa el último audio del usuario (en segundo plano):
-       - Transcribe el audio.
-       - Puntuación (0-100): Evalúa la fluidez y naturalidad dentro del contexto "${topic}".
-       - Feedback: Muy breve y motivador.
-    2. Responde para continuar la simulación:
-       - MANTÉN EL PERSONAJE. No salgas del rol.
-       - Responde en INGLÉS natural, como lo haría una persona real en esa situación.
-       - Haz que la conversación avance de forma lógica.
-    
-    Devuelve la respuesta estrictamente en formato JSON.
-  `;
+  const prompt = buildChatConversationPrompt(topic);
 
   try {
     // 1. Get Evaluation and Text Response
     const response = await ai.models.generateContent({
-      model: 'gemini-3.1-flash-lite-preview',
+      model: MODELS.FLASH_LITE_PREVIEW,
       contents: [
         ...history.map(msg => ({
           role: msg.role,
@@ -634,7 +569,7 @@ export async function chatConversationAction(
     });
 
     if (!response.text) throw new Error('No response from Gemini');
-    const result = JSON.parse(response.text) as { evaluation: EvaluationResult, ai_response: string };
+    const result = ChatTurnSchema.parse(JSON.parse(response.text));
 
     // 2. Generate AI Speech for the response
     const speech = await generateSpeechAction(result.ai_response);
