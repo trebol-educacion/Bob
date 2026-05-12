@@ -37,6 +37,7 @@ export const ImageDescriptionEvaluationSchema = z.object({
   feedback: z.string(),
   transcribed_text: z.string(),
   details: EvaluationDetailsSchema,
+  model_answer: z.string().optional(),
 });
 
 export const ChatTurnSchema = z.object({

@@ -38,6 +38,7 @@ export interface EvaluationResult {
   score: number;
   feedback: string;
   transcribed_text: string;
+  model_answer?: string;
   details?: {
     content_coverage?: string;
     duration_feedback?: string;
@@ -237,6 +238,7 @@ export async function evaluateImageDescriptionAction(
               },
               required: ['content_coverage', 'duration_feedback', 'clarity', 'improvement_tips'],
             },
+            model_answer: { type: Type.STRING },
           },
           required: ['score', 'feedback', 'transcribed_text', 'details'],
         },
