@@ -62,7 +62,7 @@ export function ModeSelection({ onSelect, enabledModes }: ModeSelectionProps) {
   const iconClass = "text-trebol-primary group-hover:text-white transition-colors";
 
   return (
-    <div className="w-full max-w-4xl mx-auto p-4 space-y-8">
+    <div className="w-full max-w-4xl mx-auto p-4 pb-12 space-y-8 overflow-y-auto">
       <div className="text-center space-y-2">
         <h2 className="text-3xl font-black text-trebol-text tracking-tight">
           Elige tu entrenamiento

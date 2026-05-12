@@ -134,7 +134,7 @@ export default function App() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -20 }}
-                className="w-full max-w-4xl mx-auto flex-1 flex flex-col justify-center items-center py-8 px-4"
+                className="w-full max-w-4xl mx-auto flex-1 flex flex-col items-center py-8 px-4 overflow-y-auto"
               >
                 {organization && (
                   <p className="text-sm text-trebol-text/50 mb-4 text-center">{organization.name}</p>
