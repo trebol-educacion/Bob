@@ -43,12 +43,14 @@ export function renderEvaluationContent(
   score: number,
   feedback: string,
   transcribed_text?: string,
+  modelAnswer?: string,
 ): React.ReactNode {
-  const scoreColor = getScoreColor(score);
+  const roundedScore = Math.round(score);
+  const scoreColor = getScoreColor(roundedScore);
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-3">
-        <span className={`text-4xl font-black ${scoreColor}`}>{score}</span>
+        <span className={`text-4xl font-black ${scoreColor}`}>{roundedScore}</span>
         <span className="text-trebol-text/60 text-sm font-medium">/ 100</span>
       </div>
       {transcribed_text && (
@@ -57,6 +59,12 @@ export function renderEvaluationContent(
         </div>
       )}
       <p className="text-sm text-trebol-text/80">{feedback}</p>
+      {modelAnswer && (
+        <div className="bg-trebol-primary/10 border border-trebol-primary/30 rounded-lg px-3 py-2 space-y-1">
+          <p className="text-xs font-black uppercase tracking-widest text-trebol-primary">Sample answer</p>
+          <p className="text-sm text-trebol-text/80 italic">{modelAnswer}</p>
+        </div>
+      )}
     </div>
   );
 }
@@ -70,12 +78,12 @@ export function restoreMessages(stored: StoredMessage[]): ChatMsg[] {
       content = j ? (
         <div className="space-y-3">
           <p className="text-xs font-black uppercase tracking-widest text-trebol-text/50">
-            Frase {j.index + 1} de {j.total}
+            Phrase {j.index + 1} of {j.total}
           </p>
           <div className="bg-trebol-bg border-2 border-trebol-primary/30 rounded-xl p-4">
             <p className="text-xl font-extrabold text-trebol-text leading-relaxed">{j.phrase}</p>
           </div>
-          <p className="text-sm text-trebol-text/60">Escucha la frase y luego grábate pronunciándola.</p>
+          <p className="text-sm text-trebol-text/60">Listen to the phrase, then record yourself saying it.</p>
         </div>
       ) : <span>{m.content_text}</span>;
     } else if (m.msg_type === 'image_scene') {
@@ -83,7 +91,7 @@ export function restoreMessages(stored: StoredMessage[]): ChatMsg[] {
       content = (
         <div className="space-y-3">
           <p className="text-sm text-trebol-text/60">
-            Describe lo que ves en esta imagen en inglés. Tienes 60 segundos.
+            Describe what you see in this image in English. You have 60 seconds.
           </p>
           {m.content_text ? (
             <img
@@ -97,14 +105,14 @@ export function restoreMessages(stored: StoredMessage[]): ChatMsg[] {
         </div>
       );
     } else if (m.msg_type === 'evaluation') {
-      const j = m.content_json as { score: number; feedback: string; transcribed_text?: string } | null;
+      const j = m.content_json as { score: number; feedback: string; transcribed_text?: string; model_answer?: string } | null;
       content = j
-        ? renderEvaluationContent(j.score, j.feedback, j.transcribed_text)
+        ? renderEvaluationContent(j.score, j.feedback, j.transcribed_text, j?.model_answer)
         : <span>{m.content_text}</span>;
     } else if (m.msg_type === 'user_audio') {
       content = (
         <span className="flex items-center gap-2 text-sm">
-          <Mic size={14} /> Audio grabado
+          <Mic size={14} /> Audio recorded
         </span>
       );
     } else {
@@ -145,6 +153,7 @@ export interface UsePracticeChatReturn {
   handleAudioStart: () => Promise<void>;
   stopRecording: () => void;
   handleNext: () => void;
+  handleRetry: () => void;
   handleListen: (text: string) => Promise<void>;
   handleImageConfig: (config: SceneConfig) => Promise<void>;
   // Refs needed by JSX
@@ -245,7 +254,7 @@ export function usePracticeChat({
         {
           id: crypto.randomUUID(),
           role: 'bob' as const,
-          content: <span className="text-red-500">No pude acceder al micrófono. Revisa los permisos.</span>,
+          content: <span className="text-red-500">Could not access microphone. Please check your permissions.</span>,
         },
       ]);
     }, []),
@@ -267,7 +276,7 @@ export function usePracticeChat({
     const { error } = await saveMessageAction({ ...input, session_id: sid });
     if (error) {
       console.error('[saveMsg] failed:', error, 'msg_type:', input.msg_type);
-      setSaveError(`Error al guardar mensaje (${input.msg_type})`);
+      setSaveError(`Error saving message (${input.msg_type})`);
       // Auto-clear after 4 seconds
       setTimeout(() => setSaveError(null), 4000);
     }
@@ -278,18 +287,18 @@ export function usePracticeChat({
   const renderPhrase = (phrase: string, index: number, total: number) => (
     <div className="space-y-3">
       <p className="text-xs font-black uppercase tracking-widest text-trebol-text/50">
-        Frase {index + 1} de {total}
+        Phrase {index + 1} of {total}
       </p>
       <div className="bg-trebol-bg border-2 border-trebol-primary/30 rounded-xl p-4">
         <p className="text-xl font-extrabold text-trebol-text leading-relaxed">{phrase}</p>
       </div>
-      <p className="text-sm text-trebol-text/60">Escucha la frase y luego grábate pronunciándola.</p>
+      <p className="text-sm text-trebol-text/60">Listen to the phrase, then record yourself saying it.</p>
       <button
         type="button"
         onClick={() => handleListen(phrase)}
         className="flex items-center gap-2 text-sm font-bold text-trebol-primary hover:opacity-75 transition-opacity"
       >
-        <Volume2 size={16} /> Escuchar pronunciación
+        <Volume2 size={16} /> Listen to pronunciation
       </button>
     </div>
   );
@@ -297,7 +306,7 @@ export function usePracticeChat({
   const renderScene = (scene: ImageScene & { image_data?: string }) => (
     <div className="space-y-3">
       <p className="text-sm text-trebol-text/60">
-        Describe lo que ves en esta imagen en inglés. Tienes 60 segundos.
+        Describe what you see in this image in English. You have 60 seconds.
       </p>
       {scene.image_data && (
         <img
@@ -317,29 +326,29 @@ export function usePracticeChat({
     if (mode === 'situation') {
       addBobMessage(
         <p>
-          ¡Hola! Soy <strong>BOB</strong>, tu coach de pronunciación. ¿Sobre qué situación quieres practicar hoy?
+          Hi! I&apos;m <strong>BOB</strong>, your pronunciation coach. What situation would you like to practice today?
           <br />
           <span className="text-trebol-text/60 text-sm">
-            Ej: &quot;En una entrevista de trabajo&quot; o &quot;Pidiendo direcciones en la calle&quot;.
+            E.g. &quot;In a job interview&quot; or &quot;Asking for directions on the street&quot;.
           </span>
         </p>
       );
       saveMsg({
         role: 'bob',
         msg_type: 'text',
-        content_text: '¡Hola! Soy BOB, tu coach de pronunciación. ¿Sobre qué situación quieres practicar hoy?',
+        content_text: "Hi! I'm BOB, your pronunciation coach. What situation would you like to practice today?",
       });
     } else {
       addBobMessage(
         <div className="space-y-3">
-          <p>¡Vamos a practicar descripción de imágenes! Configura tu escena:</p>
+          <p>Let&apos;s practice image description! Configure your scene:</p>
           <ImageConfigSelection onConfirm={handleImageConfig} />
         </div>
       );
       saveMsg({
         role: 'bob',
         msg_type: 'text',
-        content_text: '¡Vamos a practicar descripción de imágenes! Configura tu escena:',
+        content_text: "Let's practice image description! Configure your scene:",
       });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -370,12 +379,12 @@ export function usePracticeChat({
     setPhase('generating');
     addBobMessage(
       <span className="flex items-center gap-2 text-trebol-text/70">
-        <Loader2 size={16} className="animate-spin" /> Creando tu práctica...
+        <Loader2 size={16} className="animate-spin" /> Creating your practice...
       </span>
     );
     if (!sessionStartedRef.current) {
       sessionStartedRef.current = true;
-      const id = await onSessionStart(t.slice(0, 60) || 'Práctica de frases');
+      const id = await onSessionStart(t.slice(0, 60) || 'Phrase practice');
       if (id) sessionIdRef.current = id;
     }
     try {
@@ -389,7 +398,7 @@ export function usePracticeChat({
     } catch {
       setMessages(prev => prev.slice(0, -1));
       addBobMessage(
-        <span className="text-red-500">No pude generar las frases. ¿Intentamos con otro tema?</span>
+        <span className="text-red-500">Could not generate phrases. Want to try a different topic?</span>
       );
       setPhase('topic-input');
     }
@@ -413,7 +422,7 @@ export function usePracticeChat({
     if (!cfg) {
       addBobMessage(
         <div className="space-y-3">
-          <p>¡Elige la próxima escena!</p>
+          <p>Choose the next scene!</p>
           <ImageConfigSelection onConfirm={handleImageConfig} />
         </div>
       );
@@ -423,7 +432,7 @@ export function usePracticeChat({
     setPhase('generating');
     addBobMessage(
       <span className="flex items-center gap-2 text-trebol-text/70">
-        <Loader2 size={16} className="animate-spin" /> Generando nueva escena...
+        <Loader2 size={16} className="animate-spin" /> Generating new scene...
       </span>
     );
     try {
@@ -439,7 +448,7 @@ export function usePracticeChat({
     } catch (err) {
       console.error('[handleNextImage]', err);
       setMessages(prev => prev.slice(0, -1));
-      addBobMessage(<span className="text-red-500">Error al generar la imagen. Intenta de nuevo.</span>);
+      addBobMessage(<span className="text-red-500">Error generating image. Please try again.</span>);
       setPhase('result');
     }
   };
@@ -450,23 +459,28 @@ export function usePracticeChat({
     saveMsg({ role: 'user', msg_type: 'text', content_text: `${config.topic} · ${config.difficulty}`, content_json: { topic: config.topic, difficulty: config.difficulty } });
     if (!sessionStartedRef.current) {
       sessionStartedRef.current = true;
-      const id = await onSessionStart(config.topic.slice(0, 60) || 'Describe la escena');
+      const id = await onSessionStart(config.topic.slice(0, 60) || 'Describe the scene');
       if (id) sessionIdRef.current = id;
     }
     await handleNextImage(config);
   };
 
   const handleAudioRecorded = async (audioBlob: Blob) => {
+    if (!audioBlob || audioBlob.size === 0) {
+      addBobMessage(<p>No audio detected. Please try again.</p>);
+      setPhase(mode === 'image' ? 'phrase-ready' : 'phrase-ready');
+      return;
+    }
     addUserMessage(
       <span className="flex items-center gap-2 text-sm">
-        <Mic size={14} /> Audio grabado
+        <Mic size={14} /> Audio recorded
       </span>
     );
-    saveMsg({ role: 'user', msg_type: 'user_audio', content_text: 'Audio grabado' });
+    saveMsg({ role: 'user', msg_type: 'user_audio', content_text: 'Audio recorded' });
     setPhase('evaluating');
     addBobMessage(
       <span className="flex items-center gap-2 text-trebol-text/70">
-        <Loader2 size={16} className="animate-spin" /> Analizando tu pronunciación...
+        <Loader2 size={16} className="animate-spin" /> Analyzing your pronunciation...
       </span>
     );
     try {
@@ -482,7 +496,8 @@ export function usePracticeChat({
             );
       setCurrentResult(result);
       setMessages(prev => prev.slice(0, -1));
-      addBobMessage(renderEvaluationContent(result.score, result.feedback, result.transcribed_text));
+      const modelAnswer = mode === 'image' ? result.model_answer : undefined;
+      addBobMessage(renderEvaluationContent(result.score, result.feedback, result.transcribed_text, modelAnswer));
       saveMsg({
         role: 'bob',
         msg_type: 'evaluation',
@@ -490,13 +505,14 @@ export function usePracticeChat({
           score: result.score,
           feedback: result.feedback,
           transcribed_text: result.transcribed_text ?? null,
+          model_answer: result.model_answer ?? null,
         },
       });
       setPhase('result');
     } catch {
       setMessages(prev => prev.slice(0, -1));
       addBobMessage(
-        <span className="text-red-500">Error al evaluar. ¿Intentamos de nuevo?</span>
+        <span className="text-red-500">Evaluation error. Want to try again?</span>
       );
       setPhase('phrase-ready');
     }
@@ -508,6 +524,11 @@ export function usePracticeChat({
   const handleAudioStart = async () => {
     await startRecordingHook();
     setPhase('recording');
+  };
+
+  const handleRetry = () => {
+    setPhase('phrase-ready');
+    setCurrentResult(null);
   };
 
   const handleNext = () => {
@@ -523,12 +544,12 @@ export function usePracticeChat({
         });
         setPhase('phrase-ready');
       } else {
-        const completionText = `¡Sesión completada! Has practicado ${dynamicPhrases.length} frases sobre "${topic}". ¡Sigue así!`;
+        const completionText = `Session complete! You practiced ${dynamicPhrases.length} phrases about "${topic}". Keep it up!`;
         addBobMessage(
           <div className="space-y-1">
-            <p className="font-black text-trebol-primary">¡Sesión completada! 🎉</p>
+            <p className="font-black text-trebol-primary">Session complete! 🎉</p>
             <p className="text-sm text-trebol-text/70">
-              Has practicado {dynamicPhrases.length} frases sobre &quot;{topic}&quot;. ¡Sigue así!
+              You practiced {dynamicPhrases.length} phrases about &quot;{topic}&quot;. Keep it up!
             </p>
           </div>
         );
@@ -557,6 +578,7 @@ export function usePracticeChat({
     handleAudioStart,
     stopRecording,
     handleNext,
+    handleRetry,
     handleListen,
     handleImageConfig,
     messagesEndRef,
