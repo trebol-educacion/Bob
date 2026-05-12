@@ -1,13 +1,15 @@
 'use server';
 
 import { createSupabaseServer } from '@/lib/supabase/server';
+import type { PracticeMode } from '@/lib/types/practice';
 
-export type SessionMode = 'situation' | 'image' | 'conversation';
+/** @deprecated Use PracticeMode from '@/lib/types/practice' directly. */
+export type SessionMode = PracticeMode;
 
 export interface BobSession {
   id: string;
   user_id: string;
-  mode: SessionMode;
+  mode: PracticeMode;
   topic: string | null;
   title: string;
   created_at: string;
@@ -20,7 +22,7 @@ export interface ActionResult<T> {
 }
 
 export async function createSessionAction(input: {
-  mode: SessionMode;
+  mode: PracticeMode;
   topic?: string | null;
   title: string;
 }): Promise<ActionResult<BobSession>> {
