@@ -26,7 +26,7 @@ type AppState =
 export default function App() {
   const [appState, setAppState] = useState<AppState>('mode-selection');
   const [userEmail, setUserEmail] = useState<string | undefined>();
-  const { organization } = useOrganization();
+  const { organization, enabledModes } = useOrganization();
 
   useEffect(() => {
     const supabase = createSupabaseBrowser();
@@ -136,12 +136,23 @@ export default function App() {
                 exit={{ opacity: 0, y: -20 }}
                 className="w-full flex-1 overflow-y-auto"
               >
-                <div className="w-full max-w-4xl mx-auto flex flex-col items-center py-8 px-4 pb-12">
-                  {organization && (
-                    <p className="text-sm text-trebol-text/50 mb-4 text-center">{organization.name}</p>
-                  )}
-                  <ModeSelection onSelect={handleModeSelect} />
-                </div>
+                {organization && organization.is_bob_enabled === false ? (
+                  <div className="w-full flex-1 flex flex-col items-center justify-center py-24 px-4 text-center">
+                    <div className="bg-white shadow-md rounded-2xl p-10 max-w-md w-full space-y-3">
+                      <p className="text-2xl font-black text-trebol-text">Bob no está disponible en tu colegio</p>
+                      <p className="text-trebol-text opacity-60 font-medium text-sm">
+                        Contacta con el administrador de tu colegio si crees que es un error.
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="w-full max-w-4xl mx-auto flex flex-col items-center py-8 px-4 pb-12">
+                    {organization && (
+                      <p className="text-sm text-trebol-text/50 mb-4 text-center">{organization.name}</p>
+                    )}
+                    <ModeSelection onSelect={handleModeSelect} enabledModes={enabledModes} />
+                  </div>
+                )}
               </motion.div>
             )}
 
