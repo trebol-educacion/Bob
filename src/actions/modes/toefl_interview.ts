@@ -6,10 +6,7 @@ import { getAiClient } from '../_shared';
 import { MODELS } from '@/lib/models';
 import { ToeflEvaluationSchema } from '@/lib/types/practice';
 import type { ToeflEvaluation } from '@/lib/types/practice';
-import {
-  buildToeflInterviewPrompt,
-  buildToeflResponseEvaluationPrompt,
-} from '@/lib/prompts/toefl_interview';
+import { getPrompt } from '@/lib/prompts/db-prompts';
 
 const ToeflQuestionSchema = z.object({
   text: z.string(),
@@ -32,7 +29,7 @@ export type ToeflQuestion = z.infer<typeof ToeflQuestionSchema>;
  */
 export async function generateToeflInterviewAction(): Promise<ToeflInterviewPlan> {
   const ai = getAiClient();
-  const prompt = buildToeflInterviewPrompt();
+  const prompt = await getPrompt('toefl_interview_plan');
 
   const response = await ai.models.generateContent({
     model: MODELS.FLASH_LITE_PREVIEW,
@@ -81,7 +78,7 @@ export async function evaluateToeflResponseAction(
   mimeType: string
 ): Promise<ToeflEvaluation> {
   const ai = getAiClient();
-  const prompt = buildToeflResponseEvaluationPrompt(question);
+  const prompt = await getPrompt('toefl_interview_evaluation', { QUESTION: question });
 
   const response = await ai.models.generateContent({
     model: MODELS.FLASH_LITE_PREVIEW,

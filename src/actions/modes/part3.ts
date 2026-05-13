@@ -7,11 +7,7 @@ import {
   CollaborativeEvaluationSchema,
   type CollaborativeEvaluation,
 } from '@/lib/types/practice';
-import {
-  buildPart3ScenarioPrompt,
-  buildPart3ChatPrompt,
-  buildPart3EvaluationPrompt,
-} from '@/lib/prompts/part3';
+import { getPrompt } from '@/lib/prompts/db-prompts';
 
 export type Part3Scenario = {
   topic: string;
@@ -42,7 +38,7 @@ export async function generatePart3ScenarioAction(): Promise<Part3Scenario> {
 
   const response = await ai.models.generateContent({
     model: MODELS.FLASH_LITE_PREVIEW,
-    contents: [{ role: 'user', parts: [{ text: buildPart3ScenarioPrompt() }] }],
+    contents: [{ role: 'user', parts: [{ text: await getPrompt('b1_part3_scenario') }] }],
     config: {
       responseMimeType: 'application/json',
     },
@@ -72,15 +68,18 @@ export async function chatPart3Action(
 ): Promise<{ transcribed: string; examinerResponse: string }> {
   const ai = getAiClient();
 
-  const systemInstruction = buildPart3ChatPrompt(scenario, history);
+  const historyText = history
+    .map((h) => `${h.role === 'examiner' ? 'Examiner' : 'Candidate'}: ${h.text}`)
+    .join('\n') || '(just starting)';
+  const systemInstruction = await getPrompt('b1_part3_chat', {
+    SCENE_TOPIC: scenario.topic,
+    SCENE_SITUATION: scenario.situation,
+    SCENE_QUESTION: scenario.prompt_question,
+    SCENE_OPTIONS: scenario.options.join(', '),
+    HISTORY_TEXT: historyText,
+  });
 
-  const prompt = `Listen to the candidate's audio. First transcribe exactly what they said, then generate your next examiner response based on the conversation context.
-
-Respond ONLY with valid JSON:
-{
-  "transcribed": "exact transcription of the candidate's speech",
-  "examiner_response": "your next examiner line (under 30 words)"
-}`;
+  const prompt = await getPrompt('b1_part3_chat_audio');
 
   const response = await ai.models.generateContent({
     model: MODELS.FLASH_LITE_PREVIEW,
@@ -130,7 +129,16 @@ export async function chatPart3TextAction(
 ): Promise<{ examinerResponse: string }> {
   const ai = getAiClient();
 
-  const systemInstruction = buildPart3ChatPrompt(scenario, history);
+  const historyText = history
+    .map((h) => `${h.role === 'examiner' ? 'Examiner' : 'Candidate'}: ${h.text}`)
+    .join('\n') || '(just starting)';
+  const systemInstruction = await getPrompt('b1_part3_chat', {
+    SCENE_TOPIC: scenario.topic,
+    SCENE_SITUATION: scenario.situation,
+    SCENE_QUESTION: scenario.prompt_question,
+    SCENE_OPTIONS: scenario.options.join(', '),
+    HISTORY_TEXT: historyText,
+  });
 
   const prompt = `${systemInstruction}
 
@@ -154,7 +162,14 @@ export async function evaluatePart3Action(
 ): Promise<CollaborativeEvaluation> {
   const ai = getAiClient();
 
-  const prompt = buildPart3EvaluationPrompt(scenario, history);
+  const historyText = history
+    .map((h) => `${h.role === 'examiner' ? 'Examiner' : 'Candidate'}: ${h.text}`)
+    .join('\n');
+  const prompt = await getPrompt('b1_part3_eval', {
+    SCENE_TOPIC: scenario.topic,
+    SCENE_QUESTION: scenario.prompt_question,
+    HISTORY_TEXT: historyText,
+  });
 
   const response = await ai.models.generateContent({
     model: MODELS.FLASH_LITE_PREVIEW,

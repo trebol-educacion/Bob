@@ -2,20 +2,7 @@
 
 import { GoogleGenAI, Type, Part } from '@google/genai';
 import { MODELS } from '@/lib/models';
-import {
-  buildTopicPhrasesPrompt,
-  buildPronunciationEvaluationPrompt,
-  buildImageDescriptionEvaluationPrompt,
-  buildImageGenerationPrompt,
-  buildImageScenePrompt,
-  buildB2ImageEvaluationContext,
-  buildInitialChatPrompt,
-  buildSimulateConversationPrompt,
-  buildGenerateQuestionsPrompt,
-  buildSimulateUserResponsePrompt,
-  buildChatConversationPrompt,
-  buildChatTextConversationPrompt,
-} from '@/lib/prompts';
+import { getPrompt } from '@/lib/prompts/db-prompts';
 import {
   PhraseGenerationSchema,
   ImageSceneSchema,
@@ -106,7 +93,7 @@ export async function generateSpeechAction(text: string): Promise<{ data: string
  * Generates 10 progressive phrases based on a user-provided topic.
  */
 export async function generateTopicPhrasesAction(topic: string): Promise<string[]> {
-  const prompt = buildTopicPhrasesPrompt(topic);
+  const prompt = await getPrompt('situation_phrases', { TOPIC: topic });
 
   try {
     const response = await ai.models.generateContent({
@@ -149,7 +136,7 @@ export async function generateImageAction(prompt: string): Promise<string> {
       model: MODELS.IMAGE,
       contents: [{
         role: 'user',
-        parts: [{ text: buildImageGenerationPrompt(prompt) }]
+        parts: [{ text: await getPrompt('image_generation_prompt', { SCENE_PROMPT: prompt }) }]
       }],
       config: {
         responseModalities: ['IMAGE'],
@@ -179,7 +166,10 @@ export async function generateImageSceneAction(
   difficulty: string = 'intermediate',
   level: 'b1' | 'b2' = 'b1'
 ): Promise<ImageScene> {
-  const prompt = buildImageScenePrompt(topic, difficulty, level);
+  const prompt = await getPrompt(
+    level === 'b2' ? 'image_scene_b2' : 'image_scene_b1',
+    { TOPIC: topic, DIFFICULTY: difficulty }
+  );
 
   try {
     const response = await ai.models.generateContent({
@@ -213,10 +203,10 @@ export async function evaluateImageDescriptionAction(
   sceneDescription: string,
   level: 'b1' | 'b2' = 'b1'
 ): Promise<EvaluationResult> {
-  const basePrompt = buildImageDescriptionEvaluationPrompt(sceneDescription);
+  const basePrompt = await getPrompt('image_evaluation_b1', { SCENE_DESCRIPTION: sceneDescription });
   const prompt =
     level === 'b2'
-      ? `${basePrompt}\n\n${buildB2ImageEvaluationContext()}`
+      ? `${basePrompt}\n\n${await getPrompt('image_evaluation_b2_modifier')}`
       : basePrompt;
 
   try {
@@ -266,7 +256,7 @@ export async function evaluatePronunciationAction(
   mimeType: string,
   targetPhrase: string
 ): Promise<EvaluationResult> {
-  const prompt = buildPronunciationEvaluationPrompt(targetPhrase);
+  const prompt = await getPrompt('situation_evaluation', { TARGET_PHRASE: targetPhrase });
 
   try {
     const response = await ai.models.generateContent({
@@ -309,7 +299,7 @@ export interface InitialChatResult {
  * Falls back gracefully — intentional fallback, do NOT convert to throw.
  */
 export async function generateInitialChatAction(topic: string): Promise<InitialChatResult> {
-  const prompt = buildInitialChatPrompt(topic);
+  const prompt = await getPrompt('conversation_initial', { TOPIC: topic });
 
   try {
     const response = await ai.models.generateContent({
@@ -353,7 +343,7 @@ export async function simulateConversationAction(
   history: ChatMessage[],
   topic: string
 ): Promise<ChatMessage[]> {
-  const prompt = buildSimulateConversationPrompt(topic);
+  const prompt = await getPrompt('conversation_simulate', { TOPIC: topic });
 
   try {
     const response = await ai.models.generateContent({
@@ -398,7 +388,8 @@ export async function generateQuestionsAction(
   history: ChatMessage[],
   topic: string
 ): Promise<Question[]> {
-  const prompt = buildGenerateQuestionsPrompt(history, topic);
+  const historyText = history.map(m => `${m.role}: ${m.text}`).join('\n');
+  const prompt = await getPrompt('conversation_questions', { TOPIC: topic, HISTORY_TEXT: historyText });
 
   try {
     const response = await ai.models.generateContent({
@@ -444,7 +435,7 @@ export async function simulateUserResponseAction(
   history: ChatMessage[],
   topic: string
 ): Promise<string> {
-  const prompt = buildSimulateUserResponsePrompt(topic);
+  const prompt = await getPrompt('conversation_simulate_user', { TOPIC: topic });
 
   try {
     const response = await ai.models.generateContent({
@@ -473,7 +464,7 @@ export async function chatTextConversationAction(
   history: ChatMessage[],
   topic: string
 ): Promise<ChatTurnResult> {
-  const prompt = buildChatTextConversationPrompt(topic, userText);
+  const prompt = await getPrompt('conversation_eval_text', { TOPIC: topic, USER_TEXT: userText });
 
   try {
     const response = await ai.models.generateContent({
@@ -538,7 +529,7 @@ export async function chatConversationAction(
   history: ChatMessage[],
   topic: string
 ): Promise<ChatTurnResult> {
-  const prompt = buildChatConversationPrompt(topic);
+  const prompt = await getPrompt('conversation_eval_audio', { TOPIC: topic });
 
   try {
     // 1. Get Evaluation and Text Response

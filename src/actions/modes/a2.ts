@@ -4,11 +4,7 @@ import { z } from 'zod';
 import { getAiClient } from '../_shared';
 import { MODELS } from '@/lib/models';
 import { CambridgeEvaluationSchema, type CambridgeEvaluation } from '@/lib/types/practice';
-import {
-  buildA2SessionPrompt,
-  buildA2ExaminerReactionPrompt,
-  buildA2FinalEvaluationPrompt,
-} from '@/lib/prompts/a2';
+import { getPrompt } from '@/lib/prompts/db-prompts';
 
 const A2SessionPlanSchema = z.object({
   phase1_questions: z.array(z.string()).length(3),
@@ -26,7 +22,7 @@ export async function generateA2SessionAction(): Promise<A2SessionPlan> {
 
   const response = await ai.models.generateContent({
     model: MODELS.FLASH_LITE_PREVIEW,
-    contents: [{ role: 'user', parts: [{ text: buildA2SessionPrompt() }] }],
+    contents: [{ role: 'user', parts: [{ text: await getPrompt('a2_session') }] }],
     config: {
       responseMimeType: 'application/json',
     },
@@ -63,7 +59,7 @@ export async function processA2AnswerAction(
         role: 'user',
         parts: [
           {
-            text: 'Please transcribe exactly what the candidate said in this audio. Respond with ONLY the transcribed text, nothing else.',
+            text: await getPrompt('a2_transcribe_audio'),
           },
           {
             inlineData: {
@@ -84,7 +80,7 @@ export async function processA2AnswerAction(
     contents: [
       {
         role: 'user',
-        parts: [{ text: buildA2ExaminerReactionPrompt(question, transcribed) }],
+        parts: [{ text: await getPrompt('a2_examiner_reaction', { QUESTION: question, TRANSCRIBED_ANSWER: transcribed }) }],
       },
     ],
   });
@@ -99,7 +95,10 @@ export async function evaluateA2FinalAction(
 ): Promise<CambridgeEvaluation> {
   const ai = getAiClient();
 
-  const prompt = buildA2FinalEvaluationPrompt(questionsAndAnswers);
+  const transcript = questionsAndAnswers
+    .map((qa, i) => `Q${i + 1}: ${qa.question}\nA: ${qa.answer}`)
+    .join('\n\n');
+  const prompt = await getPrompt('a2_final_evaluation', { TRANSCRIPT: transcript });
 
   const response = await ai.models.generateContent({
     model: MODELS.FLASH_LITE_PREVIEW,

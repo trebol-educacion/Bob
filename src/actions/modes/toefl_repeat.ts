@@ -5,7 +5,7 @@ import { GoogleGenAI, Type, Part } from '@google/genai';
 import { getAiClient } from '../_shared';
 import { MODELS } from '@/lib/models';
 import { RepetitionEvaluationSchema, RepetitionEvaluation } from '@/lib/types/practice';
-import { buildToeflRepeatSessionPrompt, buildRepetitionEvaluationPrompt } from '@/lib/prompts/toefl_repeat';
+import { getPrompt } from '@/lib/prompts/db-prompts';
 
 const ToeflRepeatItemSchema = z.object({
   text: z.string(),
@@ -28,7 +28,7 @@ export type ToeflAudioChunk = {
  */
 export async function generateToeflRepeatSessionAction(): Promise<ToeflRepeatItem[]> {
   const ai = getAiClient();
-  const prompt = buildToeflRepeatSessionPrompt();
+  const prompt = await getPrompt('toefl_repeat_session');
 
   const response = await ai.models.generateContent({
     model: MODELS.FLASH_LITE_PREVIEW,
@@ -126,7 +126,7 @@ export async function evaluateRepetitionAction(
   mimeType: string
 ): Promise<RepetitionEvaluation> {
   const ai = getAiClient();
-  const prompt = buildRepetitionEvaluationPrompt(originalText);
+  const prompt = await getPrompt('toefl_repeat_evaluation', { ORIGINAL_TEXT: originalText });
 
   const response = await ai.models.generateContent({
     model: MODELS.FLASH_LITE_PREVIEW,
