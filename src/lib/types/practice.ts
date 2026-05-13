@@ -11,6 +11,28 @@ export type PracticeMode =
   | 'b2_speaking'
   | null;
 
+export type ModeKey = NonNullable<PracticeMode>;
+
+export type ModeFramework = 'generic' | 'cambridge' | 'toefl';
+
+export type CefrLevel = 'a1' | 'a2' | 'b1' | 'b2' | 'c1' | 'c2';
+
+export interface ModeDef {
+  framework: ModeFramework;
+  cefrLevels: CefrLevel[];
+}
+
+export const MODE_CATALOG: Record<ModeKey, ModeDef> = {
+  situation:           { framework: 'generic',   cefrLevels: [] },
+  image:               { framework: 'generic',   cefrLevels: [] },
+  conversation:        { framework: 'generic',   cefrLevels: [] },
+  a2_part1:            { framework: 'cambridge', cefrLevels: ['a2'] },
+  b1_collaborative:    { framework: 'cambridge', cefrLevels: ['b1'] },
+  b2_speaking:         { framework: 'cambridge', cefrLevels: ['b2'] },
+  toefl_listen_repeat: { framework: 'toefl',     cefrLevels: ['a2', 'b1', 'b2'] },
+  toefl_interview:     { framework: 'toefl',     cefrLevels: ['b1', 'b2', 'c1'] },
+};
+
 export type ExamLevel = 'a2' | 'b1' | 'b2' | 'toefl';
 
 export const BaseEvaluationResultSchema = z.object({
