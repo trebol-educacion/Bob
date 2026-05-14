@@ -374,6 +374,19 @@ export function YLVoiceNote({
   );
 }
 
+export function YLBobTextMessage({ text }: { text: string }) {
+  return (
+    <div className="flex justify-start gap-2">
+      <div className="w-8 h-8 rounded-full bg-trebol-primary/15 flex items-center justify-center shrink-0 text-xs font-bold text-trebol-primary mt-1">
+        B
+      </div>
+      <div className="rounded-2xl px-4 py-2 bg-white border border-trebol-border text-trebol-text text-sm max-w-sm font-semibold">
+        {text}
+      </div>
+    </div>
+  );
+}
+
 export function YLImageMessage({ src }: { src: string }) {
   const finalSrc = src.startsWith('data:') ? src : `data:image/png;base64,${src}`;
   return (

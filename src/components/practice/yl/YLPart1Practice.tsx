@@ -38,6 +38,7 @@ import {
   YLVoiceNote,
   YLImageMessage,
   YLUserTextMessage,
+  YLBobTextMessage,
   YLChatMicBar,
 } from './_shared';
 
@@ -369,26 +370,28 @@ export function YLPart1Practice({
 
   type ChatItem =
     | { kind: 'image'; id: string; src: string }
-    | { kind: 'cue'; id: string; text: string }
+    | { kind: 'bob-text'; id: string; text: string }
+    | { kind: 'bob-voice'; id: string; text: string }
     | { kind: 'user-text'; id: string; text: string }
-    | { kind: 'reaction'; id: string; text: string };
+    | { kind: 'reaction-text'; id: string; text: string }
+    | { kind: 'reaction-voice'; id: string; text: string };
 
   const chatItems: ChatItem[] = [];
   images.forEach((src, i) => chatItems.push({ kind: 'image', id: `img-${i}`, src }));
   for (let i = 0; i <= cueIndex; i++) {
     if (plan?.cues[i]) {
-      chatItems.push({ kind: 'cue', id: `cue-${i}`, text: plan.cues[i] });
+      chatItems.push({ kind: 'bob-text', id: `cue-t-${i}`, text: plan.cues[i] });
+      chatItems.push({ kind: 'bob-voice', id: `cue-v-${i}`, text: plan.cues[i] });
     }
     if (i < cueIndex) {
       const past = turnQAsRef.current[i];
       chatItems.push({ kind: 'user-text', id: `u-${i}`, text: past?.transcript || '' });
-      // Pre-built history reactions could go here when reloaded — for now we
-      // only show the reaction for the most recently completed turn below.
     }
   }
   if (phase === 'reaction-ready' && currentReaction) {
     chatItems.push({ kind: 'user-text', id: `u-curr`, text: '' });
-    chatItems.push({ kind: 'reaction', id: `r-${cueIndex}`, text: currentReaction });
+    chatItems.push({ kind: 'reaction-text', id: `r-t-${cueIndex}`, text: currentReaction });
+    chatItems.push({ kind: 'reaction-voice', id: `r-v-${cueIndex}`, text: currentReaction });
   }
 
   const canRecord = phase === 'cue-ready' || phase === 'playing-cue';
@@ -409,12 +412,14 @@ export function YLPart1Practice({
             switch (item.kind) {
               case 'image':
                 return <YLImageMessage key={item.id} src={item.src} />;
-              case 'cue':
+              case 'bob-text':
+              case 'reaction-text':
+                return <YLBobTextMessage key={item.id} text={item.text} />;
+              case 'bob-voice':
+              case 'reaction-voice':
                 return <YLVoiceNote key={item.id} text={item.text} side="bob" />;
               case 'user-text':
                 return <YLUserTextMessage key={item.id} text={item.text} />;
-              case 'reaction':
-                return <YLVoiceNote key={item.id} text={item.text} side="bob" />;
             }
           })}
           {isProcessing && (
