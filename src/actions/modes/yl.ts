@@ -99,6 +99,79 @@ export async function startYLSessionAction(input: {
 }
 
 // ---------------------------------------------------------------------------
+// Persist scene image(s) so reopening the session shows them without
+// regenerating from Gemini. Idempotent per (session, image_index).
+// ---------------------------------------------------------------------------
+
+export async function persistYLImagesAction(
+  sessionId: string,
+  imageDataUris: string[]
+): Promise<void> {
+  if (imageDataUris.length === 0) return;
+  const supabase = await createSupabaseServer();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('[persistYLImagesAction] Not authenticated');
+
+  await supabase.from('bob_messages').insert(
+    imageDataUris.map((dataUri, idx) => ({
+      session_id: sessionId,
+      user_id: user.id,
+      role: 'bob' as const,
+      msg_type: 'image_scene',
+      content_text: null,
+      content_json: { image_data_uri: dataUri, image_index: idx },
+    }))
+  );
+}
+
+// ---------------------------------------------------------------------------
+// TTS cache per (session, cue_text). First call hits Gemini and persists the
+// audio in bob_messages; subsequent calls return the cached blob.
+// ---------------------------------------------------------------------------
+
+import { generateSpeechAction } from '@/actions/gemini';
+
+export async function getOrCreateCueAudioAction(
+  sessionId: string,
+  cueText: string
+): Promise<{ data: string; mimeType: string }> {
+  const supabase = await createSupabaseServer();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('[getOrCreateCueAudioAction] Not authenticated');
+
+  // Look up cached audio
+  const { data: existing } = await supabase
+    .from('bob_messages')
+    .select('content_json')
+    .eq('session_id', sessionId)
+    .eq('msg_type', 'yl_tts')
+    .eq('content_text', cueText)
+    .limit(1)
+    .maybeSingle();
+
+  if (existing?.content_json) {
+    const cached = existing.content_json as { audio_b64?: string; mime?: string };
+    if (cached.audio_b64) {
+      return { data: cached.audio_b64, mimeType: cached.mime ?? 'audio/L16;codec=pcm;rate=24000' };
+    }
+  }
+
+  // Cache miss → call Gemini and persist
+  const { data, mimeType } = await generateSpeechAction(cueText);
+
+  await supabase.from('bob_messages').insert({
+    session_id: sessionId,
+    user_id: user.id,
+    role: 'bob' as const,
+    msg_type: 'yl_tts',
+    content_text: cueText,
+    content_json: { audio_b64: data, mime: mimeType },
+  });
+
+  return { data, mimeType };
+}
+
+// ---------------------------------------------------------------------------
 // T3.3 — generateYLContentAction
 // Calls Gemini to produce the YL session plan (cues + image prompts if needed).
 // For parts that require images, also returns image_prompts to pass to

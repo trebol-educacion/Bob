@@ -9,6 +9,7 @@ import React from 'react';
 import { motion } from 'motion/react';
 import { ArrowLeft, Mic, MicOff, CheckCircle } from 'lucide-react';
 import { generateSpeechAction } from '@/actions/gemini';
+import { getOrCreateCueAudioAction } from '@/actions/modes/yl';
 import { pcmToWavBase64 } from '@/lib/audio';
 import type { EvalResponse } from '@/lib/types/practice';
 
@@ -265,10 +266,13 @@ export function YLVoiceNote({
   text,
   side = 'bob',
   durationHint,
+  sessionId,
 }: {
   text: string;
   side?: 'bob' | 'user';
   durationHint?: number; // seconds, optional
+  /** When provided, audio is cached per (sessionId, text) in the DB. */
+  sessionId?: string;
 }) {
   const [playing, setPlaying] = React.useState(false);
   const [duration, setDuration] = React.useState<number | null>(durationHint ?? null);
@@ -298,7 +302,19 @@ export function YLVoiceNote({
     }
     try {
       stopCurrentAudio();
-      const { data, mimeType } = await generateSpeechAction(text);
+      // Prefer the cached-on-DB action when we have a sessionId so we don't
+      // hit Gemini twice for the same cue.
+      let data: string;
+      let mimeType: string;
+      if (sessionId) {
+        const cached = await getOrCreateCueAudioAction(sessionId, text);
+        data = cached.data;
+        mimeType = cached.mimeType;
+      } else {
+        const fresh = await generateSpeechAction(text);
+        data = fresh.data;
+        mimeType = fresh.mimeType;
+      }
       const url = pcmToWavBase64(data, mimeType);
       const audio = new Audio(url);
       audioRef.current = audio;

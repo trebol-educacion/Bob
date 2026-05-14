@@ -2,7 +2,7 @@
 
 import { createSupabaseServer } from '@/lib/supabase/server';
 
-export type MsgType = 'text' | 'phrase' | 'image_scene' | 'evaluation' | 'user_audio' | 'yl_cue';
+export type MsgType = 'text' | 'phrase' | 'image_scene' | 'evaluation' | 'user_audio' | 'yl_cue' | 'yl_tts';
 
 export interface StoredMessage {
   id: string;

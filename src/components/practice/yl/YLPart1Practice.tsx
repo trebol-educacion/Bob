@@ -21,6 +21,7 @@ import {
   saveYLTurnAction,
   evaluateYLFinalAction,
   getSessionMessagesAction,
+  persistYLImagesAction,
 } from '@/actions/modes/yl';
 import type { YLExam, YLPlan } from '@/lib/types/yl';
 import type { EvalResponse, ModeKey } from '@/lib/types/practice';
@@ -124,6 +125,29 @@ export function YLPart1Practice({
   // ── Init ──────────────────────────────────────────────────────────────────
 
   useEffect(() => {
+    // If we already have a sessionId (reopened from sidebar) the work is
+    // done — never regenerate. The chat is built from the persisted
+    // bob_messages passed in via initialMessages.
+    if (initialSessionId) {
+      setSessionId(initialSessionId);
+      const cuesFromMsgs = (initialMessages ?? [])
+        .filter((m) => m.role === 'bob' && m.msg_type === 'yl_cue')
+        .map((m) => (m.content_json as { cue?: string } | null)?.cue)
+        .filter((c): c is string => typeof c === 'string');
+      const imgsFromMsgs = (initialMessages ?? [])
+        .filter((m) => m.role === 'bob' && m.msg_type === 'image_scene')
+        .map((m) => (m.content_json as { image_data_uri?: string } | null)?.image_data_uri)
+        .filter((u): u is string => typeof u === 'string');
+      if (cuesFromMsgs.length > 0) {
+        setPlan({ cues: cuesFromMsgs } as YLPlan);
+      }
+      if (imgsFromMsgs.length > 0) {
+        setImages(imgsFromMsgs);
+      }
+      setPhase('finished');
+      return;
+    }
+
     if (isReadOnly) return;
 
     async function init() {
@@ -141,6 +165,12 @@ export function YLPart1Practice({
             p.character_description
           );
           setImages(imgs);
+          // Persist images so reopening this session does NOT regenerate.
+          try {
+            await persistYLImagesAction(sid, imgs);
+          } catch (err) {
+            console.warn('[YL] persist images failed (non-fatal):', err);
+          }
         }
 
         setPhase('ready');
@@ -417,7 +447,7 @@ export function YLPart1Practice({
                 return <YLBobTextMessage key={item.id} text={item.text} />;
               case 'bob-voice':
               case 'reaction-voice':
-                return <YLVoiceNote key={item.id} text={item.text} side="bob" />;
+                return <YLVoiceNote key={item.id} text={item.text} side="bob" sessionId={sessionId} />;
               case 'user-text':
                 return <YLUserTextMessage key={item.id} text={item.text} />;
             }
