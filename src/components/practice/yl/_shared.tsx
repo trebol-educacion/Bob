@@ -24,19 +24,52 @@ export const REACTION_PAUSE_MS = 1200;
 // ---------------------------------------------------------------------------
 
 let _currentAudio: HTMLAudioElement | null = null;
+let _currentText: string | null = null;
+let _cachedUrl: string | null = null;
 
 export function stopCurrentAudio(): void {
   if (_currentAudio) {
     _currentAudio.pause();
     _currentAudio = null;
   }
+  _currentText = null;
+  _cachedUrl = null;
+}
+
+export function pauseCurrentAudio(): void {
+  if (_currentAudio && !_currentAudio.paused) _currentAudio.pause();
+}
+
+export function isAudioPaused(): boolean {
+  return !!_currentAudio && _currentAudio.paused;
+}
+
+export async function resumeCurrentAudio(): Promise<void> {
+  if (_currentAudio && _currentAudio.paused) {
+    try { await _currentAudio.play(); } catch { /* ignore */ }
+  }
 }
 
 export async function playTTS(text: string): Promise<void> {
+  // Reuse the cached audio when replaying the same text (no extra TTS call).
+  if (_currentText === text && _cachedUrl) {
+    if (_currentAudio) _currentAudio.pause();
+    const audio = new Audio(_cachedUrl);
+    _currentAudio = audio;
+    await new Promise<void>((resolve) => {
+      audio.onended = () => resolve();
+      audio.onerror = () => resolve();
+      audio.play().catch(() => resolve());
+    });
+    return;
+  }
+
   stopCurrentAudio();
   try {
     const { data, mimeType } = await generateSpeechAction(text);
     const url = pcmToWavBase64(data, mimeType);
+    _currentText = text;
+    _cachedUrl = url;
     const audio = new Audio(url);
     _currentAudio = audio;
     await new Promise<void>((resolve) => {
@@ -44,7 +77,6 @@ export async function playTTS(text: string): Promise<void> {
       audio.onerror = () => resolve();
       audio.play().catch(() => resolve());
     });
-    _currentAudio = null;
   } catch {
     // Non-fatal — continue even if TTS fails
   }
@@ -221,6 +253,312 @@ export function YLReactionCard({ reaction }: { reaction: string }) {
     <div className="bg-trebol-secondary/10 rounded-xl px-5 py-4 text-center max-w-sm">
       <p className="text-trebol-text font-semibold italic">"{reaction}"</p>
       <p className="text-xs text-trebol-text/40 mt-1">Examinador</p>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Voice-note message — WhatsApp-style audio bubble using cached TTS
+// ---------------------------------------------------------------------------
+
+export function YLVoiceNote({
+  text,
+  side = 'bob',
+  durationHint,
+}: {
+  text: string;
+  side?: 'bob' | 'user';
+  durationHint?: number; // seconds, optional
+}) {
+  const [playing, setPlaying] = React.useState(false);
+  const [duration, setDuration] = React.useState<number | null>(durationHint ?? null);
+  const [progress, setProgress] = React.useState(0); // 0..1
+  const audioRef = React.useRef<HTMLAudioElement | null>(null);
+  const intervalRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const stop = React.useCallback(() => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+    setPlaying(false);
+  }, []);
+
+  React.useEffect(() => () => stop(), [stop]);
+
+  const handlePlay = React.useCallback(async () => {
+    if (playing) {
+      stop();
+      setProgress(0);
+      return;
+    }
+    try {
+      stopCurrentAudio();
+      const { data, mimeType } = await generateSpeechAction(text);
+      const url = pcmToWavBase64(data, mimeType);
+      const audio = new Audio(url);
+      audioRef.current = audio;
+      audio.onloadedmetadata = () => {
+        if (Number.isFinite(audio.duration)) setDuration(audio.duration);
+      };
+      audio.onended = () => {
+        stop();
+        setProgress(1);
+        setTimeout(() => setProgress(0), 600);
+      };
+      audio.onerror = () => stop();
+      setPlaying(true);
+      intervalRef.current = setInterval(() => {
+        if (audio.duration > 0) setProgress(audio.currentTime / audio.duration);
+      }, 100);
+      await audio.play();
+    } catch {
+      stop();
+    }
+  }, [playing, stop, text]);
+
+  const fmt = (s: number | null) => {
+    if (s === null || !Number.isFinite(s)) return '0:00';
+    const m = Math.floor(s / 60);
+    const sec = Math.floor(s % 60);
+    return `${m}:${sec.toString().padStart(2, '0')}`;
+  };
+
+  const isBob = side === 'bob';
+  const bubbleColor = isBob ? 'bg-white border border-trebol-border' : 'bg-trebol-primary/10';
+  const iconColor = isBob ? 'bg-trebol-primary text-white' : 'bg-trebol-text text-white';
+
+  return (
+    <div className={`flex ${isBob ? 'justify-start' : 'justify-end'} gap-2`}>
+      {isBob && (
+        <div className="w-8 h-8 rounded-full bg-trebol-primary/15 flex items-center justify-center shrink-0 text-xs font-bold text-trebol-primary mt-1">
+          B
+        </div>
+      )}
+      <div className={`flex items-center gap-3 rounded-2xl px-3 py-2 max-w-sm ${bubbleColor}`}>
+        <button
+          type="button"
+          onClick={handlePlay}
+          className={`w-9 h-9 rounded-full ${iconColor} flex items-center justify-center hover:opacity-90 transition-opacity`}
+          aria-label={playing ? 'Pausar' : 'Reproducir'}
+        >
+          {playing ? (
+            <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
+              <rect x="6" y="5" width="4" height="14" rx="1" />
+              <rect x="14" y="5" width="4" height="14" rx="1" />
+            </svg>
+          ) : (
+            <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
+              <path d="M8 5v14l11-7z" />
+            </svg>
+          )}
+        </button>
+        <div className="flex-1 min-w-32">
+          <div className="h-1.5 bg-trebol-text/15 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-trebol-primary transition-all"
+              style={{ width: `${Math.round(progress * 100)}%` }}
+            />
+          </div>
+          <div className="flex justify-between text-[10px] text-trebol-text/50 mt-1">
+            <span>🎤 nota de voz</span>
+            <span>{fmt(duration)}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function YLImageMessage({ src }: { src: string }) {
+  const finalSrc = src.startsWith('data:') ? src : `data:image/png;base64,${src}`;
+  return (
+    <div className="flex justify-start gap-2">
+      <div className="w-8 h-8 rounded-full bg-trebol-primary/15 flex items-center justify-center shrink-0 text-xs font-bold text-trebol-primary mt-1">
+        B
+      </div>
+      <div className="rounded-2xl overflow-hidden shadow bg-white max-w-sm">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={finalSrc} alt="Imagen" className="w-full h-auto block" />
+      </div>
+    </div>
+  );
+}
+
+export function YLUserTextMessage({ text }: { text: string }) {
+  return (
+    <div className="flex justify-end gap-2">
+      <div className="rounded-2xl px-4 py-2 bg-trebol-primary/10 text-trebol-text text-sm max-w-sm">
+        {text || <span className="text-trebol-text/40 italic">(sin audio)</span>}
+      </div>
+    </div>
+  );
+}
+
+export function YLChatMicBar({
+  onStart,
+  onStop,
+  isRecording,
+  seconds,
+  maxSeconds,
+  disabled,
+  helperText,
+}: {
+  onStart: () => void;
+  onStop: () => void;
+  isRecording: boolean;
+  seconds: number;
+  maxSeconds: number;
+  disabled?: boolean;
+  helperText?: string;
+}) {
+  return (
+    <div className="border-t border-trebol-border bg-white/90 backdrop-blur p-3 flex items-center justify-center gap-3">
+      {helperText && !isRecording && (
+        <p className="text-xs text-trebol-text/60 font-medium">{helperText}</p>
+      )}
+      {isRecording ? (
+        <>
+          <div className="flex items-center gap-2 text-red-500 font-bold text-sm">
+            <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+            {seconds}s / {maxSeconds}s
+          </div>
+          <button
+            type="button"
+            onClick={onStop}
+            className="w-14 h-14 rounded-full bg-red-500 text-white shadow-lg hover:scale-105 active:scale-95 transition-transform flex items-center justify-center"
+            aria-label="Terminar respuesta"
+          >
+            <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+              <rect x="6" y="6" width="12" height="12" rx="2" />
+            </svg>
+          </button>
+        </>
+      ) : (
+        <button
+          type="button"
+          onClick={onStart}
+          disabled={disabled}
+          className="w-14 h-14 rounded-full bg-trebol-primary text-white shadow-lg hover:scale-105 active:scale-95 transition-transform flex items-center justify-center disabled:opacity-40 disabled:hover:scale-100"
+          aria-label="Empezar a hablar"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
+            <rect x="9" y="3" width="6" height="12" rx="3" />
+            <path d="M5 11a7 7 0 0 0 14 0" />
+            <line x1="12" y1="18" x2="12" y2="22" />
+          </svg>
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Audio player controls — circular icon buttons in trebol palette
+// ---------------------------------------------------------------------------
+
+interface YLAudioControlsProps {
+  isPlaying: boolean;
+  isPaused: boolean;
+  onPlay: () => void;
+  onPause: () => void;
+  onReplay: () => void;
+  onRecord?: () => void;
+  onNext?: () => void;
+  showRecord?: boolean;
+  showNext?: boolean;
+}
+
+export function YLAudioControls({
+  isPlaying,
+  isPaused,
+  onPlay,
+  onPause,
+  onReplay,
+  onRecord,
+  onNext,
+  showRecord = false,
+  showNext = false,
+}: YLAudioControlsProps) {
+  const Btn = ({
+    onClick,
+    title,
+    children,
+    primary = false,
+    accent = false,
+    disabled = false,
+  }: {
+    onClick: () => void;
+    title: string;
+    children: React.ReactNode;
+    primary?: boolean;
+    accent?: boolean;
+    disabled?: boolean;
+  }) => {
+    const base =
+      'w-12 h-12 rounded-full flex items-center justify-center shadow-md transition-all hover:scale-105 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100';
+    const color = primary
+      ? 'bg-trebol-primary text-white'
+      : accent
+      ? 'bg-red-500 text-white'
+      : 'bg-trebol-secondary/20 text-trebol-text hover:bg-trebol-secondary/40';
+    return (
+      <button type="button" onClick={onClick} title={title} disabled={disabled} className={`${base} ${color}`}>
+        {children}
+      </button>
+    );
+  };
+
+  return (
+    <div className="flex items-center gap-3 justify-center">
+      {/* Play / Pause */}
+      {isPlaying && !isPaused ? (
+        <Btn onClick={onPause} title="Pausar">
+          <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
+            <rect x="6" y="5" width="4" height="14" rx="1" />
+            <rect x="14" y="5" width="4" height="14" rx="1" />
+          </svg>
+        </Btn>
+      ) : (
+        <Btn onClick={onPlay} title="Reproducir" primary>
+          <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
+            <path d="M8 5v14l11-7z" />
+          </svg>
+        </Btn>
+      )}
+
+      {/* Replay */}
+      <Btn onClick={onReplay} title="Volver a empezar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+          <path d="M3 12a9 9 0 1 0 3-6.7" />
+          <polyline points="3 4 3 10 9 10" />
+        </svg>
+      </Btn>
+
+      {/* Record */}
+      {showRecord && onRecord && (
+        <Btn onClick={onRecord} title="Empezar a hablar" accent>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+            <rect x="9" y="3" width="6" height="12" rx="3" />
+            <path d="M5 11a7 7 0 0 0 14 0" />
+            <line x1="12" y1="18" x2="12" y2="22" />
+          </svg>
+        </Btn>
+      )}
+
+      {/* Next */}
+      {showNext && onNext && (
+        <Btn onClick={onNext} title="Siguiente" primary>
+          <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
+            <path d="M6 4l12 8-12 8V4z" />
+            <rect x="18" y="4" width="2" height="16" />
+          </svg>
+        </Btn>
+      )}
     </div>
   );
 }

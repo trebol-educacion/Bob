@@ -31,13 +31,14 @@ import {
   YLLoadingScreen,
   YLErrorScreen,
   YLToolbar,
-  YLExaminerCard,
-  YLRecordingButton,
-  YLReactionCard,
   YLScoreDisplay,
   YLFeedbackCard,
   YLResultsHeader,
   YLReadOnlyMessage,
+  YLVoiceNote,
+  YLImageMessage,
+  YLUserTextMessage,
+  YLChatMicBar,
 } from './_shared';
 
 // ---------------------------------------------------------------------------
@@ -170,16 +171,7 @@ export function YLPart1Practice({
     }
   }, [phase, plan, loadCue]);
 
-  // User-driven actions
-  const handlePlayCue = useCallback(async () => {
-    if (!currentCue) return;
-    setPhase('playing-cue');
-    try {
-      await playTTS(currentCue);
-    } finally {
-      setPhase('cue-ready');
-    }
-  }, [currentCue]);
+  // User-driven actions — audio playback is owned per-bubble by YLVoiceNote.
 
   const handleStartRecording = useCallback(async () => {
     stopCurrentAudio();
@@ -373,7 +365,34 @@ export function YLPart1Practice({
     );
   }
 
-  // ── Render: active practice ───────────────────────────────────────────────
+  // ── Render: active practice (chat-style) ─────────────────────────────────
+
+  type ChatItem =
+    | { kind: 'image'; id: string; src: string }
+    | { kind: 'cue'; id: string; text: string }
+    | { kind: 'user-text'; id: string; text: string }
+    | { kind: 'reaction'; id: string; text: string };
+
+  const chatItems: ChatItem[] = [];
+  images.forEach((src, i) => chatItems.push({ kind: 'image', id: `img-${i}`, src }));
+  for (let i = 0; i <= cueIndex; i++) {
+    if (plan?.cues[i]) {
+      chatItems.push({ kind: 'cue', id: `cue-${i}`, text: plan.cues[i] });
+    }
+    if (i < cueIndex) {
+      const past = turnQAsRef.current[i];
+      chatItems.push({ kind: 'user-text', id: `u-${i}`, text: past?.transcript || '' });
+      // Pre-built history reactions could go here when reloaded — for now we
+      // only show the reaction for the most recently completed turn below.
+    }
+  }
+  if (phase === 'reaction-ready' && currentReaction) {
+    chatItems.push({ kind: 'user-text', id: `u-curr`, text: '' });
+    chatItems.push({ kind: 'reaction', id: `r-${cueIndex}`, text: currentReaction });
+  }
+
+  const canRecord = phase === 'cue-ready' || phase === 'playing-cue';
+  const isProcessing = phase === 'processing';
 
   return (
     <div className="flex-1 flex flex-col min-h-0">
@@ -384,111 +403,66 @@ export function YLPart1Practice({
         progress={progress}
       />
 
-      <div className="flex-1 flex flex-col gap-4 p-4 overflow-y-auto">
-        {/* Images */}
-        {images.length > 0 && (
-          <div
-            className={`grid gap-3 ${images.length === 2 ? 'grid-cols-2' : 'grid-cols-1'} max-w-2xl mx-auto w-full`}
-          >
-            {images.map((src, i) => (
-              <div key={i} className="rounded-2xl overflow-hidden shadow-md bg-white aspect-video relative">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={src.startsWith('data:') ? src : `data:image/png;base64,${src}`}
-                  alt={`Imagen ${i + 1}`}
-                  className="w-full h-full object-cover"
-                />
+      <div className="flex-1 overflow-y-auto px-4 py-6">
+        <div className="max-w-2xl mx-auto w-full space-y-3">
+          {chatItems.map((item) => {
+            switch (item.kind) {
+              case 'image':
+                return <YLImageMessage key={item.id} src={item.src} />;
+              case 'cue':
+                return <YLVoiceNote key={item.id} text={item.text} side="bob" />;
+              case 'user-text':
+                return <YLUserTextMessage key={item.id} text={item.text} />;
+              case 'reaction':
+                return <YLVoiceNote key={item.id} text={item.text} side="bob" />;
+            }
+          })}
+          {isProcessing && (
+            <div className="flex justify-start gap-2">
+              <div className="w-8 h-8 rounded-full bg-trebol-primary/15 flex items-center justify-center shrink-0 text-xs font-bold text-trebol-primary mt-1">
+                B
               </div>
-            ))}
-          </div>
-        )}
-
-        {/* Examiner cue + status */}
-        <div className="flex flex-col items-center gap-4 w-full">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={`cue-${cueIndex}`}
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -12 }}
-              className="w-full flex justify-center"
-            >
-              <YLExaminerCard cue={currentCue || '...'} />
-            </motion.div>
-          </AnimatePresence>
-
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={`status-${phase}`}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="flex flex-col items-center gap-4 w-full"
-            >
-              {(phase === 'cue-ready' || phase === 'playing-cue') && (
-                <div className="flex flex-wrap gap-3 justify-center">
-                  <button
-                    type="button"
-                    onClick={handlePlayCue}
-                    disabled={phase === 'playing-cue'}
-                    className="px-5 py-3 rounded-full bg-trebol-secondary/20 text-trebol-text font-bold text-sm hover:bg-trebol-secondary/40 transition-colors disabled:opacity-50"
-                  >
-                    {phase === 'playing-cue' ? 'Reproduciendo…' : '🔁 Escuchar de nuevo'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleStartRecording}
-                    disabled={phase === 'playing-cue'}
-                    className="px-5 py-3 rounded-full bg-trebol-primary text-white font-bold text-sm hover:opacity-90 transition-opacity disabled:opacity-50"
-                  >
-                    🎤 Empezar a hablar
-                  </button>
-                </div>
-              )}
-
-              {phase === 'recording' && (
-                <YLRecordingButton
-                  isRecording={isRecording}
-                  onStop={handleStopRecording}
-                  seconds={recordingSeconds}
-                  maxSeconds={RECORDING_MAX_SECONDS}
-                />
-              )}
-
-              {phase === 'processing' && (
-                <div className="flex flex-col items-center gap-3">
-                  <div className="w-8 h-8 border-3 border-trebol-primary border-t-transparent rounded-full animate-spin" />
-                  <p className="text-trebol-text/50 font-semibold text-sm">
-                    Procesando tu respuesta...
-                  </p>
-                </div>
-              )}
-
-              {phase === 'reaction-ready' && currentReaction && (
-                <div className="flex flex-col items-center gap-4">
-                  <YLReactionCard reaction={currentReaction} />
-                  <div className="flex gap-3">
-                    <button
-                      type="button"
-                      onClick={handlePlayReaction}
-                      className="px-5 py-3 rounded-full bg-trebol-secondary/20 text-trebol-text font-bold text-sm hover:bg-trebol-secondary/40 transition-colors"
-                    >
-                      🔁 Escuchar de nuevo
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleNextCue}
-                      className="px-5 py-3 rounded-full bg-trebol-primary text-white font-bold text-sm hover:opacity-90 transition-opacity"
-                    >
-                      ⏭️ Siguiente pregunta
-                    </button>
-                  </div>
-                </div>
-              )}
-            </motion.div>
-          </AnimatePresence>
+              <div className="rounded-2xl px-4 py-3 bg-white border border-trebol-border flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-trebol-primary animate-bounce" />
+                <div className="w-2 h-2 rounded-full bg-trebol-primary animate-bounce" style={{ animationDelay: '120ms' }} />
+                <div className="w-2 h-2 rounded-full bg-trebol-primary animate-bounce" style={{ animationDelay: '240ms' }} />
+              </div>
+            </div>
+          )}
         </div>
       </div>
+
+      {phase === 'reaction-ready' ? (
+        <div className="border-t border-trebol-border bg-white/90 backdrop-blur p-3 flex items-center justify-center">
+          <button
+            type="button"
+            onClick={handleNextCue}
+            className="px-6 py-3 rounded-full bg-trebol-primary text-white font-bold text-sm hover:opacity-90 transition-opacity flex items-center gap-2"
+          >
+            Siguiente pregunta
+            <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
+              <path d="M6 4l12 8-12 8V4z" />
+              <rect x="18" y="4" width="2" height="16" />
+            </svg>
+          </button>
+        </div>
+      ) : (
+        <YLChatMicBar
+          onStart={handleStartRecording}
+          onStop={handleStopRecording}
+          isRecording={phase === 'recording' && isRecording}
+          seconds={recordingSeconds}
+          maxSeconds={RECORDING_MAX_SECONDS}
+          disabled={isProcessing}
+          helperText={
+            phase === 'playing-cue'
+              ? 'Bob está hablando…'
+              : isProcessing
+              ? 'Procesando tu respuesta…'
+              : 'Pulsa para responder con tu voz'
+          }
+        />
+      )}
     </div>
   );
 }
