@@ -90,7 +90,7 @@ export async function generateToeflRepeatAudiosAction(
         speechConfig: {
           voiceConfig: {
             prebuiltVoiceConfig: {
-              voiceName: 'aoede',
+              voiceName: 'Sadaltager',
             },
           },
         },

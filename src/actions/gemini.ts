@@ -66,7 +66,7 @@ export async function generateSpeechAction(text: string): Promise<{ data: string
         speechConfig: {
           voiceConfig: {
             prebuiltVoiceConfig: {
-              voiceName: 'aoede',
+              voiceName: 'Sadaltager',
             },
           },
         },
