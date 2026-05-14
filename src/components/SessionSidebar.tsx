@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { MessageSquare, Image as ImageIcon, MessagesSquare, Users, BookOpen, Headphones, Mic, Plus, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react';
+import { MessageSquare, Image as ImageIcon, MessagesSquare, Users, BookOpen, Headphones, Mic, Plus, ChevronLeft, ChevronRight, Trash2, Hand, HelpCircle, User, GitCompare, MessageCircle, BookImage } from 'lucide-react';
 import { BobSession, SessionMode } from '@/actions/sessions';
 import { cn } from '@/lib/utils';
 
@@ -19,9 +19,18 @@ const MODE_ICON: Record<NonNullable<SessionMode>, React.ElementType> = {
   generic_situation: MessageSquare,
   generic_image: ImageIcon,
   generic_conversation: MessagesSquare,
-  // Cambridge YL
-  cambridge_starters_part1: BookOpen,
-  cambridge_movers_part1: BookOpen,
+  // Cambridge YL — Starters
+  cambridge_starters_part1: Hand,
+  cambridge_starters_part2: HelpCircle,
+  cambridge_starters_part3: BookOpen,
+  cambridge_starters_part4: User,
+  // Cambridge YL — Movers
+  cambridge_movers_part1: GitCompare,
+  cambridge_movers_part2: MessageCircle,
+  cambridge_movers_part3: BookImage,
+  cambridge_movers_part4: User,
+  cambridge_movers_part5: ImageIcon,
+  // Cambridge YL — Flyers
   cambridge_flyers_part1: BookOpen,
   // Cambridge KET
   cambridge_ket_part1: BookOpen,

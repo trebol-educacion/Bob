@@ -14,9 +14,18 @@ export type ModeFramework = 'generic' | 'cambridge' | 'toefl';
 // ---------------------------------------------------------------------------
 
 export type PracticeMode =
-  // Cambridge YL (A1 / A2)
+  // Cambridge YL (A1 / A2) — Starters (Pre-A1)
   | 'cambridge_starters_part1'
+  | 'cambridge_starters_part2'
+  | 'cambridge_starters_part3'
+  | 'cambridge_starters_part4'
+  // Cambridge YL — Movers (A1)
   | 'cambridge_movers_part1'
+  | 'cambridge_movers_part2'
+  | 'cambridge_movers_part3'
+  | 'cambridge_movers_part4'
+  | 'cambridge_movers_part5'
+  // Cambridge YL — Flyers (A2)
   | 'cambridge_flyers_part1'
   // Cambridge KET (A2 Key)
   | 'cambridge_ket_part1'
@@ -65,9 +74,18 @@ export interface ModeDef {
 }
 
 export const MODE_CATALOG: Record<ModeKey, ModeDef> = {
-  // ── Cambridge YL ──────────────────────────────────────────────────────────
+  // ── Cambridge YL — Starters (Pre-A1, shown to a1 students) ──────────────
   cambridge_starters_part1: { framework: 'cambridge', cefrLevels: ['a1'] },
+  cambridge_starters_part2: { framework: 'cambridge', cefrLevels: ['a1'] },
+  cambridge_starters_part3: { framework: 'cambridge', cefrLevels: ['a1'] },
+  cambridge_starters_part4: { framework: 'cambridge', cefrLevels: ['a1'] },
+  // ── Cambridge YL — Movers (A1) ───────────────────────────────────────────
   cambridge_movers_part1:   { framework: 'cambridge', cefrLevels: ['a1'] },
+  cambridge_movers_part2:   { framework: 'cambridge', cefrLevels: ['a1'] },
+  cambridge_movers_part3:   { framework: 'cambridge', cefrLevels: ['a1'] },
+  cambridge_movers_part4:   { framework: 'cambridge', cefrLevels: ['a1'] },
+  cambridge_movers_part5:   { framework: 'cambridge', cefrLevels: ['a1'] },
+  // ── Cambridge YL — Flyers (A2) ───────────────────────────────────────────
   cambridge_flyers_part1:   { framework: 'cambridge', cefrLevels: ['a2'] },
 
   // ── Cambridge KET (A2 Key) ────────────────────────────────────────────────
@@ -188,3 +206,86 @@ export type CambridgeEvaluation = z.infer<typeof CambridgeEvaluationSchema>;
 export type ToeflEvaluation = z.infer<typeof ToeflEvaluationSchema>;
 export type RepetitionEvaluation = z.infer<typeof RepetitionEvaluationSchema>;
 export type CollaborativeEvaluation = z.infer<typeof CollaborativeEvaluationSchema>;
+
+// ---------------------------------------------------------------------------
+// MODE_UI_METADATA — display info for each selectable mode.
+// icon: lucide-react component name (string) — resolved at render time.
+// section: grouping label used by ModeSelection.
+// ---------------------------------------------------------------------------
+
+export interface ModeUIEntry {
+  /** lucide-react icon component name (e.g. 'BookOpen') */
+  icon: string;
+  title: string;
+  description: string;
+  badge: string;
+  section: string;
+}
+
+export const MODE_UI_METADATA: Partial<Record<ModeKey, ModeUIEntry>> = {
+  // ── Cambridge YL — Starters (Pre-A1) ─────────────────────────────────────
+  cambridge_starters_part1: {
+    icon: 'Hand',
+    title: 'Starters: Señalar imágenes',
+    description: 'Señala y nombra objetos en una imagen colorida',
+    badge: 'Pre-A1 · 3 min',
+    section: 'Cambridge Young Learners',
+  },
+  cambridge_starters_part2: {
+    icon: 'HelpCircle',
+    title: 'Starters: Preguntas sobre escena',
+    description: 'Responde preguntas sencillas sobre una imagen',
+    badge: 'Pre-A1 · 3 min',
+    section: 'Cambridge Young Learners',
+  },
+  cambridge_starters_part3: {
+    icon: 'BookOpen',
+    title: 'Starters: Historia con imágenes',
+    description: 'Narra una historia sencilla con 4 imágenes',
+    badge: 'Pre-A1 · 4 min',
+    section: 'Cambridge Young Learners',
+  },
+  cambridge_starters_part4: {
+    icon: 'User',
+    title: 'Starters: Preguntas personales',
+    description: 'Responde preguntas sobre ti mismo en inglés',
+    badge: 'Pre-A1 · 3 min',
+    section: 'Cambridge Young Learners',
+  },
+  // ── Cambridge YL — Movers (A1) ────────────────────────────────────────────
+  cambridge_movers_part1: {
+    icon: 'GitCompare',
+    title: 'Movers: Encuentra diferencias',
+    description: 'Describe las diferencias entre dos imágenes parecidas',
+    badge: 'A1 · 5 min',
+    section: 'Cambridge Young Learners',
+  },
+  cambridge_movers_part2: {
+    icon: 'MessageCircle',
+    title: 'Movers: Intercambio de información',
+    description: 'Intercambia información con el examinador usando tarjetas',
+    badge: 'A1 · 4 min',
+    section: 'Cambridge Young Learners',
+  },
+  cambridge_movers_part3: {
+    icon: 'BookImage',
+    title: 'Movers: Cuenta la historia',
+    description: 'Narra una historia completa con 4 imágenes secuenciales',
+    badge: 'A1 · 5 min',
+    section: 'Cambridge Young Learners',
+  },
+  cambridge_movers_part4: {
+    icon: 'User',
+    title: 'Movers: Preguntas personales',
+    description: 'Responde preguntas personales con más detalle',
+    badge: 'A1 · 3 min',
+    section: 'Cambridge Young Learners',
+  },
+  cambridge_movers_part5: {
+    icon: 'ImageIcon',
+    title: 'Movers: Describe la imagen',
+    description: 'Describe una imagen con vocabulario A1 variado',
+    badge: 'A1 · 4 min',
+    section: 'Cambridge Young Learners',
+  },
+};
