@@ -90,10 +90,37 @@ export async function startYLSessionAction(input: {
 
   console.log(`[YL][${input.mode}] session ${session.id} created in ${Date.now() - t0}ms — generating plan`);
 
+  // Fetch the last 20 plans of this user+mode to discourage repetition.
+  const { data: recent } = await supabase
+    .from('bob_sessions')
+    .select('plan_json')
+    .eq('user_id', user.id)
+    .eq('mode', input.mode)
+    .not('plan_json', 'is', null)
+    .order('created_at', { ascending: false })
+    .limit(20);
+
+  const avoidSummary = (recent ?? [])
+    .map((r) => {
+      const p = r.plan_json as { options?: string[]; cues?: unknown[] } | null;
+      if (!p) return null;
+      if (p.options && p.options.length > 0) return `[${p.options.join(', ')}]`;
+      if (p.cues && p.cues.length > 0)
+        return `[${(p.cues as Array<string | { text?: string }>).map((c) => (typeof c === 'string' ? c : c.text ?? '')).slice(0, 3).join(' | ')}…]`;
+      return null;
+    })
+    .filter((s): s is string => s !== null)
+    .join('\n- ');
+
+  const avoidList = avoidSummary ? `- ${avoidSummary}` : '(none yet — feel free to pick any topic)';
+
   // Generate the session plan
   const t1 = Date.now();
-  const plan = await generateYLContentAction(exam, part);
+  const plan = await generateYLContentAction(exam, part, { avoidList });
   console.log(`[YL][${input.mode}] plan ready in ${Date.now() - t1}ms (cues=${plan.cues?.length ?? 0}, images=${plan.image_prompts?.length ?? 0})`);
+
+  // Persist the plan in the session so future generations know what to avoid
+  await supabase.from('bob_sessions').update({ plan_json: plan }).eq('id', session.id);
 
   return { sessionId: session.id as string, plan };
 }
@@ -180,10 +207,13 @@ export async function getOrCreateCueAudioAction(
 
 export async function generateYLContentAction(
   exam: YLExam,
-  part: number
+  part: number,
+  options?: { avoidList?: string }
 ): Promise<YLPlan> {
   const ai = getAiClient();
-  const promptText = await getPrompt(generationKey(exam, part));
+  const promptText = await getPrompt(generationKey(exam, part), {
+    AVOID_LIST: options?.avoidList ?? '(none)',
+  });
 
   const response = await ai.models.generateContent({
     model: MODELS.FLASH_LITE_PREVIEW,
