@@ -93,7 +93,7 @@ export async function generateSpeechAction(text: string): Promise<{ data: string
  * Generates 10 progressive phrases based on a user-provided topic.
  */
 export async function generateTopicPhrasesAction(topic: string): Promise<string[]> {
-  const prompt = await getPrompt('situation_phrases', { TOPIC: topic });
+  const prompt = await getPrompt('generic_situation_a2_generation', { TOPIC: topic });
 
   try {
     const response = await ai.models.generateContent({
@@ -136,7 +136,7 @@ export async function generateImageAction(prompt: string): Promise<string> {
       model: MODELS.IMAGE,
       contents: [{
         role: 'user',
-        parts: [{ text: await getPrompt('image_generation_prompt', { SCENE_PROMPT: prompt }) }]
+        parts: [{ text: await getPrompt('generic_image_b1_image_gen', { SCENE_DESCRIPTION: prompt }) }]
       }],
       config: {
         responseModalities: ['IMAGE'],
@@ -167,7 +167,7 @@ export async function generateImageSceneAction(
   level: 'b1' | 'b2' = 'b1'
 ): Promise<ImageScene> {
   const prompt = await getPrompt(
-    level === 'b2' ? 'image_scene_b2' : 'image_scene_b1',
+    level === 'b2' ? 'generic_image_b2_generation' : 'generic_image_b1_generation',
     { TOPIC: topic, DIFFICULTY: difficulty }
   );
 
@@ -203,11 +203,10 @@ export async function evaluateImageDescriptionAction(
   sceneDescription: string,
   level: 'b1' | 'b2' = 'b1'
 ): Promise<EvaluationResult> {
-  const basePrompt = await getPrompt('image_evaluation_b1', { SCENE_DESCRIPTION: sceneDescription });
-  const prompt =
-    level === 'b2'
-      ? `${basePrompt}\n\n${await getPrompt('image_evaluation_b2_modifier')}`
-      : basePrompt;
+  const prompt = await getPrompt(
+    level === 'b2' ? 'generic_image_b2_evaluation' : 'generic_image_b1_evaluation',
+    { SCENE_DESCRIPTION: sceneDescription, AUDIO_DURATION_SECONDS: 0 }
+  );
 
   try {
     const response = await ai.models.generateContent({
@@ -256,7 +255,7 @@ export async function evaluatePronunciationAction(
   mimeType: string,
   targetPhrase: string
 ): Promise<EvaluationResult> {
-  const prompt = await getPrompt('situation_evaluation', { TARGET_PHRASE: targetPhrase });
+  const prompt = await getPrompt('generic_situation_a2_evaluation', { TARGET_PHRASE: targetPhrase, AUDIO_DURATION_SECONDS: 0 });
 
   try {
     const response = await ai.models.generateContent({
@@ -299,7 +298,7 @@ export interface InitialChatResult {
  * Falls back gracefully — intentional fallback, do NOT convert to throw.
  */
 export async function generateInitialChatAction(topic: string): Promise<InitialChatResult> {
-  const prompt = await getPrompt('conversation_initial', { TOPIC: topic });
+  const prompt = await getPrompt('generic_conversation_shared_initial', { TOPIC: topic, CEFR_LEVEL: 'b1' });
 
   try {
     const response = await ai.models.generateContent({
@@ -343,7 +342,7 @@ export async function simulateConversationAction(
   history: ChatMessage[],
   topic: string
 ): Promise<ChatMessage[]> {
-  const prompt = await getPrompt('conversation_simulate', { TOPIC: topic });
+  const prompt = await getPrompt('generic_conversation_shared_simulate', { TOPIC: topic, CEFR_LEVEL: 'b1', USER_TURN: '', HISTORY: '' });
 
   try {
     const response = await ai.models.generateContent({
@@ -389,7 +388,7 @@ export async function generateQuestionsAction(
   topic: string
 ): Promise<Question[]> {
   const historyText = history.map(m => `${m.role}: ${m.text}`).join('\n');
-  const prompt = await getPrompt('conversation_questions', { TOPIC: topic, HISTORY_TEXT: historyText });
+  const prompt = await getPrompt('generic_conversation_shared_questions', { TRANSCRIPT: historyText, CEFR_LEVEL: 'b1' });
 
   try {
     const response = await ai.models.generateContent({
@@ -435,7 +434,7 @@ export async function simulateUserResponseAction(
   history: ChatMessage[],
   topic: string
 ): Promise<string> {
-  const prompt = await getPrompt('conversation_simulate_user', { TOPIC: topic });
+  const prompt = await getPrompt('generic_conversation_shared_simulate_user', { TOPIC: topic, CEFR_LEVEL: 'b1', LAST_TURN: '' });
 
   try {
     const response = await ai.models.generateContent({
@@ -464,7 +463,7 @@ export async function chatTextConversationAction(
   history: ChatMessage[],
   topic: string
 ): Promise<ChatTurnResult> {
-  const prompt = await getPrompt('conversation_eval_text', { TOPIC: topic, USER_TEXT: userText });
+  const prompt = await getPrompt('generic_conversation_shared_eval_audio', { TOPIC: topic, CEFR_LEVEL: 'b1' });
 
   try {
     const response = await ai.models.generateContent({
@@ -529,7 +528,7 @@ export async function chatConversationAction(
   history: ChatMessage[],
   topic: string
 ): Promise<ChatTurnResult> {
-  const prompt = await getPrompt('conversation_eval_audio', { TOPIC: topic });
+  const prompt = await getPrompt('generic_conversation_shared_eval_audio', { TOPIC: topic, CEFR_LEVEL: 'b1' });
 
   try {
     // 1. Get Evaluation and Text Response

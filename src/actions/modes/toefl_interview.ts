@@ -29,7 +29,8 @@ export type ToeflQuestion = z.infer<typeof ToeflQuestionSchema>;
  */
 export async function generateToeflInterviewAction(): Promise<ToeflInterviewPlan> {
   const ai = getAiClient();
-  const prompt = await getPrompt('toefl_interview_plan');
+  // Default to B2 level for interview generation
+  const prompt = await getPrompt('toefl_interview_b2_generation');
 
   const response = await ai.models.generateContent({
     model: MODELS.FLASH_LITE_PREVIEW,
@@ -78,7 +79,8 @@ export async function evaluateToeflResponseAction(
   mimeType: string
 ): Promise<ToeflEvaluation> {
   const ai = getAiClient();
-  const prompt = await getPrompt('toefl_interview_evaluation', { QUESTION: question });
+  // Default to B2 level for interview evaluation
+  const prompt = await getPrompt('toefl_interview_b2_evaluation', { QUESTION: question, TOPIC: '', USER_TRANSCRIPT: '', AUDIO_DURATION_SECONDS: 0 });
 
   const response = await ai.models.generateContent({
     model: MODELS.FLASH_LITE_PREVIEW,

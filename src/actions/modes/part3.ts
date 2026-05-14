@@ -38,7 +38,7 @@ export async function generatePart3ScenarioAction(): Promise<Part3Scenario> {
 
   const response = await ai.models.generateContent({
     model: MODELS.FLASH_LITE_PREVIEW,
-    contents: [{ role: 'user', parts: [{ text: await getPrompt('b1_part3_scenario') }] }],
+    contents: [{ role: 'user', parts: [{ text: await getPrompt('cambridge_pet_p3_b1_generation') }] }],
     config: {
       responseMimeType: 'application/json',
     },
@@ -71,7 +71,7 @@ export async function chatPart3Action(
   const historyText = history
     .map((h) => `${h.role === 'examiner' ? 'Examiner' : 'Candidate'}: ${h.text}`)
     .join('\n') || '(just starting)';
-  const systemInstruction = await getPrompt('b1_part3_chat', {
+  const systemInstruction = await getPrompt('cambridge_pet_p3_b1_partner_turn', {
     SCENE_TOPIC: scenario.topic,
     SCENE_SITUATION: scenario.situation,
     SCENE_QUESTION: scenario.prompt_question,
@@ -79,7 +79,7 @@ export async function chatPart3Action(
     HISTORY_TEXT: historyText,
   });
 
-  const prompt = await getPrompt('b1_part3_chat_audio');
+  const prompt = await getPrompt('cambridge_pet_p3_b1_partner_turn_audio');
 
   const response = await ai.models.generateContent({
     model: MODELS.FLASH_LITE_PREVIEW,
@@ -132,7 +132,7 @@ export async function chatPart3TextAction(
   const historyText = history
     .map((h) => `${h.role === 'examiner' ? 'Examiner' : 'Candidate'}: ${h.text}`)
     .join('\n') || '(just starting)';
-  const systemInstruction = await getPrompt('b1_part3_chat', {
+  const systemInstruction = await getPrompt('cambridge_pet_p3_b1_partner_turn', {
     SCENE_TOPIC: scenario.topic,
     SCENE_SITUATION: scenario.situation,
     SCENE_QUESTION: scenario.prompt_question,
@@ -165,7 +165,7 @@ export async function evaluatePart3Action(
   const historyText = history
     .map((h) => `${h.role === 'examiner' ? 'Examiner' : 'Candidate'}: ${h.text}`)
     .join('\n');
-  const prompt = await getPrompt('b1_part3_eval', {
+  const prompt = await getPrompt('cambridge_pet_p3_b1_evaluation', {
     SCENE_TOPIC: scenario.topic,
     SCENE_QUESTION: scenario.prompt_question,
     HISTORY_TEXT: historyText,

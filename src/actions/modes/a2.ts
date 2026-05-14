@@ -22,7 +22,7 @@ export async function generateA2SessionAction(): Promise<A2SessionPlan> {
 
   const response = await ai.models.generateContent({
     model: MODELS.FLASH_LITE_PREVIEW,
-    contents: [{ role: 'user', parts: [{ text: await getPrompt('a2_session') }] }],
+    contents: [{ role: 'user', parts: [{ text: await getPrompt('cambridge_ket_part1_a2_generation') }] }],
     config: {
       responseMimeType: 'application/json',
     },
@@ -59,7 +59,7 @@ export async function processA2AnswerAction(
         role: 'user',
         parts: [
           {
-            text: await getPrompt('a2_transcribe_audio'),
+            text: await getPrompt('cambridge_ket_part1_a2_transcribe'),
           },
           {
             inlineData: {
@@ -80,7 +80,8 @@ export async function processA2AnswerAction(
     contents: [
       {
         role: 'user',
-        parts: [{ text: await getPrompt('a2_examiner_reaction', { QUESTION: question, TRANSCRIBED_ANSWER: transcribed }) }],
+        // Use rubric helper to generate a brief model-answer acknowledgement
+        parts: [{ text: await getPrompt('cambridge_ket_a2_rubric_helper', { QUESTION: question }) }],
       },
     ],
   });
@@ -98,7 +99,7 @@ export async function evaluateA2FinalAction(
   const transcript = questionsAndAnswers
     .map((qa, i) => `Q${i + 1}: ${qa.question}\nA: ${qa.answer}`)
     .join('\n\n');
-  const prompt = await getPrompt('a2_final_evaluation', { TRANSCRIPT: transcript });
+  const prompt = await getPrompt('cambridge_ket_part1_a2_evaluation', { QUESTION: 'Full interview', USER_TRANSCRIPT: transcript, AUDIO_DURATION_SECONDS: 0 });
 
   const response = await ai.models.generateContent({
     model: MODELS.FLASH_LITE_PREVIEW,
