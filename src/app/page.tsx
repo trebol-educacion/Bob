@@ -299,7 +299,7 @@ export default function App() {
 
             {appState === 'exam-practicing' && mode && (
               <motion.div
-                key={`exam-practicing-${mode}-${activeSessionId ?? 'new'}`}
+                key={`exam-practicing-${mode}-${selectedMessages.length > 0 ? activeSessionId : 'new'}`}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}

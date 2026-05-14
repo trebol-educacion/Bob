@@ -130,25 +130,38 @@ export async function startYLSessionAction(input: {
 // regenerating from Gemini. Idempotent per (session, image_index).
 // ---------------------------------------------------------------------------
 
+/**
+ * Persist a single scene image. Called once per image from the client to
+ * stay well under the Next server-action body limit and the array-nesting
+ * cap. Idempotent over (session, image_index) thanks to the index check.
+ */
+export async function persistYLImageAction(
+  sessionId: string,
+  imageDataUri: string,
+  imageIndex: number
+): Promise<void> {
+  const supabase = await createSupabaseServer();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('[persistYLImageAction] Not authenticated');
+
+  await supabase.from('bob_messages').insert({
+    session_id: sessionId,
+    user_id: user.id,
+    role: 'bob' as const,
+    msg_type: 'image_scene',
+    content_text: null,
+    content_json: { image_data_uri: imageDataUri, image_index: imageIndex },
+  });
+}
+
+/** Deprecated: kept for backwards compatibility — iterates one image at a time. */
 export async function persistYLImagesAction(
   sessionId: string,
   imageDataUris: string[]
 ): Promise<void> {
-  if (imageDataUris.length === 0) return;
-  const supabase = await createSupabaseServer();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('[persistYLImagesAction] Not authenticated');
-
-  await supabase.from('bob_messages').insert(
-    imageDataUris.map((dataUri, idx) => ({
-      session_id: sessionId,
-      user_id: user.id,
-      role: 'bob' as const,
-      msg_type: 'image_scene',
-      content_text: null,
-      content_json: { image_data_uri: dataUri, image_index: idx },
-    }))
-  );
+  for (let i = 0; i < imageDataUris.length; i++) {
+    await persistYLImageAction(sessionId, imageDataUris[i], i);
+  }
 }
 
 // ---------------------------------------------------------------------------
