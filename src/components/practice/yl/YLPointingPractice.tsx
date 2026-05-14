@@ -26,6 +26,8 @@ import {
   YLErrorScreen,
   YLToolbar,
   YLVoiceNote,
+  YLBobTextMessage,
+  YLUserTextMessage,
   YLScoreDisplay,
   YLFeedbackCard,
   YLResultsHeader,
@@ -71,6 +73,15 @@ export function YLPointingPractice({
   const [finalEval, setFinalEval] = useState<EvalResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [messages] = useState<BobMessageShape[]>(initialMessages ?? []);
+  // Conversation log shown in the chat below the click grid
+  type TurnEntry = {
+    id: string;
+    cueText: string;
+    userPicked: string;
+    correct: boolean;
+    reactionText: string;
+  };
+  const [turns, setTurns] = useState<TurnEntry[]>([]);
 
   const initStartedRef = useRef(false);
 
@@ -122,12 +133,32 @@ export function YLPointingPractice({
     if (correct) setScore((s) => s + 1);
     setPhase('answered');
 
+    const targetWord = plan?.options?.[currentCue.target_index] ?? 'item';
+    const chosenWord = plan?.options?.[optionIdx] ?? 'item';
+    const reactionText = correct
+      ? `Excellent! That's the ${targetWord}. Well done!`
+      : `Not quite. That's the ${chosenWord}. The ${targetWord} is over there. Try the next one!`;
+
+    setTurns((prev) => [
+      ...prev,
+      {
+        id: `turn-${cueIndex}`,
+        cueText: currentCue.text,
+        userPicked: chosenWord,
+        correct,
+        reactionText,
+      },
+    ]);
+
+    // Speak the reaction in English
+    void playTTS(reactionText);
+
     try {
       await saveYLTurnAction(sessionId, {
         cue: currentCue.text,
         cueIndex,
-        transcript: plan?.options?.[optionIdx] ?? `option ${optionIdx}`,
-        reaction: correct ? '¡Muy bien! 🌟' : 'Casi… ¡vamos de nuevo!',
+        transcript: chosenWord,
+        reaction: reactionText,
       });
     } catch (err) {
       console.warn('[YLPointing] save turn failed:', err);
@@ -235,45 +266,45 @@ export function YLPointingPractice({
       />
 
       <div className="flex-1 overflow-y-auto px-4 sm:px-12 py-6">
-        <div className="w-full space-y-4">
-          {/* Cue as voice-note only, no text */}
-          {currentCue && sessionId && (
+        <div className="w-full space-y-3">
+          {/* Conversation log for previously answered rounds */}
+          {turns.map((t) => (
+            <React.Fragment key={t.id}>
+              {/* Bob asks (voice + text via voice-note rendering can be added here if needed) */}
+              <YLBobTextMessage text={t.cueText} />
+              {/* User's pick */}
+              <YLUserTextMessage text={`👉 ${t.userPicked} ${t.correct ? '✓' : '✗'}`} />
+              {/* Bob's reaction: text + voice note */}
+              <YLBobTextMessage text={t.reactionText} />
+              {sessionId && (
+                <YLVoiceNote text={t.reactionText} side="bob" sessionId={sessionId} />
+              )}
+            </React.Fragment>
+          ))}
+
+          {/* Current cue (voice only, NO text) */}
+          {currentCue && sessionId && phase === 'ready' && (
             <YLVoiceNote text={currentCue.text} side="bob" sessionId={sessionId} />
           )}
 
-          {/* 4-option grid */}
-          {plan?.options && images.length === plan.options.length && (
+          {/* 4-option grid (only while waiting for an answer) */}
+          {phase === 'ready' && plan?.options && images.length === plan.options.length && (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 max-w-3xl">
-              {plan.options.map((label, idx) => {
-                const isChosen = chosenIndex === idx;
-                const isCorrectChoice = currentCue?.target_index === idx;
-                const showResult = phase === 'answered';
-                let ringClass = 'ring-2 ring-transparent';
-                if (showResult && isChosen && wasCorrect) ringClass = 'ring-4 ring-green-500';
-                if (showResult && isChosen && !wasCorrect) ringClass = 'ring-4 ring-red-500';
-                if (showResult && !isChosen && isCorrectChoice) ringClass = 'ring-4 ring-green-300';
-                return (
-                  <button
-                    key={`${idx}-${label}`}
-                    type="button"
-                    onClick={() => handleSelect(idx)}
-                    disabled={phase !== 'ready' || chosenIndex !== null}
-                    className={`group rounded-2xl bg-white shadow hover:shadow-lg overflow-hidden transition-all ${ringClass} disabled:cursor-default`}
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={images[idx].startsWith('data:') ? images[idx] : `data:image/png;base64,${images[idx]}`}
-                      alt={label}
-                      className="w-full aspect-square object-cover group-hover:scale-105 transition-transform"
-                    />
-                    {showResult && (
-                      <div className={`py-1 text-center text-xs font-bold ${isChosen ? (wasCorrect ? 'text-green-700 bg-green-50' : 'text-red-700 bg-red-50') : isCorrectChoice ? 'text-green-700 bg-green-50' : 'text-trebol-text/40'}`}>
-                        {isChosen ? (wasCorrect ? '✓ ¡Correcto!' : '✗ No era esta') : isCorrectChoice ? '👉 Esta era' : label}
-                      </div>
-                    )}
-                  </button>
-                );
-              })}
+              {plan.options.map((label, idx) => (
+                <button
+                  key={`${idx}-${label}`}
+                  type="button"
+                  onClick={() => handleSelect(idx)}
+                  className="group rounded-2xl bg-white shadow hover:shadow-lg overflow-hidden transition-all ring-2 ring-transparent hover:ring-trebol-secondary/40"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={images[idx].startsWith('data:') ? images[idx] : `data:image/png;base64,${images[idx]}`}
+                    alt={label}
+                    className="w-full aspect-square object-cover group-hover:scale-105 transition-transform"
+                  />
+                </button>
+              ))}
             </div>
           )}
         </div>
