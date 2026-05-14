@@ -67,14 +67,28 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
   useEffect(() => {
     const supabase = createSupabaseBrowser();
 
-    supabase.auth.getUser().then(async ({ data }) => {
-      if (!data.user) {
+    (async () => {
+      // Try session first (sync read from cookies / storage). getUser validates
+      // remotely and can return null in incognito or transient network issues.
+      const sessionRes = await supabase.auth.getSession();
+      let user = sessionRes.data.session?.user ?? null;
+
+      if (!user) {
+        const userRes = await supabase.auth.getUser();
+        if (userRes.error) {
+          console.warn('[Bob access] getUser error:', userRes.error.message);
+        }
+        user = userRes.data.user ?? null;
+      }
+
+      if (!user) {
+        console.warn('[Bob access] No client-side session despite middleware passthrough.');
         setAccessDenialReason('not_authenticated');
         setLoading(false);
         return;
       }
 
-      const userId = data.user.id;
+      const userId = user.id;
 
       try {
         const org = await getOrganizationForUser(userId);
@@ -165,7 +179,7 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
       } finally {
         setLoading(false);
       }
-    });
+    })();
   }, []);
 
   const setCefrActiveLevel = useCallback(async (level: CefrLevel) => {
