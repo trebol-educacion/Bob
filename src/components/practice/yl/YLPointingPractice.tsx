@@ -250,13 +250,13 @@ export function YLPointingPractice({
             // Exclude rows that are pure audio cache (yl_tts) or scene
             // images saved separately — they would duplicate the conversation.
             .filter((m) => m.msg_type !== 'evaluation' && m.msg_type !== 'yl_tts' && m.msg_type !== 'image_scene')
-            .flatMap((m) => {
+            .flatMap((m): React.ReactElement[] => {
               // For user_audio rows, the cue lives in content_json.cue.
               // Render the cue as a SEPARATE Bob bubble on the left BEFORE the
               // user's pick on the right, instead of inline as a label.
               if (m.role === 'user' && m.msg_type === 'user_audio') {
                 const cue = (m.content_json as { cue?: string } | null)?.cue ?? '';
-                const bubbles: React.ReactNode[] = [];
+                const bubbles: React.ReactElement[] = [];
                 if (cue) {
                   bubbles.push(
                     <YLBobTextMessage key={`${m.id}-cue`} text={cue} />
