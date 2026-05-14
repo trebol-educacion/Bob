@@ -236,25 +236,6 @@ export function YLPointingPractice({
     );
   }
 
-  if (phase === 'finished' && finalEval) {
-    return (
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="flex-1 overflow-y-auto p-6 max-w-2xl mx-auto w-full space-y-6"
-      >
-        <YLResultsHeader title="¡Práctica completada!" subtitle={partLabel} />
-        <YLScoreDisplay evalResult={finalEval} />
-        <YLFeedbackCard feedback={finalEval.feedback} />
-        <button
-          onClick={onBack}
-          className="w-full py-3 bg-trebol-primary text-white rounded-xl font-bold hover:opacity-90 transition-opacity"
-        >
-          Volver a los modos
-        </button>
-      </motion.div>
-    );
-  }
 
   return (
     <div className="flex-1 flex flex-col min-h-0">
@@ -287,6 +268,19 @@ export function YLPointingPractice({
             <YLVoiceNote text={currentCue.text} side="bob" sessionId={sessionId} />
           )}
 
+          {/* Final results inline in chat */}
+          {phase === 'finished' && finalEval && !isReadOnly && (
+            <motion.div
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="space-y-3 max-w-md"
+            >
+              <YLResultsHeader title="¡Práctica completada!" subtitle={partLabel} />
+              <YLScoreDisplay evalResult={finalEval} />
+              <YLFeedbackCard feedback={finalEval.feedback} />
+            </motion.div>
+          )}
+
           {/* 4-option grid (only while waiting for an answer) */}
           {phase === 'ready' && plan?.options && images.length === plan.options.length && (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 max-w-3xl">
@@ -315,6 +309,7 @@ export function YLPointingPractice({
         <p className="text-xs text-trebol-text/60 font-medium pl-2">
           {phase === 'ready' && '🎧 Escucha y haz clic en la imagen correcta'}
           {phase === 'answered' && (wasCorrect ? '¡Muy bien!' : 'Casi… vamos a la siguiente')}
+          {phase === 'finished' && '✅ Práctica completada'}
         </p>
         {phase === 'answered' && (
           <button
@@ -327,6 +322,15 @@ export function YLPointingPractice({
               <path d="M6 4l12 8-12 8V4z" />
               <rect x="18" y="4" width="2" height="16" />
             </svg>
+          </button>
+        )}
+        {phase === 'finished' && !isReadOnly && (
+          <button
+            type="button"
+            onClick={onBack}
+            className="px-6 py-3 rounded-full bg-trebol-primary text-white font-bold text-sm hover:opacity-90 transition-opacity"
+          >
+            Volver a los modos
           </button>
         )}
       </div>
