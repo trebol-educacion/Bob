@@ -32,12 +32,15 @@ export function resolveEnabledModes({
   if (!isBobEnabled) return [];
 
   const effectiveFrameworks = studentFrameworks.filter(f => orgFrameworks.includes(f));
+  const hasAssignedFrameworks = effectiveFrameworks.length > 0;
 
   return (Object.keys(MODE_CATALOG) as ModeKey[]).filter(key => {
     const def = MODE_CATALOG[key];
 
     if (def.framework === 'generic') {
-      // Always-visible generic modes (cefrLevels=[]) OR level-specific generic modes
+      // Generic modes are fallback: only visible when the student has NO
+      // framework assigned. As soon as a framework is enabled, hide them.
+      if (hasAssignedFrameworks) return false;
       if (def.cefrLevels.length === 0) return true;
       if (studentActiveCefr === null) return false;
       return def.cefrLevels.includes(studentActiveCefr);

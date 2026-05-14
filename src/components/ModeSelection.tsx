@@ -1,16 +1,64 @@
 import React, { forwardRef } from 'react';
 import { motion } from 'motion/react';
-import { MessageSquare, Image as ImageIcon, Sparkles, Mic2, Users, BookOpen, Headphones, ClipboardList, FileText } from 'lucide-react';
+import {
+  MessageSquare,
+  Image as ImageIcon,
+  Sparkles,
+  Mic2,
+  Headphones,
+  ClipboardList,
+  Hand,
+  HelpCircle,
+  BookOpen,
+  User,
+  GitCompare,
+  MessageCircle,
+  BookImage,
+} from 'lucide-react';
 import type { ModeKey, PracticeMode, CefrLevel } from '@/lib/types/practice';
+import { MODE_UI_METADATA } from '@/lib/types/practice';
 import { CefrLevelSelector } from '@/components/CefrLevelSelector';
+import type { AvailableMode } from '@/contexts/OrganizationContext';
 
-interface ModeSelectionProps {
-  onSelect: (mode: PracticeMode) => void;
-  enabledModes?: PracticeMode[];
-  cefrActiveLevel?: CefrLevel | null;
-  cefrLevelLocked?: boolean;
-  onCefrChange?: (level: CefrLevel) => void;
+// ---------------------------------------------------------------------------
+// Icon resolver — maps lucide icon name string → JSX element
+// ---------------------------------------------------------------------------
+
+const ICON_MAP: Record<string, React.FC<{ size?: number; className?: string }>> = {
+  MessageSquare,
+  Image: ImageIcon,
+  Sparkles,
+  Mic2,
+  Headphones,
+  ClipboardList,
+  Hand,
+  HelpCircle,
+  BookOpen,
+  User,
+  GitCompare,
+  MessageCircle,
+  BookImage,
+  ImageIcon,
+};
+
+function resolveIcon(name: string, size = 28, className?: string): React.ReactNode {
+  const Icon = ICON_MAP[name];
+  if (Icon) return <Icon size={size} className={className} />;
+  return <Sparkles size={size} className={className} />;
 }
+
+// ---------------------------------------------------------------------------
+// Friendly section names for frameworks
+// ---------------------------------------------------------------------------
+
+const FRAMEWORK_SECTION: Record<string, string> = {
+  cambridge: 'Cambridge English',
+  toefl: 'TOEFL iBT',
+};
+
+// ---------------------------------------------------------------------------
+// Sub-components
+// ---------------------------------------------------------------------------
 
 interface ModeCardProps {
   mode: ModeKey;
@@ -59,21 +107,107 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
   );
 }
 
+// ---------------------------------------------------------------------------
+// ModeSelection props
+// ---------------------------------------------------------------------------
+
+interface ModeSelectionProps {
+  onSelect: (mode: PracticeMode) => void;
+  enabledModes?: PracticeMode[];
+  /** DB-driven modes from OrganizationContext — used as fallback display data */
+  availableModes?: AvailableMode[];
+  cefrActiveLevel?: CefrLevel | null;
+  cefrLevelLocked?: boolean;
+  onCefrChange?: (level: CefrLevel) => void;
+}
+
+// ---------------------------------------------------------------------------
+// Main component
+// ---------------------------------------------------------------------------
+
 export const ModeSelection = forwardRef<HTMLDivElement, ModeSelectionProps>(function ModeSelection(
-  { onSelect, enabledModes, cefrActiveLevel = null, cefrLevelLocked = false, onCefrChange },
+  { onSelect, enabledModes = [], availableModes = [], cefrActiveLevel = null, cefrLevelLocked = false, onCefrChange },
   selectorRef
 ) {
-  const isDisabled = (mode: ModeKey) =>
-    enabledModes !== undefined && !enabledModes.includes(mode);
-  const isVisible = (mode: ModeKey) => !isDisabled(mode);
+  const iconClass = 'text-trebol-primary group-hover:text-white transition-colors';
 
-  const freePracticeVisible =
-    isVisible('generic_situation') || isVisible('generic_image') || isVisible('generic_conversation');
-  const cambridgeVisible =
-    isVisible('cambridge_pet_p3') || isVisible('cambridge_ket_part1') || isVisible('cambridge_fce_p1');
-  const toeflVisible = isVisible('toefl_listen_repeat') || isVisible('toefl_interview');
+  // Separate generic modes from framework modes
+  const genericEnabled = enabledModes.filter(
+    (m): m is ModeKey => m !== null && (m as string).startsWith('generic_')
+  );
+  const frameworkEnabled = enabledModes.filter(
+    (m): m is ModeKey => m !== null && !(m as string).startsWith('generic_')
+  );
 
-  const iconClass = "text-trebol-primary group-hover:text-white transition-colors";
+  // Free Practice section is only shown when there are no framework modes.
+  // resolveEnabledModes already removes generic modes when frameworks are assigned,
+  // so genericEnabled will be empty when frameworkEnabled is non-empty.
+  const showFreePractice = frameworkEnabled.length === 0;
+
+  // Build an index from availableModes for O(1) fallback display data lookup
+  // key: `${framework}_${exam_part}` (matches PracticeMode pattern)
+  const availableModeIndex = new Map<string, AvailableMode>();
+  for (const am of availableModes) {
+    const key = `${am.framework}_${am.exam_part}`;
+    if (!availableModeIndex.has(key)) availableModeIndex.set(key, am);
+  }
+
+  // Group framework modes by their section name
+  const sectionMap = new Map<string, ModeKey[]>();
+  for (const mode of frameworkEnabled) {
+    const meta = MODE_UI_METADATA[mode];
+    // Determine section name: prefer metadata, then derive from framework prefix, then fallback
+    let sectionName: string;
+    if (meta?.section) {
+      sectionName = meta.section;
+    } else {
+      // Derive framework from mode key prefix (e.g. 'cambridge_...' → 'cambridge')
+      const framework = (mode as string).split('_')[0];
+      sectionName = FRAMEWORK_SECTION[framework] ?? 'Other';
+    }
+    const existing = sectionMap.get(sectionName) ?? [];
+    existing.push(mode);
+    sectionMap.set(sectionName, existing);
+  }
+
+  // Render a single card for a framework mode
+  function renderFrameworkCard(mode: ModeKey) {
+    const meta = MODE_UI_METADATA[mode];
+    const amFallback = availableModeIndex.get(mode as string);
+
+    if (meta) {
+      return (
+        <ModeCard
+          key={mode}
+          mode={mode}
+          icon={resolveIcon(meta.icon, 28, iconClass)}
+          title={meta.title}
+          description={meta.description}
+          badge={meta.badge}
+          onSelect={onSelect}
+        />
+      );
+    }
+
+    // Fallback: use availableModes data or generic presentation
+    const title = amFallback?.label ?? mode;
+    const description = amFallback?.description ?? '';
+    const cefrBadge = amFallback?.cefr_level
+      ? `${amFallback.cefr_level.toUpperCase()} · ${amFallback.exam_part}`
+      : amFallback?.exam_part ?? '';
+
+    return (
+      <ModeCard
+        key={mode}
+        mode={mode}
+        icon={<Sparkles size={28} className={iconClass} />}
+        title={title}
+        description={description}
+        badge={cefrBadge || undefined}
+        onSelect={onSelect}
+      />
+    );
+  }
 
   return (
     <div className="w-full max-w-4xl mx-auto p-4 pb-12 space-y-8 overflow-y-auto">
@@ -96,109 +230,45 @@ export const ModeSelection = forwardRef<HTMLDivElement, ModeSelectionProps>(func
         />
       </div>
 
-      {/* Free Practice */}
-      {freePracticeVisible && (
+      {/* Free Practice — shown only when no framework modes are active */}
+      {showFreePractice && (
         <div>
           <SectionTitle>Free Practice</SectionTitle>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {isVisible('generic_situation') && (
-              <ModeCard
-                mode="generic_situation"
-                icon={<MessageSquare size={28} className={iconClass} />}
-                title="Práctica de Situación"
-                description="Practica frases útiles para situaciones reales personalizadas por ti."
-                onSelect={onSelect}
-              />
-            )}
-            {isVisible('generic_image') && (
-              <ModeCard
-                mode="generic_image"
-                icon={<ImageIcon size={28} className={iconClass} />}
-                title="Descripción de Imagen"
-                description="Prepárate para el examen B1 describiendo escenas generadas por IA."
-                onSelect={onSelect}
-              />
-            )}
-            {isVisible('generic_conversation') && (
-              <ModeCard
-                mode="generic_conversation"
-                icon={<Mic2 size={28} className={iconClass} />}
-                title="Conversación Fluida"
-                description="Interactúa en una conversación real con IA sobre cualquier tema."
-                onSelect={onSelect}
-              />
-            )}
+            <ModeCard
+              mode="generic_situation"
+              icon={<MessageSquare size={28} className={iconClass} />}
+              title="Práctica de Situación"
+              description="Practica frases útiles para situaciones reales personalizadas por ti."
+              onSelect={onSelect}
+            />
+            <ModeCard
+              mode="generic_image"
+              icon={<ImageIcon size={28} className={iconClass} />}
+              title="Descripción de Imagen"
+              description="Prepárate para el examen B1 describiendo escenas generadas por IA."
+              onSelect={onSelect}
+            />
+            <ModeCard
+              mode="generic_conversation"
+              icon={<Mic2 size={28} className={iconClass} />}
+              title="Conversación Fluida"
+              description="Interactúa en una conversación real con IA sobre cualquier tema."
+              onSelect={onSelect}
+            />
           </div>
         </div>
       )}
 
-      {/* Cambridge English */}
-      {cambridgeVisible && (
-        <div>
-          <SectionTitle>Cambridge English</SectionTitle>
+      {/* Dynamic framework sections */}
+      {Array.from(sectionMap.entries()).map(([sectionName, modes]) => (
+        <div key={sectionName}>
+          <SectionTitle>{sectionName}</SectionTitle>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {isVisible('cambridge_pet_p3') && (
-              <ModeCard
-                mode="cambridge_pet_p3"
-                icon={<Users size={28} className={iconClass} />}
-                title="B1 Collaborative Task"
-                description="Discuss &amp; decide together"
-                badge="B1 · 10 min"
-                onSelect={onSelect}
-              />
-            )}
-            {isVisible('cambridge_ket_part1') && (
-              <ModeCard
-                mode="cambridge_ket_part1"
-                icon={<BookOpen size={28} className={iconClass} />}
-                title="A2 Key Speaking"
-                description="Answer questions from an examiner"
-                badge="A2 · 8 min"
-                onSelect={onSelect}
-              />
-            )}
-            {isVisible('cambridge_fce_p1') && (
-              <ModeCard
-                mode="cambridge_fce_p1"
-                icon={<FileText size={28} className={iconClass} />}
-                title="B2 First Speaking"
-                description="Describe &amp; compare photos"
-                badge="B2 · 5 min"
-                onSelect={onSelect}
-              />
-            )}
+            {modes.map(renderFrameworkCard)}
           </div>
         </div>
-      )}
-
-      {/* TOEFL iBT */}
-      {toeflVisible && (
-        <div>
-          <SectionTitle>TOEFL iBT</SectionTitle>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {isVisible('toefl_listen_repeat') && (
-              <ModeCard
-                mode="toefl_listen_repeat"
-                icon={<Headphones size={28} className={iconClass} />}
-                title="Listen &amp; Repeat"
-                description="Repeat what you hear clearly"
-                badge="TOEFL · 10 min"
-                onSelect={onSelect}
-              />
-            )}
-            {isVisible('toefl_interview') && (
-              <ModeCard
-                mode="toefl_interview"
-                icon={<ClipboardList size={28} className={iconClass} />}
-                title="Take an Interview"
-                description="Answer topic questions under time"
-                badge="TOEFL · 8 min"
-                onSelect={onSelect}
-              />
-            )}
-          </div>
-        </div>
-      )}
+      ))}
     </div>
   );
 });

@@ -6,6 +6,17 @@ import { createSupabaseBrowser } from '@/lib/supabase/browser-client';
 import { resolveEnabledModes } from '@/lib/modes';
 import type { ModeKey, ModeFramework, CefrLevel } from '@/lib/types/practice';
 
+// ---------------------------------------------------------------------------
+// AvailableMode — a mode row fetched from bob_prompts (DB-driven)
+// ---------------------------------------------------------------------------
+export interface AvailableMode {
+  framework: ModeFramework;
+  exam_part: string;
+  cefr_level: CefrLevel | null;
+  label: string;
+  description: string | null;
+}
+
 const FRAMEWORK_NAME_MAP: Record<string, ModeFramework> = {
   'Cambridge English': 'cambridge',
   'TOEFL iBT': 'toefl',
@@ -26,6 +37,8 @@ interface OrganizationContextValue {
   organization: Organization | null;
   loading: boolean;
   enabledModes: ModeKey[];
+  /** DB-driven list of available modes from bob_prompts (generation rows, non-generic). */
+  availableModes: AvailableMode[];
   cefrActiveLevel: CefrLevel | null;
   cefrLevelLocked: boolean;
   setCefrActiveLevel: (level: CefrLevel) => Promise<void>;
@@ -38,6 +51,7 @@ const OrganizationContext = createContext<OrganizationContextValue>({
   organization: null,
   loading: true,
   enabledModes: ['generic_situation', 'generic_image', 'generic_conversation'],
+  availableModes: [],
   cefrActiveLevel: null,
   cefrLevelLocked: false,
   setCefrActiveLevel: async () => {},
@@ -54,6 +68,7 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
     'generic_image',
     'generic_conversation',
   ]);
+  const [availableModes, setAvailableModes] = useState<AvailableMode[]>([]);
   const [cefrActiveLevel, setCefrActiveLevelState] = useState<CefrLevel | null>(null);
   const [cefrLevelLocked, setCefrLevelLocked] = useState(false);
   const [userRole, setUserRole] = useState<string | null>(null);
@@ -95,8 +110,8 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
         setOrganization(org);
         setCachedOrg(org);
 
-        // Parallel fetch: profile (role + CEFR), student frameworks, org frameworks
-        const [profileResult, studentFwResult, orgFwResult] = await Promise.all([
+        // Parallel fetch: profile (role + CEFR), student frameworks, org frameworks, available modes
+        const [profileResult, studentFwResult, orgFwResult, availableModesResult] = await Promise.all([
           supabase
             .from('profiles')
             .select('role, cefr_active_level, cefr_level_locked')
@@ -110,6 +125,14 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
             .from('organization_frameworks')
             .select('framework_id, pedagogical_frameworks(name, type)')
             .eq('organization_id', org?.id ?? ''),
+          supabase
+            .from('bob_prompts')
+            .select('framework, exam_part, cefr_level, label, description')
+            .eq('activity_type', 'generation')
+            .neq('framework', 'generic')
+            .order('framework')
+            .order('cefr_level', { ascending: true, nullsFirst: false })
+            .order('exam_part'),
         ]);
 
         if (profileResult.error) {
@@ -120,6 +143,9 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
         }
         if (orgFwResult.error) {
           console.error('[OrganizationContext] organization_frameworks query failed:', orgFwResult.error);
+        }
+        if (availableModesResult.error) {
+          console.error('[OrganizationContext] bob_prompts (availableModes) query failed:', availableModesResult.error);
         }
 
         const activeLevel = (profileResult.data?.cefr_active_level ?? null) as CefrLevel | null;
@@ -174,6 +200,31 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
         });
 
         setEnabledModes(modes);
+
+        // Deduplicate availableModes by (framework, exam_part, cefr_level) — take first row per combo
+        const rawModes = (availableModesResult.data ?? []) as Array<{
+          framework: string;
+          exam_part: string;
+          cefr_level: string | null;
+          label: string;
+          description: string | null;
+        }>;
+        const seen = new Set<string>();
+        const deduped: AvailableMode[] = [];
+        for (const row of rawModes) {
+          const key = `${row.framework}|${row.exam_part}|${row.cefr_level ?? ''}`;
+          if (!seen.has(key)) {
+            seen.add(key);
+            deduped.push({
+              framework: row.framework as ModeFramework,
+              exam_part: row.exam_part,
+              cefr_level: (row.cefr_level ?? null) as CefrLevel | null,
+              label: row.label,
+              description: row.description,
+            });
+          }
+        }
+        setAvailableModes(deduped);
       } catch (err) {
         console.error('[OrganizationContext] Unexpected error loading org data:', err);
       } finally {
@@ -220,6 +271,7 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
       organization,
       loading,
       enabledModes,
+      availableModes,
       cefrActiveLevel,
       cefrLevelLocked,
       setCefrActiveLevel,
