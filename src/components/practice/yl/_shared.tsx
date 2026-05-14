@@ -164,46 +164,46 @@ export function YLRecordingButton({
   );
 }
 
-export function YLScoreDisplay({ evalResult }: { evalResult: EvalResponse }) {
+/**
+ * Compact 2-line result card combining score + feedback. Designed to live
+ * inline in the chat without dominating it.
+ */
+export function YLResultCompact({ evalResult }: { evalResult: EvalResponse }) {
   const pct = Math.round((evalResult.score / evalResult.score_max) * 100);
   return (
-    <div className="bg-white border border-trebol-border rounded-2xl px-4 py-3 flex items-center justify-between gap-4">
-      <div>
-        <p className="text-[10px] font-semibold uppercase tracking-widest text-trebol-text/50">Score</p>
-        <p className="text-2xl font-black text-trebol-text leading-tight">
-          {evalResult.score}
-          <span className="text-sm text-trebol-text/50 font-semibold ml-1">/ {evalResult.score_max}</span>
-        </p>
-      </div>
-      <div className="text-right space-y-1">
-        <span className="inline-block px-2 py-0.5 rounded-full bg-trebol-primary/10 text-trebol-primary text-xs font-bold">
+    <div className="bg-white border border-trebol-border rounded-2xl px-4 py-3 space-y-1 max-w-md shadow-sm">
+      <div className="flex items-center gap-2 text-sm">
+        <CheckCircle className="text-trebol-primary shrink-0" size={16} />
+        <span className="font-bold text-trebol-text">Practice complete</span>
+        <span className="text-trebol-text/40">·</span>
+        <span className="font-semibold text-trebol-text">
+          {evalResult.score}<span className="text-trebol-text/50">/{evalResult.score_max}</span>
+        </span>
+        <span className="px-1.5 py-0.5 rounded-full bg-trebol-primary/10 text-trebol-primary text-[10px] font-bold">
           {evalResult.cefr_band.toUpperCase()}
         </span>
-        <p className="text-xs text-trebol-text/50">{pct}%</p>
+        <span className="text-xs text-trebol-text/50 ml-auto">{pct}%</span>
       </div>
+      <p className="text-xs text-trebol-text/70 leading-relaxed">{evalResult.feedback}</p>
     </div>
   );
 }
 
-export function YLFeedbackCard({ feedback }: { feedback: string }) {
-  return (
-    <div className="bg-white border border-trebol-border rounded-2xl px-4 py-3 space-y-1">
-      <p className="text-[10px] font-semibold uppercase tracking-widest text-trebol-text/50">Examiner feedback</p>
-      <p className="text-trebol-text/80 text-sm leading-relaxed">{feedback}</p>
-    </div>
-  );
+// Backwards-compat aliases — older code paths still import these
+export function YLScoreDisplay({ evalResult }: { evalResult: EvalResponse }) {
+  return <YLResultCompact evalResult={evalResult} />;
 }
 
-export function YLResultsHeader({ title, subtitle }: { title: string; subtitle: string }) {
-  return (
-    <div className="flex items-center gap-2 text-trebol-text/70">
-      <CheckCircle className="text-trebol-primary" size={18} />
-      <div>
-        <p className="text-sm font-bold text-trebol-text">{title}</p>
-        <p className="text-xs text-trebol-text/50">{subtitle}</p>
-      </div>
-    </div>
-  );
+export function YLFeedbackCard({ feedback: _feedback }: { feedback: string }) {
+  // Feedback is rendered inside YLResultCompact now; this is a no-op kept for backwards compat.
+  void _feedback;
+  return null;
+}
+
+export function YLResultsHeader(_: { title: string; subtitle: string }) {
+  // The compact result card already conveys completion + score; this
+  // header used to duplicate that info. Kept as no-op for backwards compat.
+  return null;
 }
 
 export function YLToolbar({
