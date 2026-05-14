@@ -16,6 +16,7 @@ interface UseSessionStateReturn {
   handleSelectSession: (id: string, onSelected: (mode: string, topic: string) => void) => Promise<void>;
   handleDeleteSession: (id: string, activeSessionId: string | null, resetToModeSelection: () => void) => Promise<void>;
   handleConversationSessionStart: (topic: string) => void;
+  refreshSessions: () => Promise<void>;
 }
 
 export function useSessionState(userEmail: string | undefined): UseSessionStateReturn {
@@ -24,6 +25,12 @@ export function useSessionState(userEmail: string | undefined): UseSessionStateR
   const [sessionsLoading, setSessionsLoading] = useState(true);
   const [selectedSession, setSelectedSession] = useState<BobSession | null>(null);
   const [selectedMessages, setSelectedMessages] = useState<StoredMessage[]>([]);
+
+  const refreshSessions = useCallback(async () => {
+    const { data } = await getSessionsAction();
+    setSessions(data ?? []);
+    setSessionsLoading(false);
+  }, []);
 
   useEffect(() => {
     if (!userEmail) return;
@@ -89,5 +96,6 @@ export function useSessionState(userEmail: string | undefined): UseSessionStateR
     handleSelectSession,
     handleDeleteSession,
     handleConversationSessionStart,
+    refreshSessions,
   };
 }

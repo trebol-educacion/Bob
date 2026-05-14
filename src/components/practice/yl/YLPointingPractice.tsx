@@ -48,6 +48,7 @@ export interface YLPointingPracticeProps {
   onBack: () => void;
   sessionId?: string;
   initialMessages?: BobMessageShape[];
+  onSessionCreated?: (sessionId: string) => void;
 }
 
 type Phase = 'loading' | 'ready' | 'answered' | 'evaluating' | 'finished';
@@ -58,6 +59,7 @@ export function YLPointingPractice({
   onBack,
   sessionId: initialSessionId,
   initialMessages,
+  onSessionCreated,
 }: YLPointingPracticeProps) {
   const mode: ModeKey = `cambridge_${exam}_part${part}` as ModeKey;
   const isReadOnly = !!initialMessages && initialMessages.length > 0;
@@ -96,6 +98,7 @@ export function YLPointingPractice({
       try {
         const { sessionId: sid, plan: p } = await startYLSessionAction({ mode });
         setSessionId(sid);
+        onSessionCreated?.(sid);
         setPlan(p);
         if (p.option_image_prompts && p.option_image_prompts.length > 0) {
           const imgs = await generateYLImagesAction(exam, part, p.option_image_prompts);

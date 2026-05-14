@@ -76,6 +76,7 @@ export interface YLPart3PracticeProps {
   onBack: () => void;
   sessionId?: string;
   initialMessages?: BobMessageShape[];
+  onSessionCreated?: (sessionId: string) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -88,6 +89,7 @@ export function YLPart3Practice({
   onBack,
   sessionId: initialSessionId,
   initialMessages,
+  onSessionCreated,
 }: YLPart3PracticeProps) {
   const mode: ModeKey = `cambridge_${exam}_part${part}` as ModeKey;
   const isReadOnly = !!initialMessages && initialMessages.length > 0;
@@ -131,6 +133,7 @@ export function YLPart3Practice({
       try {
         const { sessionId: sid, plan: p } = await startYLSessionAction({ mode });
         setSessionId(sid);
+        onSessionCreated?.(sid);
         setPlan(p);
 
         // Generate all 4 story images with CHARACTER_DESCRIPTION for visual consistency

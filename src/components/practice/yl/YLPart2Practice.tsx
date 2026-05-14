@@ -68,6 +68,7 @@ export interface YLPart2PracticeProps {
   onBack: () => void;
   sessionId?: string;
   initialMessages?: BobMessageShape[];
+  onSessionCreated?: (sessionId: string) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -80,6 +81,7 @@ export function YLPart2Practice({
   onBack,
   sessionId: initialSessionId,
   initialMessages,
+  onSessionCreated,
 }: YLPart2PracticeProps) {
   const mode: ModeKey = `cambridge_${exam}_part${part}` as ModeKey;
   const isReadOnly = !!initialMessages && initialMessages.length > 0;
@@ -122,6 +124,7 @@ export function YLPart2Practice({
       try {
         const { sessionId: sid, plan: p } = await startYLSessionAction({ mode });
         setSessionId(sid);
+        onSessionCreated?.(sid);
         setPlan(p);
 
         if (p.image_prompts && p.image_prompts.length > 0) {

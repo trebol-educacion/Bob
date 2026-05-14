@@ -54,6 +54,7 @@ interface YLRenderProps {
   onBack: () => void;
   sessionId?: string;
   initialMessages?: StoredMessage[];
+  onSessionCreated?: (sessionId: string) => void;
 }
 
 /**
@@ -110,7 +111,16 @@ export default function App() {
     handleSelectSession,
     handleDeleteSession,
     handleConversationSessionStart,
+    refreshSessions,
   } = useSessionState(userEmail);
+
+  const handleYLSessionCreated = useCallback(
+    (newSessionId: string) => {
+      setActiveSessionId(newSessionId);
+      void refreshSessions();
+    },
+    [setActiveSessionId, refreshSessions]
+  );
 
   const onNewSession = useCallback(() => {
     handleNewSession(resetToModeSelection);
@@ -300,6 +310,7 @@ export default function App() {
                   onBack: onFinish,
                   sessionId: activeSessionId ?? undefined,
                   initialMessages: selectedMessages.length > 0 ? selectedMessages : undefined,
+                  onSessionCreated: handleYLSessionCreated,
                 })}
 
                 {mode === 'cambridge_pet_p3' && (

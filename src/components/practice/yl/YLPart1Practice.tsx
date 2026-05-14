@@ -72,6 +72,7 @@ export interface YLPart1PracticeProps {
   onBack: () => void;
   sessionId?: string;
   initialMessages?: BobMessageShape[];
+  onSessionCreated?: (sessionId: string) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -84,6 +85,7 @@ export function YLPart1Practice({
   onBack,
   sessionId: initialSessionId,
   initialMessages,
+  onSessionCreated,
 }: YLPart1PracticeProps) {
   const mode: ModeKey = `cambridge_${exam}_part${part}` as ModeKey;
 
@@ -157,6 +159,7 @@ export function YLPart1Practice({
       try {
         const { sessionId: sid, plan: p } = await startYLSessionAction({ mode });
         setSessionId(sid);
+        onSessionCreated?.(sid);
         setPlan(p);
 
         // Generate images if the plan provides image prompts
