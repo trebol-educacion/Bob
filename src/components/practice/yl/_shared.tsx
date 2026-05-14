@@ -273,12 +273,16 @@ export function YLVoiceNote({
   durationHint?: number; // seconds, optional
   /** When provided, audio is cached per (sessionId, text) in the DB. */
   sessionId?: string;
+  /** Auto-play once on mount. After playback, the button switches to a replay icon. */
+  autoPlay?: boolean;
 }) {
   const [playing, setPlaying] = React.useState(false);
+  const [hasPlayed, setHasPlayed] = React.useState(false);
   const [duration, setDuration] = React.useState<number | null>(durationHint ?? null);
   const [progress, setProgress] = React.useState(0); // 0..1
   const audioRef = React.useRef<HTMLAudioElement | null>(null);
   const intervalRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
+  const autoPlayedRef = React.useRef(false);
 
   const stop = React.useCallback(() => {
     if (audioRef.current) {
@@ -323,6 +327,7 @@ export function YLVoiceNote({
       };
       audio.onended = () => {
         stop();
+        setHasPlayed(true);
         setProgress(1);
         setTimeout(() => setProgress(0), 600);
       };
@@ -335,7 +340,14 @@ export function YLVoiceNote({
     } catch {
       stop();
     }
-  }, [playing, stop, text]);
+  }, [playing, stop, text, sessionId]);
+
+  // Auto-play once on mount when the parent requests it
+  React.useEffect(() => {
+    if (!autoPlay || autoPlayedRef.current) return;
+    autoPlayedRef.current = true;
+    void handlePlay();
+  }, [autoPlay, handlePlay]);
 
   const fmt = (s: number | null) => {
     if (s === null || !Number.isFinite(s)) return '0:00';
@@ -355,19 +367,27 @@ export function YLVoiceNote({
           B
         </div>
       )}
-      <div className={`flex items-center gap-3 rounded-2xl px-3 py-2 max-w-sm ${bubbleColor}`}>
+      <div className={`flex items-center gap-3 rounded-2xl px-3 py-2 max-w-sm ${bubbleColor} ${playing ? 'ring-2 ring-trebol-primary/40 shadow-md' : ''}`}>
         <button
           type="button"
           onClick={handlePlay}
-          className={`w-9 h-9 rounded-full ${iconColor} flex items-center justify-center hover:opacity-90 transition-opacity`}
-          aria-label={playing ? 'Pause' : 'Reproducir'}
+          className={`w-9 h-9 rounded-full ${iconColor} flex items-center justify-center hover:opacity-90 transition-opacity ${playing ? 'animate-pulse' : ''}`}
+          aria-label={playing ? 'Pause' : hasPlayed ? 'Replay' : 'Play'}
         >
           {playing ? (
+            // Pause icon
             <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
               <rect x="6" y="5" width="4" height="14" rx="1" />
               <rect x="14" y="5" width="4" height="14" rx="1" />
             </svg>
+          ) : hasPlayed ? (
+            // Replay (circular arrow) icon
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+              <path d="M3 12a9 9 0 1 0 3-6.7" />
+              <polyline points="3 4 3 10 9 10" />
+            </svg>
           ) : (
+            // Play (triangle) icon
             <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
               <path d="M8 5v14l11-7z" />
             </svg>
@@ -376,12 +396,12 @@ export function YLVoiceNote({
         <div className="flex-1 min-w-32">
           <div className="h-1.5 bg-trebol-text/15 rounded-full overflow-hidden">
             <div
-              className="h-full bg-trebol-primary transition-all"
+              className={`h-full bg-trebol-primary transition-all ${playing ? 'animate-pulse' : ''}`}
               style={{ width: `${Math.round(progress * 100)}%` }}
             />
           </div>
           <div className="flex justify-between text-[10px] text-trebol-text/50 mt-1">
-            <span>🎤 nota de voz</span>
+            <span>{playing ? '▶ Playing…' : hasPlayed ? '🔁 Listen again' : '🎤 Voice note'}</span>
             <span>{fmt(duration)}</span>
           </div>
         </div>

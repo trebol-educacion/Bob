@@ -122,11 +122,8 @@ export function YLPointingPractice({
   const currentCue = plan?.pointing_cues?.[cueIndex];
   const totalCues = plan?.pointing_cues?.length ?? 4;
 
-  // Speak the cue automatically when a new one is presented
-  useEffect(() => {
-    if (phase !== 'ready' || !currentCue) return;
-    void playTTS(currentCue.text);
-  }, [phase, currentCue]);
+  // Note: cue audio auto-plays via the YLVoiceNote bubble itself (prop autoPlay)
+  // so the user sees the playing state in the same UI that controls replay.
 
   const handleSelect = async (optionIdx: number) => {
     if (phase !== 'ready' || chosenIndex !== null || !currentCue || !sessionId) return;
@@ -153,9 +150,7 @@ export function YLPointingPractice({
       },
     ]);
 
-    // Speak the reaction in English
-    void playTTS(reactionText);
-
+    // Reaction is auto-played by the YLVoiceNote bubble below (autoPlay)
     try {
       await saveYLTurnAction(sessionId, {
         cue: currentCue.text,
@@ -282,16 +277,27 @@ export function YLPointingPractice({
               <YLBobTextMessage text={t.cueText} />
               {/* User's pick */}
               <YLUserTextMessage text={`👉 ${t.userPicked} ${t.correct ? '✓' : '✗'}`} />
-              {/* Bob's reaction: voice note only (no text) */}
+              {/* Bob's reaction: voice note only (no text). Auto-plays the latest one. */}
               {sessionId && (
-                <YLVoiceNote text={t.reactionText} side="bob" sessionId={sessionId} />
+                <YLVoiceNote
+                  text={t.reactionText}
+                  side="bob"
+                  sessionId={sessionId}
+                  autoPlay={t.id === `turn-${cueIndex - 1}` || (phase === 'answered' && t.id === `turn-${cueIndex}`)}
+                />
               )}
             </React.Fragment>
           ))}
 
-          {/* Current cue (voice only, NO text) */}
+          {/* Current cue (voice only, NO text). Auto-plays once on mount. */}
           {currentCue && sessionId && phase === 'ready' && (
-            <YLVoiceNote text={currentCue.text} side="bob" sessionId={sessionId} />
+            <YLVoiceNote
+              key={`cue-${cueIndex}`}
+              text={currentCue.text}
+              side="bob"
+              sessionId={sessionId}
+              autoPlay
+            />
           )}
 
           {/* Final results inline in chat */}
