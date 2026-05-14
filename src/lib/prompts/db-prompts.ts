@@ -125,6 +125,12 @@ export async function getPrompt(
   // Look up in cache
   let template: string | undefined = cache.get(key)?.prompt_current
 
+  // Cache miss → force one refresh in case the key was added after last load
+  if (template === undefined && !cacheEmpty && !cacheExpired) {
+    await loadCache()
+    template = cache.get(key)?.prompt_current
+  }
+
   // Fall back to static map
   if (template === undefined) {
     template = FALLBACK_PROMPTS[key]
