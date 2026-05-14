@@ -15,14 +15,41 @@ interface SessionSidebarProps {
 }
 
 const MODE_ICON: Record<NonNullable<SessionMode>, React.ElementType> = {
-  situation: MessageSquare,
-  image: ImageIcon,
-  conversation: MessagesSquare,
-  b1_collaborative: Users,
-  a2_part1: BookOpen,
+  // Generic
+  generic_situation: MessageSquare,
+  generic_image: ImageIcon,
+  generic_conversation: MessagesSquare,
+  // Cambridge YL
+  cambridge_starters_part1: BookOpen,
+  cambridge_movers_part1: BookOpen,
+  cambridge_flyers_part1: BookOpen,
+  // Cambridge KET
+  cambridge_ket_part1: BookOpen,
+  cambridge_ket_part2: BookOpen,
+  // Cambridge PET
+  cambridge_pet_p1: Users,
+  cambridge_pet_p2: Users,
+  cambridge_pet_p3: Users,
+  cambridge_pet_p4: Users,
+  // Cambridge FCE
+  cambridge_fce_p1: ImageIcon,
+  cambridge_fce_p2: ImageIcon,
+  cambridge_fce_p3: ImageIcon,
+  cambridge_fce_p4: ImageIcon,
+  // Cambridge CAE
+  cambridge_cae_p1: MessageSquare,
+  cambridge_cae_p2: MessageSquare,
+  cambridge_cae_p3: MessageSquare,
+  cambridge_cae_p4: MessageSquare,
+  // Cambridge CPE
+  cambridge_cpe_p1: MessageSquare,
+  cambridge_cpe_p2: MessageSquare,
+  cambridge_cpe_p3a: MessageSquare,
+  cambridge_cpe_p3b: MessageSquare,
+  cambridge_cpe_p4: MessageSquare,
+  // TOEFL
   toefl_listen_repeat: Headphones,
   toefl_interview: Mic,
-  b2_speaking: ImageIcon,
 };
 
 function relativeDate(dateStr: string): string {

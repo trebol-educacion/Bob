@@ -208,7 +208,7 @@ export function B1CollaborativePractice({ onBack }: B1CollaborativePracticeProps
     if (!sessionCreatedRef.current) {
       sessionCreatedRef.current = true;
       createSessionAction({
-        mode: 'b1_collaborative',
+        mode: 'cambridge_pet_p3',
         topic: scenario.topic,
         title: `B1 Collaborative: ${scenario.topic}`,
       }).catch(() => {

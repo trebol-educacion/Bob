@@ -1,11 +1,12 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ModeSelection } from '@/components/ModeSelection';
 import { ConversationPractice } from '@/components/ConversationPractice';
 import { SessionSidebar } from '@/components/SessionSidebar';
 import { BobPracticeChat } from '@/components/BobPracticeChat';
+import { CefrCtaBanner } from '@/components/CefrCtaBanner';
 import { createSessionAction } from '@/actions/sessions';
 import { createSupabaseBrowser } from '@/lib/supabase/browser-client';
 import { Navbar } from '@/components/Navbar';
@@ -26,7 +27,10 @@ type AppState =
 export default function App() {
   const [appState, setAppState] = useState<AppState>('mode-selection');
   const [userEmail, setUserEmail] = useState<string | undefined>();
-  const { organization, enabledModes } = useOrganization();
+  const { organization, enabledModes, cefrActiveLevel, cefrLevelLocked, setCefrActiveLevel } = useOrganization();
+
+  // Ref forwarded to ModeSelection so the banner can scroll to the selector
+  const cefrSelectorRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const supabase = createSupabaseBrowser();
@@ -66,12 +70,12 @@ export default function App() {
   const onSelectSession = useCallback(async (id: string) => {
     await handleSelectSession(id, (sessionMode, sessionTopic) => {
       setMode(sessionMode as PracticeMode);
-      if (sessionMode === 'conversation') {
+      if (sessionMode === 'generic_conversation') {
         setTopic(sessionTopic);
         setAppState('conversation-practicing');
       } else if (
-        sessionMode === 'b1_collaborative' ||
-        sessionMode === 'a2_part1' ||
+        sessionMode === 'cambridge_pet_p3' ||
+        sessionMode === 'cambridge_ket_part1' ||
         sessionMode === 'toefl_listen_repeat' ||
         sessionMode === 'toefl_interview'
       ) {
@@ -88,11 +92,11 @@ export default function App() {
 
   const handleModeSelect = (m: PracticeMode) => {
     setMode(m);
-    if (m === 'conversation') {
+    if (m === 'generic_conversation') {
       setAppState('conversation-practicing');
     } else if (
-      m === 'b1_collaborative' ||
-      m === 'a2_part1' ||
+      m === 'cambridge_pet_p3' ||
+      m === 'cambridge_ket_part1' ||
       m === 'toefl_listen_repeat' ||
       m === 'toefl_interview'
     ) {
@@ -112,6 +116,12 @@ export default function App() {
     setSelectedSession(null);
     resetToModeSelection();
   }, [resetToModeSelection, setSelectedMessages, setSelectedSession]);
+
+  const handleBannerScroll = useCallback(() => {
+    cefrSelectorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, []);
+
+  const showBanner = cefrActiveLevel === null && !cefrLevelLocked;
 
   return (
     <div className="h-screen bg-trebol-bg flex flex-col overflow-hidden">
@@ -146,18 +156,28 @@ export default function App() {
                     </div>
                   </div>
                 ) : (
-                  <div className="w-full max-w-4xl mx-auto flex flex-col items-center py-8 px-4 pb-12">
-                    {organization && (
-                      <p className="text-sm text-trebol-text/50 mb-4 text-center">{organization.name}</p>
-                    )}
-                    <ModeSelection onSelect={handleModeSelect} enabledModes={enabledModes} />
-                  </div>
+                  <>
+                    {showBanner && <CefrCtaBanner onScroll={handleBannerScroll} />}
+                    <div className="w-full max-w-4xl mx-auto flex flex-col items-center py-8 px-4 pb-12">
+                      {organization && (
+                        <p className="text-sm text-trebol-text/50 mb-4 text-center">{organization.name}</p>
+                      )}
+                      <ModeSelection
+                        ref={cefrSelectorRef}
+                        onSelect={handleModeSelect}
+                        enabledModes={enabledModes}
+                        cefrActiveLevel={cefrActiveLevel}
+                        cefrLevelLocked={cefrLevelLocked}
+                        onCefrChange={setCefrActiveLevel}
+                      />
+                    </div>
+                  </>
                 )}
               </motion.div>
             )}
 
 
-            {appState === 'practicing' && mode && mode !== 'conversation' && (
+            {appState === 'practicing' && mode && mode !== 'generic_conversation' && (
               <motion.div
                 key={`practicing-${mode}-${selectedMessages.length > 0 ? activeSessionId : 'new'}`}
                 initial={{ opacity: 0 }}
@@ -165,13 +185,13 @@ export default function App() {
                 exit={{ opacity: 0 }}
                 className="flex-1 flex flex-col min-h-0"
               >
-                {mode === 'b2_speaking' ? (
+                {mode === 'cambridge_fce_p1' ? (
                   <BobPracticeChat
                     mode="image"
                     level="b2"
                     onBack={onFinish}
                     onSessionStart={async (title) => {
-                      const { data } = await createSessionAction({ mode: 'image', topic: title, title });
+                      const { data } = await createSessionAction({ mode: 'generic_image', topic: title, title });
                       if (data) { setActiveSessionId(data.id); setSessions(prev => [data, ...prev]); }
                       return data?.id;
                     }}
@@ -180,10 +200,10 @@ export default function App() {
                   />
                 ) : (
                   <BobPracticeChat
-                    mode={mode as 'situation' | 'image'}
+                    mode={mode === 'generic_image' ? 'image' : 'situation'}
                     onBack={onFinish}
                     onSessionStart={async (title) => {
-                      const { data } = await createSessionAction({ mode: mode as 'situation' | 'image', topic: title, title });
+                      const { data } = await createSessionAction({ mode, topic: title, title });
                       if (data) { setActiveSessionId(data.id); setSessions(prev => [data, ...prev]); }
                       return data?.id;
                     }}
@@ -219,10 +239,10 @@ export default function App() {
                 exit={{ opacity: 0 }}
                 className="flex-1 flex flex-col min-h-0"
               >
-                {mode === 'b1_collaborative' && (
+                {mode === 'cambridge_pet_p3' && (
                   <B1CollaborativePractice onBack={() => setAppState('mode-selection')} />
                 )}
-                {mode === 'a2_part1' && (
+                {mode === 'cambridge_ket_part1' && (
                   <A2Part1Practice onBack={() => setAppState('mode-selection')} />
                 )}
                 {mode === 'toefl_listen_repeat' && (

@@ -1,21 +1,25 @@
-import React from 'react';
+import React, { forwardRef } from 'react';
 import { motion } from 'motion/react';
 import { MessageSquare, Image as ImageIcon, Sparkles, Mic2, Users, BookOpen, Headphones, ClipboardList, FileText } from 'lucide-react';
-import type { PracticeMode } from '@/lib/types/practice';
+import type { ModeKey, PracticeMode, CefrLevel } from '@/lib/types/practice';
+import { CefrLevelSelector } from '@/components/CefrLevelSelector';
 
 interface ModeSelectionProps {
   onSelect: (mode: PracticeMode) => void;
   enabledModes?: PracticeMode[];
+  cefrActiveLevel?: CefrLevel | null;
+  cefrLevelLocked?: boolean;
+  onCefrChange?: (level: CefrLevel) => void;
 }
 
 interface ModeCardProps {
-  mode: NonNullable<PracticeMode>;
+  mode: ModeKey;
   icon: React.ReactNode;
   title: string;
   description: string;
   badge?: string;
   disabled?: boolean;
-  onSelect: (mode: NonNullable<PracticeMode>) => void;
+  onSelect: (mode: ModeKey) => void;
 }
 
 function ModeCard({ mode, icon, title, description, badge, disabled, onSelect }: ModeCardProps) {
@@ -55,8 +59,11 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function ModeSelection({ onSelect, enabledModes }: ModeSelectionProps) {
-  const isDisabled = (mode: NonNullable<PracticeMode>) =>
+export const ModeSelection = forwardRef<HTMLDivElement, ModeSelectionProps>(function ModeSelection(
+  { onSelect, enabledModes, cefrActiveLevel = null, cefrLevelLocked = false, onCefrChange },
+  selectorRef
+) {
+  const isDisabled = (mode: ModeKey) =>
     enabledModes !== undefined && !enabledModes.includes(mode);
 
   const iconClass = "text-trebol-primary group-hover:text-white transition-colors";
@@ -72,32 +79,42 @@ export function ModeSelection({ onSelect, enabledModes }: ModeSelectionProps) {
         </p>
       </div>
 
+      {/* CEFR Level Selector */}
+      <div ref={selectorRef} className="flex justify-center">
+        <CefrLevelSelector
+          value={cefrActiveLevel}
+          onChange={onCefrChange ?? (() => {})}
+          disabled={!onCefrChange}
+          locked={cefrLevelLocked}
+        />
+      </div>
+
       {/* Free Practice */}
       <div>
         <SectionTitle>Free Practice</SectionTitle>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <ModeCard
-            mode="situation"
+            mode="generic_situation"
             icon={<MessageSquare size={28} className={iconClass} />}
             title="Práctica de Situación"
             description="Practica frases útiles para situaciones reales personalizadas por ti."
-            disabled={isDisabled('situation')}
+            disabled={isDisabled('generic_situation')}
             onSelect={onSelect}
           />
           <ModeCard
-            mode="image"
+            mode="generic_image"
             icon={<ImageIcon size={28} className={iconClass} />}
             title="Descripción de Imagen"
             description="Prepárate para el examen B1 describiendo escenas generadas por IA."
-            disabled={isDisabled('image')}
+            disabled={isDisabled('generic_image')}
             onSelect={onSelect}
           />
           <ModeCard
-            mode="conversation"
+            mode="generic_conversation"
             icon={<Mic2 size={28} className={iconClass} />}
             title="Conversación Fluida"
             description="Interactúa en una conversación real con IA sobre cualquier tema."
-            disabled={isDisabled('conversation')}
+            disabled={isDisabled('generic_conversation')}
             onSelect={onSelect}
           />
         </div>
@@ -108,30 +125,30 @@ export function ModeSelection({ onSelect, enabledModes }: ModeSelectionProps) {
         <SectionTitle>Cambridge English</SectionTitle>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <ModeCard
-            mode="b1_collaborative"
+            mode="cambridge_pet_p3"
             icon={<Users size={28} className={iconClass} />}
             title="B1 Collaborative Task"
             description="Discuss &amp; decide together"
             badge="B1 · 10 min"
-            disabled={isDisabled('b1_collaborative')}
+            disabled={isDisabled('cambridge_pet_p3')}
             onSelect={onSelect}
           />
           <ModeCard
-            mode="a2_part1"
+            mode="cambridge_ket_part1"
             icon={<BookOpen size={28} className={iconClass} />}
             title="A2 Key Speaking"
             description="Answer questions from an examiner"
             badge="A2 · 8 min"
-            disabled={isDisabled('a2_part1')}
+            disabled={isDisabled('cambridge_ket_part1')}
             onSelect={onSelect}
           />
           <ModeCard
-            mode="b2_speaking"
+            mode="cambridge_fce_p1"
             icon={<FileText size={28} className={iconClass} />}
             title="B2 First Speaking"
             description="Describe &amp; compare photos"
             badge="B2 · 5 min"
-            disabled={isDisabled('b2_speaking')}
+            disabled={isDisabled('cambridge_fce_p1')}
             onSelect={onSelect}
           />
         </div>
@@ -163,4 +180,4 @@ export function ModeSelection({ onSelect, enabledModes }: ModeSelectionProps) {
       </div>
     </div>
   );
-}
+});

@@ -163,7 +163,7 @@ export function A2Part1Practice({ onBack }: A2Part1PracticeProps) {
       try {
         const [sessionPlan] = await Promise.all([
           generateA2SessionAction(),
-          createSessionAction({ mode: 'a2_part1', title: 'A2 Key Speaking – Part 1' }),
+          createSessionAction({ mode: 'cambridge_ket_part1', title: 'A2 Key Speaking – Part 1' }),
         ]);
         setPlan(sessionPlan);
         setPhase('phase1');

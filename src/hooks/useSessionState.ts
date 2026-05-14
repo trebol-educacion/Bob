@@ -69,7 +69,7 @@ export function useSessionState(userEmail: string | undefined): UseSessionStateR
   }, [sessions]);
 
   const handleConversationSessionStart = useCallback((topic: string) => {
-    createSessionAction({ mode: 'conversation', topic, title: topic.slice(0, 60) || 'Conversación' })
+    createSessionAction({ mode: 'generic_conversation', topic, title: topic.slice(0, 60) || 'Conversación' })
       .then(({ data }) => {
         if (data) { setActiveSessionId(data.id); setSessions(prev => [data, ...prev]); }
       });
