@@ -12,7 +12,7 @@ const poppins = Poppins({
 });
 
 export const metadata: Metadata = {
-  title: "PronunciaBien - AI English Coach",
+  title: "Bob",
   description: "Mejora tu pronunciación en inglés con la ayuda de la IA de Gemini.",
 };
 
