@@ -19,6 +19,10 @@ export const MODELS = {
    */
   FLASH_LITE_LATEST: 'gemini-flash-lite-latest',
 
-  /** Full image generation model */
-  IMAGE: 'gemini-3.1-flash-image-preview',
+  /**
+   * Stable production image-generation model (Gemini 2.5 flash image).
+   * Typically 5–10s. Same model used in mcp-canva. Llamar vía
+   * ai.models.generateContent() con responseModalities: ['IMAGE'].
+   */
+  IMAGE: 'gemini-2.5-flash-image',
 } as const;
