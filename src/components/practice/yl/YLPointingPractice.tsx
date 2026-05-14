@@ -111,7 +111,7 @@ export function YLPointingPractice({
         }
         setPhase('ready');
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Error al preparar la sesión');
+        setError(err instanceof Error ? err.message : 'Error preparing the session');
       }
     })();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -192,10 +192,10 @@ export function YLPointingPractice({
           cefr_band: 'a1',
           feedback:
             pct === 100
-              ? '¡Perfecto! Identificaste todos los objetos.'
+              ? 'Perfect! You identified all the objects.'
               : pct >= 50
-              ? '¡Buen trabajo! La próxima vez intenta acertar todos.'
-              : 'Vamos a practicar un poquito más con el vocabulario.',
+              ? 'Good job! Next time try to get them all right.'
+              : 'Let’s practice the vocabulary a little more.',
         };
         setFinalEval(result);
         // Persist final eval (click-based) directly — Gemini-based eval
@@ -207,18 +207,18 @@ export function YLPointingPractice({
         }
         setPhase('finished');
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Error finalizando la sesión');
+        setError(err instanceof Error ? err.message : 'Error finalizing the session');
       }
     })();
   }, [phase, sessionId, plan, score, mode]);
 
   if (error) return <YLErrorScreen error={error} onBack={onBack} />;
   if (phase === 'loading')
-    return <YLLoadingScreen message="Preparando tu práctica…" />;
+    return <YLLoadingScreen message="Getting your practice ready…" />;
   if (phase === 'evaluating')
-    return <YLLoadingScreen message="Calculando tu puntuación final…" />;
+    return <YLLoadingScreen message="Calculating your final score…" />;
 
-  const partLabel = 'Starters Part 1 — Señalar imágenes';
+  const partLabel = 'Starters Part 1 — Point to the picture';
   const progress = Math.round(((cueIndex + (phase === 'answered' ? 1 : 0)) / totalCues) * 100);
 
   if (phase === 'finished' && isReadOnly) {
@@ -234,7 +234,7 @@ export function YLPointingPractice({
 
     return (
       <div className="flex-1 flex flex-col min-h-0">
-        <YLToolbar title={partLabel} subtitle="Historial de práctica" onBack={onBack} progress={100} />
+        <YLToolbar title={partLabel} subtitle="Practice history" onBack={onBack} progress={100} />
         <div className="flex-1 overflow-y-auto p-4 space-y-3">
           {messages
             .filter((m) => m.msg_type !== 'evaluation')
@@ -253,7 +253,7 @@ export function YLPointingPractice({
               animate={{ opacity: 1, y: 0 }}
               className="space-y-3 max-w-md pt-2"
             >
-              <YLResultsHeader title="¡Práctica completada!" subtitle={partLabel} />
+              <YLResultsHeader title="Practice complete!" subtitle={partLabel} />
               <YLScoreDisplay evalResult={savedEval} />
               <YLFeedbackCard feedback={savedEval.feedback} />
             </motion.div>
@@ -268,7 +268,7 @@ export function YLPointingPractice({
     <div className="flex-1 flex flex-col min-h-0">
       <YLToolbar
         title={partLabel}
-        subtitle={`Ronda ${cueIndex + 1} de ${totalCues}`}
+        subtitle={`Round ${cueIndex + 1} of ${totalCues}`}
         onBack={onBack}
         progress={progress}
       />
@@ -302,7 +302,7 @@ export function YLPointingPractice({
               animate={{ opacity: 1, y: 0 }}
               className="space-y-3 max-w-md"
             >
-              <YLResultsHeader title="¡Práctica completada!" subtitle={partLabel} />
+              <YLResultsHeader title="Practice complete!" subtitle={partLabel} />
               <YLScoreDisplay evalResult={finalEval} />
               <YLFeedbackCard feedback={finalEval.feedback} />
             </motion.div>
@@ -334,9 +334,9 @@ export function YLPointingPractice({
       {/* Bottom action bar */}
       <div className="border-t border-trebol-border bg-white/90 backdrop-blur p-3 flex items-center justify-between gap-3">
         <p className="text-xs text-trebol-text/60 font-medium pl-2">
-          {phase === 'ready' && '🎧 Escucha y haz clic en la imagen correcta'}
-          {phase === 'answered' && (wasCorrect ? '¡Muy bien!' : 'Casi… vamos a la siguiente')}
-          {phase === 'finished' && '✅ Práctica completada'}
+          {phase === 'ready' && '🎧 Listen and tap the correct picture'}
+          {phase === 'answered' && (wasCorrect ? 'Well done!' : 'Almost… let’s try the next one')}
+          {phase === 'finished' && '✅ Practice complete'}
         </p>
         {phase === 'answered' && (
           <button
@@ -357,7 +357,7 @@ export function YLPointingPractice({
             onClick={onBack}
             className="px-6 py-3 rounded-full bg-trebol-primary text-white font-bold text-sm hover:opacity-90 transition-opacity"
           >
-            Volver a los modos
+            Back to activities
           </button>
         )}
       </div>

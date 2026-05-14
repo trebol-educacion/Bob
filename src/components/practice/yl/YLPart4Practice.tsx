@@ -293,12 +293,12 @@ export function YLPart4Practice({
 
   if (error) return <YLErrorScreen error={error} onBack={onBack} />;
   if (phase === 'loading') return <YLLoadingScreen message="Preparando tus preguntas..." />;
-  if (phase === 'evaluating') return <YLLoadingScreen message="Calculando tu puntuación final..." />;
+  if (phase === 'evaluating') return <YLLoadingScreen message="Calculating your final score…" />;
 
   if (phase === 'finished' && isReadOnly) {
     return (
       <div className="flex-1 flex flex-col min-h-0">
-        <YLToolbar title={partLabel} subtitle="Historial de práctica" onBack={onBack} progress={100} />
+        <YLToolbar title={partLabel} subtitle="Practice history" onBack={onBack} progress={100} />
         <div className="flex-1 overflow-y-auto p-4 space-y-3">
           {messages.map((msg) => (
             <YLReadOnlyMessage
@@ -329,7 +329,7 @@ export function YLPart4Practice({
             onClick={onBack}
             className="flex-1 py-3 bg-trebol-primary text-white rounded-xl font-bold hover:opacity-90 transition-opacity"
           >
-            Volver a los modos
+            Back to activities
           </button>
         </div>
       </motion.div>
@@ -411,7 +411,7 @@ export function YLPart4Practice({
               <div className="flex flex-col items-center gap-3">
                 <div className="w-8 h-8 border-3 border-trebol-primary border-t-transparent rounded-full animate-spin" />
                 <p className="text-trebol-text/50 font-semibold text-sm">
-                  Procesando tu respuesta...
+                  Processing your answer…
                 </p>
               </div>
             )}

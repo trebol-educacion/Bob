@@ -114,7 +114,7 @@ export function YLErrorScreen({
             onClick={onRetry}
             className="px-5 py-2 bg-trebol-primary text-white rounded-lg font-semibold"
           >
-            Reintentar
+            Retry
           </button>
         )}
         <button
@@ -148,7 +148,7 @@ export function YLRecordingButton({
         <Mic size={28} className="text-white" />
       </motion.div>
       <div className="text-center space-y-1">
-        <p className="text-sm font-bold text-red-500">Grabando...</p>
+        <p className="text-sm font-bold text-red-500">Recording...</p>
         <p className="text-xs text-trebol-text/40">
           {seconds}s / {maxSeconds}s
         </p>
@@ -158,7 +158,7 @@ export function YLRecordingButton({
         className="flex items-center gap-2 px-4 py-2 bg-trebol-border rounded-lg text-sm font-semibold text-trebol-text hover:bg-trebol-secondary/30 transition-colors"
       >
         <MicOff size={16} />
-        Terminar respuesta
+        Stop
       </button>
     </div>
   );
@@ -168,10 +168,10 @@ export function YLScoreDisplay({ evalResult }: { evalResult: EvalResponse }) {
   const pct = Math.round((evalResult.score / evalResult.score_max) * 100);
   return (
     <div className="bg-trebol-primary rounded-2xl p-6 text-center text-white space-y-1">
-      <p className="text-sm font-bold uppercase tracking-widest opacity-80">Puntuación</p>
+      <p className="text-sm font-bold uppercase tracking-widest opacity-80">Score</p>
       <p className="text-7xl font-black">{evalResult.score}</p>
       <p className="text-sm opacity-80">
-        de {evalResult.score_max} pts ({pct}%)
+        of {evalResult.score_max} pts ({pct}%)
       </p>
       <span className="inline-block mt-2 px-3 py-1 rounded-full bg-white/20 text-sm font-bold">
         {evalResult.cefr_band.toUpperCase()}
@@ -183,7 +183,7 @@ export function YLScoreDisplay({ evalResult }: { evalResult: EvalResponse }) {
 export function YLFeedbackCard({ feedback }: { feedback: string }) {
   return (
     <div className="bg-white rounded-2xl p-5 shadow-sm space-y-2">
-      <h3 className="font-black text-trebol-text">Comentarios del examinador</h3>
+      <h3 className="font-black text-trebol-text">Examiner feedback</h3>
       <p className="text-trebol-text/80 text-sm leading-relaxed">{feedback}</p>
     </div>
   );
@@ -216,7 +216,7 @@ export function YLToolbar({
         <button
           onClick={onBack}
           className="p-1.5 rounded-lg hover:bg-trebol-secondary/20 transition-colors"
-          aria-label="Volver"
+          aria-label="Back"
         >
           <ArrowLeft size={20} className="text-trebol-text" />
         </button>
@@ -253,7 +253,7 @@ export function YLReactionCard({ reaction }: { reaction: string }) {
   return (
     <div className="bg-trebol-secondary/10 rounded-xl px-5 py-4 text-center max-w-sm">
       <p className="text-trebol-text font-semibold italic">"{reaction}"</p>
-      <p className="text-xs text-trebol-text/40 mt-1">Examinador</p>
+      <p className="text-xs text-trebol-text/40 mt-1">Examiner</p>
     </div>
   );
 }
@@ -360,7 +360,7 @@ export function YLVoiceNote({
           type="button"
           onClick={handlePlay}
           className={`w-9 h-9 rounded-full ${iconColor} flex items-center justify-center hover:opacity-90 transition-opacity`}
-          aria-label={playing ? 'Pausar' : 'Reproducir'}
+          aria-label={playing ? 'Pause' : 'Reproducir'}
         >
           {playing ? (
             <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
@@ -451,7 +451,7 @@ export function YLChatMicBar({
         {isRecording ? (
           <span className="flex items-center gap-2 text-red-500 font-bold">
             <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-            Grabando · {seconds}s / {maxSeconds}s
+            Recording · {seconds}s / {maxSeconds}s
           </span>
         ) : (
           helperText ?? ''
@@ -462,7 +462,7 @@ export function YLChatMicBar({
           type="button"
           onClick={onStop}
           className="w-14 h-14 rounded-full bg-red-500 text-white shadow-lg hover:scale-105 active:scale-95 transition-transform flex items-center justify-center"
-          aria-label="Terminar respuesta"
+          aria-label="Stop"
         >
           <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
             <rect x="6" y="6" width="12" height="12" rx="2" />
@@ -474,7 +474,7 @@ export function YLChatMicBar({
           onClick={onStart}
           disabled={disabled}
           className="w-14 h-14 rounded-full bg-trebol-primary text-white shadow-lg hover:scale-105 active:scale-95 transition-transform flex items-center justify-center disabled:opacity-40 disabled:hover:scale-100"
-          aria-label="Empezar a hablar"
+          aria-label="Start speaking"
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
             <rect x="9" y="3" width="6" height="12" rx="3" />
@@ -547,7 +547,7 @@ export function YLAudioControls({
     <div className="flex items-center gap-3 justify-center">
       {/* Play / Pause */}
       {isPlaying && !isPaused ? (
-        <Btn onClick={onPause} title="Pausar">
+        <Btn onClick={onPause} title="Pause">
           <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
             <rect x="6" y="5" width="4" height="14" rx="1" />
             <rect x="14" y="5" width="4" height="14" rx="1" />
@@ -562,7 +562,7 @@ export function YLAudioControls({
       )}
 
       {/* Replay */}
-      <Btn onClick={onReplay} title="Volver a empezar">
+      <Btn onClick={onReplay} title="Restart">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
           <path d="M3 12a9 9 0 1 0 3-6.7" />
           <polyline points="3 4 3 10 9 10" />
@@ -571,7 +571,7 @@ export function YLAudioControls({
 
       {/* Record */}
       {showRecord && onRecord && (
-        <Btn onClick={onRecord} title="Empezar a hablar" accent>
+        <Btn onClick={onRecord} title="Start speaking" accent>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
             <rect x="9" y="3" width="6" height="12" rx="3" />
             <path d="M5 11a7 7 0 0 0 14 0" />
@@ -631,7 +631,7 @@ export function YLReadOnlyMessage({
       <div className="flex flex-col gap-1 max-w-md">
         {!isBob && cue && (
           <div className="text-xs text-trebol-text/50 italic px-2">
-            Examinador: <span className="text-trebol-text/70">{cue}</span>
+            Examiner: <span className="text-trebol-text/70">{cue}</span>
           </div>
         )}
         <div
@@ -643,7 +643,7 @@ export function YLReadOnlyMessage({
         >
           {text || (
             <span className="text-trebol-text/40 italic">
-              {isBob ? '...' : '(sin audio capturado)'}
+              {isBob ? '...' : '(no audio recorded)'}
             </span>
           )}
         </div>

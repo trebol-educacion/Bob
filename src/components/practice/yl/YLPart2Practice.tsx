@@ -292,13 +292,13 @@ export function YLPart2Practice({
   // ── Renders ───────────────────────────────────────────────────────────────
 
   if (error) return <YLErrorScreen error={error} onBack={onBack} />;
-  if (phase === 'loading') return <YLLoadingScreen message="Preparando tu práctica..." />;
-  if (phase === 'evaluating') return <YLLoadingScreen message="Calculando tu puntuación final..." />;
+  if (phase === 'loading') return <YLLoadingScreen message="Getting your practice ready…" />;
+  if (phase === 'evaluating') return <YLLoadingScreen message="Calculating your final score…" />;
 
   if (phase === 'finished' && isReadOnly) {
     return (
       <div className="flex-1 flex flex-col min-h-0">
-        <YLToolbar title={partLabel} subtitle="Historial de práctica" onBack={onBack} progress={100} />
+        <YLToolbar title={partLabel} subtitle="Practice history" onBack={onBack} progress={100} />
         <div className="flex-1 overflow-y-auto p-4 space-y-3">
           {messages.map((msg) => (
             <YLReadOnlyMessage
@@ -321,7 +321,7 @@ export function YLPart2Practice({
         animate={{ opacity: 1, y: 0 }}
         className="flex-1 overflow-y-auto p-6 max-w-2xl mx-auto w-full space-y-6"
       >
-        <YLResultsHeader title="¡Práctica completada!" subtitle={partLabel} />
+        <YLResultsHeader title="Practice complete!" subtitle={partLabel} />
         <YLScoreDisplay evalResult={finalEval} />
         <YLFeedbackCard feedback={finalEval.feedback} />
 
@@ -342,7 +342,7 @@ export function YLPart2Practice({
             onClick={onBack}
             className="flex-1 py-3 bg-trebol-primary text-white rounded-xl font-bold hover:opacity-90 transition-opacity"
           >
-            Volver a los modos
+            Back to activities
           </button>
         </div>
       </motion.div>
@@ -439,7 +439,7 @@ export function YLPart2Practice({
                 <div className="flex flex-col items-center gap-3">
                   <div className="w-8 h-8 border-3 border-trebol-primary border-t-transparent rounded-full animate-spin" />
                   <p className="text-trebol-text/50 font-semibold text-sm">
-                    Procesando tu respuesta...
+                    Processing your answer…
                   </p>
                 </div>
               )}

@@ -104,7 +104,7 @@ export function YLPart1Practice({
   const [finalEval, setFinalEval] = useState<EvalResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [messages, setMessages] = useState<BobMessageShape[]>(initialMessages ?? []);
-  const [loadingStage, setLoadingStage] = useState<string>('Preparando tu práctica…');
+  const [loadingStage, setLoadingStage] = useState<string>('Getting your practice ready…');
 
   const recordedBlobRef = useRef<Blob | null>(null);
   const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -348,13 +348,13 @@ export function YLPart1Practice({
   // ── Render: loading ───────────────────────────────────────────────────────
 
   if (phase === 'loading') {
-    return <YLLoadingScreen message="Preparando tu práctica..." />;
+    return <YLLoadingScreen message="Getting your practice ready…" />;
   }
 
   // ── Render: evaluating ────────────────────────────────────────────────────
 
   if (phase === 'evaluating') {
-    return <YLLoadingScreen message="Calculando tu puntuación final..." />;
+    return <YLLoadingScreen message="Calculating your final score…" />;
   }
 
   // ── Render: finished — read-only history ──────────────────────────────────
@@ -362,7 +362,7 @@ export function YLPart1Practice({
   if (phase === 'finished' && isReadOnly) {
     return (
       <div className="flex-1 flex flex-col min-h-0">
-        <YLToolbar title={partLabel} subtitle="Historial de práctica" onBack={onBack} progress={100} />
+        <YLToolbar title={partLabel} subtitle="Practice history" onBack={onBack} progress={100} />
         <div className="flex-1 overflow-y-auto p-4 space-y-3">
           {messages.map((msg) => (
             <YLReadOnlyMessage
@@ -387,7 +387,7 @@ export function YLPart1Practice({
         animate={{ opacity: 1, y: 0 }}
         className="flex-1 overflow-y-auto p-6 max-w-2xl mx-auto w-full space-y-6"
       >
-        <YLResultsHeader title="¡Práctica completada!" subtitle={partLabel} />
+        <YLResultsHeader title="Practice complete!" subtitle={partLabel} />
         <YLScoreDisplay evalResult={finalEval} />
         <YLFeedbackCard feedback={finalEval.feedback} />
         <div className="flex gap-3 pb-4">
@@ -395,7 +395,7 @@ export function YLPart1Practice({
             onClick={onBack}
             className="flex-1 py-3 bg-trebol-primary text-white rounded-xl font-bold hover:opacity-90 transition-opacity"
           >
-            Volver a los modos
+            Back to activities
           </button>
         </div>
       </motion.div>
@@ -437,7 +437,7 @@ export function YLPart1Practice({
     <div className="flex-1 flex flex-col min-h-0">
       <YLToolbar
         title={partLabel}
-        subtitle={`Cue ${cueIndex + 1} de ${totalCues}`}
+        subtitle={`Cue ${cueIndex + 1} of ${totalCues}`}
         onBack={onBack}
         progress={progress}
       />
@@ -480,7 +480,7 @@ export function YLPart1Practice({
             onClick={handleNextCue}
             className="px-6 py-3 rounded-full bg-trebol-primary text-white font-bold text-sm hover:opacity-90 transition-opacity flex items-center gap-2"
           >
-            Siguiente pregunta
+            Next question
             <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
               <path d="M6 4l12 8-12 8V4z" />
               <rect x="18" y="4" width="2" height="16" />
@@ -497,10 +497,10 @@ export function YLPart1Practice({
           disabled={isProcessing}
           helperText={
             phase === 'playing-cue'
-              ? 'Bob está hablando…'
+              ? 'Bob is speaking…'
               : isProcessing
-              ? 'Procesando tu respuesta…'
-              : 'Pulsa para responder con tu voz'
+              ? 'Processing your answer…'
+              : 'Tap to answer with your voice'
           }
         />
       )}
