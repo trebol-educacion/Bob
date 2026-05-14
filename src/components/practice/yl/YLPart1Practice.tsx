@@ -394,7 +394,7 @@ export function YLPart1Practice({
               <div key={i} className="rounded-2xl overflow-hidden shadow-md bg-white aspect-video relative">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={`data:image/png;base64,${src}`}
+                  src={src.startsWith('data:') ? src : `data:image/png;base64,${src}`}
                   alt={`Imagen ${i + 1}`}
                   className="w-full h-full object-cover"
                 />

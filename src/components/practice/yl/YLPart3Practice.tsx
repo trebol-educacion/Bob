@@ -376,7 +376,7 @@ export function YLPart3Practice({
               <div key={i} className="rounded-xl overflow-hidden shadow-sm">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={`data:image/png;base64,${src}`}
+                  src={src.startsWith('data:') ? src : `data:image/png;base64,${src}`}
                   alt={`Escena ${i + 1}`}
                   className="w-full object-cover aspect-video"
                 />
@@ -447,7 +447,7 @@ export function YLPart3Practice({
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={`data:image/png;base64,${currentImage}`}
+                src={currentImage.startsWith('data:') ? currentImage : `data:image/png;base64,${currentImage}`}
                 alt={`Escena ${currentImageIdx + 1}`}
                 className="w-full object-cover"
               />
@@ -472,7 +472,7 @@ export function YLPart3Practice({
                 {i <= currentImageIdx && (
                   /* eslint-disable-next-line @next/next/no-img-element */
                   <img
-                    src={`data:image/png;base64,${src}`}
+                    src={src.startsWith('data:') ? src : `data:image/png;base64,${src}`}
                     alt=""
                     className="w-full h-full object-cover"
                   />

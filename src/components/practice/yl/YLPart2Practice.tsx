@@ -362,7 +362,7 @@ export function YLPart2Practice({
           <div className="max-w-lg mx-auto w-full rounded-2xl overflow-hidden shadow-md bg-white">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src={`data:image/png;base64,${images[0]}`}
+              src={(images[0]?.startsWith('data:') ? images[0] : `data:image/png;base64,${images[0] ?? ''}`)}
               alt="Imagen de la escena"
               className="w-full object-cover"
             />
