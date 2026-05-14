@@ -110,7 +110,8 @@ export function YLPointingPractice({
               part,
               p.option_image_prompts[i],
               i,
-              total
+              total,
+              sid
             );
             setImages((prev) => {
               const next = [...prev];
@@ -365,7 +366,7 @@ export function YLPointingPractice({
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src={images[idx].startsWith('data:') ? images[idx] : `data:image/png;base64,${images[idx]}`}
+                    src={images[idx].startsWith('http') || images[idx].startsWith('data:') ? images[idx] : `data:image/png;base64,${images[idx]}`}
                     alt={label}
                     className="w-full aspect-square object-cover group-hover:scale-105 transition-transform"
                   />

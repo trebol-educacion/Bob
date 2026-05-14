@@ -329,6 +329,7 @@ export async function generateYLImageAction(
   imagePrompt: string,
   idx: number,
   totalImages: number,
+  sessionId: string,
   characterDescription?: string
 ): Promise<string> {
   const key = imageGenKey(exam, part);
@@ -347,6 +348,8 @@ export async function generateYLImageAction(
   }
   const fullPrompt = await getPrompt(key, params);
 
+  let imgB64: string | null = null;
+  let mime = 'image/png';
   for (let attempt = 0; attempt < 2; attempt++) {
     const tImg = Date.now();
     const response = await ai.models.generateContent({
@@ -361,11 +364,40 @@ export async function generateYLImageAction(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const data = (imagePart as any)?.inlineData?.data;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const mime = (imagePart as any)?.inlineData?.mimeType ?? 'image/png';
-    if (data) return `data:${mime};base64,${data}`;
+    const partMime = (imagePart as any)?.inlineData?.mimeType ?? 'image/png';
+    if (data) {
+      imgB64 = data;
+      mime = partMime;
+      break;
+    }
     console.warn(`[generateYLImageAction] empty image attempt ${attempt + 1}, prompt:`, fullPrompt.slice(0, 200));
   }
-  return 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
+
+  if (!imgB64) {
+    // Transparent 1×1 PNG fallback as data URI (short enough to serialize fine)
+    return 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
+  }
+
+  // Upload to Supabase Storage so the server action only returns a short URL.
+  // Avoids Next.js "Maximum array nesting / body" limits for big base64 payloads.
+  const supabase = await createSupabaseServer();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('[generateYLImageAction] Not authenticated');
+
+  const ext = mime.includes('jpeg') ? 'jpg' : 'png';
+  const path = `${user.id}/${sessionId}/${idx}.${ext}`;
+  const bytes = Buffer.from(imgB64, 'base64');
+  const upload = await supabase.storage
+    .from('bob-images')
+    .upload(path, bytes, { contentType: mime, upsert: true });
+  if (upload.error) {
+    console.error('[generateYLImageAction] storage upload failed:', upload.error);
+    // Fallback to data URI inline (will probably hit serializer limit but at least content exists)
+    return `data:${mime};base64,${imgB64}`;
+  }
+
+  const { data: pub } = supabase.storage.from('bob-images').getPublicUrl(path);
+  return pub.publicUrl;
 }
 
 /**
