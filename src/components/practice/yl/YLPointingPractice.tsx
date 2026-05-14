@@ -278,12 +278,11 @@ export function YLPointingPractice({
           {/* Conversation log for previously answered rounds */}
           {turns.map((t) => (
             <React.Fragment key={t.id}>
-              {/* Bob asks (voice + text via voice-note rendering can be added here if needed) */}
+              {/* Bob asks (text shown so the kid can read along) */}
               <YLBobTextMessage text={t.cueText} />
               {/* User's pick */}
               <YLUserTextMessage text={`👉 ${t.userPicked} ${t.correct ? '✓' : '✗'}`} />
-              {/* Bob's reaction: text + voice note */}
-              <YLBobTextMessage text={t.reactionText} />
+              {/* Bob's reaction: voice note only (no text) */}
               {sessionId && (
                 <YLVoiceNote text={t.reactionText} side="bob" sessionId={sessionId} />
               )}
