@@ -267,6 +267,7 @@ export function YLVoiceNote({
   side = 'bob',
   durationHint,
   sessionId,
+  autoPlay,
 }: {
   text: string;
   side?: 'bob' | 'user';
