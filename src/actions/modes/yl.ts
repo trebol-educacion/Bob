@@ -445,8 +445,13 @@ export async function evaluateYLFinalAction(input: {
 // ---------------------------------------------------------------------------
 // T3.7 — getSessionMessagesAction
 // Returns all messages for a session ordered by created_at.
-// Note: getMessagesAction also exists in src/actions/messages.ts.
-// This re-export lives here for co-location with YL actions.
+// Note: getMessagesAction is exported from src/actions/messages.ts.
+// Server-action files only allow async function exports, so the alias is
+// declared here as a thin async wrapper instead of a re-export.
 // ---------------------------------------------------------------------------
 
-export { getMessagesAction as getSessionMessagesAction } from '@/actions/messages';
+import { getMessagesAction } from '@/actions/messages';
+
+export async function getSessionMessagesAction(sessionId: string) {
+  return getMessagesAction(sessionId);
+}
