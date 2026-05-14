@@ -124,7 +124,10 @@ export function YLPart1Practice({
 
   // ── Init ──────────────────────────────────────────────────────────────────
 
+  const initStartedRef = useRef(false);
   useEffect(() => {
+    if (initStartedRef.current) return;
+    initStartedRef.current = true;
     // If we already have a sessionId (reopened from sidebar) the work is
     // done — never regenerate. The chat is built from the persisted
     // bob_messages passed in via initialMessages.
