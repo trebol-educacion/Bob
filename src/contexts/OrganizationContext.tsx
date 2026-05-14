@@ -15,6 +15,13 @@ function normalizeFrameworkName(name: string): ModeFramework | null {
   return FRAMEWORK_NAME_MAP[name] ?? null;
 }
 
+export type BobAccessDenialReason =
+  | 'not_authenticated'
+  | 'no_profile'
+  | 'not_student'
+  | 'no_organization'
+  | 'bob_not_enabled';
+
 interface OrganizationContextValue {
   organization: Organization | null;
   loading: boolean;
@@ -22,6 +29,9 @@ interface OrganizationContextValue {
   cefrActiveLevel: CefrLevel | null;
   cefrLevelLocked: boolean;
   setCefrActiveLevel: (level: CefrLevel) => Promise<void>;
+  userRole: string | null;
+  accessGranted: boolean;
+  accessDenialReason: BobAccessDenialReason | null;
 }
 
 const OrganizationContext = createContext<OrganizationContextValue>({
@@ -31,6 +41,9 @@ const OrganizationContext = createContext<OrganizationContextValue>({
   cefrActiveLevel: null,
   cefrLevelLocked: false,
   setCefrActiveLevel: async () => {},
+  userRole: null,
+  accessGranted: false,
+  accessDenialReason: null,
 });
 
 export function OrganizationProvider({ children }: { children: React.ReactNode }) {
@@ -43,6 +56,8 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
   ]);
   const [cefrActiveLevel, setCefrActiveLevelState] = useState<CefrLevel | null>(null);
   const [cefrLevelLocked, setCefrLevelLocked] = useState(false);
+  const [userRole, setUserRole] = useState<string | null>(null);
+  const [accessDenialReason, setAccessDenialReason] = useState<BobAccessDenialReason | null>(null);
 
   // Cached framework data for re-running resolveEnabledModes on level change
   const [cachedOrg, setCachedOrg] = useState<Organization | null>(null);
@@ -54,6 +69,7 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
 
     supabase.auth.getUser().then(async ({ data }) => {
       if (!data.user) {
+        setAccessDenialReason('not_authenticated');
         setLoading(false);
         return;
       }
@@ -65,18 +81,11 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
         setOrganization(org);
         setCachedOrg(org);
 
-        if (!org) {
-          // Individual user without org — Bob fully accessible with all generic modes
-          setEnabledModes(['generic_situation', 'generic_image', 'generic_conversation']);
-          setLoading(false);
-          return;
-        }
-
-        // Parallel fetch: student CEFR active level, student frameworks, org frameworks
+        // Parallel fetch: profile (role + CEFR), student frameworks, org frameworks
         const [profileResult, studentFwResult, orgFwResult] = await Promise.all([
           supabase
             .from('profiles')
-            .select('cefr_active_level, cefr_level_locked')
+            .select('role, cefr_active_level, cefr_level_locked')
             .eq('id', userId)
             .maybeSingle(),
           supabase
@@ -86,7 +95,7 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
           supabase
             .from('organization_frameworks')
             .select('framework_id, pedagogical_frameworks(name, type)')
-            .eq('organization_id', org.id),
+            .eq('organization_id', org?.id ?? ''),
         ]);
 
         if (profileResult.error) {
@@ -101,9 +110,29 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
 
         const activeLevel = (profileResult.data?.cefr_active_level ?? null) as CefrLevel | null;
         const levelLocked = profileResult.data?.cefr_level_locked ?? false;
+        const role = (profileResult.data?.role ?? null) as string | null;
 
         setCefrActiveLevelState(activeLevel);
         setCefrLevelLocked(levelLocked);
+        setUserRole(role);
+
+        // Access gate — don't trigger denial when profile query errored (likely transient RLS / cookie hydration)
+        if (profileResult.error) {
+          console.warn('[Bob access gate] profile query errored, deferring denial', profileResult.error);
+          setAccessDenialReason(null);
+        } else if (!profileResult.data) {
+          console.warn('[Bob access gate] no profile data for user', userId);
+          setAccessDenialReason('no_profile');
+        } else if (role !== 'student') {
+          console.warn('[Bob access gate] role is not student:', role);
+          setAccessDenialReason('not_student');
+        } else if (!org) {
+          setAccessDenialReason('no_organization');
+        } else if (!org.is_bob_enabled) {
+          setAccessDenialReason('bob_not_enabled');
+        } else {
+          setAccessDenialReason(null);
+        }
 
         const studentFrameworks: ModeFramework[] = (studentFwResult.data ?? [])
           .map((r: any) => {
@@ -124,7 +153,7 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
         setCachedOrgFrameworks(orgFrameworks);
 
         const modes = resolveEnabledModes({
-          isBobEnabled: org.is_bob_enabled,
+          isBobEnabled: org?.is_bob_enabled ?? false,
           studentActiveCefr: activeLevel,
           studentFrameworks,
           orgFrameworks,
@@ -170,6 +199,8 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
     setEnabledModes(newModes);
   }, [cefrLevelLocked, cachedOrg, cachedStudentFrameworks, cachedOrgFrameworks]);
 
+  const accessGranted = accessDenialReason === null && !loading;
+
   return (
     <OrganizationContext.Provider value={{
       organization,
@@ -178,6 +209,9 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
       cefrActiveLevel,
       cefrLevelLocked,
       setCefrActiveLevel,
+      userRole,
+      accessGranted,
+      accessDenialReason,
     }}>
       {children}
     </OrganizationContext.Provider>

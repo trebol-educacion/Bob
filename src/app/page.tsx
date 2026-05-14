@@ -7,6 +7,7 @@ import { ConversationPractice } from '@/components/ConversationPractice';
 import { SessionSidebar } from '@/components/SessionSidebar';
 import { BobPracticeChat } from '@/components/BobPracticeChat';
 import { CefrCtaBanner } from '@/components/CefrCtaBanner';
+import { BobAccessDenied } from '@/components/BobAccessDenied';
 import { createSessionAction } from '@/actions/sessions';
 import { createSupabaseBrowser } from '@/lib/supabase/browser-client';
 import { Navbar } from '@/components/Navbar';
@@ -27,7 +28,7 @@ type AppState =
 export default function App() {
   const [appState, setAppState] = useState<AppState>('mode-selection');
   const [userEmail, setUserEmail] = useState<string | undefined>();
-  const { organization, enabledModes, cefrActiveLevel, cefrLevelLocked, setCefrActiveLevel } = useOrganization();
+  const { organization, enabledModes, cefrActiveLevel, cefrLevelLocked, setCefrActiveLevel, loading: orgLoading, accessDenialReason } = useOrganization();
 
   // Ref forwarded to ModeSelection so the banner can scroll to the selector
   const cefrSelectorRef = useRef<HTMLDivElement>(null);
@@ -122,6 +123,10 @@ export default function App() {
   }, []);
 
   const showBanner = cefrActiveLevel === null && !cefrLevelLocked;
+
+  if (!orgLoading && accessDenialReason) {
+    return <BobAccessDenied reason={accessDenialReason} />;
+  }
 
   return (
     <div className="h-screen bg-trebol-bg flex flex-col overflow-hidden">
