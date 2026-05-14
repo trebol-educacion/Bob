@@ -8,6 +8,7 @@ import { SessionSidebar } from '@/components/SessionSidebar';
 import { BobPracticeChat } from '@/components/BobPracticeChat';
 import { CefrCtaBanner } from '@/components/CefrCtaBanner';
 import { BobAccessDenied } from '@/components/BobAccessDenied';
+import { StudentStatsPanel } from '@/components/StudentStatsPanel';
 import { createSessionAction } from '@/actions/sessions';
 import { createSupabaseBrowser } from '@/lib/supabase/browser-client';
 import { Navbar } from '@/components/Navbar';
@@ -31,7 +32,8 @@ type AppState =
   | 'mode-selection'
   | 'practicing'
   | 'conversation-practicing'
-  | 'exam-practicing';
+  | 'exam-practicing'
+  | 'dashboard';
 
 // ---------------------------------------------------------------------------
 // YL mode routing
@@ -190,7 +192,10 @@ export default function App() {
 
   return (
     <div className="h-screen bg-trebol-bg flex flex-col overflow-hidden">
-      <Navbar userEmail={userEmail} />
+      <Navbar
+        userEmail={userEmail}
+        onOpenDashboard={() => setAppState('dashboard')}
+      />
       <div className="flex-1 flex min-h-0">
         <SessionSidebar
           sessions={sessions}
@@ -325,6 +330,23 @@ export default function App() {
                 {mode === 'toefl_interview' && (
                   <ToeflInterviewPractice onBack={() => setAppState('mode-selection')} />
                 )}
+              </motion.div>
+            )}
+
+            {appState === 'dashboard' && (
+              <motion.div
+                key="dashboard"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="flex-1 flex flex-col min-h-0"
+              >
+                <StudentStatsPanel
+                  onBack={() => setAppState('mode-selection')}
+                  onAfterReset={() => {
+                    void refreshSessions();
+                  }}
+                />
               </motion.div>
             )}
           </AnimatePresence>

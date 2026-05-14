@@ -3,15 +3,16 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'motion/react';
-import { LogOut, User } from 'lucide-react';
+import { LogOut, User, BarChart3 } from 'lucide-react';
 import { createSupabaseBrowser } from '@/lib/supabase/browser-client';
 import { useOrganization } from '@/hooks/useOrganization';
 
 interface NavbarProps {
   userEmail?: string;
+  onOpenDashboard?: () => void;
 }
 
-export function Navbar({ userEmail }: NavbarProps) {
+export function Navbar({ userEmail, onOpenDashboard }: NavbarProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const { organization } = useOrganization();
@@ -72,8 +73,23 @@ export function Navbar({ userEmail }: NavbarProps) {
                   animate={{ opacity: 1, scale: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.95, y: -8 }}
                   transition={{ duration: 0.15 }}
-                  className="absolute right-0 mt-2 w-48 rounded-xl bg-white shadow-xl border border-gray-100 overflow-hidden z-50"
+                  className="absolute right-0 mt-2 w-52 rounded-xl bg-white shadow-xl border border-gray-100 overflow-hidden z-50"
                 >
+                  {onOpenDashboard && (
+                    <>
+                      <button
+                        onClick={() => {
+                          setOpen(false);
+                          onOpenDashboard();
+                        }}
+                        className="w-full flex items-center gap-3 px-4 py-3 text-sm font-semibold text-trebol-text hover:bg-trebol-secondary/20 transition-colors"
+                      >
+                        <BarChart3 size={16} className="text-trebol-primary" />
+                        Mi progreso
+                      </button>
+                      <div className="h-px bg-gray-100" />
+                    </>
+                  )}
                   <button
                     onClick={handleLogout}
                     className="w-full flex items-center gap-3 px-4 py-3 text-sm font-semibold text-red-600 hover:bg-red-50 transition-colors"
