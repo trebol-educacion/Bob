@@ -65,6 +65,13 @@ export const ModeSelection = forwardRef<HTMLDivElement, ModeSelectionProps>(func
 ) {
   const isDisabled = (mode: ModeKey) =>
     enabledModes !== undefined && !enabledModes.includes(mode);
+  const isVisible = (mode: ModeKey) => !isDisabled(mode);
+
+  const freePracticeVisible =
+    isVisible('generic_situation') || isVisible('generic_image') || isVisible('generic_conversation');
+  const cambridgeVisible =
+    isVisible('cambridge_pet_p3') || isVisible('cambridge_ket_part1') || isVisible('cambridge_fce_p1');
+  const toeflVisible = isVisible('toefl_listen_repeat') || isVisible('toefl_interview');
 
   const iconClass = "text-trebol-primary group-hover:text-white transition-colors";
 
@@ -90,94 +97,108 @@ export const ModeSelection = forwardRef<HTMLDivElement, ModeSelectionProps>(func
       </div>
 
       {/* Free Practice */}
-      <div>
-        <SectionTitle>Free Practice</SectionTitle>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <ModeCard
-            mode="generic_situation"
-            icon={<MessageSquare size={28} className={iconClass} />}
-            title="Práctica de Situación"
-            description="Practica frases útiles para situaciones reales personalizadas por ti."
-            disabled={isDisabled('generic_situation')}
-            onSelect={onSelect}
-          />
-          <ModeCard
-            mode="generic_image"
-            icon={<ImageIcon size={28} className={iconClass} />}
-            title="Descripción de Imagen"
-            description="Prepárate para el examen B1 describiendo escenas generadas por IA."
-            disabled={isDisabled('generic_image')}
-            onSelect={onSelect}
-          />
-          <ModeCard
-            mode="generic_conversation"
-            icon={<Mic2 size={28} className={iconClass} />}
-            title="Conversación Fluida"
-            description="Interactúa en una conversación real con IA sobre cualquier tema."
-            disabled={isDisabled('generic_conversation')}
-            onSelect={onSelect}
-          />
+      {freePracticeVisible && (
+        <div>
+          <SectionTitle>Free Practice</SectionTitle>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {isVisible('generic_situation') && (
+              <ModeCard
+                mode="generic_situation"
+                icon={<MessageSquare size={28} className={iconClass} />}
+                title="Práctica de Situación"
+                description="Practica frases útiles para situaciones reales personalizadas por ti."
+                onSelect={onSelect}
+              />
+            )}
+            {isVisible('generic_image') && (
+              <ModeCard
+                mode="generic_image"
+                icon={<ImageIcon size={28} className={iconClass} />}
+                title="Descripción de Imagen"
+                description="Prepárate para el examen B1 describiendo escenas generadas por IA."
+                onSelect={onSelect}
+              />
+            )}
+            {isVisible('generic_conversation') && (
+              <ModeCard
+                mode="generic_conversation"
+                icon={<Mic2 size={28} className={iconClass} />}
+                title="Conversación Fluida"
+                description="Interactúa en una conversación real con IA sobre cualquier tema."
+                onSelect={onSelect}
+              />
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Cambridge English */}
-      <div>
-        <SectionTitle>Cambridge English</SectionTitle>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <ModeCard
-            mode="cambridge_pet_p3"
-            icon={<Users size={28} className={iconClass} />}
-            title="B1 Collaborative Task"
-            description="Discuss &amp; decide together"
-            badge="B1 · 10 min"
-            disabled={isDisabled('cambridge_pet_p3')}
-            onSelect={onSelect}
-          />
-          <ModeCard
-            mode="cambridge_ket_part1"
-            icon={<BookOpen size={28} className={iconClass} />}
-            title="A2 Key Speaking"
-            description="Answer questions from an examiner"
-            badge="A2 · 8 min"
-            disabled={isDisabled('cambridge_ket_part1')}
-            onSelect={onSelect}
-          />
-          <ModeCard
-            mode="cambridge_fce_p1"
-            icon={<FileText size={28} className={iconClass} />}
-            title="B2 First Speaking"
-            description="Describe &amp; compare photos"
-            badge="B2 · 5 min"
-            disabled={isDisabled('cambridge_fce_p1')}
-            onSelect={onSelect}
-          />
+      {cambridgeVisible && (
+        <div>
+          <SectionTitle>Cambridge English</SectionTitle>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {isVisible('cambridge_pet_p3') && (
+              <ModeCard
+                mode="cambridge_pet_p3"
+                icon={<Users size={28} className={iconClass} />}
+                title="B1 Collaborative Task"
+                description="Discuss &amp; decide together"
+                badge="B1 · 10 min"
+                onSelect={onSelect}
+              />
+            )}
+            {isVisible('cambridge_ket_part1') && (
+              <ModeCard
+                mode="cambridge_ket_part1"
+                icon={<BookOpen size={28} className={iconClass} />}
+                title="A2 Key Speaking"
+                description="Answer questions from an examiner"
+                badge="A2 · 8 min"
+                onSelect={onSelect}
+              />
+            )}
+            {isVisible('cambridge_fce_p1') && (
+              <ModeCard
+                mode="cambridge_fce_p1"
+                icon={<FileText size={28} className={iconClass} />}
+                title="B2 First Speaking"
+                description="Describe &amp; compare photos"
+                badge="B2 · 5 min"
+                onSelect={onSelect}
+              />
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* TOEFL iBT */}
-      <div>
-        <SectionTitle>TOEFL iBT</SectionTitle>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <ModeCard
-            mode="toefl_listen_repeat"
-            icon={<Headphones size={28} className={iconClass} />}
-            title="Listen &amp; Repeat"
-            description="Repeat what you hear clearly"
-            badge="TOEFL · 10 min"
-            disabled={isDisabled('toefl_listen_repeat')}
-            onSelect={onSelect}
-          />
-          <ModeCard
-            mode="toefl_interview"
-            icon={<ClipboardList size={28} className={iconClass} />}
-            title="Take an Interview"
-            description="Answer topic questions under time"
-            badge="TOEFL · 8 min"
-            disabled={isDisabled('toefl_interview')}
-            onSelect={onSelect}
-          />
+      {toeflVisible && (
+        <div>
+          <SectionTitle>TOEFL iBT</SectionTitle>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {isVisible('toefl_listen_repeat') && (
+              <ModeCard
+                mode="toefl_listen_repeat"
+                icon={<Headphones size={28} className={iconClass} />}
+                title="Listen &amp; Repeat"
+                description="Repeat what you hear clearly"
+                badge="TOEFL · 10 min"
+                onSelect={onSelect}
+              />
+            )}
+            {isVisible('toefl_interview') && (
+              <ModeCard
+                mode="toefl_interview"
+                icon={<ClipboardList size={28} className={iconClass} />}
+                title="Take an Interview"
+                description="Answer topic questions under time"
+                badge="TOEFL · 8 min"
+                onSelect={onSelect}
+              />
+            )}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 });
