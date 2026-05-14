@@ -26,7 +26,6 @@ import type { YLExam, YLPlan } from '@/lib/types/yl';
 import type { EvalResponse, ModeKey } from '@/lib/types/practice';
 import {
   RECORDING_MAX_SECONDS,
-  REACTION_PAUSE_MS,
   playTTS,
   stopCurrentAudio,
   YLLoadingScreen,
@@ -48,12 +47,12 @@ import {
 type Phase =
   | 'loading'
   | 'ready'
-  | 'playing-cue'
-  | 'countdown'
-  | 'recording'
-  | 'processing'
-  | 'reaction'
-  | 'evaluating'
+  | 'cue-ready'      // cue text visible, alumno decides cuando escuchar o hablar
+  | 'playing-cue'    // TTS in flight
+  | 'recording'      // alumno grabando
+  | 'processing'     // upload + eval
+  | 'reaction-ready' // reacción visible, alumno decide cuándo seguir
+  | 'evaluating'     // eval final
   | 'finished';
 
 interface BobMessageShape {
@@ -153,58 +152,79 @@ export function YLPart1Practice({
 
   // ── Turn orchestration ────────────────────────────────────────────────────
 
-  const runTurn = useCallback(
-    async (idx: number) => {
+  const loadCue = useCallback(
+    (idx: number) => {
       if (!plan) return;
       const cue = plan.cues[idx];
       if (!cue) return;
-
       setCurrentCue(cue);
-      setPhase('playing-cue');
-
-      // 1. TTS of cue
-      await playTTS(cue);
-
-      // 2. Countdown
-      setPhase('countdown');
-      await new Promise<void>((resolve) => {
-        let c = 2;
-        setCountdown(c);
-        const t = setInterval(() => {
-          c -= 1;
-          setCountdown(c);
-          if (c <= 0) {
-            clearInterval(t);
-            resolve();
-          }
-        }, 1000);
-      });
-
-      // 3. Start recording
-      setPhase('recording');
-      setRecordingSeconds(0);
-      recordedBlobRef.current = null;
-      await startRecording();
-
-      let elapsed = 0;
-      recordingTimerRef.current = setInterval(() => {
-        elapsed += 1;
-        setRecordingSeconds(elapsed);
-        if (elapsed >= RECORDING_MAX_SECONDS) {
-          if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
-          stopRecording();
-        }
-      }, 1000);
+      setPhase('cue-ready');
     },
-    [plan, startRecording, stopRecording]
+    [plan]
   );
 
-  // Start first turn when ready
+  // Show the first cue when ready (no auto-play, no auto-record)
   useEffect(() => {
     if (phase === 'ready' && plan) {
-      void runTurn(0);
+      loadCue(0);
     }
-  }, [phase, plan, runTurn]);
+  }, [phase, plan, loadCue]);
+
+  // User-driven actions
+  const handlePlayCue = useCallback(async () => {
+    if (!currentCue) return;
+    setPhase('playing-cue');
+    try {
+      await playTTS(currentCue);
+    } finally {
+      setPhase('cue-ready');
+    }
+  }, [currentCue]);
+
+  const handleStartRecording = useCallback(async () => {
+    stopCurrentAudio();
+    setPhase('recording');
+    setRecordingSeconds(0);
+    recordedBlobRef.current = null;
+    await startRecording();
+
+    let elapsed = 0;
+    recordingTimerRef.current = setInterval(() => {
+      elapsed += 1;
+      setRecordingSeconds(elapsed);
+      if (elapsed >= RECORDING_MAX_SECONDS) {
+        if (recordingTimerRef.current) {
+          clearInterval(recordingTimerRef.current);
+          recordingTimerRef.current = null;
+        }
+        stopRecording();
+      }
+    }, 1000);
+  }, [startRecording, stopRecording]);
+
+  const handleStopRecording = useCallback(() => {
+    if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = null;
+    }
+    stopRecording();
+  }, [stopRecording]);
+
+  const handlePlayReaction = useCallback(async () => {
+    if (!currentReaction) return;
+    await playTTS(currentReaction);
+  }, [currentReaction]);
+
+  const handleNextCue = useCallback(() => {
+    stopCurrentAudio();
+    const nextIndex = cueIndex + 1;
+    if (!plan || nextIndex >= plan.cues.length) {
+      setPhase('evaluating');
+    } else {
+      setCueIndex(nextIndex);
+      loadCue(nextIndex);
+    }
+  }, [cueIndex, plan, loadCue]);
 
   // When recording stops → process
   useEffect(() => {
@@ -250,19 +270,10 @@ export function YLPart1Practice({
         turnQAsRef.current.push({ cue: currentCue, transcript: '' });
 
         setCurrentReaction(evalResult.reaction);
-        setPhase('reaction');
+        setPhase('reaction-ready');
 
-        await playTTS(evalResult.reaction);
-        await new Promise<void>((r) => setTimeout(r, REACTION_PAUSE_MS));
-
-        const nextIndex = cueIndex + 1;
-        if (!plan || nextIndex >= plan.cues.length) {
-          // All cues done — final eval
-          setPhase('evaluating');
-        } else {
-          setCueIndex(nextIndex);
-          void runTurn(nextIndex);
-        }
+        // Play once automatically; alumno can replay or advance manually.
+        void playTTS(evalResult.reaction);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Error procesando respuesta');
       }
@@ -288,15 +299,6 @@ export function YLPart1Practice({
     })();
   }, [phase, sessionId, plan, mode]);
 
-  const handleManualStop = useCallback(() => {
-    if (isRecording) {
-      if (recordingTimerRef.current) {
-        clearInterval(recordingTimerRef.current);
-        recordingTimerRef.current = null;
-      }
-      stopRecording();
-    }
-  }, [isRecording, stopRecording]);
 
   // ── Labels ────────────────────────────────────────────────────────────────
 
@@ -306,7 +308,7 @@ export function YLPart1Practice({
       : 'Movers Part 1 — Encuentra diferencias';
 
   const totalCues = plan?.cues.length ?? 1;
-  const progress = Math.round(((cueIndex + (phase === 'reaction' ? 1 : 0)) / totalCues) * 100);
+  const progress = Math.round(((cueIndex + (phase === 'reaction-ready' ? 1 : 0)) / totalCues) * 100);
 
   // ── Render: error ─────────────────────────────────────────────────────────
 
@@ -423,30 +425,31 @@ export function YLPart1Practice({
               exit={{ opacity: 0 }}
               className="flex flex-col items-center gap-4 w-full"
             >
-              {phase === 'playing-cue' && (
-                <p className="text-trebol-text/50 font-semibold text-sm">
-                  Escucha al examinador...
-                </p>
-              )}
-
-              {phase === 'countdown' && (
-                <div className="text-center space-y-1">
-                  <p className="text-trebol-text/60 font-semibold text-sm">Grabando en</p>
-                  <motion.span
-                    key={countdown}
-                    initial={{ scale: 1.4, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    className="text-5xl font-black text-trebol-primary block"
+              {(phase === 'cue-ready' || phase === 'playing-cue') && (
+                <div className="flex flex-wrap gap-3 justify-center">
+                  <button
+                    type="button"
+                    onClick={handlePlayCue}
+                    disabled={phase === 'playing-cue'}
+                    className="px-5 py-3 rounded-full bg-trebol-secondary/20 text-trebol-text font-bold text-sm hover:bg-trebol-secondary/40 transition-colors disabled:opacity-50"
                   >
-                    {countdown}
-                  </motion.span>
+                    {phase === 'playing-cue' ? 'Reproduciendo…' : '🔁 Escuchar de nuevo'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleStartRecording}
+                    disabled={phase === 'playing-cue'}
+                    className="px-5 py-3 rounded-full bg-trebol-primary text-white font-bold text-sm hover:opacity-90 transition-opacity disabled:opacity-50"
+                  >
+                    🎤 Empezar a hablar
+                  </button>
                 </div>
               )}
 
               {phase === 'recording' && (
                 <YLRecordingButton
                   isRecording={isRecording}
-                  onStop={handleManualStop}
+                  onStop={handleStopRecording}
                   seconds={recordingSeconds}
                   maxSeconds={RECORDING_MAX_SECONDS}
                 />
@@ -461,8 +464,26 @@ export function YLPart1Practice({
                 </div>
               )}
 
-              {phase === 'reaction' && currentReaction && (
-                <YLReactionCard reaction={currentReaction} />
+              {phase === 'reaction-ready' && currentReaction && (
+                <div className="flex flex-col items-center gap-4">
+                  <YLReactionCard reaction={currentReaction} />
+                  <div className="flex gap-3">
+                    <button
+                      type="button"
+                      onClick={handlePlayReaction}
+                      className="px-5 py-3 rounded-full bg-trebol-secondary/20 text-trebol-text font-bold text-sm hover:bg-trebol-secondary/40 transition-colors"
+                    >
+                      🔁 Escuchar de nuevo
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleNextCue}
+                      className="px-5 py-3 rounded-full bg-trebol-primary text-white font-bold text-sm hover:opacity-90 transition-opacity"
+                    >
+                      ⏭️ Siguiente pregunta
+                    </button>
+                  </div>
+                </div>
               )}
             </motion.div>
           </AnimatePresence>
