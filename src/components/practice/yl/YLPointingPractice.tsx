@@ -12,9 +12,9 @@ import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'motion/react';
 import {
   startYLSessionAction,
-  generateYLImagesAction,
+  generateYLImageAction,
   saveYLTurnAction,
-  persistYLImagesAction,
+  persistYLImageAction,
   saveYLFinalEvalAction,
 } from '@/actions/modes/yl';
 import type { YLExam, YLPlan } from '@/lib/types/yl';
@@ -101,12 +101,27 @@ export function YLPointingPractice({
         onSessionCreated?.(sid);
         setPlan(p);
         if (p.option_image_prompts && p.option_image_prompts.length > 0) {
-          const imgs = await generateYLImagesAction(exam, part, p.option_image_prompts);
-          setImages(imgs);
-          try {
-            await persistYLImagesAction(sid, imgs);
-          } catch (err) {
-            console.warn('[YL] persist images failed (non-fatal):', err);
+          // Fetch images one at a time to stay under Next.js server-action
+          // array-nesting limit. Append as soon as each one is ready.
+          const total = p.option_image_prompts.length;
+          for (let i = 0; i < total; i++) {
+            const img = await generateYLImageAction(
+              exam,
+              part,
+              p.option_image_prompts[i],
+              i,
+              total
+            );
+            setImages((prev) => {
+              const next = [...prev];
+              next[i] = img;
+              return next;
+            });
+            try {
+              await persistYLImageAction(sid, img, i);
+            } catch (err) {
+              console.warn('[YL] persist image', i, 'failed:', err);
+            }
           }
         }
         setPhase('ready');

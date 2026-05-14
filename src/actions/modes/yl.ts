@@ -318,6 +318,63 @@ export async function generateYLContentAction(
 // For story parts (3), passes CHARACTER_DESCRIPTION for visual consistency.
 // ---------------------------------------------------------------------------
 
+/**
+ * Generate a single YL image. Called one-at-a-time from the client to
+ * avoid Next.js server-action "Maximum array nesting" when several large
+ * base64 strings travel together. Iterate at the call site, not here.
+ */
+export async function generateYLImageAction(
+  exam: YLExam,
+  part: number,
+  imagePrompt: string,
+  idx: number,
+  totalImages: number,
+  characterDescription?: string
+): Promise<string> {
+  const key = imageGenKey(exam, part);
+  const ai = getAiClient();
+  const t0 = Date.now();
+  console.log(`[YL][${exam}_part${part}] generating image ${idx + 1}/${totalImages}`);
+
+  const params: Record<string, string> = {
+    IMAGE_PROMPT: imagePrompt,
+    SCENE_DESCRIPTION: imagePrompt,
+    DIFFERENCES_LIST: imagePrompt,
+    CONTEXT_DESCRIPTION: imagePrompt,
+  };
+  if (characterDescription) {
+    params.CHARACTER_DESCRIPTION = characterDescription;
+  }
+  const fullPrompt = await getPrompt(key, params);
+
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const tImg = Date.now();
+    const response = await ai.models.generateContent({
+      model: MODELS.IMAGE,
+      contents: [{ role: 'user', parts: [{ text: fullPrompt }] }],
+      config: { responseModalities: ['IMAGE'] },
+    });
+    console.log(`[YL][${exam}_part${part}] image ${idx + 1} attempt ${attempt + 1} returned in ${Date.now() - tImg}ms (elapsed ${Date.now() - t0}ms)`);
+    const parts = response.candidates?.[0]?.content?.parts ?? [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const imagePart = parts.find((p: any) => p.inlineData);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const data = (imagePart as any)?.inlineData?.data;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const mime = (imagePart as any)?.inlineData?.mimeType ?? 'image/png';
+    if (data) return `data:${mime};base64,${data}`;
+    console.warn(`[generateYLImageAction] empty image attempt ${attempt + 1}, prompt:`, fullPrompt.slice(0, 200));
+  }
+  return 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
+}
+
+/**
+ * @deprecated batched variant — kept temporarily for callers that still
+ * pass an array. Internally fans out to generateYLImageAction one at a
+ * time on the SERVER, but the response (array of 4 base64) is still huge
+ * and breaks Next's array nesting. Prefer calling generateYLImageAction
+ * directly from the client in a loop.
+ */
 export async function generateYLImagesAction(
   exam: YLExam,
   part: number,
