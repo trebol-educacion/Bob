@@ -17,7 +17,14 @@ import { B1CollaborativePractice } from '@/components/B1CollaborativePractice';
 import { A2Part1Practice } from '@/components/A2Part1Practice';
 import { ToeflListenRepeatPractice } from '@/components/ToeflListenRepeatPractice';
 import { ToeflInterviewPractice } from '@/components/ToeflInterviewPractice';
-import type { PracticeMode } from '@/lib/types/practice';
+import {
+  YLPart1Practice,
+  YLPart2Practice,
+  YLPart3Practice,
+  YLPart4Practice,
+} from '@/components/practice/yl';
+import type { PracticeMode, ModeKey } from '@/lib/types/practice';
+import type { StoredMessage } from '@/actions/messages';
 
 type AppState =
   | 'mode-selection'
@@ -25,10 +32,50 @@ type AppState =
   | 'conversation-practicing'
   | 'exam-practicing';
 
+// ---------------------------------------------------------------------------
+// YL mode routing
+// ---------------------------------------------------------------------------
+
+/** All 9 Cambridge A1 Young Learners mode keys. */
+const YL_MODES = new Set<ModeKey>([
+  'cambridge_starters_part1',
+  'cambridge_starters_part2',
+  'cambridge_starters_part3',
+  'cambridge_starters_part4',
+  'cambridge_movers_part1',
+  'cambridge_movers_part2',
+  'cambridge_movers_part3',
+  'cambridge_movers_part4',
+  'cambridge_movers_part5',
+]);
+
+interface YLRenderProps {
+  onBack: () => void;
+  sessionId?: string;
+  initialMessages?: StoredMessage[];
+}
+
+/**
+ * Maps each YL mode key to a factory that renders the correct component
+ * with the right `exam` and `part` props pre-bound.
+ * O(1) lookup — avoids long switch chains.
+ */
+const MODE_COMPONENT_MAP: Partial<Record<ModeKey, (props: YLRenderProps) => React.JSX.Element>> = {
+  cambridge_starters_part1: (p) => <YLPart1Practice exam="starters" part={1} {...p} />,
+  cambridge_starters_part2: (p) => <YLPart2Practice exam="starters" part={2} {...p} />,
+  cambridge_starters_part3: (p) => <YLPart3Practice exam="starters" part={3} {...p} />,
+  cambridge_starters_part4: (p) => <YLPart4Practice exam="starters" part={4} {...p} />,
+  cambridge_movers_part1:   (p) => <YLPart1Practice exam="movers"   part={1} {...p} />,
+  cambridge_movers_part2:   (p) => <YLPart2Practice exam="movers"   part={2} {...p} />,
+  cambridge_movers_part3:   (p) => <YLPart3Practice exam="movers"   part={3} {...p} />,
+  cambridge_movers_part4:   (p) => <YLPart4Practice exam="movers"   part={4} {...p} />,
+  cambridge_movers_part5:   (p) => <YLPart4Practice exam="movers"   part={5} {...p} />,
+};
+
 export default function App() {
   const [appState, setAppState] = useState<AppState>('mode-selection');
   const [userEmail, setUserEmail] = useState<string | undefined>();
-  const { organization, enabledModes, cefrActiveLevel, cefrLevelLocked, setCefrActiveLevel, loading: orgLoading, accessDenialReason } = useOrganization();
+  const { organization, enabledModes, availableModes, cefrActiveLevel, cefrLevelLocked, setCefrActiveLevel, loading: orgLoading, accessDenialReason } = useOrganization();
 
   // Ref forwarded to ModeSelection so the banner can scroll to the selector
   const cefrSelectorRef = useRef<HTMLDivElement>(null);
@@ -75,6 +122,7 @@ export default function App() {
         setTopic(sessionTopic);
         setAppState('conversation-practicing');
       } else if (
+        YL_MODES.has(sessionMode as ModeKey) ||
         sessionMode === 'cambridge_pet_p3' ||
         sessionMode === 'cambridge_ket_part1' ||
         sessionMode === 'toefl_listen_repeat' ||
@@ -96,6 +144,7 @@ export default function App() {
     if (m === 'generic_conversation') {
       setAppState('conversation-practicing');
     } else if (
+      (m !== null && YL_MODES.has(m)) ||
       m === 'cambridge_pet_p3' ||
       m === 'cambridge_ket_part1' ||
       m === 'toefl_listen_repeat' ||
@@ -171,6 +220,7 @@ export default function App() {
                         ref={cefrSelectorRef}
                         onSelect={handleModeSelect}
                         enabledModes={enabledModes}
+                        availableModes={availableModes}
                         cefrActiveLevel={cefrActiveLevel}
                         cefrLevelLocked={cefrLevelLocked}
                         onCefrChange={setCefrActiveLevel}
@@ -238,12 +288,19 @@ export default function App() {
 
             {appState === 'exam-practicing' && mode && (
               <motion.div
-                key={`exam-practicing-${mode}`}
+                key={`exam-practicing-${mode}-${activeSessionId ?? 'new'}`}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 className="flex-1 flex flex-col min-h-0"
               >
+                {/* Cambridge YL (A1) — dispatched via MODE_COMPONENT_MAP */}
+                {YL_MODES.has(mode) && MODE_COMPONENT_MAP[mode]?.({
+                  onBack: onFinish,
+                  sessionId: activeSessionId ?? undefined,
+                  initialMessages: selectedMessages.length > 0 ? selectedMessages : undefined,
+                })}
+
                 {mode === 'cambridge_pet_p3' && (
                   <B1CollaborativePractice onBack={() => setAppState('mode-selection')} />
                 )}
