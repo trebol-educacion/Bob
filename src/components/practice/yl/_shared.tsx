@@ -417,27 +417,28 @@ export function YLChatMicBar({
   helperText?: string;
 }) {
   return (
-    <div className="border-t border-trebol-border bg-white/90 backdrop-blur p-3 flex items-center justify-center gap-3">
-      {helperText && !isRecording && (
-        <p className="text-xs text-trebol-text/60 font-medium">{helperText}</p>
-      )}
-      {isRecording ? (
-        <>
-          <div className="flex items-center gap-2 text-red-500 font-bold text-sm">
+    <div className="border-t border-trebol-border bg-white/90 backdrop-blur p-3 flex items-center justify-between gap-3">
+      <p className="text-xs text-trebol-text/60 font-medium pl-2">
+        {isRecording ? (
+          <span className="flex items-center gap-2 text-red-500 font-bold">
             <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-            {seconds}s / {maxSeconds}s
-          </div>
-          <button
-            type="button"
-            onClick={onStop}
-            className="w-14 h-14 rounded-full bg-red-500 text-white shadow-lg hover:scale-105 active:scale-95 transition-transform flex items-center justify-center"
-            aria-label="Terminar respuesta"
-          >
-            <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
-              <rect x="6" y="6" width="12" height="12" rx="2" />
-            </svg>
-          </button>
-        </>
+            Grabando · {seconds}s / {maxSeconds}s
+          </span>
+        ) : (
+          helperText ?? ''
+        )}
+      </p>
+      {isRecording ? (
+        <button
+          type="button"
+          onClick={onStop}
+          className="w-14 h-14 rounded-full bg-red-500 text-white shadow-lg hover:scale-105 active:scale-95 transition-transform flex items-center justify-center"
+          aria-label="Terminar respuesta"
+        >
+          <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+            <rect x="6" y="6" width="12" height="12" rx="2" />
+          </svg>
+        </button>
       ) : (
         <button
           type="button"
