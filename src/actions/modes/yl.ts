@@ -164,6 +164,29 @@ export async function persistYLImagesAction(
   }
 }
 
+/**
+ * Persist a client-computed final evaluation (used by Pointing-style
+ * activities where the score is derived from click-accuracy rather than
+ * via Gemini). Saves the same `msg_type='evaluation'` row shape used by
+ * evaluateYLFinalAction so reopen logic finds it identically.
+ */
+export async function saveYLFinalEvalAction(
+  sessionId: string,
+  evalResult: EvalResponse
+): Promise<void> {
+  const supabase = await createSupabaseServer();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('[saveYLFinalEvalAction] Not authenticated');
+  await supabase.from('bob_messages').insert({
+    session_id: sessionId,
+    user_id: user.id,
+    role: 'bob' as const,
+    msg_type: 'evaluation',
+    content_text: null,
+    content_json: { ...evalResult, is_final: true },
+  });
+}
+
 // ---------------------------------------------------------------------------
 // TTS cache per (session, cue_text). First call hits Gemini and persists the
 // audio in bob_messages; subsequent calls return the cached blob.

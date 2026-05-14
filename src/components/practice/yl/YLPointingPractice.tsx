@@ -14,8 +14,8 @@ import {
   startYLSessionAction,
   generateYLImagesAction,
   saveYLTurnAction,
-  evaluateYLFinalAction,
   persistYLImagesAction,
+  saveYLFinalEvalAction,
 } from '@/actions/modes/yl';
 import type { YLExam, YLPlan } from '@/lib/types/yl';
 import type { EvalResponse, ModeKey } from '@/lib/types/practice';
@@ -198,11 +198,12 @@ export function YLPointingPractice({
               : 'Vamos a practicar un poquito más con el vocabulario.',
         };
         setFinalEval(result);
-        // Best-effort: persist final eval
+        // Persist final eval (click-based) directly — Gemini-based eval
+        // doesn't make sense for a pointing activity.
         try {
-          await evaluateYLFinalAction({ sessionId, mode, turnsCount: total });
-        } catch {
-          /* ignore */
+          await saveYLFinalEvalAction(sessionId, result);
+        } catch (err) {
+          console.warn('[YLPointing] saveYLFinalEvalAction failed:', err);
         }
         setPhase('finished');
       } catch (err) {
@@ -221,19 +222,42 @@ export function YLPointingPractice({
   const progress = Math.round(((cueIndex + (phase === 'answered' ? 1 : 0)) / totalCues) * 100);
 
   if (phase === 'finished' && isReadOnly) {
+    // Find the saved final evaluation (if any) so we can render the
+    // score / feedback cards inline below the conversation.
+    const finalMsg = messages.find(
+      (m) =>
+        m.msg_type === 'evaluation' &&
+        m.role === 'bob' &&
+        (m.content_json as { is_final?: boolean } | null)?.is_final === true
+    );
+    const savedEval = (finalMsg?.content_json as EvalResponse | undefined) ?? null;
+
     return (
       <div className="flex-1 flex flex-col min-h-0">
         <YLToolbar title={partLabel} subtitle="Historial de práctica" onBack={onBack} progress={100} />
         <div className="flex-1 overflow-y-auto p-4 space-y-3">
-          {messages.map((m) => (
-            <YLReadOnlyMessage
-              key={m.id}
-              role={m.role}
-              text={(m.content_text as string) ?? ''}
-              msgType={m.msg_type}
-              contentJson={m.content_json}
-            />
-          ))}
+          {messages
+            .filter((m) => m.msg_type !== 'evaluation')
+            .map((m) => (
+              <YLReadOnlyMessage
+                key={m.id}
+                role={m.role}
+                text={(m.content_text as string) ?? ''}
+                msgType={m.msg_type}
+                contentJson={m.content_json}
+              />
+            ))}
+          {savedEval && (
+            <motion.div
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="space-y-3 max-w-md pt-2"
+            >
+              <YLResultsHeader title="¡Práctica completada!" subtitle={partLabel} />
+              <YLScoreDisplay evalResult={savedEval} />
+              <YLFeedbackCard feedback={savedEval.feedback} />
+            </motion.div>
+          )}
         </div>
       </div>
     );
