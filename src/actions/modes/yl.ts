@@ -343,29 +343,33 @@ export async function generateYLImagesAction(
       }
 
       const fullPrompt = await getPrompt(key, params);
-      const tImg = Date.now();
-      console.log(`[YL][${exam}_part${part}] image ${idx + 1}/${imagePrompts.length} sent to Gemini`);
-      // Call Gemini Image directly — do NOT route through generateImageAction
-      // because it re-wraps the prompt with generic_image_b1_image_gen.
-      const response = await ai.models.generateContent({
-        model: MODELS.IMAGE,
-        contents: [{ role: 'user', parts: [{ text: fullPrompt }] }],
-        config: { responseModalities: ['IMAGE'] },
-      });
-      console.log(`[YL][${exam}_part${part}] image ${idx + 1} returned in ${Date.now() - tImg}ms (total elapsed ${Date.now() - t0}ms)`);
 
-      const parts = response.candidates?.[0]?.content?.parts ?? [];
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const imagePart = parts.find((p: any) => p.inlineData);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const data = (imagePart as any)?.inlineData?.data;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const mime = (imagePart as any)?.inlineData?.mimeType ?? 'image/png';
-      if (!data) {
-        console.error('[generateYLImagesAction] No image data, prompt was:', fullPrompt.slice(0, 200));
-        throw new Error('No image data received from Gemini');
+      // Retry once if the model returns no image data (occasional empty
+      // response or safety filter trip). After two empties → return a
+      // transparent placeholder so the rest of the activity still works.
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const tImg = Date.now();
+        console.log(`[YL][${exam}_part${part}] image ${idx + 1}/${imagePrompts.length} sent to Gemini (attempt ${attempt + 1})`);
+        const response = await ai.models.generateContent({
+          model: MODELS.IMAGE,
+          contents: [{ role: 'user', parts: [{ text: fullPrompt }] }],
+          config: { responseModalities: ['IMAGE'] },
+        });
+        console.log(`[YL][${exam}_part${part}] image ${idx + 1} attempt ${attempt + 1} returned in ${Date.now() - tImg}ms (total elapsed ${Date.now() - t0}ms)`);
+        const parts = response.candidates?.[0]?.content?.parts ?? [];
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const imagePart = parts.find((p: any) => p.inlineData);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const data = (imagePart as any)?.inlineData?.data;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const mime = (imagePart as any)?.inlineData?.mimeType ?? 'image/png';
+        if (data) {
+          return `data:${mime};base64,${data}`;
+        }
+        console.warn(`[generateYLImagesAction] empty image (attempt ${attempt + 1}); prompt:`, fullPrompt.slice(0, 200));
       }
-      return `data:${mime};base64,${data}`;
+      // 1×1 transparent PNG placeholder so the activity continues
+      return 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
     })
   );
 }
