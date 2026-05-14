@@ -22,9 +22,8 @@ import {
   evaluateYLTurnAction,
   saveYLTurnAction,
   evaluateYLFinalAction,
-  type YLExam,
-  type YLPlan,
 } from '@/actions/modes/yl';
+import type { YLExam, YLPlan } from '@/lib/types/yl';
 import type { EvalResponse, ModeKey } from '@/lib/types/practice';
 import {
   RECORDING_MAX_SECONDS,

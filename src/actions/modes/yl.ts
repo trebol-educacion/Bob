@@ -4,32 +4,10 @@ import { z } from 'zod';
 import { getAiClient } from '../_shared';
 import { MODELS } from '@/lib/models';
 import { EvalResponseSchema, type EvalResponse, type ModeKey } from '@/lib/types/practice';
+import { YLPlanSchema, type YLPlan, type YLExam, type YLTurnEvalResult } from '@/lib/types/yl';
 import { getPrompt } from '@/lib/prompts/db-prompts';
 import { createSupabaseServer } from '@/lib/supabase/server';
 import { generateImageAction } from '@/actions/gemini';
-
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-export type YLExam = 'starters' | 'movers';
-
-/** Plan returned by Gemini for Parts 1–5. Shape varies by part. */
-export const YLPlanSchema = z.object({
-  cues: z.array(z.string()).min(1),
-  image_prompts: z.array(z.string()).optional(),
-  character_description: z.string().optional(),
-  story_title: z.string().optional(),
-  story_beats: z.array(z.string()).optional(),
-  // Info-exchange (Movers P2)
-  student_card: z.record(z.string(), z.string()).optional(),
-  examiner_card: z.record(z.string(), z.string()).optional(),
-  target_questions: z.array(z.string()).optional(),
-});
-
-export type YLPlan = z.infer<typeof YLPlanSchema>;
-
-export type YLTurnEvalResult = EvalResponse & { reaction: string };
 
 // ---------------------------------------------------------------------------
 // Helpers
