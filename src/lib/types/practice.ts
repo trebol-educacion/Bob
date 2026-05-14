@@ -186,17 +186,17 @@ export const EvalResponseSchema = z.object({
   score: z.number().min(0),
   score_max: z.number().min(0),
   cefr_band: z.enum(['a1', 'a2', 'b1', 'b2', 'c1', 'c2']),
-  toefl_band: z.number().min(1).max(6).optional(),
+  toefl_band: z.number().min(1).max(6).nullish(),
   band_per_criterion: z
     .object({
-      grammar_and_vocabulary:     z.number().min(0).max(5).optional(),
-      pronunciation:              z.number().min(0).max(5).optional(),
-      interactive_communication:  z.number().min(0).max(5).optional(),
-      discourse_management:       z.number().min(0).max(5).optional(),
+      grammar_and_vocabulary:     z.number().min(0).max(5).nullish(),
+      pronunciation:              z.number().min(0).max(5).nullish(),
+      interactive_communication:  z.number().min(0).max(5).nullish(),
+      discourse_management:       z.number().min(0).max(5).nullish(),
     })
-    .optional(),
+    .nullish(),
   feedback: z.string(),
-  model_answer: z.string().optional(),
+  model_answer: z.string().nullish(),
 });
 
 export type EvalResponse = z.infer<typeof EvalResponseSchema>;

@@ -229,12 +229,30 @@ export function YLReadOnlyMessage({
   role,
   text,
   msgType,
+  contentJson,
 }: {
   role: string;
   text: string;
   msgType: string;
+  contentJson?: Record<string, unknown> | null;
 }) {
   const isBob = role === 'bob';
+  const cue =
+    contentJson && typeof contentJson === 'object' && 'cue' in contentJson
+      ? (contentJson.cue as string)
+      : null;
+
+  if (msgType === 'evaluation') {
+    return (
+      <div className="flex justify-start gap-2">
+        <div className="w-8 h-8 rounded-full bg-trebol-primary/10 flex items-center justify-center shrink-0 text-xs font-bold text-trebol-primary mt-1">B</div>
+        <div className="max-w-xs rounded-2xl px-4 py-3 text-sm bg-white border border-trebol-border text-trebol-text/60 italic">
+          📊 Evaluación guardada
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={`flex ${isBob ? 'justify-start' : 'justify-end'} gap-2`}>
       {isBob && (
@@ -242,18 +260,25 @@ export function YLReadOnlyMessage({
           B
         </div>
       )}
-      <div
-        className={`max-w-xs rounded-2xl px-4 py-3 text-sm ${
-          isBob
-            ? 'bg-white border border-trebol-border text-trebol-text'
-            : 'bg-trebol-primary/10 text-trebol-text'
-        }`}
-      >
-        {msgType === 'evaluation' ? (
-          <span className="text-trebol-text/60 italic">📊 Evaluación guardada</span>
-        ) : (
-          text
+      <div className="flex flex-col gap-1 max-w-md">
+        {!isBob && cue && (
+          <div className="text-xs text-trebol-text/50 italic px-2">
+            Examinador: <span className="text-trebol-text/70">{cue}</span>
+          </div>
         )}
+        <div
+          className={`rounded-2xl px-4 py-3 text-sm ${
+            isBob
+              ? 'bg-white border border-trebol-border text-trebol-text'
+              : 'bg-trebol-primary/10 text-trebol-text'
+          }`}
+        >
+          {text || (
+            <span className="text-trebol-text/40 italic">
+              {isBob ? '...' : '(sin audio capturado)'}
+            </span>
+          )}
+        </div>
       </div>
     </div>
   );

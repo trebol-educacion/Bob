@@ -7,7 +7,6 @@ import { EvalResponseSchema, type EvalResponse, type ModeKey } from '@/lib/types
 import { YLPlanSchema, type YLPlan, type YLExam, type YLTurnEvalResult } from '@/lib/types/yl';
 import { getPrompt } from '@/lib/prompts/db-prompts';
 import { createSupabaseServer } from '@/lib/supabase/server';
-import { generateImageAction } from '@/actions/gemini';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -71,6 +70,9 @@ export async function startYLSessionAction(input: {
   const titleKey = `${exam}_${part}`;
   const title = partTitles[titleKey] ?? `Cambridge ${exam} Part ${part}`;
 
+  const t0 = Date.now();
+  console.log(`[YL][${input.mode}] start — creating session`);
+
   const { data: session, error: sessionErr } = await supabase
     .from('bob_sessions')
     .insert({
@@ -86,8 +88,12 @@ export async function startYLSessionAction(input: {
     throw new Error(`[startYLSessionAction] Failed to create session: ${sessionErr?.message}`);
   }
 
+  console.log(`[YL][${input.mode}] session ${session.id} created in ${Date.now() - t0}ms — generating plan`);
+
   // Generate the session plan
+  const t1 = Date.now();
   const plan = await generateYLContentAction(exam, part);
+  console.log(`[YL][${input.mode}] plan ready in ${Date.now() - t1}ms (cues=${plan.cues?.length ?? 0}, images=${plan.image_prompts?.length ?? 0})`);
 
   return { sessionId: session.id as string, plan };
 }
@@ -166,9 +172,13 @@ export async function generateYLImagesAction(
   characterDescription?: string
 ): Promise<string[]> {
   const key = imageGenKey(exam, part);
+  const ai = getAiClient();
+
+  console.log(`[YL][${exam}_part${part}] generating ${imagePrompts.length} image(s)`);
+  const t0 = Date.now();
 
   return Promise.all(
-    imagePrompts.map(async (imagePrompt) => {
+    imagePrompts.map(async (imagePrompt, idx) => {
       const params: Record<string, string> = {
         IMAGE_PROMPT: imagePrompt,
         SCENE_DESCRIPTION: imagePrompt,
@@ -180,10 +190,29 @@ export async function generateYLImagesAction(
       }
 
       const fullPrompt = await getPrompt(key, params);
-      // generateImageAction expects the raw prompt text for Gemini Image model.
-      // It internally wraps it through generic_image_b1_image_gen which adds
-      // the illustration style — use the raw imagePrompt + style suffix instead.
-      return generateImageAction(fullPrompt);
+      const tImg = Date.now();
+      console.log(`[YL][${exam}_part${part}] image ${idx + 1}/${imagePrompts.length} sent to Gemini`);
+      // Call Gemini Image directly — do NOT route through generateImageAction
+      // because it re-wraps the prompt with generic_image_b1_image_gen.
+      const response = await ai.models.generateContent({
+        model: MODELS.IMAGE,
+        contents: [{ role: 'user', parts: [{ text: fullPrompt }] }],
+        config: { responseModalities: ['IMAGE'] },
+      });
+      console.log(`[YL][${exam}_part${part}] image ${idx + 1} returned in ${Date.now() - tImg}ms (total elapsed ${Date.now() - t0}ms)`);
+
+      const parts = response.candidates?.[0]?.content?.parts ?? [];
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const imagePart = parts.find((p: any) => p.inlineData);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const data = (imagePart as any)?.inlineData?.data;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const mime = (imagePart as any)?.inlineData?.mimeType ?? 'image/png';
+      if (!data) {
+        console.error('[generateYLImagesAction] No image data, prompt was:', fullPrompt.slice(0, 200));
+        throw new Error('No image data received from Gemini');
+      }
+      return `data:${mime};base64,${data}`;
     })
   );
 }
@@ -306,20 +335,19 @@ export async function evaluateYLTurnAction(input: {
   const transcribed = (transcribeResponse.text ?? '(silence)').trim();
 
   // Step 2: Evaluate + get examiner reaction
-  const evalPrompt = await getPrompt(evaluationKey(exam, part), {
+  const sharedParams = {
     USER_TRANSCRIPT: transcribed,
     QUESTION: input.cue,
+    EXAMINER_CUE: input.cue,
     STORY_BEAT: input.cue,
     DIFFERENCE: input.cue,
+    PERSONAL_QUESTION: input.cue,
+    CUE: input.cue,
+    SCENE_QUESTION: input.cue,
     AUDIO_DURATION_SECONDS: input.audioDuration,
-  });
-
-  const reactionPrompt = await getPrompt(reactionKey(exam, part), {
-    USER_TRANSCRIPT: transcribed,
-    QUESTION: input.cue,
-    STORY_BEAT: input.cue,
-    DIFFERENCE: input.cue,
-  });
+  } as const;
+  const evalPrompt = await getPrompt(evaluationKey(exam, part), sharedParams);
+  const reactionPrompt = await getPrompt(reactionKey(exam, part), sharedParams);
 
   // Run evaluation and reaction in parallel
   const [evalResponse, reactionResponse] = await Promise.all([

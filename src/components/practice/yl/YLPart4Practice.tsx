@@ -303,6 +303,7 @@ export function YLPart4Practice({
               role={msg.role}
               text={(msg.content_text as string) ?? ''}
               msgType={msg.msg_type}
+              contentJson={msg.content_json}
             />
           ))}
         </div>

@@ -100,6 +100,7 @@ export function YLPart1Practice({
   const [finalEval, setFinalEval] = useState<EvalResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [messages, setMessages] = useState<BobMessageShape[]>(initialMessages ?? []);
+  const [loadingStage, setLoadingStage] = useState<string>('Preparando tu práctica…');
 
   const recordedBlobRef = useRef<Blob | null>(null);
   const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -338,6 +339,7 @@ export function YLPart1Practice({
               role={msg.role}
               text={(msg.content_text as string) ?? ''}
               msgType={msg.msg_type}
+              contentJson={msg.content_json}
             />
           ))}
         </div>
