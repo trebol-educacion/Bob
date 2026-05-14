@@ -167,23 +167,28 @@ export function YLRecordingButton({
 export function YLScoreDisplay({ evalResult }: { evalResult: EvalResponse }) {
   const pct = Math.round((evalResult.score / evalResult.score_max) * 100);
   return (
-    <div className="bg-trebol-primary rounded-2xl p-6 text-center text-white space-y-1">
-      <p className="text-sm font-bold uppercase tracking-widest opacity-80">Score</p>
-      <p className="text-7xl font-black">{evalResult.score}</p>
-      <p className="text-sm opacity-80">
-        of {evalResult.score_max} pts ({pct}%)
-      </p>
-      <span className="inline-block mt-2 px-3 py-1 rounded-full bg-white/20 text-sm font-bold">
-        {evalResult.cefr_band.toUpperCase()}
-      </span>
+    <div className="bg-white border border-trebol-border rounded-2xl px-4 py-3 flex items-center justify-between gap-4">
+      <div>
+        <p className="text-[10px] font-semibold uppercase tracking-widest text-trebol-text/50">Score</p>
+        <p className="text-2xl font-black text-trebol-text leading-tight">
+          {evalResult.score}
+          <span className="text-sm text-trebol-text/50 font-semibold ml-1">/ {evalResult.score_max}</span>
+        </p>
+      </div>
+      <div className="text-right space-y-1">
+        <span className="inline-block px-2 py-0.5 rounded-full bg-trebol-primary/10 text-trebol-primary text-xs font-bold">
+          {evalResult.cefr_band.toUpperCase()}
+        </span>
+        <p className="text-xs text-trebol-text/50">{pct}%</p>
+      </div>
     </div>
   );
 }
 
 export function YLFeedbackCard({ feedback }: { feedback: string }) {
   return (
-    <div className="bg-white rounded-2xl p-5 shadow-sm space-y-2">
-      <h3 className="font-black text-trebol-text">Examiner feedback</h3>
+    <div className="bg-white border border-trebol-border rounded-2xl px-4 py-3 space-y-1">
+      <p className="text-[10px] font-semibold uppercase tracking-widest text-trebol-text/50">Examiner feedback</p>
       <p className="text-trebol-text/80 text-sm leading-relaxed">{feedback}</p>
     </div>
   );
@@ -191,10 +196,12 @@ export function YLFeedbackCard({ feedback }: { feedback: string }) {
 
 export function YLResultsHeader({ title, subtitle }: { title: string; subtitle: string }) {
   return (
-    <div className="text-center space-y-2">
-      <CheckCircle className="mx-auto text-trebol-primary" size={48} />
-      <h2 className="text-2xl font-black text-trebol-text">{title}</h2>
-      <p className="text-trebol-text/60 font-medium">{subtitle}</p>
+    <div className="flex items-center gap-2 text-trebol-text/70">
+      <CheckCircle className="text-trebol-primary" size={18} />
+      <div>
+        <p className="text-sm font-bold text-trebol-text">{title}</p>
+        <p className="text-xs text-trebol-text/50">{subtitle}</p>
+      </div>
     </div>
   );
 }
