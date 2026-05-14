@@ -22,6 +22,7 @@ import {
   YLPart2Practice,
   YLPart3Practice,
   YLPart4Practice,
+  YLPointingPractice,
 } from '@/components/practice/yl';
 import type { PracticeMode, ModeKey } from '@/lib/types/practice';
 import type { StoredMessage } from '@/actions/messages';
@@ -61,7 +62,7 @@ interface YLRenderProps {
  * O(1) lookup — avoids long switch chains.
  */
 const MODE_COMPONENT_MAP: Partial<Record<ModeKey, (props: YLRenderProps) => React.JSX.Element>> = {
-  cambridge_starters_part1: (p) => <YLPart1Practice exam="starters" part={1} {...p} />,
+  cambridge_starters_part1: (p) => <YLPointingPractice exam="starters" part={1} {...p} />,
   cambridge_starters_part2: (p) => <YLPart2Practice exam="starters" part={2} {...p} />,
   cambridge_starters_part3: (p) => <YLPart3Practice exam="starters" part={3} {...p} />,
   cambridge_starters_part4: (p) => <YLPart4Practice exam="starters" part={4} {...p} />,

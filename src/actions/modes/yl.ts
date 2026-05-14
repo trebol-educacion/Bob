@@ -205,21 +205,35 @@ export async function generateYLContentAction(
   // (examiner_cues vs cues, image_prompt vs image_prompts, etc.). Normalize
   // to the canonical YLPlanSchema shape before validating.
   const p = (parsed ?? {}) as Record<string, unknown>;
-  const normalized = {
-    cues:
-      (p.cues as unknown[]) ??
-      (p.examiner_cues as unknown[]) ??
-      (p.target_questions as unknown[]) ??
-      (typeof p.scene_description === 'string' ? [p.scene_description] : []),
-    image_prompts:
-      (p.image_prompts as unknown[]) ??
-      (typeof p.image_prompt === 'string' ? [p.image_prompt] : undefined),
+
+  // Pointing-shape detection (Starters P1 / Movers P1 click activity)
+  const isPointing =
+    Array.isArray(p.options) &&
+    Array.isArray(p.option_image_prompts) &&
+    Array.isArray(p.cues) &&
+    p.cues.length > 0 &&
+    typeof (p.cues as unknown[])[0] === 'object';
+
+  const normalized: Record<string, unknown> = {
+    cues: isPointing
+      ? (p.cues as Array<{ text: string }>).map((c) => c.text)
+      : (p.cues as unknown[]) ??
+        (p.examiner_cues as unknown[]) ??
+        (p.target_questions as unknown[]) ??
+        (typeof p.scene_description === 'string' ? [p.scene_description] : []),
+    image_prompts: isPointing
+      ? (p.option_image_prompts as unknown[])
+      : (p.image_prompts as unknown[]) ??
+        (typeof p.image_prompt === 'string' ? [p.image_prompt] : undefined),
     character_description: p.character_description ?? p.character ?? undefined,
     story_title: p.story_title ?? p.title ?? undefined,
     story_beats: (p.story_beats as unknown[]) ?? (p.beats as unknown[]) ?? undefined,
     student_card: p.student_card ?? undefined,
     examiner_card: p.examiner_card ?? undefined,
     target_questions: (p.target_questions as unknown[]) ?? undefined,
+    options: isPointing ? (p.options as unknown[]) : undefined,
+    option_image_prompts: isPointing ? (p.option_image_prompts as unknown[]) : undefined,
+    pointing_cues: isPointing ? (p.cues as unknown[]) : undefined,
   };
 
   const result = YLPlanSchema.safeParse(normalized);
