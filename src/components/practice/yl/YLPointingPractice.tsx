@@ -247,7 +247,9 @@ export function YLPointingPractice({
         <YLToolbar title={partLabel} subtitle="Practice history" onBack={onBack} progress={100} />
         <div className="flex-1 overflow-y-auto p-4 space-y-3">
           {messages
-            .filter((m) => m.msg_type !== 'evaluation')
+            // Exclude rows that are pure audio cache (yl_tts) or scene
+            // images saved separately — they would duplicate the conversation.
+            .filter((m) => m.msg_type !== 'evaluation' && m.msg_type !== 'yl_tts' && m.msg_type !== 'image_scene')
             .map((m) => (
               <YLReadOnlyMessage
                 key={m.id}
