@@ -12,8 +12,10 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import Image from 'next/image';
+import { ArrowLeft, MapPin, Zap } from 'lucide-react';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
 import { blobToBase64 } from '@/lib/audio';
+import { ACTIVE_MODEL_LABEL } from '@/actions/gemini';
 import {
   startYLSessionAction,
   generateYLImagesAction,
@@ -25,13 +27,13 @@ import {
 } from '@/actions/modes/yl';
 import type { YLExam, YLPlan } from '@/lib/types/yl';
 import type { EvalResponse, ModeKey } from '@/lib/types/practice';
+import { ChatShell } from '@/components/ChatShell';
 import {
   RECORDING_MAX_SECONDS,
   playTTS,
   stopCurrentAudio,
   YLLoadingScreen,
   YLErrorScreen,
-  YLToolbar,
   YLScoreDisplay,
   YLFeedbackCard,
   YLResultsHeader,
@@ -329,15 +331,36 @@ export function YLPart1Practice({
   }, [phase, sessionId, plan, mode]);
 
 
-  // ── Labels ────────────────────────────────────────────────────────────────
+  // ── Labels & header config ─────────────────────────────────────────────────
 
   const partLabel =
     exam === 'starters'
       ? 'Starters Part 1 — Señalar imágenes'
       : 'Movers Part 1 — Encuentra diferencias';
 
+  const headerIcon = exam === 'starters' ? MapPin : Zap;
+  const headerTitle = exam === 'starters' ? 'Starters — Part 1' : 'Movers — Speaking';
+  const headerSubtitle = exam === 'starters' ? 'Ages 6–8 · Part 1' : 'Ages 7–9 · Part 1';
+  const partBadgeLabel = exam === 'starters' ? 'PART 1' : 'PART 1';
+
   const totalCues = plan?.cues.length ?? 1;
   const progress = Math.round(((cueIndex + (phase === 'reaction-ready' ? 1 : 0)) / totalCues) * 100);
+
+  const backButton = (
+    <button
+      onClick={onBack}
+      className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
+      aria-label="Back"
+    >
+      <ArrowLeft size={18} className="text-gray-600" />
+    </button>
+  );
+
+  const partBadge = (
+    <span className="text-xs font-bold bg-amber-50 text-amber-700 px-2 py-1 rounded-md">
+      {partBadgeLabel}
+    </span>
+  );
 
   // ── Render: error ─────────────────────────────────────────────────────────
 
@@ -361,20 +384,22 @@ export function YLPart1Practice({
 
   if (phase === 'finished' && isReadOnly) {
     return (
-      <div className="flex-1 flex flex-col min-h-0">
-        <YLToolbar title={partLabel} subtitle="Practice history" onBack={onBack} progress={100} />
-        <div className="flex-1 overflow-y-auto p-4 space-y-3">
-          {messages.map((msg) => (
-            <YLReadOnlyMessage
-              key={msg.id}
-              role={msg.role}
-              text={(msg.content_text as string) ?? ''}
-              msgType={msg.msg_type}
-              contentJson={msg.content_json}
-            />
-          ))}
-        </div>
-      </div>
+      <ChatShell
+        headerConfig={{ icon: headerIcon, title: headerTitle, subtitle: 'Practice history', accentColor: 'amber', leftSlot: backButton, rightSlot: partBadge, online: false }}
+        footerConfig={{ modeLabel: `YL · ${partBadgeLabel}`, modelName: ACTIVE_MODEL_LABEL }}
+        inputSlot={null}
+        animationKey="yl-part1-readonly"
+      >
+        {messages.map((msg) => (
+          <YLReadOnlyMessage
+            key={msg.id}
+            role={msg.role}
+            text={(msg.content_text as string) ?? ''}
+            msgType={msg.msg_type}
+            contentJson={msg.content_json}
+          />
+        ))}
+      </ChatShell>
     );
   }
 
@@ -433,77 +458,82 @@ export function YLPart1Practice({
   const canRecord = phase === 'cue-ready' || phase === 'playing-cue';
   const isProcessing = phase === 'processing';
 
-  return (
-    <div className="flex-1 flex flex-col min-h-0">
-      <YLToolbar
-        title={partLabel}
-        subtitle={`Cue ${cueIndex + 1} of ${totalCues}`}
-        onBack={onBack}
-        progress={progress}
-      />
-
-      <div className="flex-1 overflow-y-auto px-4 sm:px-12 py-6">
-        <div className="w-full space-y-3">
-          {chatItems.map((item) => {
-            switch (item.kind) {
-              case 'image':
-                return <YLImageMessage key={item.id} src={item.src} />;
-              case 'bob-text':
-              case 'reaction-text':
-                return <YLBobTextMessage key={item.id} text={item.text} />;
-              case 'bob-voice':
-              case 'reaction-voice':
-                return <YLVoiceNote key={item.id} text={item.text} side="bob" sessionId={sessionId} />;
-              case 'user-text':
-                return <YLUserTextMessage key={item.id} text={item.text} />;
-            }
-          })}
-          {isProcessing && (
-            <div className="flex justify-start gap-2">
-              <div className="w-8 h-8 rounded-full bg-trebol-primary/15 flex items-center justify-center shrink-0 text-xs font-bold text-trebol-primary mt-1">
-                B
-              </div>
-              <div className="rounded-2xl px-4 py-3 bg-white border border-trebol-border flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-trebol-primary animate-bounce" />
-                <div className="w-2 h-2 rounded-full bg-trebol-primary animate-bounce" style={{ animationDelay: '120ms' }} />
-                <div className="w-2 h-2 rounded-full bg-trebol-primary animate-bounce" style={{ animationDelay: '240ms' }} />
-              </div>
-            </div>
-          )}
-        </div>
+  const inputBar =
+    phase === 'reaction-ready' ? (
+      <div className="border-t border-gray-100 bg-white/90 backdrop-blur p-3 flex items-center justify-center">
+        <button
+          type="button"
+          onClick={handleNextCue}
+          className="px-6 py-3 rounded-full bg-blue-600 text-white font-bold text-sm hover:opacity-90 transition-opacity flex items-center gap-2"
+        >
+          Next question
+          <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
+            <path d="M6 4l12 8-12 8V4z" />
+            <rect x="18" y="4" width="2" height="16" />
+          </svg>
+        </button>
       </div>
+    ) : (
+      <YLChatMicBar
+        onStart={handleStartRecording}
+        onStop={handleStopRecording}
+        isRecording={phase === 'recording' && isRecording}
+        seconds={recordingSeconds}
+        maxSeconds={RECORDING_MAX_SECONDS}
+        disabled={isProcessing}
+        helperText={
+          phase === 'playing-cue'
+            ? 'Bob is speaking…'
+            : isProcessing
+            ? 'Processing your answer…'
+            : 'Tap to answer with your voice'
+        }
+      />
+    );
 
-      {phase === 'reaction-ready' ? (
-        <div className="border-t border-trebol-border bg-white/90 backdrop-blur p-3 flex items-center justify-center">
-          <button
-            type="button"
-            onClick={handleNextCue}
-            className="px-6 py-3 rounded-full bg-trebol-primary text-white font-bold text-sm hover:opacity-90 transition-opacity flex items-center gap-2"
-          >
-            Next question
-            <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
-              <path d="M6 4l12 8-12 8V4z" />
-              <rect x="18" y="4" width="2" height="16" />
-            </svg>
-          </button>
-        </div>
-      ) : (
-        <YLChatMicBar
-          onStart={handleStartRecording}
-          onStop={handleStopRecording}
-          isRecording={phase === 'recording' && isRecording}
-          seconds={recordingSeconds}
-          maxSeconds={RECORDING_MAX_SECONDS}
-          disabled={isProcessing}
-          helperText={
-            phase === 'playing-cue'
-              ? 'Bob is speaking…'
-              : isProcessing
-              ? 'Processing your answer…'
-              : 'Tap to answer with your voice'
-          }
-        />
-      )}
+  const progressBar = (
+    <div className="w-20 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+      <motion.div
+        animate={{ width: `${progress}%` }}
+        transition={{ duration: 0.4 }}
+        className="h-full bg-blue-600"
+      />
     </div>
+  );
+
+  return (
+    <ChatShell
+      headerConfig={{ icon: headerIcon, title: headerTitle, subtitle: `${headerSubtitle} · Cue ${cueIndex + 1}/${totalCues}`, accentColor: 'amber', leftSlot: backButton, rightSlot: <div className="flex items-center gap-2">{progressBar}{partBadge}</div>, online: true }}
+      footerConfig={{ modeLabel: `YL · ${partBadgeLabel}`, modelName: ACTIVE_MODEL_LABEL }}
+      inputSlot={inputBar}
+      animationKey="yl-part1"
+    >
+      {chatItems.map((item) => {
+        switch (item.kind) {
+          case 'image':
+            return <YLImageMessage key={item.id} src={item.src} />;
+          case 'bob-text':
+          case 'reaction-text':
+            return <YLBobTextMessage key={item.id} text={item.text} />;
+          case 'bob-voice':
+          case 'reaction-voice':
+            return <YLVoiceNote key={item.id} text={item.text} side="bob" sessionId={sessionId} />;
+          case 'user-text':
+            return <YLUserTextMessage key={item.id} text={item.text} />;
+        }
+      })}
+      {isProcessing && (
+        <div className="flex justify-start gap-2">
+          <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 text-xs font-bold bg-amber-50 text-amber-600 border border-amber-100 mt-1">
+            B
+          </div>
+          <div className="rounded-2xl px-4 py-3 bg-white border border-gray-100 flex items-center gap-1.5">
+            <div className="w-2 h-2 rounded-full bg-gray-300 animate-bounce" />
+            <div className="w-2 h-2 rounded-full bg-gray-300 animate-bounce" style={{ animationDelay: '120ms' }} />
+            <div className="w-2 h-2 rounded-full bg-gray-300 animate-bounce" style={{ animationDelay: '240ms' }} />
+          </div>
+        </div>
+      )}
+    </ChatShell>
   );
 }

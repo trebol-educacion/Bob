@@ -10,6 +10,8 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'motion/react';
+import { ArrowLeft, MapPin } from 'lucide-react';
+import { ACTIVE_MODEL_LABEL } from '@/actions/gemini';
 import {
   startYLSessionAction,
   generateYLImageAction,
@@ -19,12 +21,12 @@ import {
 } from '@/actions/modes/yl';
 import type { YLExam, YLPlan } from '@/lib/types/yl';
 import type { EvalResponse, ModeKey } from '@/lib/types/practice';
+import { ChatShell } from '@/components/ChatShell';
 import {
   playTTS,
   stopCurrentAudio,
   YLLoadingScreen,
   YLErrorScreen,
-  YLToolbar,
   YLVoiceNote,
   YLBobTextMessage,
   YLUserTextMessage,
@@ -206,7 +208,7 @@ export function YLPointingPractice({
               ? 'Perfect! You identified all the objects.'
               : pct >= 50
               ? 'Good job! Next time try to get them all right.'
-              : 'Let’s practice the vocabulary a little more.',
+              : "Let's practice the vocabulary a little more.",
         };
         setFinalEval(result);
         // Persist final eval (click-based) directly — Gemini-based eval
@@ -232,6 +234,32 @@ export function YLPointingPractice({
   const partLabel = 'Starters Part 1 — Point to the picture';
   const progress = Math.round(((cueIndex + (phase === 'answered' ? 1 : 0)) / totalCues) * 100);
 
+  const backButton = (
+    <button
+      onClick={onBack}
+      className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
+      aria-label="Back"
+    >
+      <ArrowLeft size={18} className="text-gray-600" />
+    </button>
+  );
+
+  const partBadge = (
+    <span className="text-xs font-bold bg-amber-50 text-amber-700 px-2 py-1 rounded-md">
+      POINTING
+    </span>
+  );
+
+  const progressBar = (
+    <div className="w-20 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+      <motion.div
+        animate={{ width: `${progress}%` }}
+        transition={{ duration: 0.4 }}
+        className="h-full bg-blue-600"
+      />
+    </div>
+  );
+
   if (phase === 'finished' && isReadOnly) {
     // Find the saved final evaluation (if any) so we can render the
     // score / feedback cards inline below the conversation.
@@ -244,169 +272,166 @@ export function YLPointingPractice({
     const savedEval = (finalMsg?.content_json as EvalResponse | undefined) ?? null;
 
     return (
-      <div className="flex-1 flex flex-col min-h-0">
-        <YLToolbar title={partLabel} subtitle="Practice history" onBack={onBack} progress={100} />
-        <div className="flex-1 overflow-y-auto p-4 space-y-3">
-          {messages
-            // Exclude rows that are pure audio cache (yl_tts) or scene
-            // images saved separately — they would duplicate the conversation.
-            .filter((m) => m.msg_type !== 'evaluation' && m.msg_type !== 'yl_tts' && m.msg_type !== 'image_scene')
-            .flatMap((m): React.ReactElement[] => {
-              // For user_audio rows, the cue lives in content_json.cue.
-              // Render the cue as a SEPARATE Bob bubble on the left BEFORE the
-              // user's pick on the right, instead of inline as a label.
-              if (m.role === 'user' && m.msg_type === 'user_audio') {
-                const cue = (m.content_json as { cue?: string } | null)?.cue ?? '';
-                const bubbles: React.ReactElement[] = [];
-                if (cue) {
-                  bubbles.push(
-                    <YLBobTextMessage key={`${m.id}-cue`} text={cue} />
-                  );
-                }
+      <ChatShell
+        headerConfig={{ icon: MapPin, title: 'Starters — Pointing', subtitle: 'Practice history', accentColor: 'amber', leftSlot: backButton, rightSlot: partBadge, online: false }}
+        footerConfig={{ modeLabel: 'YL · POINTING', modelName: ACTIVE_MODEL_LABEL }}
+        inputSlot={null}
+        animationKey="yl-pointing-readonly"
+      >
+        {messages
+          // Exclude rows that are pure audio cache (yl_tts) or scene
+          // images saved separately — they would duplicate the conversation.
+          .filter((m) => m.msg_type !== 'evaluation' && m.msg_type !== 'yl_tts' && m.msg_type !== 'image_scene')
+          .flatMap((m): React.ReactElement[] => {
+            // For user_audio rows, the cue lives in content_json.cue.
+            // Render the cue as a SEPARATE Bob bubble on the left BEFORE the
+            // user's pick on the right, instead of inline as a label.
+            if (m.role === 'user' && m.msg_type === 'user_audio') {
+              const cue = (m.content_json as { cue?: string } | null)?.cue ?? '';
+              const bubbles: React.ReactElement[] = [];
+              if (cue) {
                 bubbles.push(
-                  <YLReadOnlyMessage
-                    key={m.id}
-                    role={m.role}
-                    text={(m.content_text as string) ?? ''}
-                    msgType={m.msg_type}
-                  />
+                  <YLBobTextMessage key={`${m.id}-cue`} text={cue} />
                 );
-                return bubbles;
               }
-              return [
+              bubbles.push(
                 <YLReadOnlyMessage
                   key={m.id}
                   role={m.role}
                   text={(m.content_text as string) ?? ''}
                   msgType={m.msg_type}
-                  contentJson={m.content_json}
-                />,
-              ];
-            })}
-          {savedEval && (
-            <motion.div
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="space-y-3 max-w-md pt-2"
-            >
-              <YLResultsHeader title="Practice complete!" subtitle={partLabel} />
-              <YLScoreDisplay evalResult={savedEval} />
-              <YLFeedbackCard feedback={savedEval.feedback} />
-            </motion.div>
-          )}
-        </div>
-      </div>
+                />
+              );
+              return bubbles;
+            }
+            return [
+              <YLReadOnlyMessage
+                key={m.id}
+                role={m.role}
+                text={(m.content_text as string) ?? ''}
+                msgType={m.msg_type}
+                contentJson={m.content_json}
+              />,
+            ];
+          })}
+        {savedEval && (
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="space-y-3 max-w-md pt-2"
+          >
+            <YLResultsHeader title="Practice complete!" subtitle={partLabel} />
+            <YLScoreDisplay evalResult={savedEval} />
+            <YLFeedbackCard feedback={savedEval.feedback} />
+          </motion.div>
+        )}
+      </ChatShell>
     );
   }
 
 
+  const bottomBar = (
+    <div className="border-t border-gray-100 bg-white/90 backdrop-blur p-3 flex items-center justify-between gap-3">
+      <p className="text-xs text-gray-500 font-medium pl-2">
+        {phase === 'ready' && '🎧 Listen and tap the correct picture'}
+        {phase === 'answered' && (wasCorrect ? 'Well done!' : 'Almost… let\'s try the next one')}
+        {phase === 'finished' && '✅ Practice complete'}
+      </p>
+      {phase === 'answered' && (
+        <button
+          type="button"
+          onClick={handleNext}
+          className="px-6 py-3 rounded-full bg-blue-600 text-white font-bold text-sm hover:opacity-90 transition-opacity flex items-center gap-2"
+        >
+          {cueIndex + 1 >= totalCues ? 'Ver resultados' : 'Siguiente'}
+          <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
+            <path d="M6 4l12 8-12 8V4z" />
+            <rect x="18" y="4" width="2" height="16" />
+          </svg>
+        </button>
+      )}
+      {phase === 'finished' && !isReadOnly && (
+        <button
+          type="button"
+          onClick={onBack}
+          className="px-6 py-3 rounded-full bg-blue-600 text-white font-bold text-sm hover:opacity-90 transition-opacity"
+        >
+          Back to activities
+        </button>
+      )}
+    </div>
+  );
+
   return (
-    <div className="flex-1 flex flex-col min-h-0">
-      <YLToolbar
-        title={partLabel}
-        subtitle={`Round ${cueIndex + 1} of ${totalCues}`}
-        onBack={onBack}
-        progress={progress}
-      />
-
-      <div className="flex-1 overflow-y-auto px-4 sm:px-12 py-6">
-        <div className="w-full space-y-3">
-          {/* Conversation log for previously answered rounds */}
-          {turns.map((t) => (
-            <React.Fragment key={t.id}>
-              {/* Bob asks (text shown so the kid can read along) */}
-              <YLBobTextMessage text={t.cueText} />
-              {/* User's pick */}
-              <YLUserTextMessage text={`👉 ${t.userPicked} ${t.correct ? '✓' : '✗'}`} />
-              {/* Bob's reaction: voice note only (no text). Auto-plays the latest one. */}
-              {sessionId && (
-                <YLVoiceNote
-                  text={t.reactionText}
-                  side="bob"
-                  sessionId={sessionId}
-                  autoPlay={t.id === `turn-${cueIndex - 1}` || (phase === 'answered' && t.id === `turn-${cueIndex}`)}
-                />
-              )}
-            </React.Fragment>
-          ))}
-
-          {/* Current cue (voice only, NO text). Auto-plays once on mount. */}
-          {currentCue && sessionId && phase === 'ready' && (
+    <ChatShell
+      headerConfig={{ icon: MapPin, title: 'Starters — Pointing', subtitle: `Ages 6–8 · Round ${cueIndex + 1}/${totalCues}`, accentColor: 'amber', leftSlot: backButton, rightSlot: <div className="flex items-center gap-2">{progressBar}{partBadge}</div>, online: true }}
+      footerConfig={{ modeLabel: 'YL · POINTING', modelName: ACTIVE_MODEL_LABEL }}
+      inputSlot={bottomBar}
+      animationKey="yl-pointing"
+    >
+      {/* Conversation log for previously answered rounds */}
+      {turns.map((t) => (
+        <React.Fragment key={t.id}>
+          {/* Bob asks (text shown so the kid can read along) */}
+          <YLBobTextMessage text={t.cueText} />
+          {/* User's pick */}
+          <YLUserTextMessage text={`👉 ${t.userPicked} ${t.correct ? '✓' : '✗'}`} />
+          {/* Bob's reaction: voice note only (no text). Auto-plays the latest one. */}
+          {sessionId && (
             <YLVoiceNote
-              key={`cue-${cueIndex}`}
-              text={currentCue.text}
+              text={t.reactionText}
               side="bob"
               sessionId={sessionId}
-              autoPlay
+              autoPlay={t.id === `turn-${cueIndex - 1}` || (phase === 'answered' && t.id === `turn-${cueIndex}`)}
             />
           )}
+        </React.Fragment>
+      ))}
 
-          {/* Final results inline in chat */}
-          {phase === 'finished' && finalEval && !isReadOnly && (
-            <motion.div
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="space-y-3 max-w-md"
+      {/* Current cue (voice only, NO text). Auto-plays once on mount. */}
+      {currentCue && sessionId && phase === 'ready' && (
+        <YLVoiceNote
+          key={`cue-${cueIndex}`}
+          text={currentCue.text}
+          side="bob"
+          sessionId={sessionId}
+          autoPlay
+        />
+      )}
+
+      {/* Final results inline in chat */}
+      {phase === 'finished' && finalEval && !isReadOnly && (
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="space-y-3 max-w-md"
+        >
+          <YLResultsHeader title="Practice complete!" subtitle={partLabel} />
+          <YLScoreDisplay evalResult={finalEval} />
+          <YLFeedbackCard feedback={finalEval.feedback} />
+        </motion.div>
+      )}
+
+      {/* 4-option grid (only while waiting for an answer) */}
+      {phase === 'ready' && plan?.options && images.length === plan.options.length && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 max-w-3xl">
+          {plan.options.map((label, idx) => (
+            <button
+              key={`${idx}-${label}`}
+              type="button"
+              onClick={() => handleSelect(idx)}
+              className="group rounded-2xl bg-white shadow hover:shadow-lg overflow-hidden transition-all ring-2 ring-transparent hover:ring-blue-200"
             >
-              <YLResultsHeader title="Practice complete!" subtitle={partLabel} />
-              <YLScoreDisplay evalResult={finalEval} />
-              <YLFeedbackCard feedback={finalEval.feedback} />
-            </motion.div>
-          )}
-
-          {/* 4-option grid (only while waiting for an answer) */}
-          {phase === 'ready' && plan?.options && images.length === plan.options.length && (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 max-w-3xl">
-              {plan.options.map((label, idx) => (
-                <button
-                  key={`${idx}-${label}`}
-                  type="button"
-                  onClick={() => handleSelect(idx)}
-                  className="group rounded-2xl bg-white shadow hover:shadow-lg overflow-hidden transition-all ring-2 ring-transparent hover:ring-trebol-secondary/40"
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={images[idx].startsWith('http') || images[idx].startsWith('data:') ? images[idx] : `data:image/png;base64,${images[idx]}`}
-                    alt={label}
-                    className="w-full aspect-square object-cover group-hover:scale-105 transition-transform"
-                  />
-                </button>
-              ))}
-            </div>
-          )}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={images[idx].startsWith('http') || images[idx].startsWith('data:') ? images[idx] : `data:image/png;base64,${images[idx]}`}
+                alt={label}
+                className="w-full aspect-square object-cover group-hover:scale-105 transition-transform"
+              />
+            </button>
+          ))}
         </div>
-      </div>
-
-      {/* Bottom action bar */}
-      <div className="border-t border-trebol-border bg-white/90 backdrop-blur p-3 flex items-center justify-between gap-3">
-        <p className="text-xs text-trebol-text/60 font-medium pl-2">
-          {phase === 'ready' && '🎧 Listen and tap the correct picture'}
-          {phase === 'answered' && (wasCorrect ? 'Well done!' : 'Almost… let’s try the next one')}
-          {phase === 'finished' && '✅ Practice complete'}
-        </p>
-        {phase === 'answered' && (
-          <button
-            type="button"
-            onClick={handleNext}
-            className="px-6 py-3 rounded-full bg-trebol-primary text-white font-bold text-sm hover:opacity-90 transition-opacity flex items-center gap-2"
-          >
-            {cueIndex + 1 >= totalCues ? 'Ver resultados' : 'Siguiente'}
-            <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
-              <path d="M6 4l12 8-12 8V4z" />
-              <rect x="18" y="4" width="2" height="16" />
-            </svg>
-          </button>
-        )}
-        {phase === 'finished' && !isReadOnly && (
-          <button
-            type="button"
-            onClick={onBack}
-            className="px-6 py-3 rounded-full bg-trebol-primary text-white font-bold text-sm hover:opacity-90 transition-opacity"
-          >
-            Back to activities
-          </button>
-        )}
-      </div>
-    </div>
+      )}
+    </ChatShell>
   );
 }

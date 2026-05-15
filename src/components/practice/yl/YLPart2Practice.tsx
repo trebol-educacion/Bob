@@ -11,8 +11,10 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { ArrowLeft, Headphones, Image as ImageIcon } from 'lucide-react';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
 import { blobToBase64 } from '@/lib/audio';
+import { ACTIVE_MODEL_LABEL } from '@/actions/gemini';
 import {
   startYLSessionAction,
   generateYLImagesAction,
@@ -22,6 +24,7 @@ import {
 } from '@/actions/modes/yl';
 import type { YLExam, YLPlan } from '@/lib/types/yl';
 import type { EvalResponse, ModeKey } from '@/lib/types/practice';
+import { ChatShell } from '@/components/ChatShell';
 import {
   RECORDING_MAX_SECONDS,
   REACTION_PAUSE_MS,
@@ -29,7 +32,6 @@ import {
   stopCurrentAudio,
   YLLoadingScreen,
   YLErrorScreen,
-  YLToolbar,
   YLExaminerCard,
   YLRecordingButton,
   YLReactionCard,
@@ -279,15 +281,36 @@ export function YLPart2Practice({
     }
   }, [isRecording, stopRecording]);
 
-  // ── Labels ────────────────────────────────────────────────────────────────
+  // ── Labels & header config ─────────────────────────────────────────────────
 
   const partLabel =
     exam === 'starters'
       ? 'Starters Part 2 — Preguntas sobre escena'
       : 'Movers Part 2 — Intercambio de información';
 
+  const headerIcon = exam === 'starters' ? Headphones : ImageIcon;
+  const headerTitle = exam === 'starters' ? 'Starters — Listening' : 'Movers — Image';
+  const headerSubtitle = exam === 'starters' ? 'Ages 6–8 · Part 2' : 'Ages 7–9 · Part 2';
+  const partBadgeLabel = 'PART 2';
+
   const totalCues = plan?.cues.length ?? 1;
   const progress = Math.round(((cueIndex + (phase === 'reaction' ? 1 : 0)) / totalCues) * 100);
+
+  const backButton = (
+    <button
+      onClick={onBack}
+      className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
+      aria-label="Back"
+    >
+      <ArrowLeft size={18} className="text-gray-600" />
+    </button>
+  );
+
+  const partBadge = (
+    <span className="text-xs font-bold bg-amber-50 text-amber-700 px-2 py-1 rounded-md">
+      {partBadgeLabel}
+    </span>
+  );
 
   // ── Renders ───────────────────────────────────────────────────────────────
 
@@ -297,20 +320,22 @@ export function YLPart2Practice({
 
   if (phase === 'finished' && isReadOnly) {
     return (
-      <div className="flex-1 flex flex-col min-h-0">
-        <YLToolbar title={partLabel} subtitle="Practice history" onBack={onBack} progress={100} />
-        <div className="flex-1 overflow-y-auto p-4 space-y-3">
-          {messages.map((msg) => (
-            <YLReadOnlyMessage
-              key={msg.id}
-              role={msg.role}
-              text={(msg.content_text as string) ?? ''}
-              msgType={msg.msg_type}
-              contentJson={msg.content_json}
-            />
-          ))}
-        </div>
-      </div>
+      <ChatShell
+        headerConfig={{ icon: headerIcon, title: headerTitle, subtitle: 'Practice history', accentColor: 'amber', leftSlot: backButton, rightSlot: partBadge, online: false }}
+        footerConfig={{ modeLabel: `YL · ${partBadgeLabel}`, modelName: ACTIVE_MODEL_LABEL }}
+        inputSlot={null}
+        animationKey="yl-part2-readonly"
+      >
+        {messages.map((msg) => (
+          <YLReadOnlyMessage
+            key={msg.id}
+            role={msg.role}
+            text={(msg.content_text as string) ?? ''}
+            msgType={msg.msg_type}
+            contentJson={msg.content_json}
+          />
+        ))}
+      </ChatShell>
     );
   }
 
@@ -328,9 +353,9 @@ export function YLPart2Practice({
         {/* Movers P2: show info exchange cards from plan */}
         {exam === 'movers' && plan?.student_card && (
           <div className="bg-white rounded-2xl p-5 shadow-sm space-y-2">
-            <h3 className="font-black text-trebol-text">Tu tarjeta de información</h3>
+            <h3 className="font-black text-gray-900">Tu tarjeta de información</h3>
             {Object.entries(plan.student_card).map(([k, v]) => (
-              <p key={k} className="text-sm text-trebol-text/80">
+              <p key={k} className="text-sm text-gray-700">
                 <span className="font-semibold">{k}:</span> {v}
               </p>
             ))}
@@ -340,7 +365,7 @@ export function YLPart2Practice({
         <div className="flex gap-3 pb-4">
           <button
             onClick={onBack}
-            className="flex-1 py-3 bg-trebol-primary text-white rounded-xl font-bold hover:opacity-90 transition-opacity"
+            className="flex-1 py-3 bg-blue-600 text-white rounded-xl font-bold hover:opacity-90 transition-opacity"
           >
             Back to activities
           </button>
@@ -349,108 +374,114 @@ export function YLPart2Practice({
     );
   }
 
+  const progressBar = (
+    <div className="w-20 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+      <motion.div
+        animate={{ width: `${progress}%` }}
+        transition={{ duration: 0.4 }}
+        className="h-full bg-blue-600"
+      />
+    </div>
+  );
+
   // Active practice
   return (
-    <div className="flex-1 flex flex-col min-h-0">
-      <YLToolbar
-        title={partLabel}
-        subtitle={`Pregunta ${cueIndex + 1} de ${totalCues}`}
-        onBack={onBack}
-        progress={progress}
-      />
-
-      <div className="flex-1 flex flex-col gap-4 p-4 overflow-y-auto">
-        {/* Image (Starters: 1 scene image; Movers: context card image) */}
-        {images.length > 0 && (
-          <div className="max-w-lg mx-auto w-full rounded-2xl overflow-hidden shadow-md bg-white">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={(images[0]?.startsWith('data:') ? images[0] : `data:image/png;base64,${images[0] ?? ''}`)}
-              alt="Imagen de la escena"
-              className="w-full object-cover"
-            />
-          </div>
-        )}
-
-        {/* Movers: show student info card */}
-        {exam === 'movers' && plan?.student_card && (
-          <div className="max-w-lg mx-auto w-full bg-amber-50 border border-amber-200 rounded-2xl p-4 space-y-1">
-            <p className="text-xs font-bold text-amber-700 uppercase tracking-wide">Tu tarjeta</p>
-            {Object.entries(plan.student_card).map(([k, v]) => (
-              <p key={k} className="text-sm text-trebol-text">
-                <span className="font-semibold">{k}:</span> {v}
-              </p>
-            ))}
-          </div>
-        )}
-
-        {/* Examiner cue + status */}
-        <div className="flex flex-col items-center gap-4 w-full">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={`cue-${cueIndex}`}
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -12 }}
-              className="w-full flex justify-center"
-            >
-              <YLExaminerCard cue={currentCue || '...'} />
-            </motion.div>
-          </AnimatePresence>
-
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={`status-${phase}`}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="flex flex-col items-center gap-4 w-full"
-            >
-              {phase === 'playing-cue' && (
-                <p className="text-trebol-text/50 font-semibold text-sm">
-                  Escucha al examinador...
-                </p>
-              )}
-
-              {phase === 'countdown' && (
-                <div className="text-center space-y-1">
-                  <p className="text-trebol-text/60 font-semibold text-sm">Grabando en</p>
-                  <motion.span
-                    key={countdown}
-                    initial={{ scale: 1.4, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    className="text-5xl font-black text-trebol-primary block"
-                  >
-                    {countdown}
-                  </motion.span>
-                </div>
-              )}
-
-              {phase === 'recording' && (
-                <YLRecordingButton
-                  isRecording={isRecording}
-                  onStop={handleManualStop}
-                  seconds={recordingSeconds}
-                  maxSeconds={RECORDING_MAX_SECONDS}
-                />
-              )}
-
-              {phase === 'processing' && (
-                <div className="flex flex-col items-center gap-3">
-                  <div className="w-8 h-8 border-3 border-trebol-primary border-t-transparent rounded-full animate-spin" />
-                  <p className="text-trebol-text/50 font-semibold text-sm">
-                    Processing your answer…
-                  </p>
-                </div>
-              )}
-
-              {phase === 'reaction' && currentReaction && (
-                <YLReactionCard reaction={currentReaction} />
-              )}
-            </motion.div>
-          </AnimatePresence>
+    <ChatShell
+      headerConfig={{ icon: headerIcon, title: headerTitle, subtitle: `${headerSubtitle} · Q ${cueIndex + 1}/${totalCues}`, accentColor: 'amber', leftSlot: backButton, rightSlot: <div className="flex items-center gap-2">{progressBar}{partBadge}</div>, online: true }}
+      footerConfig={{ modeLabel: `YL · ${partBadgeLabel}`, modelName: ACTIVE_MODEL_LABEL }}
+      inputSlot={null}
+      animationKey="yl-part2"
+    >
+      {/* Image (Starters: 1 scene image; Movers: context card image) */}
+      {images.length > 0 && (
+        <div className="max-w-lg mx-auto w-full rounded-2xl overflow-hidden shadow-md bg-white">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={(images[0]?.startsWith('data:') ? images[0] : `data:image/png;base64,${images[0] ?? ''}`)}
+            alt="Imagen de la escena"
+            className="w-full object-cover"
+          />
         </div>
+      )}
+
+      {/* Movers: show student info card */}
+      {exam === 'movers' && plan?.student_card && (
+        <div className="max-w-lg mx-auto w-full bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-1">
+          <p className="text-xs font-bold text-amber-700 uppercase tracking-wide">Tu tarjeta</p>
+          {Object.entries(plan.student_card).map(([k, v]) => (
+            <p key={k} className="text-sm text-gray-700">
+              <span className="font-semibold">{k}:</span> {v}
+            </p>
+          ))}
+        </div>
+      )}
+
+      {/* Examiner cue + status */}
+      <div className="flex flex-col items-center gap-4 w-full">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={`cue-${cueIndex}`}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -12 }}
+            className="w-full flex justify-center"
+          >
+            <YLExaminerCard cue={currentCue || '...'} />
+          </motion.div>
+        </AnimatePresence>
+
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={`status-${phase}`}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="flex flex-col items-center gap-4 w-full"
+          >
+            {phase === 'playing-cue' && (
+              <p className="text-gray-500 font-semibold text-sm">
+                Escucha al examinador...
+              </p>
+            )}
+
+            {phase === 'countdown' && (
+              <div className="text-center space-y-1">
+                <p className="text-gray-500 font-semibold text-sm">Grabando en</p>
+                <motion.span
+                  key={countdown}
+                  initial={{ scale: 1.4, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  className="text-5xl font-black text-blue-600 block"
+                >
+                  {countdown}
+                </motion.span>
+              </div>
+            )}
+
+            {phase === 'recording' && (
+              <YLRecordingButton
+                isRecording={isRecording}
+                onStop={handleManualStop}
+                seconds={recordingSeconds}
+                maxSeconds={RECORDING_MAX_SECONDS}
+              />
+            )}
+
+            {phase === 'processing' && (
+              <div className="flex flex-col items-center gap-3">
+                <div className="w-8 h-8 border-3 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                <p className="text-gray-500 font-semibold text-sm">
+                  Processing your answer…
+                </p>
+              </div>
+            )}
+
+            {phase === 'reaction' && currentReaction && (
+              <YLReactionCard reaction={currentReaction} />
+            )}
+          </motion.div>
+        </AnimatePresence>
       </div>
-    </div>
+    </ChatShell>
   );
 }

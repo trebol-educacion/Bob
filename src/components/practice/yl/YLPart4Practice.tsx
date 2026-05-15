@@ -14,9 +14,10 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { User } from 'lucide-react';
+import { User, ArrowLeft, Star } from 'lucide-react';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
 import { blobToBase64 } from '@/lib/audio';
+import { ACTIVE_MODEL_LABEL } from '@/actions/gemini';
 import {
   startYLSessionAction,
   evaluateYLTurnAction,
@@ -25,6 +26,7 @@ import {
 } from '@/actions/modes/yl';
 import type { YLExam, YLPlan } from '@/lib/types/yl';
 import type { EvalResponse, ModeKey } from '@/lib/types/practice';
+import { ChatShell } from '@/components/ChatShell';
 import {
   RECORDING_MAX_SECONDS,
   REACTION_PAUSE_MS,
@@ -32,7 +34,6 @@ import {
   stopCurrentAudio,
   YLLoadingScreen,
   YLErrorScreen,
-  YLToolbar,
   YLExaminerCard,
   YLRecordingButton,
   YLReactionCard,
@@ -277,7 +278,7 @@ export function YLPart4Practice({
     }
   }, [isRecording, stopRecording]);
 
-  // ── Labels ────────────────────────────────────────────────────────────────
+  // ── Labels & header config ─────────────────────────────────────────────────
 
   const partLabel = (() => {
     if (exam === 'starters' && part === 4) return 'Starters Part 4 — Preguntas personales';
@@ -286,8 +287,36 @@ export function YLPart4Practice({
     return `Cambridge ${exam} Part ${part}`;
   })();
 
+  const headerTitle = (() => {
+    if (exam === 'starters') return 'Starters — Personal';
+    if (part === 5) return 'Movers — Describe';
+    return 'Movers — Personal';
+  })();
+  const headerSubtitle = (() => {
+    if (exam === 'starters') return 'Ages 6–8 · Part 4';
+    if (part === 5) return 'Ages 7–9 · Part 5';
+    return 'Ages 7–9 · Part 4';
+  })();
+  const partBadgeLabel = `PART ${part}`;
+
   const totalCues = plan?.cues.length ?? 1;
   const progress = Math.round(((cueIndex + (phase === 'reaction' ? 1 : 0)) / totalCues) * 100);
+
+  const backButton = (
+    <button
+      onClick={onBack}
+      className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
+      aria-label="Back"
+    >
+      <ArrowLeft size={18} className="text-gray-600" />
+    </button>
+  );
+
+  const partBadge = (
+    <span className="text-xs font-bold bg-amber-50 text-amber-700 px-2 py-1 rounded-md">
+      {partBadgeLabel}
+    </span>
+  );
 
   // ── Renders ───────────────────────────────────────────────────────────────
 
@@ -297,20 +326,22 @@ export function YLPart4Practice({
 
   if (phase === 'finished' && isReadOnly) {
     return (
-      <div className="flex-1 flex flex-col min-h-0">
-        <YLToolbar title={partLabel} subtitle="Practice history" onBack={onBack} progress={100} />
-        <div className="flex-1 overflow-y-auto p-4 space-y-3">
-          {messages.map((msg) => (
-            <YLReadOnlyMessage
-              key={msg.id}
-              role={msg.role}
-              text={(msg.content_text as string) ?? ''}
-              msgType={msg.msg_type}
-              contentJson={msg.content_json}
-            />
-          ))}
-        </div>
-      </div>
+      <ChatShell
+        headerConfig={{ icon: Star, title: headerTitle, subtitle: 'Practice history', accentColor: 'amber', leftSlot: backButton, rightSlot: partBadge, online: false }}
+        footerConfig={{ modeLabel: `YL · ${partBadgeLabel}`, modelName: ACTIVE_MODEL_LABEL }}
+        inputSlot={null}
+        animationKey={`yl-part${part}-readonly`}
+      >
+        {messages.map((msg) => (
+          <YLReadOnlyMessage
+            key={msg.id}
+            role={msg.role}
+            text={(msg.content_text as string) ?? ''}
+            msgType={msg.msg_type}
+            contentJson={msg.content_json}
+          />
+        ))}
+      </ChatShell>
     );
   }
 
@@ -327,7 +358,7 @@ export function YLPart4Practice({
         <div className="flex gap-3 pb-4">
           <button
             onClick={onBack}
-            className="flex-1 py-3 bg-trebol-primary text-white rounded-xl font-bold hover:opacity-90 transition-opacity"
+            className="flex-1 py-3 bg-blue-600 text-white rounded-xl font-bold hover:opacity-90 transition-opacity"
           >
             Back to activities
           </button>
@@ -337,23 +368,31 @@ export function YLPart4Practice({
   }
 
   // Active practice — no images, just a friendly avatar area
-  return (
-    <div className="flex-1 flex flex-col min-h-0">
-      <YLToolbar
-        title={partLabel}
-        subtitle={`Pregunta ${cueIndex + 1} de ${totalCues}`}
-        onBack={onBack}
-        progress={progress}
+  const progressBar = (
+    <div className="w-20 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+      <motion.div
+        animate={{ width: `${progress}%` }}
+        transition={{ duration: 0.4 }}
+        className="h-full bg-blue-600"
       />
+    </div>
+  );
 
-      <div className="flex-1 flex flex-col items-center justify-center gap-6 p-6">
+  return (
+    <ChatShell
+      headerConfig={{ icon: Star, title: headerTitle, subtitle: `${headerSubtitle} · Q ${cueIndex + 1}/${totalCues}`, accentColor: 'amber', leftSlot: backButton, rightSlot: <div className="flex items-center gap-2">{progressBar}{partBadge}</div>, online: true }}
+      footerConfig={{ modeLabel: `YL · ${partBadgeLabel}`, modelName: ACTIVE_MODEL_LABEL }}
+      inputSlot={null}
+      animationKey={`yl-part${part}`}
+    >
+      <div className="flex flex-col items-center justify-center gap-6 py-4">
         {/* Bob avatar placeholder */}
         <motion.div
           animate={phase === 'playing-cue' ? { scale: [1, 1.05, 1] } : {}}
           transition={{ repeat: Infinity, duration: 1.5 }}
-          className="w-20 h-20 rounded-full bg-trebol-primary/10 flex items-center justify-center"
+          className="w-20 h-20 rounded-full bg-amber-50 border border-amber-100 flex items-center justify-center"
         >
-          <User size={40} className="text-trebol-primary" />
+          <User size={40} className="text-amber-600" />
         </motion.div>
 
         {/* Examiner cue */}
@@ -379,19 +418,19 @@ export function YLPart4Practice({
             className="flex flex-col items-center gap-4 w-full"
           >
             {phase === 'playing-cue' && (
-              <p className="text-trebol-text/50 font-semibold text-sm">
+              <p className="text-gray-500 font-semibold text-sm">
                 Escucha la pregunta...
               </p>
             )}
 
             {phase === 'countdown' && (
               <div className="text-center space-y-1">
-                <p className="text-trebol-text/60 font-semibold text-sm">Grabando en</p>
+                <p className="text-gray-500 font-semibold text-sm">Grabando en</p>
                 <motion.span
                   key={countdown}
                   initial={{ scale: 1.4, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
-                  className="text-5xl font-black text-trebol-primary block"
+                  className="text-5xl font-black text-blue-600 block"
                 >
                   {countdown}
                 </motion.span>
@@ -409,8 +448,8 @@ export function YLPart4Practice({
 
             {phase === 'processing' && (
               <div className="flex flex-col items-center gap-3">
-                <div className="w-8 h-8 border-3 border-trebol-primary border-t-transparent rounded-full animate-spin" />
-                <p className="text-trebol-text/50 font-semibold text-sm">
+                <div className="w-8 h-8 border-3 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                <p className="text-gray-500 font-semibold text-sm">
                   Processing your answer…
                 </p>
               </div>
@@ -422,6 +461,6 @@ export function YLPart4Practice({
           </motion.div>
         </AnimatePresence>
       </div>
-    </div>
+    </ChatShell>
   );
 }
