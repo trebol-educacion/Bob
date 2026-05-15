@@ -1,44 +1,13 @@
 'use client';
 
 import React from 'react';
-import { ChevronLeft } from 'lucide-react';
+import { Mic, Image } from 'lucide-react';
 import { usePracticeChat, UsePracticeChatProps } from '@/hooks/usePracticeChat';
+import { ChatShell } from '@/components/ChatShell';
+import { MessageBubble, TypingIndicator, SuggestionChip } from '@/components/chat';
+import { ACTIVE_MODEL_LABEL } from '@/actions/gemini';
 import { PhrasePhase } from './PhrasePhase';
 import { ImagePhase } from './ImagePhase';
-
-// ─── Chat messages area ───────────────────────────────────────────────────────
-
-function MessagesArea({
-  messages,
-  messagesEndRef,
-}: Pick<ReturnType<typeof usePracticeChat>, 'messages' | 'messagesEndRef'>) {
-  return (
-    <div className="flex-1 overflow-y-auto px-4 py-6 space-y-4 bg-slate-50/40">
-      {messages.map((msg) => (
-        <div
-          key={msg.id}
-          className={`flex items-start gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}
-        >
-          {msg.role === 'bob' && (
-            <div className="w-8 h-8 rounded-full bg-trebol-primary text-white text-xs font-black flex items-center justify-center shrink-0 mt-0.5">
-              B
-            </div>
-          )}
-          <div
-            className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm shadow-sm ${
-              msg.role === 'bob'
-                ? 'bg-white border border-trebol-border rounded-tl-none text-trebol-text'
-                : 'bg-trebol-primary text-white rounded-tr-none'
-            }`}
-          >
-            {msg.content}
-          </div>
-        </div>
-      ))}
-      <div ref={messagesEndRef} />
-    </div>
-  );
-}
 
 // ─── Save error banner ────────────────────────────────────────────────────────
 
@@ -61,51 +30,106 @@ export function BobPracticeChat(props: UsePracticeChatProps) {
     props.onBack();
   };
 
+  const isImageMode = props.mode === 'image';
+
+  const headerConfig = isImageMode
+    ? {
+        icon: Image,
+        title: 'Bob — Imágenes',
+        subtitle: 'DESCRIBE LO QUE VES',
+        accentColor: 'purple' as const,
+      }
+    : {
+        icon: Mic,
+        title: 'Bob — Situaciones',
+        subtitle: 'PRONUNCIACIÓN EN INGLÉS',
+        accentColor: 'blue' as const,
+      };
+
   const inputArea =
     props.mode === 'situation' ? (
-      <PhrasePhase
-        phase={chat.phase}
-        inputText={chat.inputText}
-        setInputText={chat.setInputText}
-        handleTopicSubmit={chat.handleTopicSubmit}
-        handleAudioStart={chat.handleAudioStart}
-        stopRecording={chat.stopRecording}
-        isRecording={chat.isRecording}
-        handleNext={chat.handleNext}
-        handleRetry={chat.handleRetry}
-        dynamicPhrases={chat.dynamicPhrases}
-        currentIndex={chat.currentIndex}
-        onBack={chat.onBack}
-        topic={chat.topic}
-      />
+      <>
+        <SaveErrorBanner error={chat.saveError} />
+        <PhrasePhase
+          phase={chat.phase}
+          inputText={chat.inputText}
+          setInputText={chat.setInputText}
+          handleTopicSubmit={chat.handleTopicSubmit}
+          handleAudioStart={chat.handleAudioStart}
+          stopRecording={chat.stopRecording}
+          isRecording={chat.isRecording}
+          handleNext={chat.handleNext}
+          handleRetry={chat.handleRetry}
+          dynamicPhrases={chat.dynamicPhrases}
+          currentIndex={chat.currentIndex}
+          onBack={chat.onBack}
+          topic={chat.topic}
+        />
+      </>
     ) : (
-      <ImagePhase
-        phase={chat.phase}
-        handleAudioStart={chat.handleAudioStart}
-        stopRecording={chat.stopRecording}
-        handleNextImage={chat.handleNextImage}
-        isRecording={chat.isRecording}
-        onStopRecording={chat.stopRecording}
-        handleRetry={chat.handleRetry}
-      />
+      <>
+        <SaveErrorBanner error={chat.saveError} />
+        <ImagePhase
+          phase={chat.phase}
+          handleAudioStart={chat.handleAudioStart}
+          stopRecording={chat.stopRecording}
+          handleNextImage={chat.handleNextImage}
+          isRecording={chat.isRecording}
+          onStopRecording={chat.stopRecording}
+          handleRetry={chat.handleRetry}
+        />
+      </>
     );
 
+  // Build a back button for the left slot
+  const backButton = (
+    <button
+      onClick={handleBackWithRecordingGuard}
+      className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
+      aria-label="Volver"
+    >
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5 text-gray-500">
+        <polyline points="15 18 9 12 15 6" />
+      </svg>
+    </button>
+  );
+
   return (
-    <div className="flex flex-col h-full bg-white">
-      <div className="flex items-center gap-2 px-4 py-3 border-b border-trebol-border bg-white shrink-0">
-        <button
-          onClick={handleBackWithRecordingGuard}
-          className="p-1 hover:bg-gray-100 rounded-full transition-colors"
+    <ChatShell
+      header={{ ...headerConfig, leftSlot: backButton }}
+      footer={{
+        modeLabel: isImageMode ? 'MODO IMÁGENES ACTIVO' : 'MODO SITUACIONES ACTIVO',
+        modelName: ACTIVE_MODEL_LABEL,
+      }}
+      inputSlot={inputArea}
+      animationKey={props.mode}
+    >
+      {chat.messages.map((msg) => (
+        <MessageBubble
+          key={msg.id}
+          variant={msg.role === 'user' ? 'user' : 'assistant'}
+          icon={isImageMode ? Image : Mic}
+          accentColor={isImageMode ? 'purple' : 'blue'}
         >
-          <ChevronLeft className="w-5 h-5 text-trebol-text" />
-        </button>
-        <span className="text-sm font-semibold text-trebol-text">
-          {props.mode === 'situation' ? 'Phrase Practice' : 'Image Description'}
-        </span>
-      </div>
-      <MessagesArea messages={chat.messages} messagesEndRef={chat.messagesEndRef} />
-      <SaveErrorBanner error={chat.saveError} />
-      {inputArea}
-    </div>
+          {msg.content}
+        </MessageBubble>
+      ))}
+      {(chat.phase === 'evaluating' || chat.phase === 'generating') && (
+        <TypingIndicator />
+      )}
+      {/* Suggestion chips — shown only in phrase-ready state for situation mode */}
+      {props.mode === 'situation' && chat.phase === 'phrase-ready' && chat.dynamicPhrases.length > 0 && (
+        <div className="flex flex-wrap gap-2 mt-2">
+          {chat.dynamicPhrases.slice(0, 3).map((phrase, i) => (
+            <SuggestionChip
+              key={i}
+              text={phrase}
+              onClick={() => {}}
+              disabled={chat.isRecording}
+            />
+          ))}
+        </div>
+      )}
+    </ChatShell>
   );
 }
