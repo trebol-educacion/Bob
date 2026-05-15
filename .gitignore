@@ -11,3 +11,7 @@ coverage/
 
 tsconfig.tsbuildinfo
 Referencias/
+
+.playwright-mcp/
+.sdd/
+supabase/.temp/
