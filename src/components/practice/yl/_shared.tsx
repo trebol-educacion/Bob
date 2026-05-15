@@ -90,8 +90,8 @@ export async function playTTS(text: string): Promise<void> {
 export function YLLoadingScreen({ message }: { message: string }) {
   return (
     <div className="flex-1 flex flex-col items-center justify-center gap-4">
-      <div className="w-12 h-12 border-4 border-trebol-primary border-t-transparent rounded-full animate-spin" />
-      <p className="text-trebol-text/60 font-semibold">{message}</p>
+      <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
+      <p className="text-gray-500 font-semibold">{message}</p>
     </div>
   );
 }
@@ -112,14 +112,14 @@ export function YLErrorScreen({
         {onRetry && (
           <button
             onClick={onRetry}
-            className="px-5 py-2 bg-trebol-primary text-white rounded-lg font-semibold"
+            className="px-5 py-2 bg-blue-600 text-white rounded-lg font-semibold"
           >
             Retry
           </button>
         )}
         <button
           onClick={onBack}
-          className="px-5 py-2 bg-trebol-border text-trebol-text rounded-lg font-semibold"
+          className="px-5 py-2 bg-gray-100 text-gray-700 rounded-lg font-semibold"
         >
           Volver
         </button>
@@ -149,13 +149,13 @@ export function YLRecordingButton({
       </motion.div>
       <div className="text-center space-y-1">
         <p className="text-sm font-bold text-red-500">Recording...</p>
-        <p className="text-xs text-trebol-text/40">
+        <p className="text-xs text-gray-400">
           {seconds}s / {maxSeconds}s
         </p>
       </div>
       <button
         onClick={onStop}
-        className="flex items-center gap-2 px-4 py-2 bg-trebol-border rounded-lg text-sm font-semibold text-trebol-text hover:bg-trebol-secondary/30 transition-colors"
+        className="flex items-center gap-2 px-4 py-2 bg-gray-100 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-200 transition-colors"
       >
         <MicOff size={16} />
         Stop
@@ -171,20 +171,20 @@ export function YLRecordingButton({
 export function YLResultCompact({ evalResult }: { evalResult: EvalResponse }) {
   const pct = Math.round((evalResult.score / evalResult.score_max) * 100);
   return (
-    <div className="bg-white border border-trebol-border rounded-2xl px-4 py-3 space-y-1 max-w-md shadow-sm">
+    <div className="bg-white border border-gray-100 rounded-2xl px-4 py-3 space-y-1 max-w-md shadow-sm">
       <div className="flex items-center gap-2 text-sm">
-        <CheckCircle className="text-trebol-primary shrink-0" size={16} />
-        <span className="font-bold text-trebol-text">Practice complete</span>
-        <span className="text-trebol-text/40">·</span>
-        <span className="font-semibold text-trebol-text">
-          {evalResult.score}<span className="text-trebol-text/50">/{evalResult.score_max}</span>
+        <CheckCircle className="text-blue-600 shrink-0" size={16} />
+        <span className="font-bold text-gray-800">Practice complete</span>
+        <span className="text-gray-300">·</span>
+        <span className="font-semibold text-gray-800">
+          {evalResult.score}<span className="text-gray-400">/{evalResult.score_max}</span>
         </span>
-        <span className="px-1.5 py-0.5 rounded-full bg-trebol-primary/10 text-trebol-primary text-[10px] font-bold">
+        <span className="px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-600 text-[10px] font-bold">
           {evalResult.cefr_band.toUpperCase()}
         </span>
-        <span className="text-xs text-trebol-text/50 ml-auto">{pct}%</span>
+        <span className="text-xs text-gray-400 ml-auto">{pct}%</span>
       </div>
-      <p className="text-xs text-trebol-text/70 leading-relaxed">{evalResult.feedback}</p>
+      <p className="text-xs text-gray-500 leading-relaxed">{evalResult.feedback}</p>
     </div>
   );
 }
@@ -206,6 +206,11 @@ export function YLResultsHeader(_: { title: string; subtitle: string }) {
   return null;
 }
 
+/**
+ * @deprecated YLToolbar is superseded by ChatShell with leftSlot/rightSlot.
+ * Kept for backward compatibility while YL modes migrate to ChatShell.
+ * Do not use in new code.
+ */
 export function YLToolbar({
   title,
   subtitle,
@@ -219,24 +224,24 @@ export function YLToolbar({
 }) {
   return (
     <>
-      <div className="flex items-center gap-4 px-4 py-3 border-b border-trebol-border bg-white shrink-0">
+      <div className="flex items-center gap-4 px-4 py-3 border-b border-gray-100 bg-white shrink-0">
         <button
           onClick={onBack}
-          className="p-1.5 rounded-lg hover:bg-trebol-secondary/20 transition-colors"
+          className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
           aria-label="Back"
         >
-          <ArrowLeft size={20} className="text-trebol-text" />
+          <ArrowLeft size={20} className="text-gray-600" />
         </button>
         <div className="flex-1">
-          <p className="text-sm font-black text-trebol-text">{title}</p>
-          <p className="text-xs text-trebol-text/50 font-medium">{subtitle}</p>
+          <p className="text-sm font-black text-gray-900">{title}</p>
+          <p className="text-xs text-gray-400 font-medium">{subtitle}</p>
         </div>
       </div>
-      <div className="h-1.5 bg-trebol-border shrink-0">
+      <div className="h-1.5 bg-gray-100 shrink-0">
         <motion.div
           animate={{ width: `${progress}%` }}
           transition={{ duration: 0.4 }}
-          className="h-full bg-trebol-primary"
+          className="h-full bg-blue-600"
         />
       </div>
     </>
@@ -247,20 +252,20 @@ export function YLExaminerCard({ cue }: { cue: string }) {
   return (
     <div className="bg-white rounded-2xl shadow-md p-6 space-y-4 w-full max-w-lg">
       <div className="flex items-center gap-2">
-        <span className="text-xs font-bold text-trebol-primary bg-trebol-secondary/20 px-2 py-0.5 rounded-full">
+        <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
           Examinador
         </span>
       </div>
-      <p className="text-xl font-black text-trebol-text leading-snug">{cue}</p>
+      <p className="text-xl font-black text-gray-900 leading-snug">{cue}</p>
     </div>
   );
 }
 
 export function YLReactionCard({ reaction }: { reaction: string }) {
   return (
-    <div className="bg-trebol-secondary/10 rounded-xl px-5 py-4 text-center max-w-sm">
-      <p className="text-trebol-text font-semibold italic">"{reaction}"</p>
-      <p className="text-xs text-trebol-text/40 mt-1">Examiner</p>
+    <div className="bg-gray-50 border border-gray-100 rounded-xl px-5 py-4 text-center max-w-sm">
+      <p className="text-gray-700 font-semibold italic">"{reaction}"</p>
+      <p className="text-xs text-gray-400 mt-1">Examiner</p>
     </div>
   );
 }
@@ -365,17 +370,17 @@ export function YLVoiceNote({
   };
 
   const isBob = side === 'bob';
-  const bubbleColor = isBob ? 'bg-white border border-trebol-border' : 'bg-trebol-primary/10';
-  const iconColor = isBob ? 'bg-trebol-primary text-white' : 'bg-trebol-text text-white';
+  const bubbleColor = isBob ? 'bg-white border border-gray-100' : 'bg-blue-600';
+  const iconColor = isBob ? 'bg-blue-600 text-white' : 'bg-white/20 text-white';
 
   return (
     <div className={`flex ${isBob ? 'justify-start' : 'justify-end'} gap-2`}>
       {isBob && (
-        <div className="w-8 h-8 rounded-full bg-trebol-primary/15 flex items-center justify-center shrink-0 text-xs font-bold text-trebol-primary mt-1">
+        <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 text-xs font-bold bg-amber-50 text-amber-600 border border-amber-100 mt-1">
           B
         </div>
       )}
-      <div className={`flex items-center gap-3 rounded-2xl px-3 py-2 max-w-sm ${bubbleColor} ${playing ? 'ring-2 ring-trebol-primary/40 shadow-md' : ''}`}>
+      <div className={`flex items-center gap-3 rounded-2xl px-3 py-2 max-w-sm ${bubbleColor} ${playing ? 'ring-2 ring-blue-600/30 shadow-md' : ''}`}>
         <button
           type="button"
           onClick={handlePlay}
@@ -402,13 +407,13 @@ export function YLVoiceNote({
           )}
         </button>
         <div className="flex-1 min-w-32">
-          <div className="h-1.5 bg-trebol-text/15 rounded-full overflow-hidden">
+          <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
             <div
-              className={`h-full bg-trebol-primary transition-all ${playing ? 'animate-pulse' : ''}`}
+              className={`h-full bg-blue-600 transition-all ${playing ? 'animate-pulse' : ''}`}
               style={{ width: `${Math.round(progress * 100)}%` }}
             />
           </div>
-          <div className="flex justify-between text-[10px] text-trebol-text/50 mt-1">
+          <div className={`flex justify-between text-[10px] mt-1 ${isBob ? 'text-gray-400' : 'text-white/70'}`}>
             <span>{playing ? '▶ Playing…' : hasPlayed ? '🔁 Listen again' : '🎤 Voice note'}</span>
             <span>{fmt(duration)}</span>
           </div>
@@ -421,10 +426,10 @@ export function YLVoiceNote({
 export function YLBobTextMessage({ text }: { text: string }) {
   return (
     <div className="flex justify-start gap-2">
-      <div className="w-8 h-8 rounded-full bg-trebol-primary/15 flex items-center justify-center shrink-0 text-xs font-bold text-trebol-primary mt-1">
+      <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 text-xs font-bold bg-amber-50 text-amber-600 border border-amber-100 mt-1">
         B
       </div>
-      <div className="rounded-2xl px-4 py-2 bg-white border border-trebol-border text-trebol-text text-sm max-w-sm font-semibold">
+      <div className="rounded-2xl rounded-tl-sm px-4 py-2 bg-white border border-gray-100 shadow-sm text-gray-800 text-sm max-w-sm font-semibold">
         {text}
       </div>
     </div>
@@ -435,7 +440,7 @@ export function YLImageMessage({ src }: { src: string }) {
   const finalSrc = src.startsWith('data:') ? src : `data:image/png;base64,${src}`;
   return (
     <div className="flex justify-start gap-2">
-      <div className="w-8 h-8 rounded-full bg-trebol-primary/15 flex items-center justify-center shrink-0 text-xs font-bold text-trebol-primary mt-1">
+      <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 text-xs font-bold bg-amber-50 text-amber-600 border border-amber-100 mt-1">
         B
       </div>
       <div className="rounded-2xl overflow-hidden shadow bg-white max-w-sm">
@@ -449,8 +454,8 @@ export function YLImageMessage({ src }: { src: string }) {
 export function YLUserTextMessage({ text }: { text: string }) {
   return (
     <div className="flex justify-end gap-2">
-      <div className="rounded-2xl px-4 py-2 bg-trebol-primary/10 text-trebol-text text-sm max-w-sm">
-        {text || <span className="text-trebol-text/40 italic">(sin audio)</span>}
+      <div className="rounded-2xl rounded-tr-sm px-4 py-2 bg-blue-600 text-white text-sm max-w-sm">
+        {text || <span className="text-white/60 italic">(sin audio)</span>}
       </div>
     </div>
   );
@@ -474,8 +479,8 @@ export function YLChatMicBar({
   helperText?: string;
 }) {
   return (
-    <div className="border-t border-trebol-border bg-white/90 backdrop-blur p-3 flex items-center justify-between gap-3">
-      <p className="text-xs text-trebol-text/60 font-medium pl-2">
+    <div className="border-t border-gray-100 bg-white/90 backdrop-blur p-3 flex items-center justify-between gap-3">
+      <p className="text-xs text-gray-500 font-medium pl-2">
         {isRecording ? (
           <span className="flex items-center gap-2 text-red-500 font-bold">
             <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
@@ -501,7 +506,7 @@ export function YLChatMicBar({
           type="button"
           onClick={onStart}
           disabled={disabled}
-          className="w-14 h-14 rounded-full bg-trebol-primary text-white shadow-lg hover:scale-105 active:scale-95 transition-transform flex items-center justify-center disabled:opacity-40 disabled:hover:scale-100"
+          className="w-14 h-14 rounded-full bg-blue-600 text-white shadow-lg hover:scale-105 active:scale-95 transition-transform flex items-center justify-center disabled:opacity-40 disabled:hover:scale-100"
           aria-label="Start speaking"
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
@@ -560,10 +565,10 @@ export function YLAudioControls({
     const base =
       'w-12 h-12 rounded-full flex items-center justify-center shadow-md transition-all hover:scale-105 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100';
     const color = primary
-      ? 'bg-trebol-primary text-white'
+      ? 'bg-blue-600 text-white'
       : accent
       ? 'bg-red-500 text-white'
-      : 'bg-trebol-secondary/20 text-trebol-text hover:bg-trebol-secondary/40';
+      : 'bg-gray-100 text-gray-700 hover:bg-gray-200';
     return (
       <button type="button" onClick={onClick} title={title} disabled={disabled} className={`${base} ${color}`}>
         {children}
@@ -641,8 +646,8 @@ export function YLReadOnlyMessage({
   if (msgType === 'evaluation') {
     return (
       <div className="flex justify-start gap-2">
-        <div className="w-8 h-8 rounded-full bg-trebol-primary/10 flex items-center justify-center shrink-0 text-xs font-bold text-trebol-primary mt-1">B</div>
-        <div className="max-w-xs rounded-2xl px-4 py-3 text-sm bg-white border border-trebol-border text-trebol-text/60 italic">
+        <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 text-xs font-bold bg-amber-50 text-amber-600 border border-amber-100 mt-1">B</div>
+        <div className="max-w-xs rounded-2xl rounded-tl-sm px-4 py-3 text-sm bg-white border border-gray-100 text-gray-400 italic">
           📊 Evaluación guardada
         </div>
       </div>
@@ -652,25 +657,25 @@ export function YLReadOnlyMessage({
   return (
     <div className={`flex ${isBob ? 'justify-start' : 'justify-end'} gap-2`}>
       {isBob && (
-        <div className="w-8 h-8 rounded-full bg-trebol-primary/10 flex items-center justify-center shrink-0 text-xs font-bold text-trebol-primary mt-1">
+        <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 text-xs font-bold bg-amber-50 text-amber-600 border border-amber-100 mt-1">
           B
         </div>
       )}
       <div className="flex flex-col gap-1 max-w-md">
         {!isBob && cue && (
-          <div className="text-xs text-trebol-text/50 italic px-2">
-            Examiner: <span className="text-trebol-text/70">{cue}</span>
+          <div className="text-xs text-gray-400 italic px-2">
+            Examiner: <span className="text-gray-500">{cue}</span>
           </div>
         )}
         <div
           className={`rounded-2xl px-4 py-3 text-sm ${
             isBob
-              ? 'bg-white border border-trebol-border text-trebol-text'
-              : 'bg-trebol-primary/10 text-trebol-text'
+              ? 'bg-white border border-gray-100 shadow-sm text-gray-800 rounded-tl-sm'
+              : 'bg-blue-600 text-white rounded-tr-sm'
           }`}
         >
           {text || (
-            <span className="text-trebol-text/40 italic">
+            <span className={isBob ? 'text-gray-400 italic' : 'text-white/60 italic'}>
               {isBob ? '...' : '(no audio recorded)'}
             </span>
           )}
