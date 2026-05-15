@@ -521,7 +521,7 @@ export function YLChatMicBar({
 }
 
 // ---------------------------------------------------------------------------
-// Audio player controls — circular icon buttons in trebol palette
+// Audio player controls — circular icon buttons (Zoe-style)
 // ---------------------------------------------------------------------------
 
 interface YLAudioControlsProps {

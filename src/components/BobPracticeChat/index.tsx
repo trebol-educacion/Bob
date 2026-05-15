@@ -96,8 +96,8 @@ export function BobPracticeChat(props: UsePracticeChatProps) {
 
   return (
     <ChatShell
-      header={{ ...headerConfig, leftSlot: backButton }}
-      footer={{
+      headerConfig={{ ...headerConfig, leftSlot: backButton }}
+      footerConfig={{
         modeLabel: isImageMode ? 'MODO IMÁGENES ACTIVO' : 'MODO SITUACIONES ACTIVO',
         modelName: ACTIVE_MODEL_LABEL,
       }}

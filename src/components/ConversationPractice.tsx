@@ -595,14 +595,14 @@ export function ConversationPractice({ topic: topicProp = '', onFinish, noFrame,
 
   return (
     <ChatShell
-      header={{
+      headerConfig={{
         icon: headerIcon,
         title: headerTitle,
         subtitle: 'SIMULACIÓN B1',
         accentColor: 'blue',
         online: true,
       }}
-      footer={{
+      footerConfig={{
         modeLabel,
         modelName: ACTIVE_MODEL_LABEL,
       }}

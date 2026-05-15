@@ -18,7 +18,7 @@ export function TypingIndicator() {
           <motion.span
             key={i}
             className="w-2 h-2 bg-gray-300 rounded-full inline-block"
-            animate={{ scale: [1, 1.3, 1] }}
+            animate={{ scale: [1, 1.5, 1] }}
             transition={{ repeat: Infinity, duration: 0.9, delay: i * 0.15 }}
           />
         ))}

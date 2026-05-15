@@ -37,8 +37,8 @@ export type ChatFooterConfig = {
 };
 
 export type ChatShellProps = {
-  header: ChatHeaderConfig;
-  footer: ChatFooterConfig;
+  headerConfig: ChatHeaderConfig;
+  footerConfig: ChatFooterConfig;
   /** Message list, cards, images — the scrollable body */
   children: React.ReactNode;
   /** Mode-specific mic bar, text input, send button — rendered above <ChatFooter> */
@@ -78,12 +78,12 @@ function AssistantAvatar({
   return (
     <div className="relative shrink-0">
       <div
-        className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-inner border ${a.avatarBg} ${a.avatarBorder}`}
+        className={`w-10 h-10 rounded-2xl flex items-center justify-center shadow-inner border ${a.avatarBg} ${a.avatarBorder}`}
       >
-        <Icon size={22} className={a.avatarIcon} />
+        <Icon size={18} className={a.avatarIcon} />
       </div>
       {online && (
-        <span className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 border-2 border-white rounded-full animate-pulse" />
+        <span className="absolute -bottom-1 -right-1 w-2.5 h-2.5 bg-green-500 rounded-full animate-pulse" />
       )}
     </div>
   );
@@ -144,8 +144,8 @@ function ChatFooter({
 // ---------------------------------------------------------------------------
 
 export function ChatShell({
-  header,
-  footer,
+  headerConfig: header,
+  footerConfig: footer,
   children,
   inputSlot,
   animationKey,
