@@ -18,6 +18,7 @@ import {
   saveYLTurnAction,
   persistYLImagesAction,
   saveYLFinalEvalAction,
+  getYLSessionPlanAction,
 } from '@/actions/modes/yl';
 import type { YLExam, YLPlan } from '@/lib/types/yl';
 import type { EvalResponse, ModeKey } from '@/lib/types/practice';
@@ -91,7 +92,95 @@ export function YLPointingPractice({
   useEffect(() => {
     if (initStartedRef.current) return;
     initStartedRef.current = true;
-    if (initialSessionId || isReadOnly) {
+
+    if (initialSessionId) {
+      (async () => {
+        try {
+          const restoredPlan = await getYLSessionPlanAction(initialSessionId);
+          if (restoredPlan) setPlan(restoredPlan);
+
+          const imgs = (initialMessages ?? [])
+            .filter((m) => m.role === 'bob' && m.msg_type === 'image_scene')
+            .sort((a, b) => {
+              const ai = (a.content_json as { image_index?: number } | null)?.image_index ?? 0;
+              const bi = (b.content_json as { image_index?: number } | null)?.image_index ?? 0;
+              return ai - bi;
+            })
+            .map((m) => (m.content_json as { image_data_uri?: string } | null)?.image_data_uri)
+            .filter((u): u is string => typeof u === 'string');
+          if (imgs.length > 0) setImages(imgs);
+
+          const userTurns = (initialMessages ?? [])
+            .filter((m) => m.role === 'user' && m.msg_type === 'user_audio')
+            .map((m) => {
+              const cj = (m.content_json as Record<string, unknown> | null) ?? {};
+              return {
+                cueIndex: (cj.cue_index as number) ?? 0,
+                cueText: (cj.cue as string) ?? '',
+                chosenWord: (cj.transcribed as string) ?? (m.content_text as string) ?? '',
+              };
+            })
+            .sort((a, b) => a.cueIndex - b.cueIndex);
+
+          const bobReactions = (initialMessages ?? [])
+            .filter((m) => m.role === 'bob' && m.msg_type === 'yl_cue')
+            .map((m) => {
+              const cj = (m.content_json as Record<string, unknown> | null) ?? {};
+              return {
+                cueIndex: (cj.cue_index as number) ?? 0,
+                reaction: (cj.reaction as string) ?? (m.content_text as string) ?? '',
+              };
+            });
+          const reactionByIndex = new Map<number, string>();
+          for (const r of bobReactions) reactionByIndex.set(r.cueIndex, r.reaction);
+
+          const rebuiltTurns: TurnEntry[] = userTurns.map((t) => {
+            const targetIdx = restoredPlan?.pointing_cues?.[t.cueIndex]?.target_index;
+            const targetWord =
+              targetIdx !== undefined ? restoredPlan?.options?.[targetIdx] ?? '' : '';
+            return {
+              id: `turn-${t.cueIndex}`,
+              cueText: t.cueText,
+              userPicked: t.chosenWord,
+              correct: !!targetWord && t.chosenWord === targetWord,
+              reactionText: reactionByIndex.get(t.cueIndex) ?? '',
+            };
+          });
+          setTurns(rebuiltTurns);
+          setScore(rebuiltTurns.filter((t) => t.correct).length);
+
+          const evalMsg = (initialMessages ?? []).find(
+            (m) =>
+              m.role === 'bob' &&
+              m.msg_type === 'evaluation' &&
+              (m.content_json as { is_final?: boolean } | null)?.is_final === true
+          );
+          const totalFromPlan = restoredPlan?.pointing_cues?.length ?? 4;
+          const isComplete = !!evalMsg || rebuiltTurns.length >= totalFromPlan;
+
+          if (isComplete) {
+            if (evalMsg) {
+              const ej = (evalMsg.content_json as Record<string, unknown> | null) ?? {};
+              setFinalEval({
+                score: (ej.score as number) ?? rebuiltTurns.filter((t) => t.correct).length,
+                score_max: (ej.score_max as number) ?? totalFromPlan,
+                cefr_band: (ej.cefr_band as 'a1') ?? 'a1',
+                feedback: (ej.feedback as string) ?? 'Great work!',
+              });
+            }
+            setPhase('finished');
+          } else {
+            setCueIndex(rebuiltTurns.length);
+            setPhase('ready');
+          }
+        } catch (err) {
+          setError(err instanceof Error ? err.message : 'Error restoring the session');
+        }
+      })();
+      return;
+    }
+
+    if (isReadOnly) {
       setPhase('finished');
       return;
     }

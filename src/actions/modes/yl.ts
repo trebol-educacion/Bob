@@ -777,6 +777,17 @@ export async function getSessionMessagesAction(sessionId: string) {
   return getMessagesAction(sessionId);
 }
 
+export async function getYLSessionPlanAction(sessionId: string): Promise<YLPlan | null> {
+  const supabase = await createSupabaseServer();
+  const { data, error } = await supabase
+    .from('bob_sessions')
+    .select('plan_json')
+    .eq('id', sessionId)
+    .maybeSingle();
+  if (error || !data || !data.plan_json) return null;
+  return safeParseFallback(YLPlanSchema, data.plan_json, YLPlanFallback);
+}
+
 const POOL_REUSE_PROBABILITY = 0.7;
 
 type VocabPick = { word: string; category: string };
