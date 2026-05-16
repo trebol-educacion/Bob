@@ -7,6 +7,7 @@ import { EvalResponseSchema, type EvalResponse, type ModeKey } from '@/lib/types
 import { YLPlanSchema, type YLPlan, type YLExam, type YLTurnEvalResult } from '@/lib/types/yl';
 import { getPrompt } from '@/lib/prompts/db-prompts';
 import { createSupabaseServer } from '@/lib/supabase/server';
+import { persistMessage, persistMessages } from '@/lib/persist-activity';
 
 /** Map a ModeKey to exam + part number. */
 function parseYLMode(mode: ModeKey): { exam: YLExam; part: number } {
@@ -122,13 +123,13 @@ export async function persistYLImageAction(
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('[persistYLImageAction] Not authenticated');
 
-  await supabase.from('bob_messages').insert({
-    session_id: sessionId,
-    user_id: user.id,
-    role: 'bob' as const,
-    msg_type: 'image_scene',
-    content_text: null,
-    content_json: { image_data_uri: imageDataUri, image_index: imageIndex },
+  await persistMessage({
+    sessionId,
+    userId: user.id,
+    role: 'bob',
+    msgType: 'image_scene',
+    contentText: null,
+    contentJson: { image_data_uri: imageDataUri, image_index: imageIndex },
   });
 }
 
@@ -155,13 +156,13 @@ export async function saveYLFinalEvalAction(
   const supabase = await createSupabaseServer();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('[saveYLFinalEvalAction] Not authenticated');
-  await supabase.from('bob_messages').insert({
-    session_id: sessionId,
-    user_id: user.id,
-    role: 'bob' as const,
-    msg_type: 'evaluation',
-    content_text: null,
-    content_json: { ...evalResult, is_final: true },
+  await persistMessage({
+    sessionId,
+    userId: user.id,
+    role: 'bob',
+    msgType: 'evaluation',
+    contentText: null,
+    contentJson: { ...evalResult, is_final: true },
   });
 }
 
@@ -193,13 +194,13 @@ export async function getOrCreateCueAudioAction(
 
   const { data, mimeType } = await generateSpeechAction(cueText);
 
-  await supabase.from('bob_messages').insert({
-    session_id: sessionId,
-    user_id: user.id,
-    role: 'bob' as const,
-    msg_type: 'yl_tts',
-    content_text: cueText,
-    content_json: { audio_b64: data, mime: mimeType },
+  await persistMessage({
+    sessionId,
+    userId: user.id,
+    role: 'bob',
+    msgType: 'yl_tts',
+    contentText: cueText,
+    contentJson: { audio_b64: data, mime: mimeType },
   });
 
   return { data, mimeType };
@@ -428,38 +429,35 @@ export async function saveYLTurnAction(
   } = await supabase.auth.getUser();
   if (!user) throw new Error('[saveYLTurnAction] Not authenticated');
 
-  const userRow = {
-    session_id: sessionId,
-    user_id: user.id,
-    role: 'user' as const,
-    msg_type: 'user_audio',
-    content_text: turn.transcript,
-    content_json: {
-      cue: turn.cue,
-      cue_index: turn.cueIndex,
-      transcribed: turn.transcript,
+  const result = await persistMessages([
+    {
+      sessionId,
+      userId: user.id,
+      role: 'user',
+      msgType: 'user_audio',
+      contentText: turn.transcript,
+      contentJson: {
+        cue: turn.cue,
+        cue_index: turn.cueIndex,
+        transcribed: turn.transcript,
+      },
     },
-  };
-
-  const bobRow = {
-    session_id: sessionId,
-    user_id: user.id,
-    role: 'bob' as const,
-    msg_type: 'yl_cue',
-    content_text: turn.reaction,
-    content_json: {
-      reaction: turn.reaction,
-      cue_index: turn.cueIndex,
-      ...(turn.evalResult ? { eval: turn.evalResult } : {}),
+    {
+      sessionId,
+      userId: user.id,
+      role: 'bob',
+      msgType: 'yl_cue',
+      contentText: turn.reaction,
+      contentJson: {
+        reaction: turn.reaction,
+        cue_index: turn.cueIndex,
+        ...(turn.evalResult ? { eval: turn.evalResult } : {}),
+      },
     },
-  };
+  ]);
 
-  const { error } = await supabase
-    .from('bob_messages')
-    .insert([userRow, bobRow]);
-
-  if (error) {
-    throw new Error(`[saveYLTurnAction] Failed to save turn: ${error.message}`);
+  if ('error' in result) {
+    throw new Error(`[saveYLTurnAction] Failed to save turn: ${result.error}`);
   }
 }
 
@@ -627,12 +625,12 @@ export async function evaluateYLFinalAction(input: {
 
   const evalResult = result.data;
 
-  await supabase.from('bob_messages').insert({
-    session_id: input.sessionId,
-    user_id: user.id,
+  await persistMessage({
+    sessionId: input.sessionId,
+    userId: user.id,
     role: 'bob',
-    msg_type: 'evaluation',
-    content_json: { ...evalResult, is_final: true },
+    msgType: 'evaluation',
+    contentJson: { ...evalResult, is_final: true },
   });
 
   return evalResult;
