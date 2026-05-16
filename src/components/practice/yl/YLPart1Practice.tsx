@@ -23,6 +23,7 @@ import {
   saveYLTurnAction,
   evaluateYLFinalAction,
   getSessionMessagesAction,
+  pregenerateYLCueAudiosAction,
 } from '@/actions/modes/yl';
 import type { YLExam, YLPlan } from '@/lib/types/yl';
 import type { EvalResponse, ModeKey } from '@/lib/types/practice';
@@ -151,16 +152,22 @@ export function YLPart1Practice({
         onSessionCreated?.(sid);
         setPlan(p);
 
-        if (p.image_prompts && p.image_prompts.length > 0) {
-          const imgs = await generateYLImagesAction(
-            exam,
-            part,
-            p.image_prompts,
-            p.character_description,
-            sid,
-          );
-          setImages(imgs);
-        }
+        const imagesPromise = p.image_prompts && p.image_prompts.length > 0
+          ? generateYLImagesAction(
+              exam,
+              part,
+              p.image_prompts,
+              p.character_description,
+              sid,
+            )
+          : Promise.resolve<string[]>([]);
+
+        const audiosPromise = p.cues && p.cues.length > 0
+          ? pregenerateYLCueAudiosAction(sid, p.cues)
+          : Promise.resolve();
+
+        const [imgs] = await Promise.all([imagesPromise, audiosPromise]);
+        if (imgs.length > 0) setImages(imgs);
 
         setPhase('ready');
       } catch (err) {
@@ -474,8 +481,17 @@ export function YLPart1Practice({
           case 'reaction-text':
             return <YLBobTextMessage key={item.id} text={item.text} />;
           case 'bob-voice':
+            return (
+              <YLVoiceNote
+                key={item.id}
+                text={item.text}
+                side="bob"
+                sessionId={sessionId}
+                autoPlay={item.id === `cue-v-${cueIndex}`}
+              />
+            );
           case 'reaction-voice':
-            return <YLVoiceNote key={item.id} text={item.text} side="bob" sessionId={sessionId} />;
+            return <YLVoiceNote key={item.id} text={item.text} side="bob" sessionId={sessionId} autoPlay />;
           case 'user-text':
             return <YLUserTextMessage key={item.id} text={item.text} />;
         }

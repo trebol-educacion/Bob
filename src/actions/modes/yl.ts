@@ -237,6 +237,21 @@ export async function getOrCreateCueAudioAction(
   return { data, mimeType };
 }
 
+export async function pregenerateYLCueAudiosAction(
+  sessionId: string,
+  cues: string[],
+): Promise<void> {
+  await Promise.all(
+    cues.map(async (cue) => {
+      try {
+        await getOrCreateCueAudioAction(sessionId, cue);
+      } catch (err) {
+        console.warn('[YL] pregenerate cue audio failed (non-fatal):', err);
+      }
+    }),
+  );
+}
+
 export async function generateYLContentAction(
   exam: YLExam,
   part: number,
