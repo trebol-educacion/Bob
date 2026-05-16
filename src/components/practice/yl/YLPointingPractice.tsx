@@ -102,29 +102,20 @@ export function YLPointingPractice({
         onSessionCreated?.(sid);
         setPlan(p);
         if (p.option_image_prompts && p.option_image_prompts.length > 0) {
-          // Fetch images one at a time to stay under Next.js server-action
-          // array-nesting limit. Append as soon as each one is ready.
           const total = p.option_image_prompts.length;
-          for (let i = 0; i < total; i++) {
-            const img = await generateYLImageAction(
-              exam,
-              part,
-              p.option_image_prompts[i],
-              i,
-              total,
-              sid
-            );
-            setImages((prev) => {
-              const next = [...prev];
-              next[i] = img;
-              return next;
-            });
-            try {
-              await persistYLImageAction(sid, img, i);
-            } catch (err) {
-              console.warn('[YL] persist image', i, 'failed:', err);
-            }
-          }
+          await Promise.all(
+            p.option_image_prompts.map(async (prompt, i) => {
+              const img = await generateYLImageAction(exam, part, prompt, i, total, sid);
+              setImages((prev) => {
+                const next = [...prev];
+                next[i] = img;
+                return next;
+              });
+              persistYLImageAction(sid, img, i).catch((err) =>
+                console.warn('[YL] persist image', i, 'failed:', err)
+              );
+            })
+          );
         }
         setPhase('ready');
       } catch (err) {

@@ -398,7 +398,7 @@ export async function generateYLImageAction(
       }
 
       if (!imgB64) {
-        return TRANSPARENT_PNG;
+        throw new Error('empty image after all attempts');
       }
 
       const supabase = await createSupabaseServer();
@@ -422,7 +422,7 @@ export async function generateYLImageAction(
       const { data: pub } = supabase.storage.from('bob-images').getPublicUrl(path);
       return pub.publicUrl;
     },
-    { storeAs: 'blob' }
+    { storeAs: 'blob', validate: (url) => typeof url === 'string' && url.startsWith('https://') }
   );
 
   if (typeof cached === 'object' && 'error' in cached) {

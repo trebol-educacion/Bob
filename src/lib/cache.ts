@@ -52,7 +52,7 @@ export async function getCachedContentIfExists<T>(
 export async function getOrCreateCachedContent<T>(
   key: CacheKey,
   producer: () => Promise<T>,
-  options?: { storeAs?: StoreAs }
+  options?: { storeAs?: StoreAs; validate?: (value: T) => boolean }
 ): Promise<T | { error: string }> {
   const storeAs = options?.storeAs ?? 'json';
   const cacheKey = hashCacheKey(key);
@@ -66,16 +66,17 @@ export async function getOrCreateCachedContent<T>(
 
   if (existing) {
     const row = existing as CacheRow;
-    await supabase
-      .from('bob_generation_cache')
-      .update({
-        hit_count: row.hit_count + 1,
-        last_hit_at: new Date().toISOString(),
-      })
-      .eq('cache_key', cacheKey);
-
     const hit = extractOutput<T>(row, storeAs);
-    if (hit !== null) return hit;
+    if (hit !== null) {
+      if (!options?.validate || options.validate(hit)) {
+        void supabase
+          .from('bob_generation_cache')
+          .update({ hit_count: row.hit_count + 1, last_hit_at: new Date().toISOString() })
+          .eq('cache_key', cacheKey);
+        return hit;
+      }
+      void supabase.from('bob_generation_cache').delete().eq('cache_key', cacheKey);
+    }
   }
 
   let produced: T;
