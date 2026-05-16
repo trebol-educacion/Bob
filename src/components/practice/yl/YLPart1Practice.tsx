@@ -23,7 +23,6 @@ import {
   saveYLTurnAction,
   evaluateYLFinalAction,
   getSessionMessagesAction,
-  persistYLImagesAction,
 } from '@/actions/modes/yl';
 import type { YLExam, YLPlan } from '@/lib/types/yl';
 import type { EvalResponse, ModeKey } from '@/lib/types/practice';
@@ -152,21 +151,15 @@ export function YLPart1Practice({
         onSessionCreated?.(sid);
         setPlan(p);
 
-        // Generate images if the plan provides image prompts
         if (p.image_prompts && p.image_prompts.length > 0) {
           const imgs = await generateYLImagesAction(
             exam,
             part,
             p.image_prompts,
-            p.character_description
+            p.character_description,
+            sid,
           );
           setImages(imgs);
-          // Persist images so reopening this session does NOT regenerate.
-          try {
-            await persistYLImagesAction(sid, imgs);
-          } catch (err) {
-            console.warn('[YL] persist images failed (non-fatal):', err);
-          }
         }
 
         setPhase('ready');

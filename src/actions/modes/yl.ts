@@ -427,14 +427,15 @@ export async function generateYLImagesAction(
   exam: YLExam,
   part: number,
   imagePrompts: string[],
-  characterDescription?: string
+  characterDescription?: string,
+  sessionId?: string,
 ): Promise<string[]> {
   const key = imageGenKey(exam, part);
 
   console.log(`[YL][${exam}_part${part}] generating ${imagePrompts.length} image(s)`);
   const t0 = Date.now();
 
-  return Promise.all(
+  const images = await Promise.all(
     imagePrompts.map(async (imagePrompt, idx) => {
       const params: Record<string, string> = {
         IMAGE_PROMPT: imagePrompt,
@@ -480,6 +481,18 @@ export async function generateYLImagesAction(
       return TRANSPARENT_PNG;
     })
   );
+
+  if (sessionId) {
+    for (let i = 0; i < images.length; i++) {
+      try {
+        await persistYLImageAction(sessionId, images[i], i);
+      } catch (err) {
+        console.warn(`[YL][${exam}_part${part}] persist image ${i} failed (non-fatal):`, err);
+      }
+    }
+  }
+
+  return images;
 }
 
 export async function saveYLTurnAction(

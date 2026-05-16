@@ -623,6 +623,15 @@ export function YLReadOnlyMessage({
     );
   }
 
+  if (msgType === 'image_scene') {
+    const src =
+      contentJson && typeof contentJson === 'object' && 'image_data_uri' in contentJson
+        ? (contentJson.image_data_uri as string)
+        : null;
+    if (!src) return null;
+    return <YLImageMessage src={src} />;
+  }
+
   return (
     <div className={`flex ${isBob ? 'justify-start' : 'justify-end'} gap-2`}>
       {isBob && (
