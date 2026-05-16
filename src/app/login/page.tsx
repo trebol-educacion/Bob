@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { motion } from 'motion/react';
 import { Mail, Lock, Loader2 } from 'lucide-react';
 import ParticlesCanvas from '@/components/ParticlesCanvas';
@@ -11,7 +10,6 @@ const BG = 'var(--color-bob-brand)';
 const GREEN = '#F8AC37';
 
 export default function LoginPage() {
-  const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -35,8 +33,7 @@ export default function LoginPage() {
       setLoading(false);
       return;
     }
-    router.push('/');
-    router.refresh();
+    window.location.assign('/');
   };
 
   return (
