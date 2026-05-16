@@ -10,9 +10,11 @@ import {
   generateToeflRepeatSessionAction,
   generateToeflRepeatAudiosAction,
   evaluateRepetitionAction,
+  saveToeflRepeatSummaryAction,
   type ToeflRepeatItem,
   type ToeflAudioChunk,
 } from '@/actions/modes/toefl_repeat';
+import { createSessionAction } from '@/actions/sessions';
 import type { RepetitionEvaluation } from '@/lib/types/practice';
 
 type Phase =
@@ -55,6 +57,7 @@ interface ToeflListenRepeatPracticeProps {
   onBack: () => void;
 }
 
+/** Main component for the TOEFL Listen & Repeat practice mode. */
 export function ToeflListenRepeatPractice({ onBack }: ToeflListenRepeatPracticeProps) {
   const [phase, setPhase] = useState<Phase>('loading');
   const [items, setItems] = useState<ToeflRepeatItem[]>([]);
@@ -69,6 +72,8 @@ export function ToeflListenRepeatPractice({ onBack }: ToeflListenRepeatPracticeP
   const recordedBlobRef = useRef<Blob | null>(null);
   const autoRecordStartedRef = useRef(false);
   const readyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const sessionIdRef = useRef<string>('');
+  const userIdRef = useRef<string>('');
 
   const countdown = useCountdown({
     seconds: RECORD_SECONDS,
@@ -93,7 +98,16 @@ export function ToeflListenRepeatPractice({ onBack }: ToeflListenRepeatPracticeP
 
     async function load() {
       try {
-        const sessionItems = await generateToeflRepeatSessionAction();
+        const sessionResult = await createSessionAction({ mode: 'toefl_listen_repeat', title: 'TOEFL Listen & Repeat' });
+        if (cancelled) return;
+        if (!sessionResult.data) {
+          setError('Could not start session. Please try again.');
+          return;
+        }
+        sessionIdRef.current = sessionResult.data.id;
+        userIdRef.current = sessionResult.data.user_id;
+
+        const sessionItems = await generateToeflRepeatSessionAction(sessionIdRef.current, userIdRef.current);
         if (cancelled) return;
         setItems(sessionItems);
         setLoadingProgress(1);
@@ -139,7 +153,6 @@ export function ToeflListenRepeatPractice({ onBack }: ToeflListenRepeatPracticeP
     audioRef.current = audio;
 
     audio.onended = () => {
-      // After playback, wait 2s then enter ready phase
       readyTimerRef.current = setTimeout(() => {
         setPhase('ready');
       }, 2000);
@@ -188,14 +201,20 @@ export function ToeflListenRepeatPractice({ onBack }: ToeflListenRepeatPracticeP
         const base64 = await blobToBase64(blob);
         const mimeType = blob.type || 'audio/webm;codecs=opus';
         const item = items[currentIndex];
-        const evaluation = await evaluateRepetitionAction(item.text, base64, mimeType);
+        const evaluation = await evaluateRepetitionAction(
+          item.text,
+          base64,
+          mimeType,
+          sessionIdRef.current,
+          userIdRef.current,
+          currentIndex
+        );
         setCurrentEvaluation(evaluation);
         setResults((prev) => [...prev, { item, evaluation }]);
         setPhase('result');
       } catch (err) {
         console.error('Evaluation error:', err);
         setError('Evaluation failed. Moving to next item.');
-        // Fallback: create a zero-score result and continue
         const item = items[currentIndex];
         const fallback: RepetitionEvaluation = {
           score: 0,
@@ -214,6 +233,24 @@ export function ToeflListenRepeatPractice({ onBack }: ToeflListenRepeatPracticeP
     evaluate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase]);
+
+  useEffect(() => {
+    if (phase !== 'finished') return;
+    if (results.length === 0) return;
+    if (!sessionIdRef.current || !userIdRef.current) return;
+
+    const avg = (key: keyof RepetitionEvaluation) =>
+      results.reduce((s, r) => s + (r.evaluation[key] as number), 0) / results.length;
+
+    saveToeflRepeatSummaryAction(sessionIdRef.current, userIdRef.current, {
+      avgScore: avg('score'),
+      avgAccuracy: avg('accuracy'),
+      avgPronunciation: avg('pronunciation'),
+      itemCount: results.length,
+    }).catch((err) => {
+      console.error('[ToeflRepeat persist] summary error:', err);
+    });
+  }, [phase, results]);
 
   const handleNext = useCallback(() => {
     setCurrentEvaluation(null);
@@ -514,4 +551,3 @@ export function ToeflListenRepeatPractice({ onBack }: ToeflListenRepeatPracticeP
     </div>
   );
 }
-

@@ -8,6 +8,9 @@ import {
   type CollaborativeEvaluation,
 } from '@/lib/types/practice';
 import { getPrompt } from '@/lib/prompts/db-prompts';
+import { createSupabaseServer } from '@/lib/supabase/server';
+import { persistMessage, readSessionMessages } from '@/lib/persist-activity';
+import type { PersistMessageInput } from '@/lib/persist-activity';
 
 export type Part3Scenario = {
   topic: string;
@@ -33,7 +36,21 @@ const Part3ChatResponseSchema = z.object({
   examiner_response: z.string(),
 });
 
-export async function generatePart3ScenarioAction(): Promise<Part3Scenario> {
+async function resolveUserId(): Promise<string | null> {
+  const supabase = await createSupabaseServer();
+  const { data: { user } } = await supabase.auth.getUser();
+  return user?.id ?? null;
+}
+
+async function safePersist(input: PersistMessageInput): Promise<void> {
+  const result = await persistMessage(input);
+  if ('error' in result) {
+    console.error('[B1 persist] persistMessage failed:', result.error);
+  }
+}
+
+/** Generate a new B1 Collaborative scenario and persist it as setup. */
+export async function generatePart3ScenarioAction(sessionId?: string): Promise<Part3Scenario> {
   const ai = getAiClient();
 
   const response = await ai.models.generateContent({
@@ -57,14 +74,29 @@ export async function generatePart3ScenarioAction(): Promise<Part3Scenario> {
     throw new Error(`Invalid scenario from AI: ${result.error.message}`);
   }
 
+  if (sessionId) {
+    const userId = await resolveUserId();
+    if (userId) {
+      await safePersist({
+        sessionId,
+        userId,
+        role: 'bob',
+        msgType: 'phrase',
+        contentJson: result.data as unknown as Record<string, unknown>,
+      });
+    }
+  }
+
   return result.data;
 }
 
+/** Process an audio turn, persist both user and Bob messages, and return transcription + examiner reply. */
 export async function chatPart3Action(
   audioBase64: string,
   mimeType: string,
   history: Part3ChatMessage[],
-  scenario: Part3Scenario
+  scenario: Part3Scenario,
+  sessionId?: string
 ): Promise<{ transcribed: string; examinerResponse: string }> {
   const ai = getAiClient();
 
@@ -116,16 +148,26 @@ export async function chatPart3Action(
     throw new Error(`Invalid chat response from AI: ${result.error.message}`);
   }
 
+  if (sessionId) {
+    const userId = await resolveUserId();
+    if (userId) {
+      await safePersist({ sessionId, userId, role: 'user', msgType: 'text', contentText: result.data.transcribed });
+      await safePersist({ sessionId, userId, role: 'bob', msgType: 'text', contentText: result.data.examiner_response });
+    }
+  }
+
   return {
     transcribed: result.data.transcribed,
     examinerResponse: result.data.examiner_response,
   };
 }
 
+/** Process a text turn, persist both user and Bob messages, and return the examiner reply. */
 export async function chatPart3TextAction(
   text: string,
   history: Part3ChatMessage[],
-  scenario: Part3Scenario
+  scenario: Part3Scenario,
+  sessionId?: string
 ): Promise<{ examinerResponse: string }> {
   const ai = getAiClient();
 
@@ -153,12 +195,22 @@ Respond with ONLY your next examiner line (no labels, no quotes, under 30 words)
 
   const examinerResponse = (response.text ?? '').trim();
 
+  if (sessionId) {
+    const userId = await resolveUserId();
+    if (userId) {
+      await safePersist({ sessionId, userId, role: 'user', msgType: 'text', contentText: text });
+      await safePersist({ sessionId, userId, role: 'bob', msgType: 'text', contentText: examinerResponse });
+    }
+  }
+
   return { examinerResponse };
 }
 
+/** Evaluate the full conversation and persist the result as an evaluation message. */
 export async function evaluatePart3Action(
   history: Part3ChatMessage[],
-  scenario: Part3Scenario
+  scenario: Part3Scenario,
+  sessionId?: string
 ): Promise<CollaborativeEvaluation> {
   const ai = getAiClient();
 
@@ -192,5 +244,46 @@ export async function evaluatePart3Action(
     throw new Error(`Invalid evaluation from AI: ${result.error.message}`);
   }
 
+  if (sessionId) {
+    const userId = await resolveUserId();
+    if (userId) {
+      await safePersist({
+        sessionId,
+        userId,
+        role: 'bob',
+        msgType: 'evaluation',
+        contentJson: result.data as unknown as Record<string, unknown>,
+      });
+    }
+  }
+
   return result.data;
+}
+
+/** Read persisted messages for a B1 session and hydrate into Part3ChatMessage shape. */
+export async function getB1SessionMessagesAction(
+  sessionId: string
+): Promise<{ history: Part3ChatMessage[]; evaluation: CollaborativeEvaluation | null }> {
+  const supabase = await createSupabaseServer();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { history: [], evaluation: null };
+
+  const rows = await readSessionMessages(sessionId, user.id);
+
+  const history: Part3ChatMessage[] = [];
+  let evaluation: CollaborativeEvaluation | null = null;
+
+  for (const row of rows) {
+    if (row.msg_type === 'evaluation' && row.role === 'bob' && row.content_json) {
+      const parsed = CollaborativeEvaluationSchema.safeParse(row.content_json);
+      if (parsed.success) evaluation = parsed.data;
+    } else if (row.msg_type === 'text') {
+      history.push({
+        role: row.role === 'user' ? 'user' : 'examiner',
+        text: row.content_text ?? '',
+      });
+    }
+  }
+
+  return { history, evaluation };
 }

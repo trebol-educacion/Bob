@@ -6,6 +6,7 @@ import { getAiClient } from '../_shared';
 import { MODELS } from '@/lib/models';
 import { RepetitionEvaluationSchema, RepetitionEvaluation } from '@/lib/types/practice';
 import { getPrompt } from '@/lib/prompts/db-prompts';
+import { persistMessage, readSessionMessages } from '@/lib/persist-activity';
 
 const ToeflRepeatItemSchema = z.object({
   text: z.string(),
@@ -24,9 +25,12 @@ export type ToeflAudioChunk = {
 };
 
 /**
- * Generates 10 progressive TOEFL Listen & Repeat items.
+ * Generates 10 progressive TOEFL Listen & Repeat items and persists the phrase plan.
  */
-export async function generateToeflRepeatSessionAction(): Promise<ToeflRepeatItem[]> {
+export async function generateToeflRepeatSessionAction(
+  sessionId: string,
+  userId: string
+): Promise<ToeflRepeatItem[]> {
   const ai = getAiClient();
   const prompt = await getPrompt('toefl_listen_repeat_b1_generation');
 
@@ -61,7 +65,20 @@ export async function generateToeflRepeatSessionAction(): Promise<ToeflRepeatIte
     throw new Error(`Invalid TOEFL session data: ${parsed.error.message}`);
   }
 
-  return parsed.data.items;
+  const items = parsed.data.items;
+
+  const persistResult = await persistMessage({
+    sessionId,
+    userId,
+    role: 'bob',
+    msgType: 'phrase',
+    contentJson: { phrases: items },
+  });
+  if ('error' in persistResult) {
+    console.error('[ToeflRepeat persist] phrase plan failed:', persistResult.error);
+  }
+
+  return items;
 }
 
 /**
@@ -118,12 +135,15 @@ export async function generateToeflRepeatAudiosAction(
 }
 
 /**
- * Evaluates a user's repetition attempt against the original sentence.
+ * Evaluates a user's repetition attempt and persists the audio attempt + per-item result.
  */
 export async function evaluateRepetitionAction(
   originalText: string,
   audioBase64: string,
-  mimeType: string
+  mimeType: string,
+  sessionId: string,
+  userId: string,
+  phraseIndex: number
 ): Promise<RepetitionEvaluation> {
   const ai = getAiClient();
   const prompt = await getPrompt('toefl_listen_repeat_b1_evaluation', { TARGET_SENTENCE: originalText, TARGET_DURATION_SECONDS: 0, USER_TRANSCRIPT: '' });
@@ -167,5 +187,61 @@ export async function evaluateRepetitionAction(
     throw new Error(`Invalid repetition evaluation: ${parsed.error.message}`);
   }
 
-  return parsed.data;
+  const evaluation = parsed.data;
+
+  const audioResult = await persistMessage({
+    sessionId,
+    userId,
+    role: 'user',
+    msgType: 'user_audio',
+    contentText: evaluation.transcribed_text || null,
+    contentJson: { phraseIndex, accuracy: evaluation.accuracy },
+  });
+  if ('error' in audioResult) {
+    console.error('[ToeflRepeat persist] user_audio failed:', audioResult.error);
+  }
+
+  const evalResult = await persistMessage({
+    sessionId,
+    userId,
+    role: 'bob',
+    msgType: 'evaluation',
+    contentJson: { phraseIndex, ...evaluation },
+  });
+  if ('error' in evalResult) {
+    console.error('[ToeflRepeat persist] evaluation failed:', evalResult.error);
+  }
+
+  return evaluation;
+}
+
+/**
+ * Persists the session-level summary after all items are completed.
+ */
+export async function saveToeflRepeatSummaryAction(
+  sessionId: string,
+  userId: string,
+  summary: { avgScore: number; avgAccuracy: number; avgPronunciation: number; itemCount: number }
+): Promise<void> {
+  const result = await persistMessage({
+    sessionId,
+    userId,
+    role: 'bob',
+    msgType: 'evaluation',
+    contentText: `Session complete. Average score: ${summary.avgScore.toFixed(2)}`,
+    contentJson: summary,
+  });
+  if ('error' in result) {
+    console.error('[ToeflRepeat persist] summary failed:', result.error);
+  }
+}
+
+/**
+ * Reads all persisted messages for a TOEFL Listen & Repeat session.
+ */
+export async function getToeflRepeatSessionMessagesAction(
+  sessionId: string,
+  userId: string
+) {
+  return readSessionMessages(sessionId, userId);
 }

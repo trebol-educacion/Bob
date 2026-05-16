@@ -94,6 +94,8 @@ export function A2Part1Practice({ onBack }: A2Part1PracticeProps) {
   const [qas, setQas] = useState<QA[]>([]);
   const [evaluation, setEvaluation] = useState<CambridgeEvaluation | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const sessionIdRef = useRef<string>('');
+  const userIdRef = useRef<string>('');
 
   const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const currentAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -157,10 +159,11 @@ export function A2Part1Practice({ onBack }: A2Part1PracticeProps) {
   useEffect(() => {
     async function init() {
       try {
-        const [sessionPlan] = await Promise.all([
-          generateA2SessionAction(),
-          createSessionAction({ mode: 'cambridge_ket_part1', title: 'A2 Key Speaking – Part 1' }),
-        ]);
+        const sessionResult = await createSessionAction({ mode: 'cambridge_ket_part1', title: 'A2 Key Speaking – Part 1' });
+        if (!sessionResult.data) throw new Error(sessionResult.error ?? 'Failed to create session');
+        sessionIdRef.current = sessionResult.data.id;
+        userIdRef.current = sessionResult.data.user_id;
+        const sessionPlan = await generateA2SessionAction(sessionIdRef.current, userIdRef.current);
         setPlan(sessionPlan);
         setPhase('phase1');
       } catch (err) {
@@ -236,7 +239,7 @@ export function A2Part1Practice({ onBack }: A2Part1PracticeProps) {
 
         if (blob && blob.size > 0) {
           const audioBase64 = await blobToBase64(blob);
-          const result = await processA2AnswerAction(audioBase64, 'audio/webm', currentQuestion);
+          const result = await processA2AnswerAction(audioBase64, 'audio/webm', currentQuestion, sessionIdRef.current, userIdRef.current);
           transcribed = result.transcribed;
           reaction = result.reaction;
         }
@@ -293,7 +296,7 @@ export function A2Part1Practice({ onBack }: A2Part1PracticeProps) {
 
     void (async () => {
       try {
-        const result = await evaluateA2FinalAction(qas);
+        const result = await evaluateA2FinalAction(qas, sessionIdRef.current, userIdRef.current);
         setEvaluation(result);
         setPhase('finished');
       } catch (err) {
@@ -325,7 +328,11 @@ export function A2Part1Practice({ onBack }: A2Part1PracticeProps) {
 
     void (async () => {
       try {
-        const sessionPlan = await generateA2SessionAction();
+        const sessionResult = await createSessionAction({ mode: 'cambridge_ket_part1', title: 'A2 Key Speaking – Part 1' });
+        if (!sessionResult.data) throw new Error(sessionResult.error ?? 'Failed to create session');
+        sessionIdRef.current = sessionResult.data.id;
+        userIdRef.current = sessionResult.data.user_id;
+        const sessionPlan = await generateA2SessionAction(sessionIdRef.current, userIdRef.current);
         setPlan(sessionPlan);
         setPhase('phase1');
       } catch (err) {

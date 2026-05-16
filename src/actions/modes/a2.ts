@@ -5,6 +5,8 @@ import { getAiClient } from '../_shared';
 import { MODELS } from '@/lib/models';
 import { CambridgeEvaluationSchema, type CambridgeEvaluation } from '@/lib/types/practice';
 import { getPrompt } from '@/lib/prompts/db-prompts';
+import { persistMessage, readSessionMessages } from '@/lib/persist-activity';
+import { createSupabaseServer } from '@/lib/supabase/server';
 
 const A2SessionPlanSchema = z.object({
   phase1_questions: z.array(z.string()).length(3),
@@ -17,7 +19,8 @@ const A2SessionPlanSchema = z.object({
 
 export type A2SessionPlan = z.infer<typeof A2SessionPlanSchema>;
 
-export async function generateA2SessionAction(): Promise<A2SessionPlan> {
+/** Generate an A2 session plan and persist it as a 'phrase' message in bob_messages. */
+export async function generateA2SessionAction(sessionId: string, userId: string): Promise<A2SessionPlan> {
   const ai = getAiClient();
 
   const response = await ai.models.generateContent({
@@ -41,13 +44,27 @@ export async function generateA2SessionAction(): Promise<A2SessionPlan> {
     throw new Error(`Invalid A2 session plan from AI: ${result.error.message}`);
   }
 
+  const persistResult = await persistMessage({
+    sessionId,
+    userId,
+    role: 'bob',
+    msgType: 'phrase',
+    contentJson: result.data as unknown as Record<string, unknown>,
+  });
+  if ('error' in persistResult) {
+    console.error('[A2 persist] plan:', persistResult.error);
+  }
+
   return result.data;
 }
 
+/** Process a student audio answer and persist the transcription as a 'user_audio' message. */
 export async function processA2AnswerAction(
   audioBase64: string,
   mimeType: string,
-  question: string
+  question: string,
+  sessionId: string,
+  userId: string,
 ): Promise<{ transcribed: string; reaction: string }> {
   const ai = getAiClient();
 
@@ -73,6 +90,18 @@ export async function processA2AnswerAction(
 
   const transcribed = (transcribeResponse.text ?? '').trim();
 
+  const persistResult = await persistMessage({
+    sessionId,
+    userId,
+    role: 'user',
+    msgType: 'user_audio',
+    contentText: transcribed,
+    contentJson: { question },
+  });
+  if ('error' in persistResult) {
+    console.error('[A2 persist] user_audio:', persistResult.error);
+  }
+
   const reactionResponse = await ai.models.generateContent({
     model: MODELS.FLASH_LITE_PREVIEW,
     contents: [
@@ -88,8 +117,11 @@ export async function processA2AnswerAction(
   return { transcribed, reaction };
 }
 
+/** Evaluate the full A2 interview and persist the result as an 'evaluation' message. */
 export async function evaluateA2FinalAction(
-  questionsAndAnswers: Array<{ question: string; answer: string }>
+  questionsAndAnswers: Array<{ question: string; answer: string }>,
+  sessionId: string,
+  userId: string,
 ): Promise<CambridgeEvaluation> {
   const ai = getAiClient();
 
@@ -119,5 +151,48 @@ export async function evaluateA2FinalAction(
     throw new Error(`Invalid A2 evaluation from AI: ${result.error.message}`);
   }
 
+  const persistResult = await persistMessage({
+    sessionId,
+    userId,
+    role: 'bob',
+    msgType: 'evaluation',
+    contentJson: result.data as unknown as Record<string, unknown>,
+  });
+  if ('error' in persistResult) {
+    console.error('[A2 persist] evaluation:', persistResult.error);
+  }
+
   return result.data;
+}
+
+/** Read persisted messages for an A2 session and hydrate plan + QAs + evaluation. */
+export async function getA2SessionMessagesAction(sessionId: string): Promise<{
+  plan: A2SessionPlan | null;
+  qas: Array<{ question: string; answer: string }>;
+  evaluation: CambridgeEvaluation | null;
+}> {
+  const supabase = await createSupabaseServer();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { plan: null, qas: [], evaluation: null };
+
+  const messages = await readSessionMessages(sessionId, user.id);
+
+  let plan: A2SessionPlan | null = null;
+  const qas: Array<{ question: string; answer: string }> = [];
+  let evaluation: CambridgeEvaluation | null = null;
+
+  for (const msg of messages) {
+    if (msg.role === 'bob' && msg.msg_type === 'phrase' && plan === null) {
+      const r = A2SessionPlanSchema.safeParse(msg.content_json);
+      if (r.success) plan = r.data;
+    } else if (msg.role === 'user' && msg.msg_type === 'user_audio') {
+      const json = msg.content_json as { question?: string } | null;
+      qas.push({ question: json?.question ?? '', answer: msg.content_text ?? '' });
+    } else if (msg.role === 'bob' && msg.msg_type === 'evaluation') {
+      const r = CambridgeEvaluationSchema.safeParse(msg.content_json);
+      if (r.success) evaluation = r.data;
+    }
+  }
+
+  return { plan, qas, evaluation };
 }

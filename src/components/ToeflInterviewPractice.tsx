@@ -11,6 +11,10 @@ import { createSessionAction } from '@/actions/sessions';
 import {
   generateToeflInterviewAction,
   evaluateToeflResponseAction,
+  persistToeflPlanAction,
+  persistToeflResponseAction,
+  persistToeflQuestionEvaluationAction,
+  persistToeflSessionSummaryAction,
   type ToeflInterviewPlan,
 } from '@/actions/modes/toefl_interview';
 import type { ToeflEvaluation } from '@/lib/types/practice';
@@ -92,6 +96,8 @@ export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const autoStartedRef = useRef(false);
   const sessionCreatedRef = useRef(false);
+  const sessionIdRef = useRef<string | null>(null);
+  const userIdRef = useRef<string | null>(null);
 
   const prepCountdown = useCountdown({
     seconds: PREP_SECONDS,
@@ -142,11 +148,18 @@ export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) 
     if (!plan) return;
     if (!sessionCreatedRef.current) {
       sessionCreatedRef.current = true;
-      createSessionAction({
+      const sessionResult = await createSessionAction({
         mode: 'toefl_interview',
         topic: plan.topic_id,
         title: `TOEFL Interview — ${plan.topic_name}`,
-      }).catch(() => { /* non-critical */ });
+      });
+      if (sessionResult.data) {
+        sessionIdRef.current = sessionResult.data.id;
+        userIdRef.current = sessionResult.data.user_id;
+        persistToeflPlanAction(sessionResult.data.id, sessionResult.data.user_id, plan).catch(
+          (err) => console.error('[ToeflInterview persist] plan fire-and-forget:', err)
+        );
+      }
     }
     setPhase('question');
     setSubPhase('reading');
@@ -227,12 +240,26 @@ export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) 
     const question = plan.questions[currentIndex];
 
     async function evaluate() {
+      const durationMs = RECORD_SECONDS * 1000;
       try {
         const base64 = await blobToBase64(blob);
         const mimeType = blob.type || 'audio/webm;codecs=opus';
         const evaluation = await evaluateToeflResponseAction(question.text, base64, mimeType);
         setCurrentEval(evaluation);
-        setEvaluations((prev) => [...prev, evaluation]);
+        setEvaluations((prev) => {
+          const next = [...prev, evaluation];
+          if (sessionIdRef.current && userIdRef.current) {
+            const sid = sessionIdRef.current;
+            const uid = userIdRef.current;
+            persistToeflResponseAction(sid, uid, currentIndex, evaluation.transcribed_text, durationMs).catch(
+              (err) => console.error('[ToeflInterview persist] response:', err)
+            );
+            persistToeflQuestionEvaluationAction(sid, uid, currentIndex, evaluation).catch(
+              (err) => console.error('[ToeflInterview persist] q-eval:', err)
+            );
+          }
+          return next;
+        });
         setSubPhase('result-preview');
       } catch (err) {
         console.error('Evaluation error:', err);
@@ -265,6 +292,14 @@ export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) 
     setError(null);
     const next = currentIndex + 1;
     if (next >= plan.questions.length) {
+      setEvaluations((prev) => {
+        if (sessionIdRef.current && userIdRef.current) {
+          persistToeflSessionSummaryAction(sessionIdRef.current, userIdRef.current, prev).catch(
+            (err) => console.error('[ToeflInterview persist] summary:', err)
+          );
+        }
+        return prev;
+      });
       setPhase('finished');
     } else {
       setCurrentIndex(next);
@@ -283,6 +318,8 @@ export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) 
     setError(null);
     autoStartedRef.current = false;
     sessionCreatedRef.current = false;
+    sessionIdRef.current = null;
+    userIdRef.current = null;
   }, []);
 
   const avgScore = evaluations.length > 0

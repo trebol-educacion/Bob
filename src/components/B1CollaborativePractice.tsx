@@ -24,6 +24,7 @@ import {
   chatPart3Action,
   chatPart3TextAction,
   evaluatePart3Action,
+  getB1SessionMessagesAction,
   type Part3Scenario,
   type Part3ChatMessage,
 } from '@/actions/modes/part3';
@@ -31,6 +32,7 @@ import type { CollaborativeEvaluation } from '@/lib/types/practice';
 
 interface B1CollaborativePracticeProps {
   onBack: () => void;
+  sessionId?: string;
 }
 
 type Phase = 'loading' | 'intro' | 'conversation' | 'evaluating' | 'result';
@@ -141,7 +143,7 @@ function SubScoreBar({ label, value }: { label: string; value: number }) {
   );
 }
 
-export function B1CollaborativePractice({ onBack }: B1CollaborativePracticeProps) {
+export function B1CollaborativePractice({ onBack, sessionId: initialSessionId }: B1CollaborativePracticeProps) {
   const [phase, setPhase] = useState<Phase>('intro');
   const [scenario, setScenario] = useState<Part3Scenario | null>(null);
   const [history, setHistory] = useState<Part3ChatMessage[]>([]);
@@ -156,6 +158,23 @@ export function B1CollaborativePractice({ onBack }: B1CollaborativePracticeProps
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const sessionCreatedRef = useRef(false);
+  const sessionIdRef = useRef<string | null>(initialSessionId ?? null);
+
+  useEffect(() => {
+    if (!initialSessionId) return;
+    sessionIdRef.current = initialSessionId;
+    sessionCreatedRef.current = true;
+    getB1SessionMessagesAction(initialSessionId).then(({ history: h, evaluation: ev }) => {
+      if (h.length > 0) {
+        setHistory(h);
+        setPhase('conversation');
+      }
+      if (ev) {
+        setEvaluation(ev);
+        setPhase('result');
+      }
+    }).catch(() => {});
+  }, [initialSessionId]);
 
   const userTurns = history.filter((m) => m.role === 'user').length;
 
@@ -210,6 +229,8 @@ export function B1CollaborativePractice({ onBack }: B1CollaborativePracticeProps
         mode: 'cambridge_pet_p3',
         topic: scenario.topic,
         title: `B1 Collaborative: ${scenario.topic}`,
+      }).then((result) => {
+        if (result.data) sessionIdRef.current = result.data.id;
       }).catch(() => {});
     }
 
@@ -233,7 +254,8 @@ export function B1CollaborativePractice({ onBack }: B1CollaborativePracticeProps
           base64,
           mimeType,
           history,
-          scenario
+          scenario,
+          sessionIdRef.current ?? undefined
         );
 
         const userMsg: Part3ChatMessage = { role: 'user', text: transcribed };
@@ -279,7 +301,7 @@ export function B1CollaborativePractice({ onBack }: B1CollaborativePracticeProps
 
     try {
       const userMsg: Part3ChatMessage = { role: 'user', text };
-      const { examinerResponse } = await chatPart3TextAction(text, history, scenario);
+      const { examinerResponse } = await chatPart3TextAction(text, history, scenario, sessionIdRef.current ?? undefined);
       const examinerMsg: Part3ChatMessage = { role: 'examiner', text: examinerResponse };
 
       setHistory((prev) => [...prev, userMsg, examinerMsg]);
@@ -297,7 +319,7 @@ export function B1CollaborativePractice({ onBack }: B1CollaborativePracticeProps
     setPhase('evaluating');
 
     try {
-      const result = await evaluatePart3Action(history, scenario);
+      const result = await evaluatePart3Action(history, scenario, sessionIdRef.current ?? undefined);
       setEvaluation(result);
       setPhase('result');
     } catch {
@@ -324,6 +346,7 @@ export function B1CollaborativePractice({ onBack }: B1CollaborativePracticeProps
     setIsProcessing(false);
     setAudioError(null);
     sessionCreatedRef.current = false;
+    sessionIdRef.current = null;
   }, []);
 
   if (phase === 'intro') {
