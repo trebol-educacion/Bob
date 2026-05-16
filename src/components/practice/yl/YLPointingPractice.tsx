@@ -11,7 +11,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'motion/react';
 import { ArrowLeft, MapPin } from 'lucide-react';
-import { ACTIVE_MODEL_LABEL } from '@/actions/gemini';
+import { ACTIVE_MODEL_LABEL } from '@/lib/models';
 import {
   startYLSessionAction,
   generateYLImageAction,

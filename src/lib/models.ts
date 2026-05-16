@@ -3,6 +3,9 @@
  * Kept as separate constants — do NOT unify; each model has distinct capabilities.
  */
 
+/** Display label shown in the chat footer badge: "BOB • Basado en {ACTIVE_MODEL_LABEL}" */
+export const ACTIVE_MODEL_LABEL = 'Gemini 2.5 Flash';
+
 /** TTS model — generates native audio output */
 export const MODELS = {
   TTS: 'gemini-2.5-flash-preview-tts',

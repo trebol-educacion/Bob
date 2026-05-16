@@ -2,8 +2,6 @@
 
 import { GoogleGenAI, Type, Part } from '@google/genai';
 
-/** Display label shown in the chat footer badge: "BOB • Basado en {ACTIVE_MODEL_LABEL}" */
-export const ACTIVE_MODEL_LABEL = 'Gemini 2.5 Flash';
 import { MODELS } from '@/lib/models';
 import { getPrompt } from '@/lib/prompts/db-prompts';
 import {

@@ -13,8 +13,8 @@ import {
   generateQuestionsAction,
   simulateConversationAction,
   Question,
-  ACTIVE_MODEL_LABEL,
 } from '@/actions/gemini';
+import { ACTIVE_MODEL_LABEL } from '@/lib/models';
 import { blobToBase64, pcmToWavBase64 } from '@/lib/audio';
 import { ResultCard } from './ResultCard';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';

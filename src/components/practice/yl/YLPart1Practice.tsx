@@ -15,7 +15,7 @@ import Image from 'next/image';
 import { ArrowLeft, MapPin, Zap } from 'lucide-react';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
 import { blobToBase64 } from '@/lib/audio';
-import { ACTIVE_MODEL_LABEL } from '@/actions/gemini';
+import { ACTIVE_MODEL_LABEL } from '@/lib/models';
 import {
   startYLSessionAction,
   generateYLImagesAction,

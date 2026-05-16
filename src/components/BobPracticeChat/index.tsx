@@ -5,7 +5,7 @@ import { Mic, Image } from 'lucide-react';
 import { usePracticeChat, UsePracticeChatProps } from '@/hooks/usePracticeChat';
 import { ChatShell } from '@/components/ChatShell';
 import { MessageBubble, TypingIndicator, SuggestionChip } from '@/components/chat';
-import { ACTIVE_MODEL_LABEL } from '@/actions/gemini';
+import { ACTIVE_MODEL_LABEL } from '@/lib/models';
 import { PhrasePhase } from './PhrasePhase';
 import { ImagePhase } from './ImagePhase';
 
