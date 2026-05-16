@@ -104,15 +104,15 @@ export function YLPointingPractice({
         if (p.option_image_prompts && p.option_image_prompts.length > 0) {
           const total = p.option_image_prompts.length;
           await Promise.all(
-            p.option_image_prompts.map(async (prompt, i) => {
-              const img = await generateYLImageAction(exam, part, prompt, i, total, sid);
+            p.option_image_prompts.map(async (prompt, idx) => {
+              const img = await generateYLImageAction(exam, part, prompt, idx, total, sid);
               setImages((prev) => {
                 const next = [...prev];
-                next[i] = img;
+                next[idx] = img;
                 return next;
               });
-              persistYLImageAction(sid, img, i).catch((err) =>
-                console.warn('[YL] persist image', i, 'failed:', err)
+              persistYLImageAction(sid, img, idx).catch((err) =>
+                console.warn('[YL] persist image', idx, 'failed:', err)
               );
             })
           );

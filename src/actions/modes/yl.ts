@@ -369,10 +369,11 @@ export async function generateYLImageAction(
         const tImg = Date.now();
         const result = await callGemini(
           { promptKey: key, model: MODELS.IMAGE },
-          (ai) => ai.models.generateContent({
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (ai) => (ai.models as any).generateImages({
             model: MODELS.IMAGE,
-            contents: [{ role: 'user', parts: [{ text: fullPrompt }] }],
-            config: { responseModalities: ['IMAGE'] },
+            prompt: fullPrompt,
+            config: { numberOfImages: 1, aspectRatio: '1:1' },
           })
         );
         console.log(`[YL][${exam}_part${part}] image ${idx + 1} attempt ${attempt + 1} returned in ${Date.now() - tImg}ms (elapsed ${Date.now() - t0}ms)`);
@@ -382,13 +383,10 @@ export async function generateYLImageAction(
           continue;
         }
 
-        const parts = result.data.candidates?.[0]?.content?.parts ?? [];
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const imagePart = parts.find((p: any) => p.inlineData);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const data = (imagePart as any)?.inlineData?.data;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const partMime = (imagePart as any)?.inlineData?.mimeType ?? 'image/png';
+        const generated = (result.data as any)?.generatedImages?.[0]?.image;
+        const data: string | undefined = generated?.imageBytes;
+        const partMime: string = generated?.mimeType ?? 'image/jpeg';
         if (data) {
           imgB64 = data;
           mime = partMime;
