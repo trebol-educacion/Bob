@@ -3,7 +3,7 @@ import type { DynamicCard } from '@/lib/types/practice';
 /** Returns the lucide-react icon name for a given DynamicCard. */
 export function getModeIcon(card: DynamicCard): string {
   const PART_ICON: Record<string, string> = {
-    starters_part1: 'Hand',
+    starters_part1: 'ListenAndPoint',
     starters_part2: 'HelpCircle',
     starters_part3: 'BookOpen',
     starters_part4: 'User',
@@ -127,4 +127,32 @@ export function getModeTitle(card: DynamicCard): string {
 /** Returns the display description for a card. */
 export function getModeDescription(card: DynamicCard): string {
   return card.description ?? '';
+}
+
+/**
+ * Official Cambridge / TOEFL name surfaced under the kid-friendly title,
+ * so teachers and parents still recognise the exam reference. Returns
+ * empty string for generic modes (no official name to show).
+ */
+export function getModeOfficialName(card: DynamicCard): string {
+  const { framework, exam_part } = card;
+  if (framework === 'cambridge') {
+    const ylMatch = exam_part.match(/^(starters|movers|flyers)_part(\d+)$/);
+    if (ylMatch) {
+      const family = ylMatch[1].charAt(0).toUpperCase() + ylMatch[1].slice(1);
+      return `Cambridge ${family} · Part ${ylMatch[2]}`;
+    }
+    const partMatch = exam_part.match(/^([a-z]+)_p?(\d+)([a-z]?)$/);
+    if (partMatch) {
+      const exam = partMatch[1].toUpperCase();
+      const part = partMatch[2] + (partMatch[3] ? partMatch[3].toUpperCase() : '');
+      return `Cambridge ${exam} · Part ${part}`;
+    }
+  }
+  if (framework === 'toefl') {
+    if (exam_part === 'listen_repeat') return 'TOEFL iBT · Listen & Repeat';
+    if (exam_part === 'interview') return 'TOEFL iBT · Interview';
+    return 'TOEFL iBT';
+  }
+  return '';
 }

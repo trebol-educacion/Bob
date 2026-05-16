@@ -19,7 +19,8 @@ import type { ModeKey, PracticeMode, CefrLevel, DynamicCard } from '@/lib/types/
 import { CefrLevelSelector } from '@/components/CefrLevelSelector';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import type { AvailableMode } from '@/contexts/OrganizationContext';
-import { getModeIcon, getModeBadge, getModeSection, getModeTitle, getModeDescription, getModeSortWeight } from '@/lib/mode-ui';
+import { getModeIcon, getModeBadge, getModeSection, getModeTitle, getModeDescription, getModeSortWeight, getModeOfficialName } from '@/lib/mode-ui';
+import { ListenAndPointIcon } from '@/components/icons/ModeIcons';
 
 const ICON_MAP: Record<string, React.FC<{ size?: number; className?: string }>> = {
   MessageSquare,
@@ -36,6 +37,7 @@ const ICON_MAP: Record<string, React.FC<{ size?: number; className?: string }>> 
   MessageCircle,
   BookImage,
   ImageIcon,
+  ListenAndPoint: ListenAndPointIcon,
 };
 
 function resolveIcon(name: string, size = 28, className?: string): React.ReactNode {
@@ -50,11 +52,12 @@ interface ModeCardProps {
   title: string;
   description: string;
   badge?: string;
+  officialName?: string;
   disabled?: boolean;
   onSelect: (mode: ModeKey) => void;
 }
 
-function ModeCard({ mode, icon, title, description, badge, disabled, onSelect }: ModeCardProps) {
+function ModeCard({ mode, icon, title, description, badge, officialName, disabled, onSelect }: ModeCardProps) {
   return (
     <motion.button
       whileHover={disabled ? {} : { scale: 1.02 }}
@@ -77,6 +80,11 @@ function ModeCard({ mode, icon, title, description, badge, disabled, onSelect }:
       <div>
         <h3 className="text-lg font-black text-trebol-text">{title}</h3>
         <p className="text-trebol-text opacity-70 font-medium mt-1 text-sm">{description}</p>
+        {officialName && (
+          <p className="text-[10px] font-bold uppercase tracking-wider text-trebol-text/40 mt-2">
+            {officialName}
+          </p>
+        )}
       </div>
       <Sparkles className="absolute -bottom-4 -right-4 text-trebol-secondary opacity-10 group-hover:opacity-30 transition-opacity" size={80} />
     </motion.button>
@@ -135,6 +143,7 @@ export const ModeSelection = forwardRef<HTMLDivElement, ModeSelectionProps>(func
         title={getModeTitle(card)}
         description={getModeDescription(card)}
         badge={getModeBadge(card)}
+        officialName={getModeOfficialName(card)}
         onSelect={onSelect}
       />
     );
