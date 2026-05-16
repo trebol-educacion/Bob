@@ -28,7 +28,7 @@ import {
   type Part3Scenario,
   type Part3ChatMessage,
 } from '@/actions/modes/part3';
-import type { CollaborativeEvaluation } from '@/lib/types/practice';
+import type { FormativeFeedback } from '@/lib/types/practice';
 import { BobMascotLoader } from '@/components/chat/BobMascotLoader';
 
 interface B1CollaborativePracticeProps {
@@ -81,65 +81,44 @@ const PRESET_SCENARIOS: Part3Scenario[] = [
   },
 ];
 
-function ScoreCircle({ score }: { score: number }) {
-  const radius = 52;
-  const circumference = 2 * Math.PI * radius;
-  const offset = circumference - (score / 100) * circumference;
-
-  const color =
-    score >= 80
-      ? '#22c55e'
-      : score >= 60
-      ? '#f59e0b'
-      : '#ef4444';
-
+function FormativeFeedbackPanel({ feedback }: { feedback: FormativeFeedback }) {
   return (
-    <div className="relative w-36 h-36 mx-auto">
-      <svg className="w-full h-full -rotate-90" viewBox="0 0 120 120">
-        <circle cx="60" cy="60" r={radius} fill="none" stroke="#e5e7eb" strokeWidth="10" />
-        <circle
-          cx="60"
-          cy="60"
-          r={radius}
-          fill="none"
-          stroke={color}
-          strokeWidth="10"
-          strokeDasharray={circumference}
-          strokeDashoffset={offset}
-          strokeLinecap="round"
-          className="transition-all duration-1000"
-        />
-      </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-3xl font-black text-trebol-text">{score}</span>
-        <span className="text-xs text-trebol-text/50 font-semibold">/ 100</span>
+    <div className="space-y-4">
+      <div className={`text-center py-3 px-4 rounded-xl font-bold text-sm ${feedback.understood ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'}`}>
+        {feedback.understood ? 'Great discussion — your ideas came through clearly!' : 'Good effort — keep practising!'}
       </div>
-    </div>
-  );
-}
-
-function SubScoreBar({ label, value }: { label: string; value: number }) {
-  const color =
-    value >= 80
-      ? 'bg-green-500'
-      : value >= 60
-      ? 'bg-amber-500'
-      : 'bg-red-500';
-
-  return (
-    <div className="space-y-1">
-      <div className="flex justify-between text-sm">
-        <span className="text-trebol-text/70 font-medium">{label}</span>
-        <span className="font-bold text-trebol-text">{value}</span>
-      </div>
-      <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-        <motion.div
-          className={`h-full rounded-full ${color}`}
-          initial={{ width: 0 }}
-          animate={{ width: `${value}%` }}
-          transition={{ duration: 0.8, ease: 'easeOut' }}
-        />
-      </div>
+      {feedback.highlights.length > 0 && (
+        <div className="bg-green-50 border border-green-200 rounded-2xl p-5 space-y-2">
+          <h2 className="font-bold text-green-800">What went well</h2>
+          <ul className="space-y-2">
+            {feedback.highlights.map((h, i) => (
+              <li key={i} className="flex items-start gap-2 text-sm text-green-700">
+                <CheckCircle2 size={16} className="mt-0.5 shrink-0" />
+                {h}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {feedback.suggestions.length > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 space-y-2">
+          <h2 className="font-bold text-amber-800">Tips to improve</h2>
+          <ul className="space-y-2">
+            {feedback.suggestions.map((s, i) => (
+              <li key={i} className="flex items-start gap-2 text-sm text-amber-700">
+                <ChevronRight size={16} className="mt-0.5 shrink-0" />
+                {s}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {feedback.model_answer && (
+        <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 space-y-1">
+          <p className="text-xs font-bold text-blue-600 uppercase tracking-widest">Example phrase</p>
+          <p className="text-sm text-blue-800 italic">"{feedback.model_answer}"</p>
+        </div>
+      )}
     </div>
   );
 }
@@ -149,7 +128,7 @@ export function B1CollaborativePractice({ onBack, sessionId: initialSessionId }:
   const [scenario, setScenario] = useState<Part3Scenario | null>(null);
   const [history, setHistory] = useState<Part3ChatMessage[]>([]);
   const [discussedOptions, setDiscussedOptions] = useState<Set<number>>(new Set());
-  const [evaluation, setEvaluation] = useState<CollaborativeEvaluation | null>(null);
+  const [evaluation, setEvaluation] = useState<FormativeFeedback | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [loadingScenario, setLoadingScenario] = useState(false);
   const [textInput, setTextInput] = useState('');
@@ -165,13 +144,13 @@ export function B1CollaborativePractice({ onBack, sessionId: initialSessionId }:
     if (!initialSessionId) return;
     sessionIdRef.current = initialSessionId;
     sessionCreatedRef.current = true;
-    getB1SessionMessagesAction(initialSessionId).then(({ history: h, evaluation: ev }) => {
+    getB1SessionMessagesAction(initialSessionId).then(({ history: h, feedback: fb }) => {
       if (h.length > 0) {
         setHistory(h);
         setPhase('conversation');
       }
-      if (ev) {
-        setEvaluation(ev);
+      if (fb) {
+        setEvaluation(fb);
         setPhase('result');
       }
     }).catch(() => {});
@@ -326,14 +305,10 @@ export function B1CollaborativePractice({ onBack, sessionId: initialSessionId }:
     } catch {
       setPhase('result');
       setEvaluation({
-        score: 0,
-        task_achievement: 0,
-        interaction: 0,
-        grammar: 0,
-        vocabulary: 0,
-        feedback: 'Could not generate evaluation. Please try again.',
-        strengths: [],
-        areas_for_improvement: [],
+        kind: 'formative',
+        understood: false,
+        highlights: [],
+        suggestions: ['Could not generate feedback. Please try again.'],
       });
     }
   }, [scenario, history]);
@@ -468,50 +443,10 @@ export function B1CollaborativePractice({ onBack, sessionId: initialSessionId }:
             >
               <ArrowLeft size={20} />
             </button>
-            <h1 className="text-2xl font-black text-trebol-text">Your Results</h1>
+            <h1 className="text-2xl font-black text-trebol-text">Your Feedback</h1>
           </div>
 
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex flex-col items-center gap-4">
-            <p className="text-sm font-bold text-trebol-text/50 uppercase tracking-widest">Overall Score</p>
-            <ScoreCircle score={evaluation.score} />
-            <p className="text-center text-trebol-text/70 text-sm max-w-sm">{evaluation.feedback}</p>
-          </div>
-
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-4">
-            <h2 className="font-bold text-trebol-text">Detailed Scores</h2>
-            <SubScoreBar label="Task Achievement" value={evaluation.task_achievement} />
-            <SubScoreBar label="Interaction" value={evaluation.interaction} />
-            <SubScoreBar label="Grammar" value={evaluation.grammar} />
-            <SubScoreBar label="Vocabulary" value={evaluation.vocabulary} />
-          </div>
-
-          {evaluation.strengths.length > 0 && (
-            <div className="bg-green-50 border border-green-200 rounded-2xl p-5 space-y-3">
-              <h2 className="font-bold text-green-800">Strengths</h2>
-              <ul className="space-y-2">
-                {evaluation.strengths.map((s) => (
-                  <li key={s} className="flex items-start gap-2 text-sm text-green-700">
-                    <CheckCircle2 size={16} className="mt-0.5 shrink-0" />
-                    {s}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {evaluation.areas_for_improvement.length > 0 && (
-            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 space-y-3">
-              <h2 className="font-bold text-amber-800">Areas for Improvement</h2>
-              <ul className="space-y-2">
-                {evaluation.areas_for_improvement.map((a) => (
-                  <li key={a} className="flex items-start gap-2 text-sm text-amber-700">
-                    <ChevronRight size={16} className="mt-0.5 shrink-0" />
-                    {a}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
+          <FormativeFeedbackPanel feedback={evaluation} />
 
           <div className="flex gap-3">
             <button

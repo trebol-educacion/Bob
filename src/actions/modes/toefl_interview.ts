@@ -3,8 +3,7 @@
 import { z } from 'zod';
 import { Type } from '@google/genai';
 import { MODELS } from '@/lib/models';
-import { ToeflEvaluationSchema } from '@/lib/types/practice';
-import type { ToeflEvaluation } from '@/lib/types/practice';
+import { FormativeFeedbackSchema, type FormativeFeedback } from '@/lib/types/practice';
 import { getPrompt } from '@/lib/prompts/db-prompts';
 import { persistMessage, readSessionMessages } from '@/lib/persist-activity';
 import { getOrCreateCachedContent } from '@/lib/cache';
@@ -38,13 +37,11 @@ const PlanFallback: ToeflInterviewPlan = {
   ],
 };
 
-const EvaluationFallback: ToeflEvaluation = {
-  score: 0,
-  fluency: 0,
-  vocabulary: 0,
-  grammar: 0,
-  feedback: 'Unable to evaluate at this time. Please try again.',
-  transcribed_text: '',
+const FormativeFeedbackFallback: FormativeFeedback = {
+  kind: 'formative',
+  understood: false,
+  highlights: [],
+  suggestions: ['Try again — we could not process your response.'],
 };
 
 /** Generates a TOEFL Interview session plan with 4 progressive questions. */
@@ -109,18 +106,28 @@ export async function generateToeflInterviewAction(): Promise<ToeflInterviewPlan
   return cached;
 }
 
-/**
- * Evaluates a user's spoken response to a TOEFL interview question.
- */
+/** Evaluates a user's spoken TOEFL response and returns formative feedback (no numeric score). */
 export async function evaluateToeflResponseAction(
   question: string,
   audioBase64: string,
   mimeType: string
-): Promise<ToeflEvaluation> {
-  const prompt = await getPrompt('toefl_interview_b2_evaluation', { QUESTION: question, TOPIC: '', USER_TRANSCRIPT: '', AUDIO_DURATION_SECONDS: 0 });
+): Promise<FormativeFeedback> {
+  const prompt = `You are a supportive TOEFL iBT speaking coach giving formative feedback to an English learner.
+
+The student answered this question:
+"${question}"
+
+Listen to the audio and return ONLY a JSON object with these fields:
+- "kind": always "formative"
+- "understood": boolean — did the student communicate their main idea clearly?
+- "highlights": array of 1-3 strings celebrating specific strengths (e.g. "Good use of examples", "Clear main idea stated at the start")
+- "suggestions": array of 1-3 specific improvement tips (e.g. "Try to elaborate more on your second point", "Use discourse markers like 'firstly' and 'however'")
+- "model_answer": one example sentence or phrase showing a strong way to open or conclude this answer
+
+Return ONLY valid JSON. No score, no band, no percentage.`;
 
   const result = await callGemini(
-    { promptKey: 'toefl_interview_b2_evaluation', model: MODELS.FLASH_LITE_PREVIEW },
+    { promptKey: 'toefl_interview_b2_formative', model: MODELS.FLASH_LITE_PREVIEW },
     (ai) => ai.models.generateContent({
       model: MODELS.FLASH_LITE_PREVIEW,
       contents: [
@@ -132,36 +139,22 @@ export async function evaluateToeflResponseAction(
           ],
         },
       ],
-      config: {
-        responseMimeType: 'application/json',
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            score: { type: Type.NUMBER },
-            fluency: { type: Type.NUMBER },
-            vocabulary: { type: Type.NUMBER },
-            grammar: { type: Type.NUMBER },
-            feedback: { type: Type.STRING },
-            transcribed_text: { type: Type.STRING },
-          },
-          required: ['score', 'fluency', 'vocabulary', 'grammar', 'feedback', 'transcribed_text'],
-        },
-      },
+      config: { responseMimeType: 'application/json' },
     })
   );
 
   if (!result.ok || !result.data.text) {
     console.error(JSON.stringify({ event: 'evaluateToeflResponseAction', error: result.ok ? 'empty response' : result.error }));
-    return EvaluationFallback;
+    return FormativeFeedbackFallback;
   }
 
   let parsed: unknown;
   try {
     parsed = JSON.parse(result.data.text);
   } catch {
-    return EvaluationFallback;
+    return FormativeFeedbackFallback;
   }
-  return safeParseFallback(ToeflEvaluationSchema, parsed, EvaluationFallback);
+  return safeParseFallback(FormativeFeedbackSchema, parsed, FormativeFeedbackFallback);
 }
 
 /** Persists the generated question plan as a single phrase row in bob_messages. */
@@ -203,37 +196,34 @@ export async function persistToeflResponseAction(
   }
 }
 
-/** Persists the formative evaluation for a single question as an evaluation row. */
+/** Persists the formative feedback for a single question as an evaluation row. */
 export async function persistToeflQuestionEvaluationAction(
   sessionId: string,
   userId: string,
   questionIndex: number,
-  evaluation: ToeflEvaluation
+  feedback: FormativeFeedback
 ): Promise<void> {
-  const { feedback, fluency, vocabulary, grammar, transcribed_text } = evaluation;
   const result = await persistMessage({
     sessionId,
     userId,
     role: 'bob',
     msgType: 'evaluation',
-    contentText: feedback,
-    contentJson: { questionIndex, fluency, vocabulary, grammar, transcribed_text },
+    contentText: feedback.suggestions[0] ?? '',
+    contentJson: { questionIndex, ...feedback },
   });
   if ('error' in result) {
     console.error('[ToeflInterview persist] evaluation:', result.error);
   }
 }
 
-/** Persists the aggregated session-end summary evaluation. */
+/** Persists the aggregated session-end summary. */
 export async function persistToeflSessionSummaryAction(
   sessionId: string,
   userId: string,
-  evaluations: ToeflEvaluation[]
+  feedbacks: FormativeFeedback[]
 ): Promise<void> {
-  const count = evaluations.length;
+  const count = feedbacks.length;
   if (count === 0) return;
-  const avg = (key: keyof Pick<ToeflEvaluation, 'fluency' | 'vocabulary' | 'grammar'>) =>
-    evaluations.reduce((s, e) => s + e[key], 0) / count;
   const result = await persistMessage({
     sessionId,
     userId,
@@ -242,10 +232,8 @@ export async function persistToeflSessionSummaryAction(
     contentJson: {
       summary: true,
       questionsAnswered: count,
-      avgFluency: avg('fluency'),
-      avgVocabulary: avg('vocabulary'),
-      avgGrammar: avg('grammar'),
-      feedbacks: evaluations.map((e) => e.feedback),
+      highlights: feedbacks.flatMap((f) => f.highlights),
+      suggestions: feedbacks.flatMap((f) => f.suggestions),
     },
   });
   if ('error' in result) {

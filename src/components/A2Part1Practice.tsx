@@ -9,7 +9,7 @@ import { createSessionAction } from '@/actions/sessions';
 import { pcmToWavBase64, blobToBase64 } from '@/lib/audio';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
 import type { A2SessionPlan } from '@/actions/modes/a2';
-import type { CambridgeEvaluation } from '@/lib/types/practice';
+import type { FormativeFeedback } from '@/lib/types/practice';
 import { BobMascotLoader } from '@/components/chat/BobMascotLoader';
 
 type A2Phase =
@@ -46,39 +46,45 @@ const RECORDING_MAX_SECONDS = 30;
 const REACTION_PAUSE_MS = 1500;
 const PHASE_TRANSITION_MS = 2000;
 
-function ScoreBar({ label, value }: { label: string; value: number }) {
+function FormativeFeedbackPanel({ feedback }: { feedback: FormativeFeedback }) {
   return (
-    <div className="space-y-1">
-      <div className="flex justify-between text-sm font-semibold text-trebol-text">
-        <span>{label}</span>
-        <span>{value}</span>
+    <div className="space-y-4">
+      <div className={`text-center py-3 px-4 rounded-xl font-bold text-sm ${feedback.understood ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'}`}>
+        {feedback.understood ? '¡Great job — your message came through!' : 'Keep practising — you are on the right track!'}
       </div>
-      <div className="h-2 bg-trebol-secondary/20 rounded-full overflow-hidden">
-        <motion.div
-          initial={{ width: 0 }}
-          animate={{ width: `${value}%` }}
-          transition={{ duration: 0.8, ease: 'easeOut' }}
-          className="h-full bg-trebol-primary rounded-full"
-        />
-      </div>
+      {feedback.highlights.length > 0 && (
+        <div className="bg-green-50 rounded-xl p-4 space-y-2">
+          <p className="text-xs font-bold text-green-700 uppercase tracking-widest">What went well</p>
+          <ul className="space-y-1">
+            {feedback.highlights.map((h, i) => (
+              <li key={i} className="flex items-start gap-2 text-sm text-green-800">
+                <span className="mt-0.5 shrink-0">✓</span>
+                <span>{h}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {feedback.suggestions.length > 0 && (
+        <div className="bg-amber-50 rounded-xl p-4 space-y-2">
+          <p className="text-xs font-bold text-amber-700 uppercase tracking-widest">Tips to improve</p>
+          <ul className="space-y-1">
+            {feedback.suggestions.map((s, i) => (
+              <li key={i} className="flex items-start gap-2 text-sm text-amber-800">
+                <span className="mt-0.5 shrink-0">→</span>
+                <span>{s}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {feedback.model_answer && (
+        <div className="bg-blue-50 rounded-xl p-4 space-y-1">
+          <p className="text-xs font-bold text-blue-600 uppercase tracking-widest">Example answer</p>
+          <p className="text-sm text-blue-800 italic">"{feedback.model_answer}"</p>
+        </div>
+      )}
     </div>
-  );
-}
-
-function CefrBadge({ level }: { level: string }) {
-  const colorMap: Record<string, string> = {
-    A1: 'bg-gray-100 text-gray-600',
-    A2: 'bg-blue-100 text-blue-700',
-    B1: 'bg-green-100 text-green-700',
-    B2: 'bg-purple-100 text-purple-700',
-    C1: 'bg-orange-100 text-orange-700',
-    C2: 'bg-red-100 text-red-700',
-  };
-  const cls = colorMap[level.toUpperCase()] ?? 'bg-gray-100 text-gray-600';
-  return (
-    <span className={`px-3 py-1 rounded-full text-sm font-bold ${cls}`}>
-      {level.toUpperCase()}
-    </span>
   );
 }
 
@@ -93,7 +99,7 @@ export function A2Part1Practice({ onBack }: A2Part1PracticeProps) {
   const [currentReaction, setCurrentReaction] = useState('');
   const [phaseTransition, setPhaseTransition] = useState<PhaseTransition | null>(null);
   const [qas, setQas] = useState<QA[]>([]);
-  const [evaluation, setEvaluation] = useState<CambridgeEvaluation | null>(null);
+  const [evaluation, setEvaluation] = useState<FormativeFeedback | null>(null);
   const [error, setError] = useState<string | null>(null);
   const sessionIdRef = useRef<string>('');
   const userIdRef = useRef<string>('');
@@ -388,56 +394,7 @@ export function A2Part1Practice({ onBack }: A2Part1PracticeProps) {
           <p className="text-trebol-text/60 font-medium">A2 Key — Part 1 Speaking</p>
         </div>
 
-        <div className="bg-trebol-primary rounded-2xl p-6 text-center text-white space-y-1">
-          <p className="text-sm font-bold uppercase tracking-widest opacity-80">Overall Score</p>
-          <p className="text-7xl font-black">{evaluation.score}</p>
-          <p className="text-sm opacity-80">out of 100</p>
-          {evaluation.cefr_level && (
-            <div className="flex justify-center mt-2">
-              <CefrBadge level={evaluation.cefr_level} />
-            </div>
-          )}
-        </div>
-
-        <div className="bg-white rounded-2xl p-5 shadow-sm space-y-4">
-          <h3 className="font-black text-trebol-text">Skill Breakdown</h3>
-          <ScoreBar label="Grammar" value={evaluation.grammar} />
-          <ScoreBar label="Vocabulary" value={evaluation.vocabulary} />
-          <ScoreBar label="Fluency" value={evaluation.fluency} />
-        </div>
-
-        <div className="bg-white rounded-2xl p-5 shadow-sm space-y-2">
-          <h3 className="font-black text-trebol-text">Examiner Feedback</h3>
-          <p className="text-trebol-text/80 text-sm leading-relaxed">{evaluation.feedback}</p>
-        </div>
-
-        {evaluation.strengths.length > 0 && (
-          <div className="bg-white rounded-2xl p-5 shadow-sm space-y-3">
-            <h3 className="font-black text-trebol-text text-green-700">Strengths</h3>
-            <ul className="space-y-2">
-              {evaluation.strengths.map((s, i) => (
-                <li key={i} className="flex items-start gap-2 text-sm text-trebol-text/80">
-                  <span className="text-green-500 mt-0.5 shrink-0">✓</span>
-                  <span>{s}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-
-        {evaluation.areas_for_improvement.length > 0 && (
-          <div className="bg-white rounded-2xl p-5 shadow-sm space-y-3">
-            <h3 className="font-black text-trebol-text text-amber-700">Areas to Improve</h3>
-            <ul className="space-y-2">
-              {evaluation.areas_for_improvement.map((a, i) => (
-                <li key={i} className="flex items-start gap-2 text-sm text-trebol-text/80">
-                  <span className="text-amber-500 mt-0.5 shrink-0">→</span>
-                  <span>{a}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
+        <FormativeFeedbackPanel feedback={evaluation} />
 
         <div className="flex gap-3 pb-4">
           <button

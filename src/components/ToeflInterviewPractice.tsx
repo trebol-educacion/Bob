@@ -17,7 +17,7 @@ import {
   persistToeflSessionSummaryAction,
   type ToeflInterviewPlan,
 } from '@/actions/modes/toefl_interview';
-import type { ToeflEvaluation } from '@/lib/types/practice';
+import type { FormativeFeedback } from '@/lib/types/practice';
 import { BobMascotLoader } from '@/components/chat/BobMascotLoader';
 
 type InterviewPhase =
@@ -37,26 +37,6 @@ type QuestionSubPhase =
 const PREP_SECONDS = 5;
 const RECORD_SECONDS = 45;
 
-function scoreColor(score: number): string {
-  if (score >= 4) return 'text-green-600';
-  if (score >= 2.5) return 'text-yellow-500';
-  return 'text-red-500';
-}
-
-function scoreBg(score: number): string {
-  if (score >= 4) return 'bg-green-50 border-green-200';
-  if (score >= 2.5) return 'bg-yellow-50 border-yellow-200';
-  return 'bg-red-50 border-red-200';
-}
-
-function scoreBand(score: number): string {
-  if (score >= 4.5) return 'Advanced';
-  if (score >= 3.5) return 'High Intermediate';
-  if (score >= 2.5) return 'Intermediate';
-  if (score >= 1.5) return 'Low Intermediate';
-  return 'Beginner';
-}
-
 function difficultyLabel(difficulty: number): string {
   switch (difficulty) {
     case 1: return 'Easy';
@@ -67,15 +47,34 @@ function difficultyLabel(difficulty: number): string {
   }
 }
 
-function ProgressBar({ value, max = 5 }: { value: number; max?: number }) {
-  const pct = Math.min((value / max) * 100, 100);
-  const color = value >= 4 ? 'bg-green-500' : value >= 2.5 ? 'bg-yellow-400' : 'bg-red-400';
+function FormativeFeedbackCard({ feedback }: { feedback: FormativeFeedback }) {
   return (
-    <div className="w-full bg-gray-100 rounded-full h-2">
-      <div
-        className={`${color} h-2 rounded-full transition-all duration-500`}
-        style={{ width: `${pct}%` }}
-      />
+    <div className="w-full space-y-3">
+      <div className={`text-center py-2 px-4 rounded-xl font-bold text-sm ${feedback.understood ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'}`}>
+        {feedback.understood ? 'Your message came through clearly!' : 'Keep going — you are improving!'}
+      </div>
+      {feedback.highlights.length > 0 && (
+        <div className="bg-green-50 rounded-xl p-3 space-y-1">
+          <p className="text-xs font-bold text-green-700 uppercase tracking-widest">Strengths</p>
+          {feedback.highlights.map((h, i) => (
+            <p key={i} className="text-sm text-green-800">✓ {h}</p>
+          ))}
+        </div>
+      )}
+      {feedback.suggestions.length > 0 && (
+        <div className="bg-amber-50 rounded-xl p-3 space-y-1">
+          <p className="text-xs font-bold text-amber-700 uppercase tracking-widest">Tips</p>
+          {feedback.suggestions.map((s, i) => (
+            <p key={i} className="text-sm text-amber-800">→ {s}</p>
+          ))}
+        </div>
+      )}
+      {feedback.model_answer && (
+        <div className="bg-blue-50 rounded-xl p-3 space-y-1">
+          <p className="text-xs font-bold text-blue-600 uppercase tracking-widest">Example</p>
+          <p className="text-sm text-blue-800 italic">"{feedback.model_answer}"</p>
+        </div>
+      )}
     </div>
   );
 }
@@ -89,8 +88,8 @@ export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) 
   const [subPhase, setSubPhase] = useState<QuestionSubPhase>('reading');
   const [plan, setPlan] = useState<ToeflInterviewPlan | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [evaluations, setEvaluations] = useState<ToeflEvaluation[]>([]);
-  const [currentEval, setCurrentEval] = useState<ToeflEvaluation | null>(null);
+  const [evaluations, setEvaluations] = useState<FormativeFeedback[]>([]);
+  const [currentEval, setCurrentEval] = useState<FormativeFeedback | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const recordedBlobRef = useRef<Blob | null>(null);
@@ -245,17 +244,17 @@ export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) 
       try {
         const base64 = await blobToBase64(blob);
         const mimeType = blob.type || 'audio/webm;codecs=opus';
-        const evaluation = await evaluateToeflResponseAction(question.text, base64, mimeType);
-        setCurrentEval(evaluation);
+        const feedback = await evaluateToeflResponseAction(question.text, base64, mimeType);
+        setCurrentEval(feedback);
         setEvaluations((prev) => {
-          const next = [...prev, evaluation];
+          const next = [...prev, feedback];
           if (sessionIdRef.current && userIdRef.current) {
             const sid = sessionIdRef.current;
             const uid = userIdRef.current;
-            persistToeflResponseAction(sid, uid, currentIndex, evaluation.transcribed_text, durationMs).catch(
+            persistToeflResponseAction(sid, uid, currentIndex, feedback.model_answer ?? '', durationMs).catch(
               (err) => console.error('[ToeflInterview persist] response:', err)
             );
-            persistToeflQuestionEvaluationAction(sid, uid, currentIndex, evaluation).catch(
+            persistToeflQuestionEvaluationAction(sid, uid, currentIndex, feedback).catch(
               (err) => console.error('[ToeflInterview persist] q-eval:', err)
             );
           }
@@ -264,13 +263,11 @@ export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) 
         setSubPhase('result-preview');
       } catch (err) {
         console.error('Evaluation error:', err);
-        const fallback: ToeflEvaluation = {
-          score: 0,
-          fluency: 0,
-          vocabulary: 0,
-          grammar: 0,
-          feedback: 'Evaluation could not be completed.',
-          transcribed_text: '',
+        const fallback: FormativeFeedback = {
+          kind: 'formative',
+          understood: false,
+          highlights: [],
+          suggestions: ['Evaluation could not be completed. Please try again.'],
         };
         setCurrentEval(fallback);
         setEvaluations((prev) => [...prev, fallback]);
@@ -323,18 +320,8 @@ export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) 
     userIdRef.current = null;
   }, []);
 
-  const avgScore = evaluations.length > 0
-    ? evaluations.reduce((s, e) => s + e.score, 0) / evaluations.length
-    : 0;
-  const avgFluency = evaluations.length > 0
-    ? evaluations.reduce((s, e) => s + e.fluency, 0) / evaluations.length
-    : 0;
-  const avgVocabulary = evaluations.length > 0
-    ? evaluations.reduce((s, e) => s + e.vocabulary, 0) / evaluations.length
-    : 0;
-  const avgGrammar = evaluations.length > 0
-    ? evaluations.reduce((s, e) => s + e.grammar, 0) / evaluations.length
-    : 0;
+  const allHighlights = evaluations.flatMap((e) => e.highlights);
+  const allSuggestions = evaluations.flatMap((e) => e.suggestions);
 
   return (
     <div className="flex-1 flex flex-col min-h-0 overflow-auto bg-trebol-bg">
@@ -485,44 +472,8 @@ export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) 
             )}
 
             {subPhase === 'result-preview' && currentEval && (
-              <div className={`w-full rounded-2xl border p-5 space-y-4 ${scoreBg(currentEval.score)}`}>
-                <div className="flex items-center justify-between">
-                  <span className="font-black text-trebol-text">Your Score</span>
-                  <span className={`text-3xl font-black ${scoreColor(currentEval.score)}`}>
-                    {currentEval.score.toFixed(1)}<span className="text-lg font-bold text-trebol-text/40"> / 5</span>
-                  </span>
-                </div>
-
-                {currentEval.transcribed_text && (
-                  <div className="bg-white/60 rounded-lg p-3">
-                    <p className="text-xs font-bold text-trebol-text/40 uppercase tracking-wide mb-1">You said</p>
-                    <p className="text-sm text-trebol-text italic">"{currentEval.transcribed_text}"</p>
-                  </div>
-                )}
-
-                <p className="text-sm text-trebol-text/80 leading-relaxed">{currentEval.feedback}</p>
-
-                <div className="grid grid-cols-3 gap-3 text-xs font-bold text-trebol-text/60">
-                  <div className="text-center">
-                    <div className={`text-lg font-black ${scoreColor(currentEval.fluency)}`}>
-                      {currentEval.fluency.toFixed(1)}
-                    </div>
-                    Fluency
-                  </div>
-                  <div className="text-center">
-                    <div className={`text-lg font-black ${scoreColor(currentEval.vocabulary)}`}>
-                      {currentEval.vocabulary.toFixed(1)}
-                    </div>
-                    Vocabulary
-                  </div>
-                  <div className="text-center">
-                    <div className={`text-lg font-black ${scoreColor(currentEval.grammar)}`}>
-                      {currentEval.grammar.toFixed(1)}
-                    </div>
-                    Grammar
-                  </div>
-                </div>
-
+              <div className="w-full space-y-4">
+                <FormativeFeedbackCard feedback={currentEval} />
                 <button
                   onClick={handleNext}
                   className="w-full flex items-center justify-center gap-2 bg-trebol-primary text-white font-black px-6 py-3 rounded-xl hover:opacity-90 transition-opacity"
@@ -544,40 +495,24 @@ export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) 
 
         {phase === 'finished' && plan && (
           <div className="flex flex-col gap-6 w-full">
-            <div className="bg-white rounded-2xl border border-trebol-border shadow-sm p-6 text-center space-y-2">
-              <p className="text-xs font-bold text-trebol-text/40 uppercase tracking-widest">Overall Score</p>
-              <div className={`text-6xl font-black ${scoreColor(avgScore)}`}>
-                {avgScore.toFixed(1)}
-                <span className="text-2xl font-bold text-trebol-text/30"> / 5.0</span>
-              </div>
-              <p className={`text-sm font-bold ${scoreColor(avgScore)}`}>{scoreBand(avgScore)}</p>
-            </div>
-
-            <div className="bg-white rounded-2xl border border-trebol-border shadow-sm p-5 space-y-4">
-              <p className="text-xs font-bold text-trebol-text/40 uppercase tracking-widest">Skill Breakdown</p>
-              <div className="space-y-3">
-                <div>
-                  <div className="flex justify-between text-sm font-bold mb-1">
-                    <span className="text-trebol-text">Fluency</span>
-                    <span className={scoreColor(avgFluency)}>{avgFluency.toFixed(1)} / 5</span>
-                  </div>
-                  <ProgressBar value={avgFluency} />
+            <div className="bg-white rounded-2xl border border-trebol-border shadow-sm p-6 space-y-4">
+              <p className="text-xs font-bold text-trebol-text/40 uppercase tracking-widest">Session Feedback</p>
+              {allHighlights.length > 0 && (
+                <div className="bg-green-50 rounded-xl p-4 space-y-1">
+                  <p className="text-xs font-bold text-green-700 uppercase tracking-widest">Strengths across the interview</p>
+                  {allHighlights.map((h, i) => (
+                    <p key={i} className="text-sm text-green-800">✓ {h}</p>
+                  ))}
                 </div>
-                <div>
-                  <div className="flex justify-between text-sm font-bold mb-1">
-                    <span className="text-trebol-text">Vocabulary</span>
-                    <span className={scoreColor(avgVocabulary)}>{avgVocabulary.toFixed(1)} / 5</span>
-                  </div>
-                  <ProgressBar value={avgVocabulary} />
+              )}
+              {allSuggestions.length > 0 && (
+                <div className="bg-amber-50 rounded-xl p-4 space-y-1">
+                  <p className="text-xs font-bold text-amber-700 uppercase tracking-widest">Focus areas</p>
+                  {allSuggestions.map((s, i) => (
+                    <p key={i} className="text-sm text-amber-800">→ {s}</p>
+                  ))}
                 </div>
-                <div>
-                  <div className="flex justify-between text-sm font-bold mb-1">
-                    <span className="text-trebol-text">Grammar</span>
-                    <span className={scoreColor(avgGrammar)}>{avgGrammar.toFixed(1)} / 5</span>
-                  </div>
-                  <ProgressBar value={avgGrammar} />
-                </div>
-              </div>
+              )}
             </div>
 
             <div className="bg-white rounded-2xl border border-trebol-border shadow-sm p-5 space-y-3">
@@ -586,17 +521,12 @@ export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) 
                 const ev = evaluations[i];
                 if (!ev) return null;
                 return (
-                  <div key={i} className={`rounded-xl border p-3 space-y-1 ${scoreBg(ev.score)}`}>
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-bold text-trebol-text/50 mb-0.5">Q{i + 1} · {difficultyLabel(q.difficulty)}</p>
-                        <p className="text-sm font-bold text-trebol-text leading-snug line-clamp-2">{q.text}</p>
-                        <p className="text-xs text-trebol-text/60 mt-1 line-clamp-1">{ev.feedback}</p>
-                      </div>
-                      <span className={`text-2xl font-black shrink-0 ${scoreColor(ev.score)}`}>
-                        {ev.score.toFixed(1)}
-                      </span>
-                    </div>
+                  <div key={i} className="rounded-xl border border-trebol-border p-3 space-y-1">
+                    <p className="text-xs font-bold text-trebol-text/50">Q{i + 1} · {difficultyLabel(q.difficulty)}</p>
+                    <p className="text-sm font-bold text-trebol-text leading-snug line-clamp-2">{q.text}</p>
+                    <p className={`text-xs font-bold ${ev.understood ? 'text-green-600' : 'text-amber-600'}`}>
+                      {ev.understood ? 'Message understood ✓' : 'Needs more practice'}
+                    </p>
                   </div>
                 );
               })}

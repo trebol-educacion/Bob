@@ -3,6 +3,42 @@ import { z } from 'zod';
 /** CEFR proficiency level. */
 export type CefrLevel = 'a1' | 'a2' | 'b1' | 'b2' | 'c1' | 'c2';
 
+/** Formative (non-graded) feedback for open speaking and writing tasks. */
+export interface FormativeFeedback {
+  kind: 'formative';
+  understood: boolean;
+  highlights: string[];
+  suggestions: string[];
+  model_answer?: string;
+}
+
+export const FormativeFeedbackSchema = z.object({
+  kind: z.literal('formative'),
+  understood: z.boolean(),
+  highlights: z.array(z.string()),
+  suggestions: z.array(z.string()),
+  model_answer: z.string().optional(),
+});
+
+/** Objective feedback for Listen & Repeat: word-level metrics, no subjective score. */
+export interface RepetitionObjectiveFeedback {
+  kind: 'repetition_objective';
+  exact_repetition: boolean;
+  missing_words: string[];
+  extra_words: string[];
+  transcribed_text: string;
+  original_text: string;
+}
+
+export const RepetitionObjectiveFeedbackSchema = z.object({
+  kind: z.literal('repetition_objective'),
+  exact_repetition: z.boolean(),
+  missing_words: z.array(z.string()),
+  extra_words: z.array(z.string()),
+  transcribed_text: z.string(),
+  original_text: z.string(),
+});
+
 export type ModeFramework = 'generic' | 'cambridge' | 'toefl';
 
 // PracticeMode — open string type. Valid keys follow the {framework}_{exam_part}

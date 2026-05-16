@@ -15,7 +15,7 @@ import {
   type ToeflAudioChunk,
 } from '@/actions/modes/toefl_repeat';
 import { createSessionAction } from '@/actions/sessions';
-import type { RepetitionEvaluation } from '@/lib/types/practice';
+import type { RepetitionObjectiveFeedback } from '@/lib/types/practice';
 
 type Phase =
   | 'loading'
@@ -28,30 +28,10 @@ type Phase =
 
 interface ItemResult {
   item: ToeflRepeatItem;
-  evaluation: RepetitionEvaluation;
+  evaluation: RepetitionObjectiveFeedback;
 }
 
 const RECORD_SECONDS = 10;
-
-function scoreColor(score: number): string {
-  if (score >= 4) return 'text-green-600';
-  if (score >= 2) return 'text-yellow-500';
-  return 'text-red-500';
-}
-
-function scoreBg(score: number): string {
-  if (score >= 4) return 'bg-green-50 border-green-200';
-  if (score >= 2) return 'bg-yellow-50 border-yellow-200';
-  return 'bg-red-50 border-red-200';
-}
-
-function scoreLabel(score: number): string {
-  if (score >= 4.5) return 'Excellent';
-  if (score >= 3.5) return 'Good';
-  if (score >= 2.5) return 'Fair';
-  if (score >= 1.5) return 'Needs Work';
-  return 'Try Again';
-}
 
 interface ToeflListenRepeatPracticeProps {
   onBack: () => void;
@@ -65,7 +45,7 @@ export function ToeflListenRepeatPractice({ onBack }: ToeflListenRepeatPracticeP
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [results, setResults] = useState<ItemResult[]>([]);
-  const [currentEvaluation, setCurrentEvaluation] = useState<RepetitionEvaluation | null>(null);
+  const [currentEvaluation, setCurrentEvaluation] = useState<RepetitionObjectiveFeedback | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -216,11 +196,11 @@ export function ToeflListenRepeatPractice({ onBack }: ToeflListenRepeatPracticeP
         console.error('Evaluation error:', err);
         setError('Evaluation failed. Moving to next item.');
         const item = items[currentIndex];
-        const fallback: RepetitionEvaluation = {
-          score: 0,
-          accuracy: 0,
-          pronunciation: 0,
-          feedback: 'Evaluation could not be completed.',
+        const fallback: RepetitionObjectiveFeedback = {
+          kind: 'repetition_objective',
+          exact_repetition: false,
+          missing_words: [],
+          extra_words: [],
           transcribed_text: '',
           original_text: item.text,
         };
@@ -239,13 +219,11 @@ export function ToeflListenRepeatPractice({ onBack }: ToeflListenRepeatPracticeP
     if (results.length === 0) return;
     if (!sessionIdRef.current || !userIdRef.current) return;
 
-    const avg = (key: keyof RepetitionEvaluation) =>
-      results.reduce((s, r) => s + (r.evaluation[key] as number), 0) / results.length;
+    const exactCount = results.filter((r) => r.evaluation.exact_repetition).length;
 
     saveToeflRepeatSummaryAction(sessionIdRef.current, userIdRef.current, {
-      avgScore: avg('score'),
-      avgAccuracy: avg('accuracy'),
-      avgPronunciation: avg('pronunciation'),
+      exactCount,
+      totalCount: results.length,
       itemCount: results.length,
     }).catch((err) => {
       console.error('[ToeflRepeat persist] summary error:', err);
@@ -276,15 +254,7 @@ export function ToeflListenRepeatPractice({ onBack }: ToeflListenRepeatPracticeP
     autoRecordStartedRef.current = false;
   }, []);
 
-  const avgScore = results.length > 0
-    ? results.reduce((s, r) => s + r.evaluation.score, 0) / results.length
-    : 0;
-  const avgAccuracy = results.length > 0
-    ? results.reduce((s, r) => s + r.evaluation.accuracy, 0) / results.length
-    : 0;
-  const avgPronunciation = results.length > 0
-    ? results.reduce((s, r) => s + r.evaluation.pronunciation, 0) / results.length
-    : 0;
+  const exactCount = results.filter((r) => r.evaluation.exact_repetition).length;
 
   return (
     <div className="flex-1 flex flex-col min-h-0 overflow-auto bg-trebol-bg">
@@ -417,31 +387,13 @@ export function ToeflListenRepeatPractice({ onBack }: ToeflListenRepeatPracticeP
 
         {phase === 'result' && currentEvaluation && items[currentIndex] && (
           <div className="w-full space-y-4">
-            <div className={`rounded-2xl border-2 p-6 text-center ${scoreBg(currentEvaluation.score)}`}>
+            <div className={`rounded-2xl border-2 p-5 text-center ${currentEvaluation.exact_repetition ? 'bg-green-50 border-green-200' : 'bg-amber-50 border-amber-200'}`}>
               <p className="text-xs font-bold uppercase tracking-widest text-trebol-text/50 mb-1">
-                Item {currentIndex + 1} Score
+                Item {currentIndex + 1}
               </p>
-              <p className={`text-6xl font-black ${scoreColor(currentEvaluation.score)}`}>
-                {currentEvaluation.score.toFixed(1)}
+              <p className={`text-xl font-black ${currentEvaluation.exact_repetition ? 'text-green-600' : 'text-amber-600'}`}>
+                {currentEvaluation.exact_repetition ? 'Perfect repetition!' : 'Almost there!'}
               </p>
-              <p className={`text-sm font-bold mt-1 ${scoreColor(currentEvaluation.score)}`}>
-                {scoreLabel(currentEvaluation.score)} / 5.0
-              </p>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div className="bg-white border border-trebol-border rounded-xl p-3 text-center">
-                <p className="text-xs text-trebol-text/50 font-semibold uppercase tracking-wide">Accuracy</p>
-                <p className={`text-2xl font-black mt-1 ${scoreColor(currentEvaluation.accuracy)}`}>
-                  {currentEvaluation.accuracy.toFixed(1)}
-                </p>
-              </div>
-              <div className="bg-white border border-trebol-border rounded-xl p-3 text-center">
-                <p className="text-xs text-trebol-text/50 font-semibold uppercase tracking-wide">Pronunciation</p>
-                <p className={`text-2xl font-black mt-1 ${scoreColor(currentEvaluation.pronunciation)}`}>
-                  {currentEvaluation.pronunciation.toFixed(1)}
-                </p>
-              </div>
             </div>
 
             <div className="bg-white border border-trebol-border rounded-xl p-4 space-y-3">
@@ -455,28 +407,45 @@ export function ToeflListenRepeatPractice({ onBack }: ToeflListenRepeatPracticeP
                   <p className="text-trebol-text/70 text-sm italic">{currentEvaluation.transcribed_text}</p>
                 </div>
               )}
-            </div>
-
-            <div className="bg-trebol-secondary/10 border border-trebol-secondary/20 rounded-xl p-4">
-              <p className="text-trebol-text text-sm font-medium">{currentEvaluation.feedback}</p>
-            </div>
-
-            <button
-              onClick={handleNext}
-              className="w-full bg-trebol-primary hover:bg-trebol-primary/90 text-white font-bold py-3 rounded-xl transition-colors flex items-center justify-center gap-2"
-            >
-              {currentIndex + 1 >= items.length ? (
-                <>
-                  <CheckCircle2 size={18} />
-                  See Results
-                </>
-              ) : (
-                <>
-                  Next
-                  <ChevronRight size={18} />
-                </>
+              {currentEvaluation.missing_words.length > 0 && (
+                <div>
+                  <p className="text-xs font-bold text-red-400 uppercase tracking-widest mb-1">Missing words</p>
+                  <p className="text-red-600 text-sm">{currentEvaluation.missing_words.join(', ')}</p>
+                </div>
               )}
-            </button>
+              {currentEvaluation.extra_words.length > 0 && (
+                <div>
+                  <p className="text-xs font-bold text-amber-500 uppercase tracking-widest mb-1">Extra words</p>
+                  <p className="text-amber-600 text-sm">{currentEvaluation.extra_words.join(', ')}</p>
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setPhase('play')}
+                className="flex-1 border-2 border-trebol-border hover:border-trebol-primary text-trebol-text font-bold py-3 rounded-xl transition-colors flex items-center justify-center gap-2 text-sm"
+              >
+                <RotateCcw size={16} />
+                Retry
+              </button>
+              <button
+                onClick={handleNext}
+                className="flex-1 bg-trebol-primary hover:bg-trebol-primary/90 text-white font-bold py-3 rounded-xl transition-colors flex items-center justify-center gap-2"
+              >
+                {currentIndex + 1 >= items.length ? (
+                  <>
+                    <CheckCircle2 size={18} />
+                    See Results
+                  </>
+                ) : (
+                  <>
+                    Next
+                    <ChevronRight size={18} />
+                  </>
+                )}
+              </button>
+            </div>
 
             {error && (
               <p className="text-red-500 text-xs text-center">{error}</p>
@@ -486,29 +455,10 @@ export function ToeflListenRepeatPractice({ onBack }: ToeflListenRepeatPracticeP
 
         {phase === 'finished' && (
           <div className="w-full space-y-6">
-            <div className={`rounded-2xl border-2 p-6 text-center ${scoreBg(avgScore)}`}>
-              <p className="text-xs font-bold uppercase tracking-widest text-trebol-text/50 mb-1">Session Score</p>
-              <p className={`text-7xl font-black ${scoreColor(avgScore)}`}>
-                {avgScore.toFixed(1)}
-              </p>
-              <p className={`text-base font-bold mt-1 ${scoreColor(avgScore)}`}>
-                {scoreLabel(avgScore)} · avg / 5.0
-              </p>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div className="bg-white border border-trebol-border rounded-xl p-3 text-center">
-                <p className="text-xs text-trebol-text/50 font-semibold uppercase tracking-wide">Avg Accuracy</p>
-                <p className={`text-2xl font-black mt-1 ${scoreColor(avgAccuracy)}`}>
-                  {avgAccuracy.toFixed(1)}
-                </p>
-              </div>
-              <div className="bg-white border border-trebol-border rounded-xl p-3 text-center">
-                <p className="text-xs text-trebol-text/50 font-semibold uppercase tracking-wide">Avg Pronunciation</p>
-                <p className={`text-2xl font-black mt-1 ${scoreColor(avgPronunciation)}`}>
-                  {avgPronunciation.toFixed(1)}
-                </p>
-              </div>
+            <div className="rounded-2xl border-2 p-6 text-center bg-trebol-primary/5 border-trebol-primary/20">
+              <p className="text-xs font-bold uppercase tracking-widest text-trebol-text/50 mb-2">Session Complete</p>
+              <p className="text-5xl font-black text-trebol-primary">{exactCount} / {results.length}</p>
+              <p className="text-sm font-bold text-trebol-text/60 mt-1">exact repetitions</p>
             </div>
 
             <div>
@@ -517,12 +467,12 @@ export function ToeflListenRepeatPractice({ onBack }: ToeflListenRepeatPracticeP
                 {results.map((r, i) => (
                   <div
                     key={i}
-                    className={`rounded-xl border-2 p-2 text-center ${scoreBg(r.evaluation.score)}`}
+                    className={`rounded-xl border-2 p-2 text-center ${r.evaluation.exact_repetition ? 'bg-green-50 border-green-200' : 'bg-amber-50 border-amber-200'}`}
                     title={r.item.text}
                   >
                     <p className="text-xs text-trebol-text/50 font-semibold">{i + 1}</p>
-                    <p className={`text-lg font-black ${scoreColor(r.evaluation.score)}`}>
-                      {r.evaluation.score.toFixed(0)}
+                    <p className={`text-lg font-black ${r.evaluation.exact_repetition ? 'text-green-600' : 'text-amber-500'}`}>
+                      {r.evaluation.exact_repetition ? '✓' : '~'}
                     </p>
                   </div>
                 ))}

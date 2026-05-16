@@ -5,6 +5,8 @@ import { MODELS } from '@/lib/models';
 import {
   CollaborativeEvaluationSchema,
   type CollaborativeEvaluation,
+  FormativeFeedbackSchema,
+  type FormativeFeedback,
 } from '@/lib/types/practice';
 import { getPrompt } from '@/lib/prompts/db-prompts';
 import { createSupabaseServer } from '@/lib/supabase/server';
@@ -53,6 +55,13 @@ const EvaluationFallback: CollaborativeEvaluation = {
   feedback: 'Unable to evaluate at this time. Please try again.',
   strengths: [],
   areas_for_improvement: [],
+};
+
+const FormativeFeedbackFallback: FormativeFeedback = {
+  kind: 'formative',
+  understood: false,
+  highlights: [],
+  suggestions: ['Try again — we could not process your response.'],
 };
 
 async function resolveUserId(): Promise<string | null> {
@@ -236,23 +245,35 @@ Respond with ONLY your next examiner line (no labels, no quotes, under 30 words)
   return { examinerResponse };
 }
 
-/** Evaluate the full conversation and persist the result as an evaluation message. */
+/** Evaluate the full B1 collaborative conversation and return formative feedback (no numeric score). */
 export async function evaluatePart3Action(
   history: Part3ChatMessage[],
   scenario: Part3Scenario,
   sessionId?: string
-): Promise<CollaborativeEvaluation> {
+): Promise<FormativeFeedback> {
   const historyText = history
     .map((h) => `${h.role === 'examiner' ? 'Examiner' : 'Candidate'}: ${h.text}`)
     .join('\n');
-  const prompt = await getPrompt('cambridge_pet_p3_b1_evaluation', {
-    SCENE_TOPIC: scenario.topic,
-    SCENE_QUESTION: scenario.prompt_question,
-    HISTORY_TEXT: historyText,
-  });
+
+  const prompt = `You are a supportive Cambridge B1 Preliminary examiner giving formative feedback.
+
+Topic: "${scenario.topic}"
+Task question: "${scenario.prompt_question}"
+
+Candidate conversation:
+${historyText}
+
+Return ONLY a JSON object with these fields:
+- "kind": always "formative"
+- "understood": boolean — did the candidate communicate their ideas clearly?
+- "highlights": array of 1-3 strings celebrating specific strengths (e.g. "Good use of linking words like 'however'", "Gave clear reasons for your choices")
+- "suggestions": array of 1-3 specific improvement tips (e.g. "Try to use comparative adjectives when comparing options", "Remember to ask the examiner's opinion too")
+- "model_answer": one example sentence demonstrating a strong way to express an opinion on this topic
+
+Return ONLY valid JSON. No score, no band, no percentage.`;
 
   const result = await callGemini(
-    { promptKey: 'cambridge_pet_p3_b1_evaluation', model: MODELS.FLASH_LITE_PREVIEW },
+    { promptKey: 'cambridge_pet_p3_b1_formative', model: MODELS.FLASH_LITE_PREVIEW },
     (ai) => ai.models.generateContent({
       model: MODELS.FLASH_LITE_PREVIEW,
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
@@ -262,17 +283,17 @@ export async function evaluatePart3Action(
 
   if (!result.ok || !result.data.text) {
     console.error(JSON.stringify({ event: 'evaluatePart3Action', error: result.ok ? 'empty response' : result.error }));
-    return EvaluationFallback;
+    return FormativeFeedbackFallback;
   }
 
   let parsed: unknown;
   try {
     parsed = JSON.parse(result.data.text);
   } catch {
-    return EvaluationFallback;
+    return FormativeFeedbackFallback;
   }
 
-  const evaluation = safeParseFallback(CollaborativeEvaluationSchema, parsed, EvaluationFallback);
+  const feedback = safeParseFallback(FormativeFeedbackSchema, parsed, FormativeFeedbackFallback);
 
   if (sessionId) {
     const userId = await resolveUserId();
@@ -282,31 +303,31 @@ export async function evaluatePart3Action(
         userId,
         role: 'bob',
         msgType: 'evaluation',
-        contentJson: evaluation as unknown as Record<string, unknown>,
+        contentJson: feedback as unknown as Record<string, unknown>,
       });
     }
   }
 
-  return evaluation;
+  return feedback;
 }
 
 /** Read persisted messages for a B1 session and hydrate into Part3ChatMessage shape. */
 export async function getB1SessionMessagesAction(
   sessionId: string
-): Promise<{ history: Part3ChatMessage[]; evaluation: CollaborativeEvaluation | null }> {
+): Promise<{ history: Part3ChatMessage[]; feedback: FormativeFeedback | null }> {
   const supabase = await createSupabaseServer();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { history: [], evaluation: null };
+  if (!user) return { history: [], feedback: null };
 
   const rows = await readSessionMessages(sessionId, user.id);
 
   const history: Part3ChatMessage[] = [];
-  let evaluation: CollaborativeEvaluation | null = null;
+  let feedback: FormativeFeedback | null = null;
 
   for (const row of rows) {
     if (row.msg_type === 'evaluation' && row.role === 'bob' && row.content_json) {
-      const parsed = CollaborativeEvaluationSchema.safeParse(row.content_json);
-      if (parsed.success) evaluation = parsed.data;
+      const parsed = FormativeFeedbackSchema.safeParse(row.content_json);
+      if (parsed.success) feedback = parsed.data;
     } else if (row.msg_type === 'text') {
       history.push({
         role: row.role === 'user' ? 'user' : 'examiner',
@@ -315,5 +336,5 @@ export async function getB1SessionMessagesAction(
     }
   }
 
-  return { history, evaluation };
+  return { history, feedback };
 }

@@ -17,6 +17,7 @@ const RECORDER_OPTIONS: MediaRecorderOptions = {
 interface UseAudioRecorderOptions {
   onRecorded: (blob: Blob) => void;
   onError?: (error: Error) => void;
+  minSizeBytes?: number;
 }
 
 interface UseAudioRecorderReturn {
@@ -28,6 +29,7 @@ interface UseAudioRecorderReturn {
 export function useAudioRecorder({
   onRecorded,
   onError,
+  minSizeBytes = 1024,
 }: UseAudioRecorderOptions): UseAudioRecorderReturn {
   const [isRecording, setIsRecording] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -65,6 +67,15 @@ export function useAudioRecorder({
         streamRef.current = null;
 
         const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        if (blob.size < minSizeBytes) {
+          const sizeError = new Error('No audio detected. Please record your response and try again.');
+          if (onError) {
+            onError(sizeError);
+          } else {
+            console.error(sizeError.message);
+          }
+          return;
+        }
         onRecorded(blob);
       };
 

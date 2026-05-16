@@ -2,7 +2,7 @@
 
 import { z } from 'zod';
 import { MODELS } from '@/lib/models';
-import { CambridgeEvaluationSchema, type CambridgeEvaluation } from '@/lib/types/practice';
+import { CambridgeEvaluationSchema, type CambridgeEvaluation, FormativeFeedbackSchema, type FormativeFeedback } from '@/lib/types/practice';
 import { getPrompt } from '@/lib/prompts/db-prompts';
 import { persistMessage, readSessionMessages } from '@/lib/persist-activity';
 import { createSupabaseServer } from '@/lib/supabase/server';
@@ -37,6 +37,13 @@ const CambridgeEvaluationFallback: CambridgeEvaluation = {
   feedback: 'Unable to evaluate at this time. Please try again.',
   strengths: [],
   areas_for_improvement: [],
+};
+
+const FormativeFeedbackFallback: FormativeFeedback = {
+  kind: 'formative',
+  understood: false,
+  highlights: [],
+  suggestions: ['Try again — we could not process your response.'],
 };
 
 /** Generate an A2 session plan and persist it as a 'phrase' message in bob_messages. */
@@ -145,19 +152,32 @@ export async function processA2AnswerAction(
   return { transcribed, reaction };
 }
 
-/** Evaluate the full A2 interview and persist the result as an 'evaluation' message. */
+/** Evaluate the full A2 interview and return formative feedback (no numeric score). */
 export async function evaluateA2FinalAction(
   questionsAndAnswers: Array<{ question: string; answer: string }>,
   sessionId: string,
   userId: string,
-): Promise<CambridgeEvaluation> {
+): Promise<FormativeFeedback> {
   const transcript = questionsAndAnswers
     .map((qa, i) => `Q${i + 1}: ${qa.question}\nA: ${qa.answer}`)
     .join('\n\n');
-  const prompt = await getPrompt('cambridge_ket_part1_a2_evaluation', { QUESTION: 'Full interview', USER_TRANSCRIPT: transcript, AUDIO_DURATION_SECONDS: 0 });
+
+  const prompt = `You are a supportive Cambridge A2 Key English examiner giving formative feedback to a young learner.
+
+Analyse this speaking interview transcript and return ONLY a JSON object with these fields:
+- "kind": always "formative"
+- "understood": boolean — did the student generally communicate successfully?
+- "highlights": array of 1-3 strings celebrating specific things the student did well (e.g. "Used past tense correctly", "Good vocabulary for hobbies")
+- "suggestions": array of 1-3 friendly, concrete improvement tips (e.g. "Try to give longer answers with 'because'", "Remember to use 'there is/are' for descriptions")
+- "model_answer": one short example sentence showing a strong answer to any one question
+
+TRANSCRIPT:
+${transcript}
+
+Return ONLY valid JSON. No score, no band, no percentage.`;
 
   const result = await callGemini(
-    { promptKey: 'cambridge_ket_part1_a2_evaluation', model: MODELS.FLASH_LITE_PREVIEW, userId },
+    { promptKey: 'cambridge_ket_part1_a2_formative', model: MODELS.FLASH_LITE_PREVIEW, userId },
     (ai) => ai.models.generateContent({
       model: MODELS.FLASH_LITE_PREVIEW,
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
@@ -167,47 +187,47 @@ export async function evaluateA2FinalAction(
 
   if (!result.ok || !result.data.text) {
     console.error(JSON.stringify({ event: 'evaluateA2FinalAction', error: result.ok ? 'empty response' : result.error }));
-    return CambridgeEvaluationFallback;
+    return FormativeFeedbackFallback;
   }
 
   let parsed: unknown;
   try {
     parsed = JSON.parse(result.data.text);
   } catch {
-    return CambridgeEvaluationFallback;
+    return FormativeFeedbackFallback;
   }
 
-  const evaluation = safeParseFallback(CambridgeEvaluationSchema, parsed, CambridgeEvaluationFallback);
+  const feedback = safeParseFallback(FormativeFeedbackSchema, parsed, FormativeFeedbackFallback);
 
   const persistResult = await persistMessage({
     sessionId,
     userId,
     role: 'bob',
     msgType: 'evaluation',
-    contentJson: evaluation as unknown as Record<string, unknown>,
+    contentJson: feedback as unknown as Record<string, unknown>,
   });
   if ('error' in persistResult) {
     console.error('[A2 persist] evaluation:', persistResult.error);
   }
 
-  return evaluation;
+  return feedback;
 }
 
-/** Read persisted messages for an A2 session and hydrate plan + QAs + evaluation. */
+/** Read persisted messages for an A2 session and hydrate plan + QAs + formative feedback. */
 export async function getA2SessionMessagesAction(sessionId: string): Promise<{
   plan: A2SessionPlan | null;
   qas: Array<{ question: string; answer: string }>;
-  evaluation: CambridgeEvaluation | null;
+  feedback: FormativeFeedback | null;
 }> {
   const supabase = await createSupabaseServer();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { plan: null, qas: [], evaluation: null };
+  if (!user) return { plan: null, qas: [], feedback: null };
 
   const messages = await readSessionMessages(sessionId, user.id);
 
   let plan: A2SessionPlan | null = null;
   const qas: Array<{ question: string; answer: string }> = [];
-  let evaluation: CambridgeEvaluation | null = null;
+  let feedback: FormativeFeedback | null = null;
 
   for (const msg of messages) {
     if (msg.role === 'bob' && msg.msg_type === 'phrase' && plan === null) {
@@ -217,10 +237,10 @@ export async function getA2SessionMessagesAction(sessionId: string): Promise<{
       const json = msg.content_json as { question?: string } | null;
       qas.push({ question: json?.question ?? '', answer: msg.content_text ?? '' });
     } else if (msg.role === 'bob' && msg.msg_type === 'evaluation') {
-      const r = CambridgeEvaluationSchema.safeParse(msg.content_json);
-      if (r.success) evaluation = r.data;
+      const r = FormativeFeedbackSchema.safeParse(msg.content_json);
+      if (r.success) feedback = r.data;
     }
   }
 
-  return { plan, qas, evaluation };
+  return { plan, qas, feedback };
 }

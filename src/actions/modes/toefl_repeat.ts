@@ -3,7 +3,7 @@
 import { z } from 'zod';
 import { Type, Part } from '@google/genai';
 import { MODELS } from '@/lib/models';
-import { RepetitionEvaluationSchema, RepetitionEvaluation } from '@/lib/types/practice';
+import { RepetitionObjectiveFeedbackSchema, type RepetitionObjectiveFeedback } from '@/lib/types/practice';
 import { getPrompt } from '@/lib/prompts/db-prompts';
 import { persistMessage, readSessionMessages } from '@/lib/persist-activity';
 import { getOrCreateCachedContent } from '@/lib/cache';
@@ -30,11 +30,11 @@ const SessionFallback: ToeflRepeatItem[] = Array.from({ length: 10 }, (_, i) => 
   difficulty: Math.min(5, Math.floor(i / 2) + 1),
 }));
 
-const EvaluationFallback: RepetitionEvaluation = {
-  score: 0,
-  accuracy: 0,
-  pronunciation: 0,
-  feedback: 'Unable to evaluate at this time. Please try again.',
+const ObjectiveFeedbackFallback: RepetitionObjectiveFeedback = {
+  kind: 'repetition_objective',
+  exact_repetition: false,
+  missing_words: [],
+  extra_words: [],
   transcribed_text: '',
   original_text: '',
 };
@@ -187,9 +187,7 @@ export async function generateToeflRepeatAudiosAction(
   return results;
 }
 
-/**
- * Evaluates a user's repetition attempt and persists the audio attempt + per-item result.
- */
+/** Evaluates a repetition attempt; returns objective word-level metrics (no subjective score). */
 export async function evaluateRepetitionAction(
   originalText: string,
   audioBase64: string,
@@ -197,11 +195,25 @@ export async function evaluateRepetitionAction(
   sessionId: string,
   userId: string,
   phraseIndex: number
-): Promise<RepetitionEvaluation> {
-  const prompt = await getPrompt('toefl_listen_repeat_b1_evaluation', { TARGET_SENTENCE: originalText, TARGET_DURATION_SECONDS: 0, USER_TRANSCRIPT: '' });
+): Promise<RepetitionObjectiveFeedback> {
+  const prompt = `You are evaluating a Listen & Repeat exercise.
+
+Target sentence: "${originalText}"
+
+Listen to the audio and transcribe what the student said. Then compare word by word.
+
+Return ONLY a JSON object with these fields:
+- "kind": always "repetition_objective"
+- "exact_repetition": boolean — true only if every word matches exactly (case-insensitive)
+- "missing_words": array of words from the target sentence that were omitted
+- "extra_words": array of words the student said that are not in the target sentence
+- "transcribed_text": what the student actually said (verbatim transcription)
+- "original_text": "${originalText}"
+
+Return ONLY valid JSON. No score, no pronunciation rating, no subjective assessment.`;
 
   const result = await callGemini(
-    { promptKey: 'toefl_listen_repeat_b1_evaluation', model: MODELS.FLASH_LITE_PREVIEW, userId },
+    { promptKey: 'toefl_listen_repeat_b1_objective', model: MODELS.FLASH_LITE_PREVIEW, userId },
     (ai) => ai.models.generateContent({
       model: MODELS.FLASH_LITE_PREVIEW,
       contents: [
@@ -213,45 +225,31 @@ export async function evaluateRepetitionAction(
           ],
         },
       ],
-      config: {
-        responseMimeType: 'application/json',
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            score: { type: Type.NUMBER },
-            accuracy: { type: Type.NUMBER },
-            pronunciation: { type: Type.NUMBER },
-            feedback: { type: Type.STRING },
-            transcribed_text: { type: Type.STRING },
-            original_text: { type: Type.STRING },
-          },
-          required: ['score', 'accuracy', 'pronunciation', 'feedback', 'transcribed_text', 'original_text'],
-        },
-      },
+      config: { responseMimeType: 'application/json' },
     })
   );
 
   if (!result.ok || !result.data.text) {
     console.error(JSON.stringify({ event: 'evaluateRepetitionAction', error: result.ok ? 'empty response' : result.error }));
-    return { ...EvaluationFallback, original_text: originalText };
+    return { ...ObjectiveFeedbackFallback, original_text: originalText };
   }
 
   let parsed: unknown;
   try {
     parsed = JSON.parse(result.data.text);
   } catch {
-    return { ...EvaluationFallback, original_text: originalText };
+    return { ...ObjectiveFeedbackFallback, original_text: originalText };
   }
 
-  const evaluation = safeParseFallback(RepetitionEvaluationSchema, parsed, { ...EvaluationFallback, original_text: originalText });
+  const feedback = safeParseFallback(RepetitionObjectiveFeedbackSchema, parsed, { ...ObjectiveFeedbackFallback, original_text: originalText });
 
   const audioResult = await persistMessage({
     sessionId,
     userId,
     role: 'user',
     msgType: 'user_audio',
-    contentText: evaluation.transcribed_text || null,
-    contentJson: { phraseIndex, accuracy: evaluation.accuracy },
+    contentText: feedback.transcribed_text || null,
+    contentJson: { phraseIndex, exact_repetition: feedback.exact_repetition },
   });
   if ('error' in audioResult) {
     console.error('[ToeflRepeat persist] user_audio failed:', audioResult.error);
@@ -262,13 +260,13 @@ export async function evaluateRepetitionAction(
     userId,
     role: 'bob',
     msgType: 'evaluation',
-    contentJson: { phraseIndex, ...evaluation },
+    contentJson: { phraseIndex, ...feedback },
   });
   if ('error' in evalResult) {
     console.error('[ToeflRepeat persist] evaluation failed:', evalResult.error);
   }
 
-  return evaluation;
+  return feedback;
 }
 
 /**
@@ -277,14 +275,14 @@ export async function evaluateRepetitionAction(
 export async function saveToeflRepeatSummaryAction(
   sessionId: string,
   userId: string,
-  summary: { avgScore: number; avgAccuracy: number; avgPronunciation: number; itemCount: number }
+  summary: { exactCount: number; totalCount: number; itemCount: number }
 ): Promise<void> {
   const result = await persistMessage({
     sessionId,
     userId,
     role: 'bob',
     msgType: 'evaluation',
-    contentText: `Session complete. Average score: ${summary.avgScore.toFixed(2)}`,
+    contentText: `Session complete. Exact repetitions: ${summary.exactCount} of ${summary.totalCount}`,
     contentJson: summary,
   });
   if ('error' in result) {
