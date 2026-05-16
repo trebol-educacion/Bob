@@ -23,9 +23,6 @@ export const MODELS = {
    */
   FLASH_LITE_LATEST: 'gemini-2.5-flash',
 
-  /**
-   * Dedicated fast image-generation model. Llamar vía ai.models.generateImages().
-   * Respuesta en generatedImages[0].image.{ imageBytes, mimeType }.
-   */
-  IMAGE: 'imagen-4.0-fast-generate-001',
+  /** Image generation via generateContent + IMAGE modality. */
+  IMAGE: 'gemini-2.5-flash-image',
 } as const;
