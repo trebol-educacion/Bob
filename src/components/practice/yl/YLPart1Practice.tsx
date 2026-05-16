@@ -49,6 +49,7 @@ import {
   YLUserTextMessage,
   YLBobTextMessage,
   YLChatMicBar,
+  BobAvatar,
 } from './_shared';
 
 type Phase =
@@ -384,6 +385,7 @@ export function YLPart1Practice({
         footerConfig={{ modeLabel: `YL · ${partBadgeLabel}`, modelName: ACTIVE_MODEL_LABEL }}
         inputSlot={null}
         animationKey="yl-part1-readonly"
+        maxWidthClass="max-w-full"
       >
         {messages.map((msg) => (
           <YLReadOnlyMessage
@@ -503,6 +505,7 @@ export function YLPart1Practice({
       footerConfig={{ modeLabel: `YL · ${partBadgeLabel}`, modelName: ACTIVE_MODEL_LABEL }}
       inputSlot={inputBar}
       animationKey="yl-part1"
+      maxWidthClass="max-w-full"
     >
       {chatItems.map((item) => {
         switch (item.kind) {
@@ -529,9 +532,7 @@ export function YLPart1Practice({
       })}
       {isProcessing && (
         <div className="flex justify-start gap-2">
-          <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 text-xs font-bold bg-amber-50 text-amber-600 border border-amber-100 mt-1">
-            B
-          </div>
+          <BobAvatar />
           <div className="rounded-2xl px-4 py-3 bg-white border border-gray-100 flex items-center gap-1.5">
             <div className="w-2 h-2 rounded-full bg-gray-300 animate-bounce" />
             <div className="w-2 h-2 rounded-full bg-gray-300 animate-bounce" style={{ animationDelay: '120ms' }} />

@@ -41,6 +41,8 @@ export type ChatShellProps = {
   inputSlot: React.ReactNode;
   /** Key for motion.section re-mount animation. Pass mode string. */
   animationKey?: string;
+  /** Tailwind max-w-* class for the chat container. Defaults to 'max-w-2xl'. Pass 'max-w-full' to stretch. */
+  maxWidthClass?: string;
 };
 
 const ACCENT: Record<
@@ -134,6 +136,7 @@ export function ChatShell({
   children,
   inputSlot,
   animationKey,
+  maxWidthClass = 'max-w-2xl',
 }: ChatShellProps) {
   const bodyRef = useRef<HTMLDivElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
@@ -151,7 +154,7 @@ export function ChatShell({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -12 }}
       transition={{ duration: 0.25, ease: 'easeOut' }}
-      className="w-full max-w-2xl mx-auto flex flex-col h-full bg-white rounded-sm shadow-xl overflow-hidden"
+      className={`w-full ${maxWidthClass} mx-auto flex flex-col h-full bg-white rounded-sm shadow-xl overflow-hidden`}
     >
       <ChatHeader {...header} />
 

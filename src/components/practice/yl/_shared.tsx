@@ -6,6 +6,7 @@
  */
 
 import React from 'react';
+import Image from 'next/image';
 import { motion } from 'motion/react';
 import { ArrowLeft, Mic, MicOff, CheckCircle } from 'lucide-react';
 import { generateSpeechAction } from '@/actions/gemini';
@@ -16,6 +17,20 @@ import { BobMascotLoader } from '@/components/chat/BobMascotLoader';
 
 export const RECORDING_MAX_SECONDS = 45;
 export const REACTION_PAUSE_MS = 1200;
+
+export function BobAvatar() {
+  return (
+    <div className="w-8 h-8 rounded-xl overflow-hidden shrink-0 bg-amber-50 border border-amber-100 mt-1 relative">
+      <Image
+        src="/bob_avatar.png"
+        alt="Bob"
+        fill
+        sizes="32px"
+        className="object-cover"
+      />
+    </div>
+  );
+}
 
 let _currentAudio: HTMLAudioElement | null = null;
 let _currentText: string | null = null;
@@ -356,9 +371,7 @@ export function YLVoiceNote({
   return (
     <div className={`flex ${isBob ? 'justify-start' : 'justify-end'} gap-2`}>
       {isBob && (
-        <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 text-xs font-bold bg-amber-50 text-amber-600 border border-amber-100 mt-1">
-          B
-        </div>
+        <BobAvatar />
       )}
       <div className={`flex items-center gap-3 rounded-2xl px-3 py-2 max-w-sm ${bubbleColor} ${playing ? 'ring-2 ring-blue-600/30 shadow-md' : ''}`}>
         <button
@@ -403,9 +416,7 @@ export function YLVoiceNote({
 export function YLBobTextMessage({ text }: { text: string }) {
   return (
     <div className="flex justify-start gap-2">
-      <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 text-xs font-bold bg-amber-50 text-amber-600 border border-amber-100 mt-1">
-        B
-      </div>
+      <BobAvatar />
       <div className="rounded-2xl rounded-tl-sm px-4 py-2 bg-white border border-gray-100 shadow-sm text-gray-800 text-sm max-w-sm font-semibold">
         {text}
       </div>
@@ -417,9 +428,7 @@ export function YLImageMessage({ src }: { src: string }) {
   const finalSrc = src.startsWith('data:') ? src : `data:image/png;base64,${src}`;
   return (
     <div className="flex justify-start gap-2">
-      <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 text-xs font-bold bg-amber-50 text-amber-600 border border-amber-100 mt-1">
-        B
-      </div>
+      <BobAvatar />
       <div className="rounded-2xl overflow-hidden shadow bg-white max-w-sm">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={finalSrc} alt="Imagen" className="w-full h-auto block" />
@@ -615,7 +624,7 @@ export function YLReadOnlyMessage({
   if (msgType === 'evaluation') {
     return (
       <div className="flex justify-start gap-2">
-        <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 text-xs font-bold bg-amber-50 text-amber-600 border border-amber-100 mt-1">B</div>
+        <BobAvatar />
         <div className="max-w-xs rounded-2xl rounded-tl-sm px-4 py-3 text-sm bg-white border border-gray-100 text-gray-400 italic">
           📊 Evaluación guardada
         </div>
@@ -635,9 +644,7 @@ export function YLReadOnlyMessage({
   return (
     <div className={`flex ${isBob ? 'justify-start' : 'justify-end'} gap-2`}>
       {isBob && (
-        <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 text-xs font-bold bg-amber-50 text-amber-600 border border-amber-100 mt-1">
-          B
-        </div>
+        <BobAvatar />
       )}
       <div className="flex flex-col gap-1 max-w-md">
         {!isBob && cue && (

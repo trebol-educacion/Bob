@@ -355,7 +355,24 @@ export function YLPointingPractice({
         footerConfig={{ modeLabel: 'YL · POINTING', modelName: ACTIVE_MODEL_LABEL }}
         inputSlot={null}
         animationKey="yl-pointing-readonly"
+        maxWidthClass="max-w-full"
       >
+        {plan?.options && images.length === plan.options.length && (
+          <div className="sticky top-0 z-10 -mx-4 px-4 pt-1 pb-3 bg-slate-50/95 backdrop-blur-sm border-b border-gray-100">
+            <div className="grid grid-cols-4 gap-2 max-w-3xl mx-auto">
+              {plan.options.map((label, idx) => (
+                <div key={`${idx}-${label}`} className="rounded-xl bg-white shadow-sm overflow-hidden ring-1 ring-gray-100">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={images[idx].startsWith('http') || images[idx].startsWith('data:') ? images[idx] : `data:image/png;base64,${images[idx]}`}
+                    alt={label}
+                    className="w-full aspect-square object-cover"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
         {messages
           // Exclude rows that are pure audio cache (yl_tts) or scene
           // images saved separately — they would duplicate the conversation.
@@ -446,7 +463,43 @@ export function YLPointingPractice({
       footerConfig={{ modeLabel: 'YL · POINTING', modelName: ACTIVE_MODEL_LABEL }}
       inputSlot={bottomBar}
       animationKey="yl-pointing"
+      maxWidthClass="max-w-full"
     >
+      {plan?.options && images.length === plan.options.length && (
+        <div className="sticky top-0 z-10 -mx-4 px-4 pt-1 pb-3 bg-slate-50/95 backdrop-blur-sm border-b border-gray-100">
+          <div className="grid grid-cols-4 gap-2 max-w-3xl mx-auto">
+            {plan.options.map((label, idx) => {
+              const disabled = phase !== 'ready' || chosenIndex !== null;
+              const isChosen = chosenIndex === idx;
+              const isTarget = currentCue?.target_index === idx;
+              const showResult = phase === 'answered';
+              const ringClass = showResult
+                ? isTarget
+                  ? 'ring-2 ring-green-500'
+                  : isChosen
+                  ? 'ring-2 ring-red-500'
+                  : 'ring-1 ring-gray-100'
+                : 'ring-1 ring-gray-100 hover:ring-blue-300';
+              return (
+                <button
+                  key={`${idx}-${label}`}
+                  type="button"
+                  onClick={() => handleSelect(idx)}
+                  disabled={disabled}
+                  className={`group rounded-xl bg-white shadow-sm overflow-hidden transition-all ${ringClass} ${disabled ? 'cursor-default' : 'cursor-pointer'}`}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={images[idx].startsWith('http') || images[idx].startsWith('data:') ? images[idx] : `data:image/png;base64,${images[idx]}`}
+                    alt={label}
+                    className={`w-full aspect-square object-cover ${disabled ? '' : 'group-hover:scale-105'} transition-transform`}
+                  />
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
       {turns.map((t) => (
         <React.Fragment key={t.id}>
           <YLBobTextMessage text={t.cueText} />
@@ -484,25 +537,6 @@ export function YLPointingPractice({
         </motion.div>
       )}
 
-      {phase === 'ready' && plan?.options && images.length === plan.options.length && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 max-w-3xl">
-          {plan.options.map((label, idx) => (
-            <button
-              key={`${idx}-${label}`}
-              type="button"
-              onClick={() => handleSelect(idx)}
-              className="group rounded-2xl bg-white shadow hover:shadow-lg overflow-hidden transition-all ring-2 ring-transparent hover:ring-blue-200"
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={images[idx].startsWith('http') || images[idx].startsWith('data:') ? images[idx] : `data:image/png;base64,${images[idx]}`}
-                alt={label}
-                className="w-full aspect-square object-cover group-hover:scale-105 transition-transform"
-              />
-            </button>
-          ))}
-        </div>
-      )}
     </ChatShell>
   );
 }
