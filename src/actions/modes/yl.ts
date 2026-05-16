@@ -49,7 +49,7 @@ const EvalFallback: EvalResponse = {
   score: 5,
   score_max: 15,
   cefr_band: 'a1',
-  feedback: '¡Buen intento! Sigue practicando.',
+  feedback: 'Nice try! Keep practising.',
 };
 
 const TRANSPARENT_PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
@@ -577,25 +577,6 @@ export async function evaluateYLTurnAction(input: {
 }): Promise<YLTurnEvalResult> {
   const { exam, part } = parseYLMode(input.mode);
 
-  if (input.audioDuration <= 0.3) {
-    console.info(
-      `[evaluateYLTurnAction] Audio too short (${input.audioDuration}s) — returning score 0`
-    );
-    return {
-      score: 0,
-      score_max: 15,
-      cefr_band: 'a1',
-      feedback:
-        '¡Casi! Vamos a intentarlo de nuevo juntos. Habla un poquito más.',
-      band_per_criterion: {
-        grammar_and_vocabulary: 0,
-        pronunciation: 0,
-        interactive_communication: 0,
-      },
-      reaction: "Let's try that again together! 🌟",
-    };
-  }
-
   const transcribeResult = await callGemini(
     { promptKey: `${exam}_part${part}_a1_transcribe`, model: MODELS.FLASH_LITE_PREVIEW },
     (ai) => ai.models.generateContent({
@@ -641,15 +622,27 @@ export async function evaluateYLTurnAction(input: {
       (ai) => ai.models.generateContent({
         model: MODELS.FLASH_LITE_PREVIEW,
         contents: [{ role: 'user', parts: [{ text: reactionPrompt }] }],
+        config: { responseMimeType: 'application/json' },
       })
     ),
   ]);
 
-  const reaction = reactionResult.ok ? (reactionResult.data.text ?? '').trim() || '¡Muy bien! 🌟' : '¡Muy bien! 🌟';
+  let reaction = 'Great job! 🌟';
+  if (reactionResult.ok && reactionResult.data.text) {
+    try {
+      const reactionJson = JSON.parse(reactionResult.data.text) as { reaction?: string };
+      if (reactionJson.reaction && reactionJson.reaction.trim()) {
+        reaction = reactionJson.reaction.trim();
+      }
+    } catch {
+      const raw = reactionResult.data.text.trim();
+      if (raw) reaction = raw;
+    }
+  }
 
   if (!evalResult.ok || !evalResult.data.text) {
     console.error(JSON.stringify({ event: 'evaluateYLTurnAction', error: evalResult.ok ? 'empty response' : evalResult.error }));
-    return { ...EvalFallback, reaction };
+    return { ...EvalFallback, reaction, transcript: transcribed };
   }
 
   let parsed: unknown;
@@ -657,16 +650,16 @@ export async function evaluateYLTurnAction(input: {
     parsed = JSON.parse(evalResult.data.text);
   } catch {
     console.error('[evaluateYLTurnAction] Failed to parse eval JSON');
-    return { ...EvalFallback, reaction };
+    return { ...EvalFallback, reaction, transcript: transcribed };
   }
 
   const result = EvalResponseSchema.safeParse(parsed);
   if (!result.success) {
     console.error('[evaluateYLTurnAction] Invalid eval schema:', result.error.message);
-    return { ...EvalFallback, reaction };
+    return { ...EvalFallback, reaction, transcript: transcribed };
   }
 
-  return { ...result.data, reaction };
+  return { ...result.data, reaction, transcript: transcribed };
 }
 
 export async function evaluateYLFinalAction(input: {

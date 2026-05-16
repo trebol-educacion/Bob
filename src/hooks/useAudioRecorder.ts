@@ -74,9 +74,11 @@ export function useAudioRecorder({
           } else {
             console.error(sizeError.message);
           }
+          setIsRecording(false);
           return;
         }
         onRecorded(blob);
+        setIsRecording(false);
       };
 
       mediaRecorder.start();
@@ -94,7 +96,6 @@ export function useAudioRecorder({
   const stopRecording = (): void => {
     if (mediaRecorderRef.current && isRecording) {
       mediaRecorderRef.current.stop();
-      setIsRecording(false);
     }
   };
 

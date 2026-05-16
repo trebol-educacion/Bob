@@ -432,7 +432,7 @@ export function YLUserTextMessage({ text }: { text: string }) {
   return (
     <div className="flex justify-end gap-2">
       <div className="rounded-2xl rounded-tr-sm px-4 py-2 bg-blue-600 text-white text-sm max-w-sm">
-        {text || <span className="text-white/60 italic">(sin audio)</span>}
+        {text || <span className="text-white/60 italic">(no audio)</span>}
       </div>
     </div>
   );

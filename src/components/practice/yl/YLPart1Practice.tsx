@@ -102,10 +102,20 @@ export function YLPart1Practice({
   const recordedBlobRef = useRef<Blob | null>(null);
   const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const turnQAsRef = useRef<{ cue: string; transcript: string }[]>([]);
+  const wasRecordingRef = useRef(false);
 
   const { isRecording, startRecording, stopRecording } = useAudioRecorder({
     onRecorded: (blob) => {
       recordedBlobRef.current = blob;
+    },
+    onError: (err) => {
+      console.warn('[YL][movers_part1] recording error:', err.message);
+      wasRecordingRef.current = false;
+      if (recordingTimerRef.current) {
+        clearInterval(recordingTimerRef.current);
+        recordingTimerRef.current = null;
+      }
+      setPhase('cue-ready');
     },
   });
 
@@ -126,20 +136,25 @@ export function YLPart1Practice({
     if (initialSessionId) {
       setSessionId(initialSessionId);
       const cuesFromMsgs = (initialMessages ?? [])
-        .filter((m) => m.role === 'bob' && m.msg_type === 'yl_cue')
-        .map((m) => (m.content_json as { cue?: string } | null)?.cue)
-        .filter((c): c is string => typeof c === 'string');
+        .filter((m) => m.role === 'bob' && m.msg_type === 'yl_tts')
+        .map((m) => (m.content_text as string) || '')
+        .filter((s) => s.length > 0);
       const imgsFromMsgs = (initialMessages ?? [])
         .filter((m) => m.role === 'bob' && m.msg_type === 'image_scene')
         .map((m) => (m.content_json as { image_data_uri?: string } | null)?.image_data_uri)
         .filter((u): u is string => typeof u === 'string');
-      if (cuesFromMsgs.length > 0) {
-        setPlan({ cues: cuesFromMsgs } as YLPlan);
+      const completedTurns = (initialMessages ?? [])
+        .filter((m) => m.role === 'bob' && m.msg_type === 'yl_cue').length;
+
+      if (imgsFromMsgs.length > 0) setImages(imgsFromMsgs);
+      if (cuesFromMsgs.length > 0) setPlan({ cues: cuesFromMsgs } as YLPlan);
+
+      if (cuesFromMsgs.length > 0 && completedTurns < cuesFromMsgs.length) {
+        setCueIndex(completedTurns);
+        setPhase('ready');
+      } else {
+        setPhase('finished');
       }
-      if (imgsFromMsgs.length > 0) {
-        setImages(imgsFromMsgs);
-      }
-      setPhase('finished');
       return;
     }
 
@@ -191,9 +206,9 @@ export function YLPart1Practice({
 
   useEffect(() => {
     if (phase === 'ready' && plan) {
-      loadCue(0);
+      loadCue(cueIndex);
     }
-  }, [phase, plan, loadCue]);
+  }, [phase, plan, loadCue, cueIndex]);
 
   const handleStartRecording = useCallback(async () => {
     stopCurrentAudio();
@@ -242,24 +257,29 @@ export function YLPart1Practice({
 
   useEffect(() => {
     if (phase !== 'recording') return;
-    if (isRecording) return;
+    if (isRecording) {
+      wasRecordingRef.current = true;
+      return;
+    }
+    if (!wasRecordingRef.current) return;
+    wasRecordingRef.current = false;
 
     if (recordingTimerRef.current) {
       clearInterval(recordingTimerRef.current);
       recordingTimerRef.current = null;
     }
 
+    const blob = recordedBlobRef.current;
+    if (!blob || blob.size === 0) {
+      setPhase('cue-ready');
+      return;
+    }
+
     void (async () => {
       setPhase('processing');
       try {
-        const blob = recordedBlobRef.current;
-        let audioBase64 = '';
-        let audioDuration = 0;
-
-        if (blob && blob.size > 0) {
-          audioBase64 = await blobToBase64(blob);
-          audioDuration = recordingSeconds;
-        }
+        const audioBase64 = await blobToBase64(blob);
+        const audioDuration = recordingSeconds;
 
         const evalResult = await evaluateYLTurnAction({
           mode,
@@ -274,12 +294,12 @@ export function YLPart1Practice({
         await saveYLTurnAction(sessionId!, {
           cue: currentCue,
           cueIndex,
-          transcript: '',
+          transcript: evalResult.transcript,
           reaction: evalResult.reaction,
           evalResult,
         });
 
-        turnQAsRef.current.push({ cue: currentCue, transcript: '' });
+        turnQAsRef.current.push({ cue: currentCue, transcript: evalResult.transcript });
 
         setCurrentReaction(evalResult.reaction);
         setPhase('reaction-ready');
@@ -415,30 +435,17 @@ export function YLPart1Practice({
     }
   }
   if (phase === 'reaction-ready' && currentReaction) {
-    chatItems.push({ kind: 'user-text', id: `u-curr`, text: '' });
+    const lastTranscript = turnQAsRef.current[turnQAsRef.current.length - 1]?.transcript ?? '';
+    const displayTranscript = lastTranscript === '(silence)' ? '' : lastTranscript;
+    chatItems.push({ kind: 'user-text', id: `u-curr`, text: displayTranscript });
     chatItems.push({ kind: 'reaction-text', id: `r-t-${cueIndex}`, text: currentReaction });
     chatItems.push({ kind: 'reaction-voice', id: `r-v-${cueIndex}`, text: currentReaction });
   }
 
-  const canRecord = phase === 'cue-ready' || phase === 'playing-cue';
   const isProcessing = phase === 'processing';
 
-  const inputBar =
-    phase === 'reaction-ready' ? (
-      <div className="border-t border-gray-100 bg-white/90 backdrop-blur p-3 flex items-center justify-center">
-        <button
-          type="button"
-          onClick={handleNextCue}
-          className="px-6 py-3 rounded-full bg-blue-600 text-white font-bold text-sm hover:opacity-90 transition-opacity flex items-center gap-2"
-        >
-          Next question
-          <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
-            <path d="M6 4l12 8-12 8V4z" />
-            <rect x="18" y="4" width="2" height="16" />
-          </svg>
-        </button>
-      </div>
-    ) : (
+  const inputBar = (
+    <div className="flex flex-col">
       <YLChatMicBar
         onStart={handleStartRecording}
         onStop={handleStopRecording}
@@ -451,10 +458,28 @@ export function YLPart1Practice({
             ? 'Bob is speaking…'
             : isProcessing
             ? 'Processing your answer…'
+            : phase === 'reaction-ready'
+            ? 'Try again or move on'
             : 'Tap to answer with your voice'
         }
       />
-    );
+      {phase === 'reaction-ready' && (
+        <div className="border-t border-gray-100 bg-white/90 backdrop-blur p-3 flex items-center justify-center">
+          <button
+            type="button"
+            onClick={handleNextCue}
+            className="px-6 py-3 rounded-full bg-blue-600 text-white font-bold text-sm hover:opacity-90 transition-opacity flex items-center gap-2"
+          >
+            Next question
+            <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
+              <path d="M6 4l12 8-12 8V4z" />
+              <rect x="18" y="4" width="2" height="16" />
+            </svg>
+          </button>
+        </div>
+      )}
+    </div>
+  );
 
   const progressBar = (
     <div className="w-20 h-1.5 bg-gray-100 rounded-full overflow-hidden">

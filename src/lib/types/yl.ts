@@ -27,4 +27,4 @@ export const YLPlanSchema = z.object({
 
 export type YLPlan = z.infer<typeof YLPlanSchema>;
 
-export type YLTurnEvalResult = EvalResponse & { reaction: string };
+export type YLTurnEvalResult = EvalResponse & { reaction: string; transcript: string };
