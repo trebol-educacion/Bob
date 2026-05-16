@@ -3,9 +3,6 @@ import 'server-only';
 import { MODELS } from '@/lib/models';
 import { callGemini } from '@/lib/gemini-client';
 
-/** Fallback when Imagen returns an empty batch (uses generateContent + IMAGE modality). */
-export const YL_IMAGE_FLASH_MODEL = 'gemini-2.5-flash-image';
-
 /** Visible placeholder — not a transparent pixel. */
 export const YL_IMAGE_PLACEHOLDER =
   'data:image/svg+xml,' +
@@ -62,25 +59,8 @@ export function extractFromGenerateImagesResponse(data: unknown): { b64: string;
   return normalizeImagePayload(items[0]?.image);
 }
 
-/** Parses `generateContent` response with IMAGE modality (Gemini Flash Image). */
-export function extractFromGenerateContentResponse(data: unknown): { b64: string; mime: string } | null {
-  const raw = data as {
-    candidates?: Array<{ content?: { parts?: Array<{ inlineData?: { data?: string; mimeType?: string } }> } }>;
-  };
-  const parts = raw.candidates?.[0]?.content?.parts ?? [];
-  for (const part of parts) {
-    const inline = part.inlineData;
-    const b64 = inline?.data;
-    if (b64 && b64.length > 100) {
-      return { b64, mime: inline?.mimeType ?? 'image/png' };
-    }
-  }
-  return null;
-}
 
-/**
- * Tries Imagen `generateImages` (2 attempts), then Gemini Flash Image via `generateContent`.
- */
+/** Tries Imagen `generateImages` up to 2 attempts. Returns null on all failures. */
 export async function generateImageWithFallback(
   promptKey: string,
   imagenPrompt: string
@@ -98,9 +78,7 @@ export async function generateImageWithFallback(
     );
 
     if (!result.ok) {
-      console.warn(
-        JSON.stringify({ event: 'yl_imagen_error', method: 'generateImages', attempt, error: result.error })
-      );
+      console.warn(JSON.stringify({ event: 'yl_imagen_error', attempt, error: result.error }));
       continue;
     }
 
@@ -108,32 +86,8 @@ export async function generateImageWithFallback(
     if (extracted) return extracted;
 
     const raw = result.data as { generatedImages?: unknown[] };
-    console.warn(
-      JSON.stringify({
-        event: 'yl_imagen_empty',
-        method: 'generateImages',
-        attempt,
-        count: raw?.generatedImages?.length ?? 0,
-      })
-    );
+    console.warn(JSON.stringify({ event: 'yl_imagen_empty', attempt, count: raw?.generatedImages?.length ?? 0 }));
   }
 
-  const flashResult = await callGemini(
-    { promptKey: `${promptKey}_flash`, model: YL_IMAGE_FLASH_MODEL },
-    (ai) =>
-      ai.models.generateContent({
-        model: YL_IMAGE_FLASH_MODEL,
-        contents: [{ role: 'user', parts: [{ text: imagenPrompt }] }],
-        config: { responseModalities: ['IMAGE'] },
-      })
-  );
-
-  if (!flashResult.ok) {
-    console.warn(
-      JSON.stringify({ event: 'yl_imagen_error', method: 'generateContent', error: flashResult.error })
-    );
-    return null;
-  }
-
-  return extractFromGenerateContentResponse(flashResult.data);
+  return null;
 }
