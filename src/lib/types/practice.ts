@@ -9,59 +9,17 @@ export type CefrLevel = 'a1' | 'a2' | 'b1' | 'b2' | 'c1' | 'c2';
 export type ModeFramework = 'generic' | 'cambridge' | 'toefl';
 
 // ---------------------------------------------------------------------------
-// PracticeMode — one entry per UI-selectable mode.
-// Keys follow the pattern: {framework}_{exam_part} (no CEFR suffix).
+// PracticeMode — open string type. Valid keys follow the {framework}_{exam_part}
+// pattern (e.g. 'cambridge_pet_p3', 'toefl_listen_repeat').
+// Runtime source of truth: bob_prompts (BD). See decisions.md D-R1, D9-1.
+// Previously a closed literal union backed by MODE_CATALOG; opened in B2 (T2.1)
+// of bob-core so adding a new exam does not require touching types.
 // ---------------------------------------------------------------------------
 
-export type PracticeMode =
-  // Cambridge YL (A1 / A2) — Starters (Pre-A1)
-  | 'cambridge_starters_part1'
-  | 'cambridge_starters_part2'
-  | 'cambridge_starters_part3'
-  | 'cambridge_starters_part4'
-  // Cambridge YL — Movers (A1)
-  | 'cambridge_movers_part1'
-  | 'cambridge_movers_part2'
-  | 'cambridge_movers_part3'
-  | 'cambridge_movers_part4'
-  | 'cambridge_movers_part5'
-  // Cambridge YL — Flyers (A2)
-  | 'cambridge_flyers_part1'
-  // Cambridge KET (A2 Key)
-  | 'cambridge_ket_part1'
-  | 'cambridge_ket_part2'
-  // Cambridge PET (B1 Preliminary)
-  | 'cambridge_pet_p1'
-  | 'cambridge_pet_p2'
-  | 'cambridge_pet_p3'
-  | 'cambridge_pet_p4'
-  // Cambridge FCE (B2 First)
-  | 'cambridge_fce_p1'
-  | 'cambridge_fce_p2'
-  | 'cambridge_fce_p3'
-  | 'cambridge_fce_p4'
-  // Cambridge CAE (C1 Advanced)
-  | 'cambridge_cae_p1'
-  | 'cambridge_cae_p2'
-  | 'cambridge_cae_p3'
-  | 'cambridge_cae_p4'
-  // Cambridge CPE (C2 Proficiency)
-  | 'cambridge_cpe_p1'
-  | 'cambridge_cpe_p2'
-  | 'cambridge_cpe_p3a'
-  | 'cambridge_cpe_p3b'
-  | 'cambridge_cpe_p4'
-  // TOEFL iBT
-  | 'toefl_listen_repeat'
-  | 'toefl_interview'
-  // Generic (always visible)
-  | 'generic_situation'
-  | 'generic_image'
-  | 'generic_conversation'
-  | null;
+export type PracticeMode = string | null;
 
 /** Alias — non-nullable mode key (used as Record key, component prop, etc.). */
-export type ModeKey = NonNullable<PracticeMode>;
+export type ModeKey = string;
 
 // ---------------------------------------------------------------------------
 // ModeDef — describes framework membership and which CEFR levels trigger it.
