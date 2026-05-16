@@ -132,6 +132,7 @@ export default function App() {
     sessionId: activeSessionId ?? undefined,
     initialMessages: selectedMessages.length > 0 ? selectedMessages : undefined,
     onSessionCreated: handleYLSessionCreated,
+    onSessionFinished: refreshSessions,
   };
 
   const examProps: ExamRenderProps = {

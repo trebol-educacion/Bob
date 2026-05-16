@@ -53,6 +53,7 @@ export interface YLPointingPracticeProps {
   sessionId?: string;
   initialMessages?: BobMessageShape[];
   onSessionCreated?: (sessionId: string) => void;
+  onSessionFinished?: () => void;
 }
 
 type Phase = 'loading' | 'ready' | 'answered' | 'evaluating' | 'finished';
@@ -64,6 +65,7 @@ export function YLPointingPractice({
   sessionId: initialSessionId,
   initialMessages,
   onSessionCreated,
+  onSessionFinished,
 }: YLPointingPracticeProps) {
   const mode: ModeKey = `cambridge_${exam}_part${part}` as ModeKey;
   const isReadOnly = !!initialMessages && initialMessages.length > 0;
@@ -317,11 +319,12 @@ export function YLPointingPractice({
           console.warn('[YLPointing] saveYLFinalEvalAction failed:', err);
         }
         setPhase('finished');
+        onSessionFinished?.();
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Error finalizing the session');
       }
     })();
-  }, [phase, sessionId, plan, score, mode]);
+  }, [phase, sessionId, plan, score, mode, onSessionFinished]);
 
   if (error) return <YLErrorScreen error={error} onBack={onBack} />;
   if (phase === 'loading')
@@ -348,13 +351,20 @@ export function YLPointingPractice({
     </span>
   );
 
-  const progressBar = (
-    <div className="w-20 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-      <motion.div
-        animate={{ width: `${progress}%` }}
-        transition={{ duration: 0.4 }}
-        className="h-full bg-blue-600"
-      />
+  const progressDots = (
+    <div className="flex items-center gap-1.5" aria-label={`Round ${cueIndex + 1} of ${totalCues}`}>
+      {Array.from({ length: totalCues }).map((_, i) => {
+        const turn = turns[i];
+        const isActive = i === cueIndex && phase !== 'finished';
+        const cls = turn
+          ? turn.correct
+            ? 'bg-green-500'
+            : 'bg-red-500'
+          : isActive
+          ? 'bg-blue-500 ring-2 ring-blue-200'
+          : 'bg-gray-200';
+        return <span key={i} className={`w-2.5 h-2.5 rounded-full ${cls}`} />;
+      })}
     </div>
   );
 
@@ -371,7 +381,7 @@ export function YLPointingPractice({
 
     return (
       <ChatShell
-        headerConfig={{ icon: MapPin, title: 'Starters — Pointing', subtitle: 'Practice history', accentColor: 'amber', leftSlot: backButton, rightSlot: partBadge, online: false }}
+        headerConfig={{ icon: MapPin, title: 'Starters — Pointing', subtitle: 'Practice history', accentColor: 'amber', leftSlot: backButton, rightSlot: <div className="flex items-center gap-3">{progressDots}{partBadge}</div>, online: false }}
         footerConfig={{ modeLabel: 'YL · POINTING', modelName: ACTIVE_MODEL_LABEL }}
         inputSlot={null}
         animationKey="yl-pointing-readonly"
@@ -479,7 +489,7 @@ export function YLPointingPractice({
 
   return (
     <ChatShell
-      headerConfig={{ icon: MapPin, title: 'Starters — Pointing', subtitle: `Ages 6–8 · Round ${cueIndex + 1}/${totalCues}`, accentColor: 'amber', leftSlot: backButton, rightSlot: <div className="flex items-center gap-2">{progressBar}{partBadge}</div>, online: true }}
+      headerConfig={{ icon: MapPin, title: 'Starters — Pointing', subtitle: `Ages 6–8 · Round ${cueIndex + 1}/${totalCues}`, accentColor: 'amber', leftSlot: backButton, rightSlot: <div className="flex items-center gap-3">{progressDots}{partBadge}</div>, online: true }}
       footerConfig={{ modeLabel: 'YL · POINTING', modelName: ACTIVE_MODEL_LABEL }}
       inputSlot={bottomBar}
       animationKey="yl-pointing"

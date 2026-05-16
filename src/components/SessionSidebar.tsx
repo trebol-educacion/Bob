@@ -138,12 +138,30 @@ export function SessionSidebar({
               onClick={() => onSelectSession(s.id)}
               title={s.title}
             >
-              <Icon size={18} className={cn('shrink-0', isActive ? 'text-trebol-primary' : 'text-trebol-text/60')} />
+              <div className="relative shrink-0">
+                <Icon size={18} className={cn(isActive ? 'text-trebol-primary' : 'text-trebol-text/60')} />
+                {s.final_score != null && (
+                  <span
+                    className="absolute -top-0.5 -right-1 w-2.5 h-2.5 rounded-full bg-green-500 ring-2 ring-white"
+                    aria-label="Completed"
+                  />
+                )}
+              </div>
               {!collapsed && (
                 <>
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-semibold text-trebol-text truncate">{s.title}</div>
-                    <div className="text-[10px] text-trebol-text/50">{relativeDate(s.created_at)}</div>
+                    <div className="text-[10px] text-trebol-text/50 flex items-center gap-1.5">
+                      <span>{relativeDate(s.created_at)}</span>
+                      {s.final_score != null && (
+                        <>
+                          <span className="text-trebol-text/30">·</span>
+                          <span className="font-bold text-green-600">
+                            {s.final_score_max ? `${s.final_score}/${s.final_score_max}` : `${s.final_score}%`}
+                          </span>
+                        </>
+                      )}
+                    </div>
                   </div>
                   <button
                     type="button"

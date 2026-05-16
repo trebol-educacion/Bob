@@ -14,6 +14,8 @@ export interface BobSession {
   title: string;
   created_at: string;
   updated_at: string;
+  final_score?: number | null;
+  final_score_max?: number | null;
 }
 
 export interface ActionResult<T> {
@@ -57,7 +59,36 @@ export async function getSessionsAction(): Promise<ActionResult<BobSession[]>> {
       .order('created_at', { ascending: false });
 
     if (error) return { data: null, error: error.message };
-    return { data: data as BobSession[], error: null };
+    const sessions = (data ?? []) as BobSession[];
+    if (sessions.length === 0) return { data: sessions, error: null };
+
+    const ids = sessions.map((s) => s.id);
+    const { data: evals } = await supabase
+      .from('bob_messages')
+      .select('session_id, content_json')
+      .in('session_id', ids)
+      .eq('msg_type', 'evaluation');
+
+    const finalEvals = new Map<string, { score: number | null; score_max: number | null }>();
+    for (const ev of evals ?? []) {
+      const cj = (ev.content_json ?? {}) as Record<string, unknown>;
+      if (cj.is_final === true) {
+        finalEvals.set(ev.session_id as string, {
+          score: typeof cj.score === 'number' ? cj.score : null,
+          score_max: typeof cj.score_max === 'number' ? cj.score_max : null,
+        });
+      }
+    }
+
+    const enriched = sessions.map((s) => {
+      const fe = finalEvals.get(s.id);
+      return {
+        ...s,
+        final_score: fe?.score ?? null,
+        final_score_max: fe?.score_max ?? null,
+      };
+    });
+    return { data: enriched, error: null };
   } catch (e) {
     return { data: null, error: String(e) };
   }

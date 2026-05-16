@@ -29,6 +29,7 @@ export interface YLRenderProps {
   sessionId?: string;
   initialMessages?: StoredMessage[];
   onSessionCreated?: (sessionId: string) => void;
+  onSessionFinished?: () => void;
 }
 
 export interface ExamRenderProps {
