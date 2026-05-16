@@ -62,17 +62,25 @@ function ModeCard({ mode, icon, title, description, badge, officialName, theme, 
   if (theme) {
     return (
       <motion.button
-        whileHover={disabled ? {} : { y: -2 }}
+        initial="rest"
+        animate="rest"
+        whileHover={disabled ? undefined : 'hover'}
         whileTap={disabled ? {} : { scale: 0.99 }}
+        variants={{ rest: { y: 0 }, hover: { y: -2 } }}
+        transition={{ duration: 0.2, ease: 'easeOut' }}
         onClick={() => !disabled && onSelect(mode)}
         disabled={disabled}
-        className={`font-nunito ${theme.cardBg} ${theme.cardRing} shadow-[0_1px_2px_rgba(0,0,0,0.04)] hover:shadow-md rounded-2xl p-6 text-left space-y-4 transition-all duration-200 group relative overflow-hidden
+        className={`font-nunito ${theme.cardBg} ${theme.cardRing} shadow-[0_1px_2px_rgba(0,0,0,0.04)] hover:shadow-md rounded-2xl p-6 text-left space-y-4 transition-shadow duration-200 group relative overflow-hidden
           ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
       >
         <div className="flex items-start justify-between gap-2">
-          <div className={`${theme.iconBg} ${theme.iconText} p-3.5 rounded-xl w-fit transition-colors duration-200`}>
+          <motion.div
+            variants={{ rest: { rotate: 0 }, hover: { rotate: -10 } }}
+            transition={{ type: 'spring', stiffness: 400, damping: 12 }}
+            className={`${theme.iconBg} ${theme.iconText} p-3.5 rounded-xl w-fit transition-colors duration-200`}
+          >
             {icon}
-          </div>
+          </motion.div>
           {badge && (
             <span className={`text-[11px] font-bold ${theme.badgeBg} ${theme.badgeText} px-2.5 py-1 rounded-full shrink-0 tracking-wide`}>
               {badge}
