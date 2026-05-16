@@ -122,7 +122,7 @@ export function SessionSidebar({
           </div>
         )}
         {sessions.map((s) => {
-          const Icon = s.mode ? MODE_ICON[s.mode] : MessageSquare;
+          const Icon = (s.mode && MODE_ICON[s.mode]) || MessageSquare;
           const isActive = s.id === activeSessionId;
           return (
             <div
