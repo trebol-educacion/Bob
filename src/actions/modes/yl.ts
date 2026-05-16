@@ -9,6 +9,11 @@ import { createSupabaseServer } from '@/lib/supabase/server';
 import { persistMessage, persistMessages } from '@/lib/persist-activity';
 import { getOrCreateCachedContent } from '@/lib/cache';
 import { callGemini, safeParseFallback } from '@/lib/gemini-client';
+import {
+  buildDirectImagenPrompt,
+  generateImageWithFallback,
+  YL_IMAGE_PLACEHOLDER,
+} from '@/lib/yl-imagen';
 
 /** Map a ModeKey to exam + part number. */
 function parseYLMode(mode: ModeKey): { exam: YLExam; part: number } {
@@ -52,7 +57,6 @@ const EvalFallback: EvalResponse = {
   feedback: 'Nice try! Keep practising.',
 };
 
-const TRANSPARENT_PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
 
 export async function startYLSessionAction(input: {
   mode: ModeKey;
@@ -350,54 +354,14 @@ export async function generateYLImageAction(
     { kind: 'image', promptKey: `yl-image-${exam}-part${part}`, inputs: cacheInputs },
     async () => {
       const key = imageGenKey(exam, part);
-      const t0 = Date.now();
+      const imagenPrompt = buildDirectImagenPrompt(imagePrompt, characterDescription);
+      const pixels = await generateImageWithFallback(key, imagenPrompt);
 
-      const params: Record<string, string> = {
-        IMAGE_PROMPT: imagePrompt,
-        SCENE_DESCRIPTION: imagePrompt,
-        DIFFERENCES_LIST: imagePrompt,
-        CONTEXT_DESCRIPTION: imagePrompt,
-      };
-      if (characterDescription) {
-        params.CHARACTER_DESCRIPTION = characterDescription;
-      }
-      const fullPrompt = await getPrompt(key, params);
-
-      let imgB64: string | null = null;
-      let mime = 'image/png';
-      for (let attempt = 0; attempt < 2; attempt++) {
-        const tImg = Date.now();
-        const result = await callGemini(
-          { promptKey: key, model: MODELS.IMAGE },
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (ai) => (ai.models as any).generateImages({
-            model: MODELS.IMAGE,
-            prompt: fullPrompt,
-            config: { numberOfImages: 1, aspectRatio: '1:1' },
-          })
-        );
-        console.log(`[YL][${exam}_part${part}] image ${idx + 1} attempt ${attempt + 1} returned in ${Date.now() - tImg}ms (elapsed ${Date.now() - t0}ms)`);
-
-        if (!result.ok) {
-          console.warn(`[generateYLImageAction] gemini error attempt ${attempt + 1}:`, result.error);
-          continue;
-        }
-
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const generated = (result.data as any)?.generatedImages?.[0]?.image;
-        const data: string | undefined = generated?.imageBytes;
-        const partMime: string = generated?.mimeType ?? 'image/jpeg';
-        if (data) {
-          imgB64 = data;
-          mime = partMime;
-          break;
-        }
-        console.warn(`[generateYLImageAction] empty image attempt ${attempt + 1}, prompt:`, fullPrompt.slice(0, 200));
-      }
-
-      if (!imgB64) {
+      if (!pixels) {
         throw new Error('empty image after all attempts');
       }
+
+      const { b64: imgB64, mime } = pixels;
 
       const supabase = await createSupabaseServer();
       const { data: { user } } = await supabase.auth.getUser();
@@ -424,7 +388,7 @@ export async function generateYLImageAction(
   );
 
   if (typeof cached === 'object' && 'error' in cached) {
-    return TRANSPARENT_PNG;
+    return YL_IMAGE_PLACEHOLDER;
   }
   return cached as string;
 }
@@ -450,48 +414,16 @@ export async function generateYLImagesAction(
 
   const images = await Promise.all(
     imagePrompts.map(async (imagePrompt, idx) => {
-      const params: Record<string, string> = {
-        IMAGE_PROMPT: imagePrompt,
-        SCENE_DESCRIPTION: imagePrompt,
-        DIFFERENCES_LIST: imagePrompt,
-        CONTEXT_DESCRIPTION: imagePrompt,
-      };
-      if (characterDescription) {
-        params.CHARACTER_DESCRIPTION = characterDescription;
-      }
-
-      const fullPrompt = await getPrompt(key, params);
-
-      for (let attempt = 0; attempt < 2; attempt++) {
-        const tImg = Date.now();
-        const result = await callGemini(
-          { promptKey: key, model: MODELS.IMAGE },
-          (ai) => ai.models.generateContent({
-            model: MODELS.IMAGE,
-            contents: [{ role: 'user', parts: [{ text: fullPrompt }] }],
-            config: { responseModalities: ['IMAGE'] },
-          })
+      const imagenPrompt = buildDirectImagenPrompt(imagePrompt, characterDescription);
+      const pixels = await generateImageWithFallback(key, imagenPrompt);
+      if (pixels) {
+        console.log(
+          `[YL][${exam}_part${part}] image ${idx + 1} ok in ${Date.now() - t0}ms (total elapsed)`
         );
-        console.log(`[YL][${exam}_part${part}] image ${idx + 1} attempt ${attempt + 1} returned in ${Date.now() - tImg}ms (total elapsed ${Date.now() - t0}ms)`);
-
-        if (!result.ok) {
-          console.warn(`[generateYLImagesAction] gemini error attempt ${attempt + 1}:`, result.error);
-          continue;
-        }
-
-        const parts = result.data.candidates?.[0]?.content?.parts ?? [];
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const imagePart = parts.find((p: any) => p.inlineData);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const data = (imagePart as any)?.inlineData?.data;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const mime = (imagePart as any)?.inlineData?.mimeType ?? 'image/png';
-        if (data) {
-          return `data:${mime};base64,${data}`;
-        }
-        console.warn(`[generateYLImagesAction] empty image (attempt ${attempt + 1}); prompt:`, fullPrompt.slice(0, 200));
+        return `data:${pixels.mime};base64,${pixels.b64}`;
       }
-      return TRANSPARENT_PNG;
+      console.warn(`[generateYLImagesAction] empty image ${idx + 1}; scene:`, imagePrompt.slice(0, 120));
+      return YL_IMAGE_PLACEHOLDER;
     })
   );
 
