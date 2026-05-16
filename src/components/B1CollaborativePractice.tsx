@@ -29,6 +29,7 @@ import {
   type Part3ChatMessage,
 } from '@/actions/modes/part3';
 import type { CollaborativeEvaluation } from '@/lib/types/practice';
+import { BobMascotLoader } from '@/components/chat/BobMascotLoader';
 
 interface B1CollaborativePracticeProps {
   onBack: () => void;
@@ -453,13 +454,7 @@ export function B1CollaborativePractice({ onBack, sessionId: initialSessionId }:
   }
 
   if (phase === 'evaluating') {
-    return (
-      <div className="flex-1 flex flex-col items-center justify-center gap-4 text-trebol-text/60">
-        <Loader2 size={40} className="animate-spin text-trebol-primary" />
-        <p className="font-semibold text-lg">Evaluating your performance…</p>
-        <p className="text-sm">This takes a few seconds</p>
-      </div>
-    );
+    return <BobMascotLoader message="Evaluating your performance…" />;
   }
 
   if (phase === 'result' && evaluation) {

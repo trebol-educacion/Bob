@@ -12,6 +12,7 @@ import { generateSpeechAction } from '@/actions/gemini';
 import { getOrCreateCueAudioAction } from '@/actions/modes/yl';
 import { pcmToWavBase64 } from '@/lib/audio';
 import type { EvalResponse } from '@/lib/types/practice';
+import { BobMascotLoader } from '@/components/chat/BobMascotLoader';
 
 export const RECORDING_MAX_SECONDS = 45;
 export const REACTION_PAUSE_MS = 1200;
@@ -75,13 +76,9 @@ export async function playTTS(text: string): Promise<void> {
   }
 }
 
+/** Loading screen shown during YL activity setup — uses Bob mascot per D-B3. */
 export function YLLoadingScreen({ message }: { message: string }) {
-  return (
-    <div className="flex-1 flex flex-col items-center justify-center gap-4">
-      <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
-      <p className="text-gray-500 font-semibold">{message}</p>
-    </div>
-  );
+  return <BobMascotLoader message={message} />;
 }
 
 export function YLErrorScreen({

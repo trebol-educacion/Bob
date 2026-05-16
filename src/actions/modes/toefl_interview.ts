@@ -8,6 +8,7 @@ import { ToeflEvaluationSchema } from '@/lib/types/practice';
 import type { ToeflEvaluation } from '@/lib/types/practice';
 import { getPrompt } from '@/lib/prompts/db-prompts';
 import { persistMessage, readSessionMessages } from '@/lib/persist-activity';
+import { getOrCreateCachedContent } from '@/lib/cache';
 
 const ToeflQuestionSchema = z.object({
   text: z.string(),
@@ -25,49 +26,58 @@ const ToeflInterviewPlanSchema = z.object({
 export type ToeflInterviewPlan = z.infer<typeof ToeflInterviewPlanSchema>;
 export type ToeflQuestion = z.infer<typeof ToeflQuestionSchema>;
 
-/**
- * Generates a TOEFL Interview session plan with 4 progressive questions.
- */
+/** Generates a TOEFL Interview session plan with 4 progressive questions. */
 export async function generateToeflInterviewAction(): Promise<ToeflInterviewPlan> {
   const ai = getAiClient();
-  const prompt = await getPrompt('toefl_interview_b2_generation');
 
-  const response = await ai.models.generateContent({
-    model: MODELS.FLASH_LITE_PREVIEW,
-    contents: [{ role: 'user', parts: [{ text: prompt }] }],
-    config: {
-      responseMimeType: 'application/json',
-      responseSchema: {
-        type: Type.OBJECT,
-        properties: {
-          topic_id: { type: Type.STRING },
-          topic_name: { type: Type.STRING },
-          topic_context: { type: Type.STRING },
-          questions: {
-            type: Type.ARRAY,
-            items: {
-              type: Type.OBJECT,
-              properties: {
-                text: { type: Type.STRING },
-                difficulty: { type: Type.NUMBER },
-                suggested_time: { type: Type.NUMBER },
+  const cached = await getOrCreateCachedContent<ToeflInterviewPlan>(
+    { kind: 'plan', promptKey: 'toefl-interview-b2-plan', inputs: {} },
+    async () => {
+      const prompt = await getPrompt('toefl_interview_b2_generation');
+
+      const response = await ai.models.generateContent({
+        model: MODELS.FLASH_LITE_PREVIEW,
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        config: {
+          responseMimeType: 'application/json',
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              topic_id: { type: Type.STRING },
+              topic_name: { type: Type.STRING },
+              topic_context: { type: Type.STRING },
+              questions: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    text: { type: Type.STRING },
+                    difficulty: { type: Type.NUMBER },
+                    suggested_time: { type: Type.NUMBER },
+                  },
+                  required: ['text', 'difficulty', 'suggested_time'],
+                },
               },
-              required: ['text', 'difficulty', 'suggested_time'],
             },
+            required: ['topic_id', 'topic_name', 'topic_context', 'questions'],
           },
         },
-        required: ['topic_id', 'topic_name', 'topic_context', 'questions'],
-      },
+      });
+
+      const raw = response.text ?? '';
+      const parsed = ToeflInterviewPlanSchema.safeParse(JSON.parse(raw));
+      if (!parsed.success) {
+        throw new Error(`Invalid TOEFL interview plan: ${parsed.error.message}`);
+      }
+      return parsed.data;
     },
-  });
+    { storeAs: 'json' }
+  );
 
-  const raw = response.text ?? '';
-  const parsed = ToeflInterviewPlanSchema.safeParse(JSON.parse(raw));
-  if (!parsed.success) {
-    throw new Error(`Invalid TOEFL interview plan: ${parsed.error.message}`);
+  if ('error' in cached) {
+    throw new Error(cached.error);
   }
-
-  return parsed.data;
+  return cached;
 }
 
 /**

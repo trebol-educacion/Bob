@@ -11,6 +11,7 @@ import { getPrompt } from '@/lib/prompts/db-prompts';
 import { createSupabaseServer } from '@/lib/supabase/server';
 import { persistMessage, readSessionMessages } from '@/lib/persist-activity';
 import type { PersistMessageInput } from '@/lib/persist-activity';
+import { getOrCreateCachedContent } from '@/lib/cache';
 
 export type Part3Scenario = {
   topic: string;
@@ -53,25 +54,35 @@ async function safePersist(input: PersistMessageInput): Promise<void> {
 export async function generatePart3ScenarioAction(sessionId?: string): Promise<Part3Scenario> {
   const ai = getAiClient();
 
-  const response = await ai.models.generateContent({
-    model: MODELS.FLASH_LITE_PREVIEW,
-    contents: [{ role: 'user', parts: [{ text: await getPrompt('cambridge_pet_p3_b1_generation') }] }],
-    config: {
-      responseMimeType: 'application/json',
+  const cached = await getOrCreateCachedContent<Part3Scenario>(
+    { kind: 'plan', promptKey: 'cambridge-pet-p3-b1-scenario', inputs: {} },
+    async () => {
+      const response = await ai.models.generateContent({
+        model: MODELS.FLASH_LITE_PREVIEW,
+        contents: [{ role: 'user', parts: [{ text: await getPrompt('cambridge_pet_p3_b1_generation') }] }],
+        config: {
+          responseMimeType: 'application/json',
+        },
+      });
+
+      const raw = response.text ?? '';
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(raw);
+      } catch {
+        throw new Error('Gemini returned invalid JSON');
+      }
+      const result = Part3ScenarioSchema.safeParse(parsed);
+      if (!result.success) {
+        throw new Error(`Invalid scenario from AI: ${result.error.message}`);
+      }
+      return result.data;
     },
-  });
+    { storeAs: 'json' }
+  );
 
-  const raw = response.text ?? '';
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    throw new Error('Gemini returned invalid JSON');
-  }
-  const result = Part3ScenarioSchema.safeParse(parsed);
-
-  if (!result.success) {
-    throw new Error(`Invalid scenario from AI: ${result.error.message}`);
+  if ('error' in cached) {
+    throw new Error(cached.error);
   }
 
   if (sessionId) {
@@ -82,12 +93,12 @@ export async function generatePart3ScenarioAction(sessionId?: string): Promise<P
         userId,
         role: 'bob',
         msgType: 'phrase',
-        contentJson: result.data as unknown as Record<string, unknown>,
+        contentJson: cached as unknown as Record<string, unknown>,
       });
     }
   }
 
-  return result.data;
+  return cached;
 }
 
 /** Process an audio turn, persist both user and Bob messages, and return transcription + examiner reply. */

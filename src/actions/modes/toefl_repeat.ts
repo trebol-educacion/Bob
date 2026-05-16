@@ -7,6 +7,7 @@ import { MODELS } from '@/lib/models';
 import { RepetitionEvaluationSchema, RepetitionEvaluation } from '@/lib/types/practice';
 import { getPrompt } from '@/lib/prompts/db-prompts';
 import { persistMessage, readSessionMessages } from '@/lib/persist-activity';
+import { getOrCreateCachedContent } from '@/lib/cache';
 
 const ToeflRepeatItemSchema = z.object({
   text: z.string(),
@@ -32,53 +33,63 @@ export async function generateToeflRepeatSessionAction(
   userId: string
 ): Promise<ToeflRepeatItem[]> {
   const ai = getAiClient();
-  const prompt = await getPrompt('toefl_listen_repeat_b1_generation');
 
-  const response = await ai.models.generateContent({
-    model: MODELS.FLASH_LITE_PREVIEW,
-    contents: [{ role: 'user', parts: [{ text: prompt }] }],
-    config: {
-      responseMimeType: 'application/json',
-      responseSchema: {
-        type: Type.OBJECT,
-        properties: {
-          items: {
-            type: Type.ARRAY,
-            items: {
-              type: Type.OBJECT,
-              properties: {
-                text: { type: Type.STRING },
-                difficulty: { type: Type.NUMBER },
+  const cached = await getOrCreateCachedContent<ToeflRepeatItem[]>(
+    { kind: 'plan', promptKey: 'toefl-listen-repeat-b1-plan', inputs: {} },
+    async () => {
+      const prompt = await getPrompt('toefl_listen_repeat_b1_generation');
+
+      const response = await ai.models.generateContent({
+        model: MODELS.FLASH_LITE_PREVIEW,
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        config: {
+          responseMimeType: 'application/json',
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              items: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    text: { type: Type.STRING },
+                    difficulty: { type: Type.NUMBER },
+                  },
+                  required: ['text', 'difficulty'],
+                },
               },
-              required: ['text', 'difficulty'],
             },
+            required: ['items'],
           },
         },
-        required: ['items'],
-      },
+      });
+
+      const raw = response.text ?? '';
+      const parsed = ToeflRepeatSessionSchema.safeParse(JSON.parse(raw));
+      if (!parsed.success) {
+        throw new Error(`Invalid TOEFL session data: ${parsed.error.message}`);
+      }
+      return parsed.data.items;
     },
-  });
+    { storeAs: 'json' }
+  );
 
-  const raw = response.text ?? '';
-  const parsed = ToeflRepeatSessionSchema.safeParse(JSON.parse(raw));
-  if (!parsed.success) {
-    throw new Error(`Invalid TOEFL session data: ${parsed.error.message}`);
+  if ('error' in cached) {
+    throw new Error(cached.error);
   }
-
-  const items = parsed.data.items;
 
   const persistResult = await persistMessage({
     sessionId,
     userId,
     role: 'bob',
     msgType: 'phrase',
-    contentJson: { phrases: items },
+    contentJson: { phrases: cached },
   });
   if ('error' in persistResult) {
     console.error('[ToeflRepeat persist] phrase plan failed:', persistResult.error);
   }
 
-  return items;
+  return cached;
 }
 
 /**
@@ -93,36 +104,47 @@ export async function generateToeflRepeatAudiosAction(
   const results: ToeflAudioChunk[] = [];
 
   const generateOne = async (phrase: string): Promise<ToeflAudioChunk> => {
-    const response = await ai.models.generateContent({
-      model: MODELS.TTS,
-      contents: [
-        {
-          role: 'user',
-          parts: [{ text: `Read this sentence aloud with clear, natural pronunciation: "${phrase}"` }],
-        },
-      ],
-      config: {
-        responseModalities: ['audio'],
-        speechConfig: {
-          voiceConfig: {
-            prebuiltVoiceConfig: {
-              voiceName: 'Sadaltager',
+    const cached = await getOrCreateCachedContent<ToeflAudioChunk>(
+      { kind: 'tts', promptKey: 'toefl-listen-repeat-phrase-tts', inputs: { text: phrase, voice: 'Sadaltager' } },
+      async () => {
+        const response = await ai.models.generateContent({
+          model: MODELS.TTS,
+          contents: [
+            {
+              role: 'user',
+              parts: [{ text: `Read this sentence aloud with clear, natural pronunciation: "${phrase}"` }],
+            },
+          ],
+          config: {
+            responseModalities: ['audio'],
+            speechConfig: {
+              voiceConfig: {
+                prebuiltVoiceConfig: {
+                  voiceName: 'Sadaltager',
+                },
+              },
             },
           },
-        },
+        });
+
+        const audioPart = response.candidates?.[0]?.content?.parts?.find((p: Part) => p.inlineData);
+
+        if (!audioPart?.inlineData?.data) {
+          throw new Error(`No audio data received for phrase: "${phrase}"`);
+        }
+
+        return {
+          data: audioPart.inlineData.data,
+          mimeType: audioPart.inlineData.mimeType ?? 'audio/L16;codec=pcm;rate=24000',
+        };
       },
-    });
+      { storeAs: 'json' }
+    );
 
-    const audioPart = response.candidates?.[0]?.content?.parts?.find((p: Part) => p.inlineData);
-
-    if (!audioPart?.inlineData?.data) {
-      throw new Error(`No audio data received for phrase: "${phrase}"`);
+    if ('error' in cached) {
+      throw new Error(cached.error);
     }
-
-    return {
-      data: audioPart.inlineData.data,
-      mimeType: audioPart.inlineData.mimeType ?? 'audio/L16;codec=pcm;rate=24000',
-    };
+    return cached;
   };
 
   for (let i = 0; i < phrases.length; i += CONCURRENCY) {

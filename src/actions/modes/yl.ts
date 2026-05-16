@@ -8,6 +8,7 @@ import { YLPlanSchema, type YLPlan, type YLExam, type YLTurnEvalResult } from '@
 import { getPrompt } from '@/lib/prompts/db-prompts';
 import { createSupabaseServer } from '@/lib/supabase/server';
 import { persistMessage, persistMessages } from '@/lib/persist-activity';
+import { getOrCreateCachedContent } from '@/lib/cache';
 
 /** Map a ModeKey to exam + part number. */
 function parseYLMode(mode: ModeKey): { exam: YLExam; part: number } {
@@ -212,68 +213,75 @@ export async function generateYLContentAction(
   options?: { avoidList?: string }
 ): Promise<YLPlan> {
   const ai = getAiClient();
-  const promptText = await getPrompt(generationKey(exam, part), {
-    AVOID_LIST: options?.avoidList ?? '(none)',
-  });
+  const avoidList = options?.avoidList ?? '(none)';
 
-  const response = await ai.models.generateContent({
-    model: MODELS.FLASH_LITE_PREVIEW,
-    contents: [{ role: 'user', parts: [{ text: promptText }] }],
-    config: {
-      responseMimeType: 'application/json',
+  const cached = await getOrCreateCachedContent<YLPlan>(
+    { kind: 'plan', promptKey: `yl-content-${exam}-part${part}`, inputs: { avoidList } },
+    async () => {
+      const promptText = await getPrompt(generationKey(exam, part), { AVOID_LIST: avoidList });
+
+      const response = await ai.models.generateContent({
+        model: MODELS.FLASH_LITE_PREVIEW,
+        contents: [{ role: 'user', parts: [{ text: promptText }] }],
+        config: {
+          responseMimeType: 'application/json',
+        },
+      });
+
+      const raw = response.text ?? '';
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(raw);
+      } catch {
+        throw new Error('[generateYLContentAction] Gemini returned invalid JSON');
+      }
+
+      const p = (parsed ?? {}) as Record<string, unknown>;
+
+      const isPointing =
+        Array.isArray(p.options) &&
+        Array.isArray(p.option_image_prompts) &&
+        Array.isArray(p.cues) &&
+        p.cues.length > 0 &&
+        typeof (p.cues as unknown[])[0] === 'object';
+
+      const normalized: Record<string, unknown> = {
+        cues: isPointing
+          ? (p.cues as Array<{ text: string }>).map((c) => c.text)
+          : (p.cues as unknown[]) ??
+            (p.examiner_cues as unknown[]) ??
+            (p.target_questions as unknown[]) ??
+            (typeof p.scene_description === 'string' ? [p.scene_description] : []),
+        image_prompts: isPointing
+          ? (p.option_image_prompts as unknown[])
+          : (p.image_prompts as unknown[]) ??
+            (typeof p.image_prompt === 'string' ? [p.image_prompt] : undefined),
+        character_description: p.character_description ?? p.character ?? undefined,
+        story_title: p.story_title ?? p.title ?? undefined,
+        story_beats: (p.story_beats as unknown[]) ?? (p.beats as unknown[]) ?? undefined,
+        student_card: p.student_card ?? undefined,
+        examiner_card: p.examiner_card ?? undefined,
+        target_questions: (p.target_questions as unknown[]) ?? undefined,
+        options: isPointing ? (p.options as unknown[]) : undefined,
+        option_image_prompts: isPointing ? (p.option_image_prompts as unknown[]) : undefined,
+        pointing_cues: isPointing ? (p.cues as unknown[]) : undefined,
+      };
+
+      const result = YLPlanSchema.safeParse(normalized);
+      if (!result.success) {
+        throw new Error(
+          `[generateYLContentAction] Invalid YL plan from AI: ${result.error.message}`
+        );
+      }
+      return result.data;
     },
-  });
+    { storeAs: 'json' }
+  );
 
-  const raw = response.text ?? '';
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    throw new Error('[generateYLContentAction] Gemini returned invalid JSON');
+  if ('error' in cached) {
+    throw new Error(cached.error);
   }
-
-  // Generation prompts use mixed key names across exam parts; normalize to
-  // canonical YLPlanSchema shape before validating.
-  const p = (parsed ?? {}) as Record<string, unknown>;
-
-  // Pointing-shape: Starters P1 / Movers P1 click activity.
-  const isPointing =
-    Array.isArray(p.options) &&
-    Array.isArray(p.option_image_prompts) &&
-    Array.isArray(p.cues) &&
-    p.cues.length > 0 &&
-    typeof (p.cues as unknown[])[0] === 'object';
-
-  const normalized: Record<string, unknown> = {
-    cues: isPointing
-      ? (p.cues as Array<{ text: string }>).map((c) => c.text)
-      : (p.cues as unknown[]) ??
-        (p.examiner_cues as unknown[]) ??
-        (p.target_questions as unknown[]) ??
-        (typeof p.scene_description === 'string' ? [p.scene_description] : []),
-    image_prompts: isPointing
-      ? (p.option_image_prompts as unknown[])
-      : (p.image_prompts as unknown[]) ??
-        (typeof p.image_prompt === 'string' ? [p.image_prompt] : undefined),
-    character_description: p.character_description ?? p.character ?? undefined,
-    story_title: p.story_title ?? p.title ?? undefined,
-    story_beats: (p.story_beats as unknown[]) ?? (p.beats as unknown[]) ?? undefined,
-    student_card: p.student_card ?? undefined,
-    examiner_card: p.examiner_card ?? undefined,
-    target_questions: (p.target_questions as unknown[]) ?? undefined,
-    options: isPointing ? (p.options as unknown[]) : undefined,
-    option_image_prompts: isPointing ? (p.option_image_prompts as unknown[]) : undefined,
-    pointing_cues: isPointing ? (p.cues as unknown[]) : undefined,
-  };
-
-  const result = YLPlanSchema.safeParse(normalized);
-  if (!result.success) {
-    throw new Error(
-      `[generateYLContentAction] Invalid YL plan from AI: ${result.error.message}`
-    );
-  }
-
-  return result.data;
+  return cached;
 }
 
 /**
@@ -290,68 +298,81 @@ export async function generateYLImageAction(
   sessionId: string,
   characterDescription?: string
 ): Promise<string> {
-  const key = imageGenKey(exam, part);
-  const ai = getAiClient();
-  const t0 = Date.now();
+  const cacheInputs: Record<string, unknown> = { exam, part, imagePrompt };
+  if (characterDescription) cacheInputs.characterDescription = characterDescription;
 
-  const params: Record<string, string> = {
-    IMAGE_PROMPT: imagePrompt,
-    SCENE_DESCRIPTION: imagePrompt,
-    DIFFERENCES_LIST: imagePrompt,
-    CONTEXT_DESCRIPTION: imagePrompt,
-  };
-  if (characterDescription) {
-    params.CHARACTER_DESCRIPTION = characterDescription;
-  }
-  const fullPrompt = await getPrompt(key, params);
+  const cached = await getOrCreateCachedContent<string>(
+    { kind: 'image', promptKey: `yl-image-${exam}-part${part}`, inputs: cacheInputs },
+    async () => {
+      const key = imageGenKey(exam, part);
+      const ai = getAiClient();
+      const t0 = Date.now();
 
-  let imgB64: string | null = null;
-  let mime = 'image/png';
-  for (let attempt = 0; attempt < 2; attempt++) {
-    const tImg = Date.now();
-    const response = await ai.models.generateContent({
-      model: MODELS.IMAGE,
-      contents: [{ role: 'user', parts: [{ text: fullPrompt }] }],
-      config: { responseModalities: ['IMAGE'] },
-    });
-    console.log(`[YL][${exam}_part${part}] image ${idx + 1} attempt ${attempt + 1} returned in ${Date.now() - tImg}ms (elapsed ${Date.now() - t0}ms)`);
-    const parts = response.candidates?.[0]?.content?.parts ?? [];
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const imagePart = parts.find((p: any) => p.inlineData);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const data = (imagePart as any)?.inlineData?.data;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const partMime = (imagePart as any)?.inlineData?.mimeType ?? 'image/png';
-    if (data) {
-      imgB64 = data;
-      mime = partMime;
-      break;
-    }
-    console.warn(`[generateYLImageAction] empty image attempt ${attempt + 1}, prompt:`, fullPrompt.slice(0, 200));
-  }
+      const params: Record<string, string> = {
+        IMAGE_PROMPT: imagePrompt,
+        SCENE_DESCRIPTION: imagePrompt,
+        DIFFERENCES_LIST: imagePrompt,
+        CONTEXT_DESCRIPTION: imagePrompt,
+      };
+      if (characterDescription) {
+        params.CHARACTER_DESCRIPTION = characterDescription;
+      }
+      const fullPrompt = await getPrompt(key, params);
 
-  if (!imgB64) {
+      let imgB64: string | null = null;
+      let mime = 'image/png';
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const tImg = Date.now();
+        const response = await ai.models.generateContent({
+          model: MODELS.IMAGE,
+          contents: [{ role: 'user', parts: [{ text: fullPrompt }] }],
+          config: { responseModalities: ['IMAGE'] },
+        });
+        console.log(`[YL][${exam}_part${part}] image ${idx + 1} attempt ${attempt + 1} returned in ${Date.now() - tImg}ms (elapsed ${Date.now() - t0}ms)`);
+        const parts = response.candidates?.[0]?.content?.parts ?? [];
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const imagePart = parts.find((p: any) => p.inlineData);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const data = (imagePart as any)?.inlineData?.data;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const partMime = (imagePart as any)?.inlineData?.mimeType ?? 'image/png';
+        if (data) {
+          imgB64 = data;
+          mime = partMime;
+          break;
+        }
+        console.warn(`[generateYLImageAction] empty image attempt ${attempt + 1}, prompt:`, fullPrompt.slice(0, 200));
+      }
+
+      if (!imgB64) {
+        return 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
+      }
+
+      const supabase = await createSupabaseServer();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('[generateYLImageAction] Not authenticated');
+
+      const ext = mime.includes('jpeg') ? 'jpg' : 'png';
+      const path = `${user.id}/${sessionId}/${idx}.${ext}`;
+      const bytes = Buffer.from(imgB64, 'base64');
+      const upload = await supabase.storage
+        .from('bob-images')
+        .upload(path, bytes, { contentType: mime, upsert: true });
+      if (upload.error) {
+        console.error('[generateYLImageAction] storage upload failed:', upload.error);
+        return `data:${mime};base64,${imgB64}`;
+      }
+
+      const { data: pub } = supabase.storage.from('bob-images').getPublicUrl(path);
+      return pub.publicUrl;
+    },
+    { storeAs: 'blob' }
+  );
+
+  if (typeof cached === 'object' && 'error' in cached) {
     return 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
   }
-
-  // Upload to Supabase Storage — avoids Next.js body size limits for large base64 payloads.
-  const supabase = await createSupabaseServer();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('[generateYLImageAction] Not authenticated');
-
-  const ext = mime.includes('jpeg') ? 'jpg' : 'png';
-  const path = `${user.id}/${sessionId}/${idx}.${ext}`;
-  const bytes = Buffer.from(imgB64, 'base64');
-  const upload = await supabase.storage
-    .from('bob-images')
-    .upload(path, bytes, { contentType: mime, upsert: true });
-  if (upload.error) {
-    console.error('[generateYLImageAction] storage upload failed:', upload.error);
-    return `data:${mime};base64,${imgB64}`;
-  }
-
-  const { data: pub } = supabase.storage.from('bob-images').getPublicUrl(path);
-  return pub.publicUrl;
+  return cached as string;
 }
 
 /**

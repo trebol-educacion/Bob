@@ -10,6 +10,7 @@ import { pcmToWavBase64, blobToBase64 } from '@/lib/audio';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
 import type { A2SessionPlan } from '@/actions/modes/a2';
 import type { CambridgeEvaluation } from '@/lib/types/practice';
+import { BobMascotLoader } from '@/components/chat/BobMascotLoader';
 
 type A2Phase =
   | 'loading'
@@ -367,21 +368,11 @@ export function A2Part1Practice({ onBack }: A2Part1PracticeProps) {
   }
 
   if (phase === 'loading') {
-    return (
-      <div className="flex-1 flex flex-col items-center justify-center gap-4">
-        <div className="w-12 h-12 border-4 border-trebol-primary border-t-transparent rounded-full animate-spin" />
-        <p className="text-trebol-text/60 font-semibold">Preparing your A2 interview...</p>
-      </div>
-    );
+    return <BobMascotLoader message="Preparing your A2 interview…" />;
   }
 
   if (phase === 'evaluating') {
-    return (
-      <div className="flex-1 flex flex-col items-center justify-center gap-4">
-        <div className="w-12 h-12 border-4 border-trebol-primary border-t-transparent rounded-full animate-spin" />
-        <p className="text-trebol-text/60 font-semibold">Evaluating your performance...</p>
-      </div>
-    );
+    return <BobMascotLoader message="Evaluating your performance…" />;
   }
 
   if (phase === 'finished' && evaluation) {

@@ -18,6 +18,7 @@ import {
   type ToeflInterviewPlan,
 } from '@/actions/modes/toefl_interview';
 import type { ToeflEvaluation } from '@/lib/types/practice';
+import { BobMascotLoader } from '@/components/chat/BobMascotLoader';
 
 type InterviewPhase =
   | 'loading'
@@ -363,11 +364,10 @@ export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) 
       <div className="flex-1 flex flex-col items-center justify-center p-6 max-w-2xl mx-auto w-full">
 
         {phase === 'loading' && (
-          <div className="flex flex-col items-center gap-4 text-center">
-            <div className="w-12 h-12 border-4 border-trebol-primary border-t-transparent rounded-full animate-spin" />
-            <p className="text-trebol-text/60 font-medium">Generating your interview session…</p>
-            {error && <p className="text-red-500 text-sm">{error}</p>}
-          </div>
+          <>
+            <BobMascotLoader message="Generating your interview session…" />
+            {error && <p className="text-red-500 text-sm text-center">{error}</p>}
+          </>
         )}
 
         {phase === 'intro' && plan && (

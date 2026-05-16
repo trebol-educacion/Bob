@@ -4,6 +4,7 @@ import { GoogleGenAI, Type, Part } from '@google/genai';
 
 import { MODELS } from '@/lib/models';
 import { getPrompt } from '@/lib/prompts/db-prompts';
+import { getOrCreateCachedContent } from '@/lib/cache';
 import {
   PhraseGenerationSchema,
   ImageSceneSchema,
@@ -54,40 +55,44 @@ export interface ImageScene {
   image_data?: string;
 }
 
-/**
- * Generates high-quality speech for a given text using Gemini's native audio output.
- */
+/** Generates high-quality speech for a given text using Gemini's native audio output. */
 export async function generateSpeechAction(text: string): Promise<{ data: string; mimeType: string }> {
-  try {
-    const response = await ai.models.generateContent({
-      model: MODELS.TTS,
-      contents: [{ role: 'user', parts: [{ text: `Read this phrase aloud with clear pronunciation: "${text}"` }] }],
-      config: {
-        responseModalities: ['audio'],
-        speechConfig: {
-          voiceConfig: {
-            prebuiltVoiceConfig: {
-              voiceName: 'Sadaltager',
+  const cached = await getOrCreateCachedContent<{ data: string; mimeType: string }>(
+    { kind: 'tts', promptKey: 'gemini-speech', inputs: { text, voice: 'Sadaltager' } },
+    async () => {
+      const response = await ai.models.generateContent({
+        model: MODELS.TTS,
+        contents: [{ role: 'user', parts: [{ text: `Read this phrase aloud with clear pronunciation: "${text}"` }] }],
+        config: {
+          responseModalities: ['audio'],
+          speechConfig: {
+            voiceConfig: {
+              prebuiltVoiceConfig: {
+                voiceName: 'Sadaltager',
+              },
             },
           },
         },
-      },
-    });
+      });
 
-    const audioPart = response.candidates?.[0]?.content?.parts?.find((p: Part) => p.inlineData);
+      const audioPart = response.candidates?.[0]?.content?.parts?.find((p: Part) => p.inlineData);
 
-    if (!audioPart?.inlineData?.data) {
-      throw new Error('No audio data received from Gemini');
-    }
+      if (!audioPart?.inlineData?.data) {
+        throw new Error('No audio data received from Gemini');
+      }
 
-    return {
-      data: audioPart.inlineData.data,
-      mimeType: audioPart.inlineData.mimeType || 'audio/L16;codec=pcm;rate=24000',
-    };
-  } catch (error) {
-    console.error('Error generating speech:', error);
-    throw error;
+      return {
+        data: audioPart.inlineData.data,
+        mimeType: audioPart.inlineData.mimeType || 'audio/L16;codec=pcm;rate=24000',
+      };
+    },
+    { storeAs: 'json' }
+  );
+
+  if ('error' in cached) {
+    throw new Error(cached.error);
   }
+  return cached;
 }
 
 /**
@@ -167,35 +172,41 @@ export async function generateImageSceneAction(
   difficulty: string = 'intermediate',
   level: 'b1' | 'b2' = 'b1'
 ): Promise<ImageScene> {
-  const prompt = await getPrompt(
-    level === 'b2' ? 'generic_image_b2_generation' : 'generic_image_b1_generation',
-    { TOPIC: topic, DIFFICULTY: difficulty }
+  const cached = await getOrCreateCachedContent<ImageScene>(
+    { kind: 'scene', promptKey: 'generic-image-scene', inputs: { topic, difficulty, level } },
+    async () => {
+      const prompt = await getPrompt(
+        level === 'b2' ? 'generic_image_b2_generation' : 'generic_image_b1_generation',
+        { TOPIC: topic, DIFFICULTY: difficulty }
+      );
+
+      const response = await ai.models.generateContent({
+        model: MODELS.FLASH_LITE_LATEST,
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        config: {
+          responseMimeType: 'application/json',
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              topic: { type: Type.STRING },
+              description: { type: Type.STRING },
+              image_prompt: { type: Type.STRING },
+            },
+            required: ['topic', 'description', 'image_prompt'],
+          },
+        },
+      });
+
+      if (!response.text) throw new Error('No response from Gemini');
+      return ImageSceneSchema.parse(JSON.parse(response.text));
+    },
+    { storeAs: 'json' }
   );
 
-  try {
-    const response = await ai.models.generateContent({
-      model: MODELS.FLASH_LITE_LATEST,
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      config: {
-        responseMimeType: 'application/json',
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            topic: { type: Type.STRING },
-            description: { type: Type.STRING },
-            image_prompt: { type: Type.STRING },
-          },
-          required: ['topic', 'description', 'image_prompt'],
-        },
-      },
-    });
-
-    if (!response.text) throw new Error('No response from Gemini');
-    return ImageSceneSchema.parse(JSON.parse(response.text));
-  } catch (error) {
-    console.error('Error generating image scene:', error);
-    throw error;
+  if ('error' in cached) {
+    throw new Error(cached.error);
   }
+  return cached;
 }
 
 export async function evaluateImageDescriptionAction(
