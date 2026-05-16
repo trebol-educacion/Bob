@@ -56,10 +56,10 @@ export function useSessionState(userEmail: string | undefined): UseSessionStateR
   ) => {
     const session = sessions.find(s => s.id === id);
     if (!session) return;
-    setActiveSessionId(id);
-    setSelectedSession(session);
     const { data } = await getMessagesAction(id);
     setSelectedMessages(data ?? []);
+    setSelectedSession(session);
+    setActiveSessionId(id);
     onSelected(session.mode ?? '', session.topic ?? '');
   }, [sessions]);
 

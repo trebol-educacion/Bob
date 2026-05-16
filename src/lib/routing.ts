@@ -53,47 +53,47 @@ export const EXAM_PART_COMPONENT_MAP: Record<ModeKey, RouteEntry> = {
   cambridge_starters_part1: {
     appState: 'exam-practicing',
     kind: 'yl',
-    render: (p) => React.createElement(YLPointingPractice, { exam: 'starters', part: 1, ...(p as YLRenderProps) }),
+    render: (p) => React.createElement(YLPointingPractice, { key: (p as YLRenderProps).sessionId ?? 'new', exam: 'starters', part: 1, ...(p as YLRenderProps) }),
   },
   cambridge_starters_part2: {
     appState: 'exam-practicing',
     kind: 'yl',
-    render: (p) => React.createElement(YLPart2Practice, { exam: 'starters', part: 2, ...(p as YLRenderProps) }),
+    render: (p) => React.createElement(YLPart2Practice, { key: (p as YLRenderProps).sessionId ?? 'new', exam: 'starters', part: 2, ...(p as YLRenderProps) }),
   },
   cambridge_starters_part3: {
     appState: 'exam-practicing',
     kind: 'yl',
-    render: (p) => React.createElement(YLPart3Practice, { exam: 'starters', part: 3, ...(p as YLRenderProps) }),
+    render: (p) => React.createElement(YLPart3Practice, { key: (p as YLRenderProps).sessionId ?? 'new', exam: 'starters', part: 3, ...(p as YLRenderProps) }),
   },
   cambridge_starters_part4: {
     appState: 'exam-practicing',
     kind: 'yl',
-    render: (p) => React.createElement(YLPart4Practice, { exam: 'starters', part: 4, ...(p as YLRenderProps) }),
+    render: (p) => React.createElement(YLPart4Practice, { key: (p as YLRenderProps).sessionId ?? 'new', exam: 'starters', part: 4, ...(p as YLRenderProps) }),
   },
   cambridge_movers_part1: {
     appState: 'exam-practicing',
     kind: 'yl',
-    render: (p) => React.createElement(YLPart1Practice, { exam: 'movers', part: 1, ...(p as YLRenderProps) }),
+    render: (p) => React.createElement(YLPart1Practice, { key: (p as YLRenderProps).sessionId ?? 'new', exam: 'movers', part: 1, ...(p as YLRenderProps) }),
   },
   cambridge_movers_part2: {
     appState: 'exam-practicing',
     kind: 'yl',
-    render: (p) => React.createElement(YLPart2Practice, { exam: 'movers', part: 2, ...(p as YLRenderProps) }),
+    render: (p) => React.createElement(YLPart2Practice, { key: (p as YLRenderProps).sessionId ?? 'new', exam: 'movers', part: 2, ...(p as YLRenderProps) }),
   },
   cambridge_movers_part3: {
     appState: 'exam-practicing',
     kind: 'yl',
-    render: (p) => React.createElement(YLPart3Practice, { exam: 'movers', part: 3, ...(p as YLRenderProps) }),
+    render: (p) => React.createElement(YLPart3Practice, { key: (p as YLRenderProps).sessionId ?? 'new', exam: 'movers', part: 3, ...(p as YLRenderProps) }),
   },
   cambridge_movers_part4: {
     appState: 'exam-practicing',
     kind: 'yl',
-    render: (p) => React.createElement(YLPart4Practice, { exam: 'movers', part: 4, ...(p as YLRenderProps) }),
+    render: (p) => React.createElement(YLPart4Practice, { key: (p as YLRenderProps).sessionId ?? 'new', exam: 'movers', part: 4, ...(p as YLRenderProps) }),
   },
   cambridge_movers_part5: {
     appState: 'exam-practicing',
     kind: 'yl',
-    render: (p) => React.createElement(YLPart4Practice, { exam: 'movers', part: 5, ...(p as YLRenderProps) }),
+    render: (p) => React.createElement(YLPart4Practice, { key: (p as YLRenderProps).sessionId ?? 'new', exam: 'movers', part: 5, ...(p as YLRenderProps) }),
   },
   cambridge_pet_p3: {
     appState: 'exam-practicing',
