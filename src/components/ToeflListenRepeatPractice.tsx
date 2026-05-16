@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowLeft, Headphones, Mic, RotateCcw, ChevronRight, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, Headphones, Mic, RotateCcw, ChevronRight, CheckCircle2, AlertCircle } from 'lucide-react';
 import { CountdownTimer } from './CountdownTimer';
 import { useCountdown } from '@/hooks/useCountdown';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
@@ -16,6 +16,9 @@ import {
 } from '@/actions/modes/toefl_repeat';
 import { createSessionAction } from '@/actions/sessions';
 import type { RepetitionObjectiveFeedback } from '@/lib/types/practice';
+import { ACTIVE_MODEL_LABEL } from '@/lib/models';
+import { ChatShell } from '@/components/ChatShell';
+import { MessageBubble, InfoCard } from '@/components/chat';
 
 type Phase =
   | 'loading'
@@ -256,248 +259,263 @@ export function ToeflListenRepeatPractice({ onBack }: ToeflListenRepeatPracticeP
 
   const exactCount = results.filter((r) => r.evaluation.exact_repetition).length;
 
-  return (
-    <div className="flex-1 flex flex-col min-h-0 overflow-auto bg-trebol-bg">
-      <div className="sticky top-0 z-10 bg-trebol-bg/90 backdrop-blur-sm border-b border-trebol-border px-4 py-3 flex items-center gap-3">
-        <button
-          onClick={onBack}
-          className="flex items-center gap-1 text-trebol-text/60 hover:text-trebol-text transition-colors text-sm font-medium"
-        >
-          <ArrowLeft size={16} />
-          Back
-        </button>
-        <div className="flex-1" />
-        <div className="flex items-center gap-2">
-          <Headphones size={16} className="text-trebol-primary" />
-          <span className="text-sm font-bold text-trebol-text">TOEFL Listen &amp; Repeat</span>
-        </div>
-        {phase !== 'loading' && phase !== 'finished' && (
-          <span className="text-sm font-semibold text-trebol-text/50">
-            {currentIndex + 1} / {items.length}
-          </span>
-        )}
-      </div>
+  const backButton = (
+    <button
+      onClick={onBack}
+      className="flex items-center gap-1 text-gray-500 hover:text-gray-800 transition-colors text-sm font-medium"
+    >
+      <ArrowLeft size={16} />
+      Back
+    </button>
+  );
 
-      <div className="flex-1 flex flex-col items-center justify-center px-4 py-8 gap-6 max-w-lg mx-auto w-full">
+  const progressBadge = phase !== 'loading' && phase !== 'finished' ? (
+    <span className="text-sm font-semibold text-gray-400">
+      {currentIndex + 1} / {items.length}
+    </span>
+  ) : null;
 
-        {phase === 'loading' && (
-          <div className="w-full space-y-6 text-center">
-            <div className="space-y-2">
-              <div className="bg-trebol-primary/10 rounded-full p-4 w-20 h-20 mx-auto flex items-center justify-center">
-                <Headphones size={36} className="text-trebol-primary animate-pulse" />
-              </div>
-              <h2 className="text-xl font-black text-trebol-text">Preparing your session...</h2>
-              <p className="text-trebol-text/60 text-sm">
-                {loadingProgress === 0
-                  ? 'Generating 10 sentences...'
-                  : `Loading audio ${loadingProgress} of ${items.length || 10}...`}
-              </p>
-            </div>
-            <div className="w-full bg-trebol-border rounded-full h-2 overflow-hidden">
-              <div
-                className="bg-trebol-primary h-full rounded-full transition-all duration-500"
-                style={{ width: `${(loadingProgress / (items.length || 10)) * 100}%` }}
-              />
-            </div>
-          </div>
-        )}
-
-        {phase === 'play' && items[currentIndex] && (
-          <div className="w-full space-y-6 text-center">
-            <div className="bg-trebol-primary/10 rounded-full p-5 w-24 h-24 mx-auto flex items-center justify-center">
-              <Headphones size={40} className="text-trebol-primary animate-bounce" />
-            </div>
-            <div className="space-y-2">
-              <p className="text-xs font-bold text-trebol-text/40 uppercase tracking-widest">
-                Level {items[currentIndex].difficulty} · Item {currentIndex + 1}
-              </p>
-              <h2 className="text-xl font-black text-trebol-text">Listen carefully...</h2>
-              <p className="text-trebol-text/60 text-sm">Repeat the sentence when prompted</p>
-            </div>
-          </div>
-        )}
-
-        {phase === 'ready' && items[currentIndex] && (
-          <div className="w-full space-y-6 text-center">
-            <div className="space-y-2">
-              <p className="text-xs font-bold text-trebol-text/40 uppercase tracking-widest">
-                Level {items[currentIndex].difficulty} · Item {currentIndex + 1}
-              </p>
-              <h2 className="text-xl font-black text-trebol-text">Get ready...</h2>
-              <div className="bg-white border border-trebol-border rounded-xl p-5 text-left shadow-sm">
-                <p className="text-trebol-text/40 text-xs font-semibold uppercase tracking-widest mb-2">Sentence</p>
-                <p className="text-trebol-text font-semibold text-base blur-sm select-none">
-                  {items[currentIndex].text}
-                </p>
-                <p className="text-xs text-trebol-text/40 mt-2 italic">Hidden — repeat from memory</p>
-              </div>
-            </div>
-            <button
-              onClick={() => setPhase('record')}
-              className="w-full bg-trebol-primary hover:bg-trebol-primary/90 text-white font-bold py-3 rounded-xl transition-colors flex items-center justify-center gap-2"
-            >
-              <Mic size={18} />
-              Start Recording
-            </button>
-          </div>
-        )}
-
-        {phase === 'record' && (
-          <div className="w-full space-y-6 text-center">
-            <div className="space-y-4">
-              <CountdownTimer
-                seconds={RECORD_SECONDS}
-                remaining={countdown.remaining}
-                isRunning={countdown.isRunning}
-                size={100}
-                strokeWidth={7}
-              />
-              <div className="space-y-1">
-                <h2 className="text-xl font-black text-trebol-text">Repeat the sentence!</h2>
-                <p className="text-sm text-trebol-text/60">
-                  {countdown.isRunning ? 'Speak clearly and naturally' : 'Processing...'}
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center justify-center gap-2">
-              <span className="w-3 h-3 rounded-full bg-red-500 animate-pulse" />
-              <span className="text-sm font-semibold text-red-600">Recording</span>
-            </div>
-            <button
-              onClick={() => {
-                countdown.stop();
-                stopRecording();
-              }}
-              className="w-full border-2 border-trebol-border hover:border-trebol-primary text-trebol-text font-semibold py-3 rounded-xl transition-colors text-sm"
-            >
-              Stop Early
-            </button>
-          </div>
-        )}
-
-        {phase === 'evaluating' && (
-          <div className="w-full space-y-4 text-center">
-            <div className="bg-trebol-primary/10 rounded-full p-4 w-20 h-20 mx-auto flex items-center justify-center">
-              <span className="text-3xl animate-spin">⚙️</span>
-            </div>
-            <h2 className="text-xl font-black text-trebol-text">Evaluating...</h2>
-            <p className="text-trebol-text/60 text-sm">Analyzing your repetition</p>
-          </div>
-        )}
-
-        {phase === 'result' && currentEvaluation && items[currentIndex] && (
-          <div className="w-full space-y-4">
-            <div className={`rounded-2xl border-2 p-5 text-center ${currentEvaluation.exact_repetition ? 'bg-green-50 border-green-200' : 'bg-amber-50 border-amber-200'}`}>
-              <p className="text-xs font-bold uppercase tracking-widest text-trebol-text/50 mb-1">
-                Item {currentIndex + 1}
-              </p>
-              <p className={`text-xl font-black ${currentEvaluation.exact_repetition ? 'text-green-600' : 'text-amber-600'}`}>
-                {currentEvaluation.exact_repetition ? 'Perfect repetition!' : 'Almost there!'}
-              </p>
-            </div>
-
-            <div className="bg-white border border-trebol-border rounded-xl p-4 space-y-3">
-              <div>
-                <p className="text-xs font-bold text-trebol-text/40 uppercase tracking-widest mb-1">Original</p>
-                <p className="text-trebol-text font-medium text-sm">{items[currentIndex].text}</p>
-              </div>
-              {currentEvaluation.transcribed_text && (
-                <div>
-                  <p className="text-xs font-bold text-trebol-text/40 uppercase tracking-widest mb-1">You said</p>
-                  <p className="text-trebol-text/70 text-sm italic">{currentEvaluation.transcribed_text}</p>
-                </div>
-              )}
-              {currentEvaluation.missing_words.length > 0 && (
-                <div>
-                  <p className="text-xs font-bold text-red-400 uppercase tracking-widest mb-1">Missing words</p>
-                  <p className="text-red-600 text-sm">{currentEvaluation.missing_words.join(', ')}</p>
-                </div>
-              )}
-              {currentEvaluation.extra_words.length > 0 && (
-                <div>
-                  <p className="text-xs font-bold text-amber-500 uppercase tracking-widest mb-1">Extra words</p>
-                  <p className="text-amber-600 text-sm">{currentEvaluation.extra_words.join(', ')}</p>
-                </div>
-              )}
-            </div>
-
-            <div className="flex gap-3">
-              <button
-                onClick={() => setPhase('play')}
-                className="flex-1 border-2 border-trebol-border hover:border-trebol-primary text-trebol-text font-bold py-3 rounded-xl transition-colors flex items-center justify-center gap-2 text-sm"
-              >
-                <RotateCcw size={16} />
-                Retry
-              </button>
-              <button
-                onClick={handleNext}
-                className="flex-1 bg-trebol-primary hover:bg-trebol-primary/90 text-white font-bold py-3 rounded-xl transition-colors flex items-center justify-center gap-2"
-              >
-                {currentIndex + 1 >= items.length ? (
-                  <>
-                    <CheckCircle2 size={18} />
-                    See Results
-                  </>
-                ) : (
-                  <>
-                    Next
-                    <ChevronRight size={18} />
-                  </>
-                )}
-              </button>
-            </div>
-
-            {error && (
-              <p className="text-red-500 text-xs text-center">{error}</p>
-            )}
-          </div>
-        )}
-
-        {phase === 'finished' && (
-          <div className="w-full space-y-6">
-            <div className="rounded-2xl border-2 p-6 text-center bg-trebol-primary/5 border-trebol-primary/20">
-              <p className="text-xs font-bold uppercase tracking-widest text-trebol-text/50 mb-2">Session Complete</p>
-              <p className="text-5xl font-black text-trebol-primary">{exactCount} / {results.length}</p>
-              <p className="text-sm font-bold text-trebol-text/60 mt-1">exact repetitions</p>
-            </div>
-
-            <div>
-              <p className="text-xs font-bold text-trebol-text/40 uppercase tracking-widest mb-3">Item Breakdown</p>
-              <div className="grid grid-cols-5 gap-2">
-                {results.map((r, i) => (
-                  <div
-                    key={i}
-                    className={`rounded-xl border-2 p-2 text-center ${r.evaluation.exact_repetition ? 'bg-green-50 border-green-200' : 'bg-amber-50 border-amber-200'}`}
-                    title={r.item.text}
-                  >
-                    <p className="text-xs text-trebol-text/50 font-semibold">{i + 1}</p>
-                    <p className={`text-lg font-black ${r.evaluation.exact_repetition ? 'text-green-600' : 'text-amber-500'}`}>
-                      {r.evaluation.exact_repetition ? '✓' : '~'}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="flex gap-3">
-              <button
-                onClick={handleRestart}
-                className="flex-1 border-2 border-trebol-border hover:border-trebol-primary text-trebol-text font-bold py-3 rounded-xl transition-colors flex items-center justify-center gap-2"
-              >
-                <RotateCcw size={16} />
-                Try Again
-              </button>
-              <button
-                onClick={onBack}
-                className="flex-1 bg-trebol-primary hover:bg-trebol-primary/90 text-white font-bold py-3 rounded-xl transition-colors flex items-center justify-center gap-2"
-              >
-                <ArrowLeft size={16} />
-                Back
-              </button>
-            </div>
-          </div>
-        )}
+  const loadingBar = (
+    <div className="w-full space-y-2">
+      <p className="text-xs text-gray-500 text-center">
+        {loadingProgress === 0
+          ? 'Generating sentences…'
+          : `Loading audio ${loadingProgress} of ${items.length || 10}…`}
+      </p>
+      <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
+        <div
+          className="bg-blue-600 h-full rounded-full transition-all duration-500"
+          style={{ width: `${(loadingProgress / (items.length || 10)) * 100}%` }}
+        />
       </div>
     </div>
+  );
+
+  return (
+    <ChatShell
+      animationKey="toefl-listen-repeat"
+      headerConfig={{
+        icon: Headphones,
+        title: 'TOEFL Listen & Repeat',
+        subtitle: 'Listen, then repeat the sentence exactly',
+        accentColor: 'blue',
+        leftSlot: backButton,
+        rightSlot: progressBadge,
+      }}
+      footerConfig={{
+        modeLabel: 'TOEFL · LISTEN & REPEAT',
+        modelName: ACTIVE_MODEL_LABEL,
+      }}
+      inputSlot={null}
+    >
+      {phase === 'loading' && (
+        <div className="flex flex-col items-center justify-center gap-6 py-12">
+          <div className="bg-blue-50 border border-blue-100 rounded-2xl p-5 w-20 h-20 flex items-center justify-center">
+            <Headphones size={36} className="text-blue-600 animate-pulse" />
+          </div>
+          <MessageBubble variant="assistant" accentColor="blue">
+            <p className="font-semibold">Preparing your session…</p>
+            <div className="mt-3">{loadingBar}</div>
+          </MessageBubble>
+        </div>
+      )}
+
+      {phase === 'play' && items[currentIndex] && (
+        <div className="flex flex-col items-center gap-4 py-8">
+          <div className="bg-blue-50 border border-blue-100 rounded-2xl p-5 w-24 h-24 flex items-center justify-center">
+            <Headphones size={40} className="text-blue-600 animate-bounce" />
+          </div>
+          <MessageBubble variant="assistant" accentColor="blue">
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">
+              Level {items[currentIndex].difficulty} · Item {currentIndex + 1}
+            </p>
+            <p className="font-semibold">Listen carefully…</p>
+            <p className="text-gray-500 text-xs mt-1">Repeat the sentence when prompted</p>
+          </MessageBubble>
+        </div>
+      )}
+
+      {phase === 'ready' && items[currentIndex] && (
+        <div className="flex flex-col gap-4">
+          <MessageBubble variant="assistant" accentColor="blue">
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">
+              Level {items[currentIndex].difficulty} · Item {currentIndex + 1}
+            </p>
+            <p className="font-semibold">Get ready…</p>
+            <div className="mt-3 bg-gray-50 border border-gray-200 rounded-xl p-3 text-left">
+              <p className="text-gray-400 text-xs font-semibold uppercase tracking-widest mb-1">Sentence</p>
+              <p className="text-gray-800 font-semibold text-sm blur-sm select-none">
+                {items[currentIndex].text}
+              </p>
+              <p className="text-xs text-gray-400 mt-1 italic">Hidden — repeat from memory</p>
+            </div>
+          </MessageBubble>
+          <button
+            onClick={() => setPhase('record')}
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl transition-colors flex items-center justify-center gap-2"
+          >
+            <Mic size={18} />
+            Start Recording
+          </button>
+        </div>
+      )}
+
+      {phase === 'record' && (
+        <div className="flex flex-col items-center gap-6 py-4">
+          <MessageBubble variant="assistant" accentColor="blue">
+            <p className="font-semibold">Repeat the sentence!</p>
+            <p className="text-gray-500 text-xs mt-1">
+              {countdown.isRunning ? 'Speak clearly and naturally' : 'Processing…'}
+            </p>
+          </MessageBubble>
+          <CountdownTimer
+            seconds={RECORD_SECONDS}
+            remaining={countdown.remaining}
+            isRunning={countdown.isRunning}
+            size={100}
+            strokeWidth={7}
+          />
+          <div className="flex items-center gap-2">
+            <span className="w-3 h-3 rounded-full bg-red-500 animate-pulse" />
+            <span className="text-sm font-semibold text-red-600">Recording</span>
+          </div>
+          <button
+            onClick={() => {
+              countdown.stop();
+              stopRecording();
+            }}
+            className="w-full border-2 border-gray-200 hover:border-blue-600 text-gray-700 font-semibold py-3 rounded-xl transition-colors text-sm"
+          >
+            Stop Early
+          </button>
+        </div>
+      )}
+
+      {phase === 'evaluating' && (
+        <div className="flex flex-col items-center gap-4 py-8">
+          <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 w-20 h-20 flex items-center justify-center">
+            <span className="text-3xl animate-spin">⚙️</span>
+          </div>
+          <MessageBubble variant="assistant" accentColor="blue">
+            <p className="font-semibold">Evaluating…</p>
+            <p className="text-gray-500 text-xs mt-1">Analyzing your repetition</p>
+          </MessageBubble>
+        </div>
+      )}
+
+      {phase === 'result' && currentEvaluation && items[currentIndex] && (
+        <div className="flex flex-col gap-4">
+          <MessageBubble variant="assistant" accentColor="blue">
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">
+              Item {currentIndex + 1}
+            </p>
+            <p className={`font-black text-base ${currentEvaluation.exact_repetition ? 'text-green-600' : 'text-amber-600'}`}>
+              {currentEvaluation.exact_repetition ? 'Perfect repetition!' : 'Almost there!'}
+            </p>
+          </MessageBubble>
+
+          <InfoCard title="Feedback" icon={currentEvaluation.exact_repetition ? CheckCircle2 : AlertCircle}>
+            <div className="space-y-2">
+              <div>
+                <p className="text-xs font-bold text-amber-700 uppercase tracking-widest mb-0.5">Original</p>
+                <p className="text-amber-900 font-medium text-sm">{items[currentIndex].text}</p>
+              </div>
+              {currentEvaluation.transcribed_text ? (
+                <div>
+                  <p className="text-xs font-bold text-amber-700 uppercase tracking-widest mb-0.5">You said</p>
+                  <p className="text-amber-800/70 text-sm italic">{currentEvaluation.transcribed_text}</p>
+                </div>
+              ) : null}
+              {currentEvaluation.missing_words.length > 0 ? (
+                <div>
+                  <p className="text-xs font-bold text-red-500 uppercase tracking-widest mb-0.5">Missing words</p>
+                  <p className="text-red-600 text-sm">{currentEvaluation.missing_words.join(', ')}</p>
+                </div>
+              ) : null}
+              {currentEvaluation.extra_words.length > 0 ? (
+                <div>
+                  <p className="text-xs font-bold text-amber-600 uppercase tracking-widest mb-0.5">Extra words</p>
+                  <p className="text-amber-700 text-sm">{currentEvaluation.extra_words.join(', ')}</p>
+                </div>
+              ) : null}
+            </div>
+          </InfoCard>
+
+          <div className="flex gap-3">
+            <button
+              onClick={() => setPhase('play')}
+              className="flex-1 border-2 border-gray-200 hover:border-blue-600 text-gray-700 font-bold py-3 rounded-xl transition-colors flex items-center justify-center gap-2 text-sm"
+            >
+              <RotateCcw size={16} />
+              Retry
+            </button>
+            <button
+              onClick={handleNext}
+              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl transition-colors flex items-center justify-center gap-2"
+            >
+              {currentIndex + 1 >= items.length ? (
+                <>
+                  <CheckCircle2 size={18} />
+                  See Results
+                </>
+              ) : (
+                <>
+                  Next
+                  <ChevronRight size={18} />
+                </>
+              )}
+            </button>
+          </div>
+
+          {error ? (
+            <p className="text-red-500 text-xs text-center">{error}</p>
+          ) : null}
+        </div>
+      )}
+
+      {phase === 'finished' && (
+        <div className="flex flex-col gap-6">
+          <MessageBubble variant="assistant" accentColor="blue">
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Session Complete</p>
+            <p className="text-4xl font-black text-blue-600">{exactCount} / {results.length}</p>
+            <p className="text-sm font-bold text-gray-400 mt-1">exact repetitions</p>
+          </MessageBubble>
+
+          <InfoCard title="Item Breakdown">
+            <div className="grid grid-cols-5 gap-2">
+              {results.map((r, i) => (
+                <div
+                  key={i}
+                  className={`rounded-xl border-2 p-2 text-center ${r.evaluation.exact_repetition ? 'bg-green-50 border-green-200' : 'bg-amber-50 border-amber-200'}`}
+                  title={r.item.text}
+                >
+                  <p className="text-xs text-gray-400 font-semibold">{i + 1}</p>
+                  <p className={`text-lg font-black ${r.evaluation.exact_repetition ? 'text-green-600' : 'text-amber-500'}`}>
+                    {r.evaluation.exact_repetition ? '✓' : '~'}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </InfoCard>
+
+          <div className="flex gap-3">
+            <button
+              onClick={handleRestart}
+              className="flex-1 border-2 border-gray-200 hover:border-blue-600 text-gray-700 font-bold py-3 rounded-xl transition-colors flex items-center justify-center gap-2"
+            >
+              <RotateCcw size={16} />
+              Try Again
+            </button>
+            <button
+              onClick={onBack}
+              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl transition-colors flex items-center justify-center gap-2"
+            >
+              <ArrowLeft size={16} />
+              Back
+            </button>
+          </div>
+        </div>
+      )}
+    </ChatShell>
   );
 }

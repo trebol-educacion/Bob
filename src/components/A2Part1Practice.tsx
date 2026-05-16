@@ -11,6 +11,9 @@ import { useAudioRecorder } from '@/hooks/useAudioRecorder';
 import type { A2SessionPlan } from '@/actions/modes/a2';
 import type { FormativeFeedback } from '@/lib/types/practice';
 import { BobMascotLoader } from '@/components/chat/BobMascotLoader';
+import { ChatShell } from '@/components/ChatShell';
+import { MessageBubble, InfoCard } from '@/components/chat';
+import { ACTIVE_MODEL_LABEL } from '@/lib/models';
 
 type A2Phase =
   | 'loading'
@@ -38,7 +41,7 @@ interface PhaseTransition {
   label: string;
 }
 
-interface A2Part1PracticeProps {
+export interface A2Part1PracticeProps {
   onBack: () => void;
 }
 
@@ -88,6 +91,7 @@ function FormativeFeedbackPanel({ feedback }: { feedback: FormativeFeedback }) {
   );
 }
 
+/** A2 Key Part 1 Speaking practice — Cambridge KET interview simulation. */
 export function A2Part1Practice({ onBack }: A2Part1PracticeProps) {
   const [phase, setPhase] = useState<A2Phase>('loading');
   const [plan, setPlan] = useState<A2SessionPlan | null>(null);
@@ -381,173 +385,208 @@ export function A2Part1Practice({ onBack }: A2Part1PracticeProps) {
     return <BobMascotLoader message="Evaluating your performance…" />;
   }
 
+  const questionNumber = questionIndex + 1;
+
+  const progressBar = (
+    <div className="w-32 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+      <motion.div
+        animate={{ width: `${progress}%` }}
+        transition={{ duration: 0.4 }}
+        className="h-full bg-blue-600 rounded-full"
+      />
+    </div>
+  );
+
+  const backButton = (
+    <button
+      onClick={onBack}
+      className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
+      aria-label="Back"
+    >
+      <ArrowLeft size={18} className="text-gray-600" />
+    </button>
+  );
+
   if (phase === 'finished' && evaluation) {
-    return (
+    const finishedBody = (
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex-1 overflow-y-auto p-6 max-w-2xl mx-auto w-full space-y-6"
+        className="space-y-6 pb-4"
       >
-        <div className="text-center space-y-2">
-          <CheckCircle className="mx-auto text-trebol-primary" size={48} />
-          <h2 className="text-2xl font-black text-trebol-text">Interview Complete!</h2>
-          <p className="text-trebol-text/60 font-medium">A2 Key — Part 1 Speaking</p>
+        <div className="text-center space-y-2 pt-2">
+          <CheckCircle className="mx-auto text-blue-600" size={48} />
+          <h2 className="text-2xl font-black text-gray-900">Interview Complete!</h2>
+          <p className="text-gray-400 font-medium">A2 Key — Part 1 Speaking</p>
         </div>
 
         <FormativeFeedbackPanel feedback={evaluation} />
 
-        <div className="flex gap-3 pb-4">
+        <div className="flex gap-3">
           <button
             onClick={handleTryAgain}
-            className="flex-1 py-3 bg-trebol-primary text-white rounded-xl font-bold hover:opacity-90 transition-opacity"
+            className="flex-1 py-3 bg-blue-600 text-white rounded-xl font-bold hover:opacity-90 transition-opacity"
           >
             Try Again
           </button>
           <button
             onClick={onBack}
-            className="flex-1 py-3 bg-trebol-border text-trebol-text rounded-xl font-bold hover:opacity-90 transition-opacity"
+            className="flex-1 py-3 bg-gray-100 text-gray-800 rounded-xl font-bold hover:opacity-90 transition-opacity"
           >
             Back to Modes
           </button>
         </div>
       </motion.div>
     );
+
+    return (
+      <ChatShell
+        headerConfig={{
+          icon: CheckCircle,
+          title: 'A2 Key – Part 1 Interview',
+          subtitle: 'Interview complete',
+          accentColor: 'blue',
+          leftSlot: backButton,
+          online: false,
+        }}
+        footerConfig={{
+          modeLabel: 'A2 KEY PART 1',
+          modelName: ACTIVE_MODEL_LABEL,
+        }}
+        inputSlot={null}
+        animationKey="a2part1-finished"
+      >
+        {finishedBody}
+      </ChatShell>
+    );
   }
 
-  const questionNumber = questionIndex + 1;
-
-  return (
-    <div className="flex-1 flex flex-col min-h-0">
-      <div className="flex items-center gap-4 px-4 py-3 border-b border-trebol-border bg-white shrink-0">
-        <button
-          onClick={onBack}
-          className="p-1.5 rounded-lg hover:bg-trebol-secondary/20 transition-colors"
-          aria-label="Back"
-        >
-          <ArrowLeft size={20} className="text-trebol-text" />
-        </button>
-        <div className="flex-1">
-          <p className="text-sm font-black text-trebol-text">A2 Key – Part 1 Interview</p>
-          <p className="text-xs text-trebol-text/50 font-medium">
-            Question {questionNumber} of {totalQuestions}
-          </p>
-        </div>
-      </div>
-
-      <div className="h-1.5 bg-trebol-border shrink-0">
-        <motion.div
-          animate={{ width: `${progress}%` }}
-          transition={{ duration: 0.4 }}
-          className="h-full bg-trebol-primary"
-        />
-      </div>
-
-      <div className="flex-1 flex flex-col items-center justify-center p-6 gap-8 overflow-hidden">
-        <AnimatePresence mode="wait">
-          {phaseTransition && (
+  const inputSlot = (
+    <div className="px-4 py-3 border-t border-gray-100 bg-white">
+      {questionStep === 'recording' && (
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
             <motion.div
-              key="phase-banner"
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-              className="absolute inset-0 flex items-center justify-center bg-white/80 backdrop-blur-sm z-10"
+              animate={{ scale: [1, 1.1, 1] }}
+              transition={{ repeat: Infinity, duration: 1.2 }}
+              className="w-10 h-10 bg-red-500 rounded-full flex items-center justify-center shadow"
             >
-              <div className="bg-trebol-primary text-white px-8 py-5 rounded-2xl shadow-lg text-center space-y-1">
-                <ChevronRight className="mx-auto opacity-60" size={20} />
-                <p className="text-xl font-black">{phaseTransition.label}</p>
-              </div>
+              <Mic size={18} className="text-white" />
             </motion.div>
-          )}
-
-          <motion.div
-            key={`question-${questionIndex}`}
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -16 }}
-            className="w-full max-w-lg"
-          >
-            <div className="bg-white rounded-2xl shadow-md p-6 space-y-4">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-trebol-primary bg-trebol-secondary/20 px-2 py-0.5 rounded-full">
-                  Examiner
-                </span>
-              </div>
-              <p className="text-xl font-black text-trebol-text leading-snug">
-                {currentQuestion || '...'}
+            <div>
+              <p className="text-sm font-bold text-red-500">Recording</p>
+              <p className="text-xs text-gray-400">
+                {recordingSeconds}s / {RECORDING_MAX_SECONDS}s
               </p>
             </div>
-          </motion.div>
-
-          <motion.div
-            key={`status-${questionStep}`}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="flex flex-col items-center gap-4 w-full max-w-lg"
+          </div>
+          <button
+            onClick={handleManualStop}
+            className="flex items-center gap-2 px-4 py-2 bg-gray-100 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-200 transition-colors"
           >
-            {questionStep === 'playing-question' && (
-              <p className="text-trebol-text/50 font-semibold text-sm">Listening to examiner...</p>
-            )}
-
-            {questionStep === 'countdown' && (
-              <div className="text-center space-y-2">
-                <p className="text-trebol-text/60 font-semibold text-sm">Recording in</p>
-                <motion.span
-                  key={countdown}
-                  initial={{ scale: 1.4, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  className="text-5xl font-black text-trebol-primary block"
-                >
-                  {countdown}
-                </motion.span>
-              </div>
-            )}
-
-            {questionStep === 'recording' && (
-              <div className="flex flex-col items-center gap-4">
-                <motion.div
-                  animate={{ scale: [1, 1.1, 1] }}
-                  transition={{ repeat: Infinity, duration: 1.2 }}
-                  className="w-16 h-16 bg-red-500 rounded-full flex items-center justify-center shadow-lg"
-                >
-                  <Mic size={28} className="text-white" />
-                </motion.div>
-                <div className="text-center space-y-1">
-                  <p className="text-sm font-bold text-red-500">Recording</p>
-                  <p className="text-xs text-trebol-text/40">
-                    {recordingSeconds}s / {RECORDING_MAX_SECONDS}s
-                  </p>
-                </div>
-                <button
-                  onClick={handleManualStop}
-                  className="flex items-center gap-2 px-4 py-2 bg-trebol-border rounded-lg text-sm font-semibold text-trebol-text hover:bg-trebol-secondary/30 transition-colors"
-                >
-                  <MicOff size={16} />
-                  Stop Recording
-                </button>
-              </div>
-            )}
-
-            {questionStep === 'processing' && (
-              <div className="flex flex-col items-center gap-3">
-                <div className="w-8 h-8 border-3 border-trebol-primary border-t-transparent rounded-full animate-spin" />
-                <p className="text-trebol-text/50 font-semibold text-sm">Processing your answer...</p>
-              </div>
-            )}
-
-            {questionStep === 'reaction' && currentReaction && (
-              <div className="bg-trebol-secondary/10 rounded-xl px-5 py-4 text-center max-w-sm">
-                <p className="text-trebol-text font-semibold italic">"{currentReaction}"</p>
-                <p className="text-xs text-trebol-text/40 mt-1">Examiner</p>
-              </div>
-            )}
-
-            {(questionStep === 'transition') && (
-              <p className="text-trebol-text/40 font-semibold text-sm">Next question...</p>
-            )}
-          </motion.div>
-        </AnimatePresence>
-      </div>
+            <MicOff size={16} />
+            Stop
+          </button>
+        </div>
+      )}
+      {questionStep !== 'recording' && (
+        <p className="text-xs text-center text-gray-400 py-1">
+          {questionStep === 'playing-question' && 'Listening to examiner...'}
+          {questionStep === 'countdown' && `Recording in ${countdown}…`}
+          {questionStep === 'processing' && 'Processing your answer...'}
+          {questionStep === 'reaction' && 'Examiner responding...'}
+          {questionStep === 'transition' && 'Next question...'}
+        </p>
+      )}
     </div>
+  );
+
+  const bodyContent = (
+    <>
+      <AnimatePresence mode="wait">
+        {phaseTransition && (
+          <motion.div
+            key="phase-banner"
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            className="fixed inset-0 flex items-center justify-center bg-white/80 backdrop-blur-sm z-30"
+          >
+            <div className="bg-blue-600 text-white px-8 py-5 rounded-2xl shadow-lg text-center space-y-1">
+              <ChevronRight className="mx-auto opacity-60" size={20} />
+              <p className="text-xl font-black">{phaseTransition.label}</p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <motion.div
+        key={`question-${questionIndex}`}
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -16 }}
+      >
+        <MessageBubble variant="assistant" accentColor="blue">
+          <p className="text-base font-bold leading-snug">
+            {currentQuestion || '...'}
+          </p>
+        </MessageBubble>
+      </motion.div>
+
+      {questionStep === 'reaction' && currentReaction && (
+        <motion.div
+          key="reaction"
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          <InfoCard title="Examiner">
+            <p className="italic">"{currentReaction}"</p>
+          </InfoCard>
+        </motion.div>
+      )}
+
+      {questionStep === 'countdown' && (
+        <div className="flex flex-col items-center gap-2 py-4">
+          <p className="text-gray-400 font-semibold text-sm">Recording in</p>
+          <motion.span
+            key={countdown}
+            initial={{ scale: 1.4, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="text-5xl font-black text-blue-600 block"
+          >
+            {countdown}
+          </motion.span>
+        </div>
+      )}
+
+      {questionStep === 'processing' && (
+        <div className="flex flex-col items-center gap-3 py-4">
+          <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+          <p className="text-gray-400 font-semibold text-sm">Processing your answer...</p>
+        </div>
+      )}
+    </>
+  );
+
+  return (
+    <ChatShell
+      headerConfig={{
+        icon: Mic,
+        title: 'A2 Key – Part 1 Interview',
+        subtitle: `Question ${questionNumber} of ${totalQuestions}`,
+        accentColor: 'blue',
+        leftSlot: backButton,
+        rightSlot: progressBar,
+        online: true,
+      }}
+      footerConfig={{
+        modeLabel: 'A2 KEY PART 1',
+        modelName: ACTIVE_MODEL_LABEL,
+      }}
+      inputSlot={inputSlot}
+      animationKey={`a2part1-${phase}`}
+    >
+      {bodyContent}
+    </ChatShell>
   );
 }

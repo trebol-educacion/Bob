@@ -6,7 +6,6 @@ import {
   ArrowLeft,
   Mic,
   MicOff,
-  Square,
   Loader2,
   CheckCircle2,
   Circle,
@@ -14,6 +13,7 @@ import {
   RotateCcw,
   Shuffle,
   Volume2,
+  MessageSquare,
 } from 'lucide-react';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
 import { blobToBase64, pcmToWavBase64 } from '@/lib/audio';
@@ -30,6 +30,9 @@ import {
 } from '@/actions/modes/part3';
 import type { FormativeFeedback } from '@/lib/types/practice';
 import { BobMascotLoader } from '@/components/chat/BobMascotLoader';
+import { ChatShell } from '@/components/ChatShell';
+import { MessageBubble, InfoCard } from '@/components/chat';
+import { ACTIVE_MODEL_LABEL } from '@/lib/models';
 
 interface B1CollaborativePracticeProps {
   onBack: () => void;
@@ -88,25 +91,27 @@ function FormativeFeedbackPanel({ feedback }: { feedback: FormativeFeedback }) {
         {feedback.understood ? 'Great discussion — your ideas came through clearly!' : 'Good effort — keep practising!'}
       </div>
       {feedback.highlights.length > 0 && (
-        <div className="bg-green-50 border border-green-200 rounded-2xl p-5 space-y-2">
-          <h2 className="font-bold text-green-800">What went well</h2>
+        <InfoCard title="What went well" icon={CheckCircle2}>
           <ul className="space-y-2">
             {feedback.highlights.map((h, i) => (
-              <li key={i} className="flex items-start gap-2 text-sm text-green-700">
-                <CheckCircle2 size={16} className="mt-0.5 shrink-0" />
+              <li key={i} className="flex items-start gap-2 text-sm">
+                <CheckCircle2 size={14} className="mt-0.5 shrink-0 text-green-600" />
                 {h}
               </li>
             ))}
           </ul>
-        </div>
+        </InfoCard>
       )}
       {feedback.suggestions.length > 0 && (
-        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 space-y-2">
-          <h2 className="font-bold text-amber-800">Tips to improve</h2>
-          <ul className="space-y-2">
+        <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-xl">
+          <div className="flex items-center gap-2 mb-3">
+            <ChevronRight size={14} className="text-amber-600 shrink-0" />
+            <span className="text-xs font-bold text-amber-700 uppercase tracking-wider">Tips to improve</span>
+          </div>
+          <ul className="space-y-2 text-sm text-amber-800/80">
             {feedback.suggestions.map((s, i) => (
-              <li key={i} className="flex items-start gap-2 text-sm text-amber-700">
-                <ChevronRight size={16} className="mt-0.5 shrink-0" />
+              <li key={i} className="flex items-start gap-2">
+                <ChevronRight size={14} className="mt-0.5 shrink-0" />
                 {s}
               </li>
             ))}
@@ -123,6 +128,7 @@ function FormativeFeedbackPanel({ feedback }: { feedback: FormativeFeedback }) {
   );
 }
 
+/** B1 Collaborative Task — Cambridge B1 Preliminary Part 3. */
 export function B1CollaborativePractice({ onBack, sessionId: initialSessionId }: B1CollaborativePracticeProps) {
   const [phase, setPhase] = useState<Phase>('intro');
   const [scenario, setScenario] = useState<Part3Scenario | null>(null);
@@ -136,7 +142,6 @@ export function B1CollaborativePractice({ onBack, sessionId: initialSessionId }:
   const [audioError, setAudioError] = useState<string | null>(null);
   const [ttsLoading, setTtsLoading] = useState(false);
 
-  const messagesEndRef = useRef<HTMLDivElement>(null);
   const sessionCreatedRef = useRef(false);
   const sessionIdRef = useRef<string | null>(initialSessionId ?? null);
 
@@ -158,14 +163,6 @@ export function B1CollaborativePractice({ onBack, sessionId: initialSessionId }:
 
   const userTurns = history.filter((m) => m.role === 'user').length;
 
-  const scrollToBottom = useCallback(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, []);
-
-  useEffect(() => {
-    scrollToBottom();
-  }, [history, scrollToBottom]);
-
   const playExaminerTts = useCallback(async (text: string) => {
     try {
       setTtsLoading(true);
@@ -174,7 +171,6 @@ export function B1CollaborativePractice({ onBack, sessionId: initialSessionId }:
       const audio = new Audio(src);
       audio.play();
     } catch {
-      // TTS is non-critical; silently ignore
     } finally {
       setTtsLoading(false);
     }
@@ -190,7 +186,6 @@ export function B1CollaborativePractice({ onBack, sessionId: initialSessionId }:
       const generated = await generatePart3ScenarioAction();
       setScenario(generated);
     } catch {
-      // Fallback to a random preset if AI fails
       const random = PRESET_SCENARIOS[Math.floor(Math.random() * PRESET_SCENARIOS.length)];
       setScenario(random);
     } finally {
@@ -243,7 +238,6 @@ export function B1CollaborativePractice({ onBack, sessionId: initialSessionId }:
 
         setHistory((prev) => [...prev, userMsg, examinerMsg]);
 
-        // Mark options as discussed heuristically
         scenario.options.forEach((option, index) => {
           if (
             transcribed.toLowerCase().includes(option.toLowerCase().split(' ')[0]) ||
@@ -326,105 +320,118 @@ export function B1CollaborativePractice({ onBack, sessionId: initialSessionId }:
   }, []);
 
   if (phase === 'intro') {
+    const introInputSlot = (
+      <div className="flex-none border-t border-gray-100 bg-white px-4 py-4 space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          {PRESET_SCENARIOS.map((preset) => (
+            <button
+              key={preset.topic}
+              onClick={() => handleSelectPreset(preset)}
+              className={`text-left p-4 rounded-xl border-2 transition-all ${
+                scenario?.topic === preset.topic
+                  ? 'border-trebol-primary bg-trebol-primary/5'
+                  : 'border-gray-200 hover:border-trebol-secondary bg-white'
+              }`}
+            >
+              <p className="font-bold text-trebol-text text-sm">{preset.topic}</p>
+              <p className="text-xs text-trebol-text/60 mt-1 line-clamp-2">{preset.situation}</p>
+            </button>
+          ))}
+        </div>
+
+        <button
+          onClick={handleSurpriseMe}
+          disabled={loadingScenario}
+          className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-dashed border-trebol-secondary/50 text-trebol-primary font-semibold hover:bg-trebol-secondary/10 transition-colors disabled:opacity-50"
+        >
+          <span className="flex items-center justify-center w-4 h-4">
+            {loadingScenario ? <Loader2 size={16} className="animate-spin" /> : <Shuffle size={16} />}
+          </span>
+          {loadingScenario ? 'Generating scenario…' : 'Surprise me (AI generated)'}
+        </button>
+
+        <AnimatePresence>
+          {scenario && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="space-y-3"
+            >
+              <div className="flex flex-wrap gap-2">
+                {scenario.options.map((opt) => (
+                  <span
+                    key={opt}
+                    className="text-xs bg-trebol-secondary/20 text-trebol-text/80 px-2 py-1 rounded-full font-medium"
+                  >
+                    {opt}
+                  </span>
+                ))}
+              </div>
+              <button
+                onClick={handleStart}
+                className="w-full bg-trebol-primary text-white font-bold py-3 rounded-xl hover:opacity-90 transition-opacity"
+              >
+                Start Discussion
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    );
+
+    const introBody = (
+      <div className="space-y-4">
+        <MessageBubble variant="assistant" icon={MessageSquare} accentColor="blue" noAnimate>
+          <p className="font-semibold">How it works</p>
+          <ul className="mt-2 space-y-1 text-sm">
+            <li className="flex items-start gap-2">
+              <ChevronRight size={14} className="mt-0.5 shrink-0" />
+              You discuss 5 options with an AI examiner (up to {MAX_TURNS} turns)
+            </li>
+            <li className="flex items-start gap-2">
+              <ChevronRight size={14} className="mt-0.5 shrink-0" />
+              Speak your opinion on each option — give reasons!
+            </li>
+            <li className="flex items-start gap-2">
+              <ChevronRight size={14} className="mt-0.5 shrink-0" />
+              After finishing, you get detailed feedback on your performance
+            </li>
+          </ul>
+        </MessageBubble>
+
+        {scenario && (
+          <InfoCard title={scenario.topic} icon={MessageSquare}>
+            <p>{scenario.situation}</p>
+            <p className="mt-1 font-semibold text-amber-900">{scenario.prompt_question}</p>
+          </InfoCard>
+        )}
+      </div>
+    );
+
     return (
-      <div className="flex-1 flex flex-col min-h-0 overflow-auto">
-        <div className="max-w-3xl mx-auto w-full px-4 py-8 space-y-8">
-            <div className="flex items-center gap-3">
+      <ChatShell
+        headerConfig={{
+          icon: MessageSquare,
+          title: 'B1 Collaborative Task',
+          subtitle: 'Cambridge B1 Preliminary · Part 3',
+          accentColor: 'blue',
+          online: true,
+          leftSlot: (
             <button
               onClick={onBack}
-              className="p-2 rounded-lg hover:bg-trebol-secondary/20 text-trebol-text/60 hover:text-trebol-text transition-colors"
+              className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors"
             >
-              <ArrowLeft size={20} />
+              <ArrowLeft size={18} />
             </button>
-            <div>
-              <h1 className="text-2xl font-black text-trebol-text">B1 Collaborative Task</h1>
-              <p className="text-sm text-trebol-text/60 font-medium">Cambridge B1 Preliminary · Part 3</p>
-            </div>
-          </div>
-
-          <div className="bg-trebol-secondary/10 rounded-xl p-5 space-y-2">
-            <h2 className="font-bold text-trebol-text">How it works</h2>
-            <ul className="space-y-1 text-sm text-trebol-text/70">
-              <li className="flex items-start gap-2">
-                <ChevronRight size={14} className="mt-0.5 text-trebol-primary shrink-0" />
-                You discuss 5 options with an AI examiner (up to {MAX_TURNS} turns)
-              </li>
-              <li className="flex items-start gap-2">
-                <ChevronRight size={14} className="mt-0.5 text-trebol-primary shrink-0" />
-                Speak your opinion on each option — give reasons!
-              </li>
-              <li className="flex items-start gap-2">
-                <ChevronRight size={14} className="mt-0.5 text-trebol-primary shrink-0" />
-                After finishing, you get detailed feedback on your performance
-              </li>
-            </ul>
-          </div>
-
-          <div className="space-y-4">
-            <h2 className="font-bold text-trebol-text">Choose a scenario</h2>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              {PRESET_SCENARIOS.map((preset) => (
-                <button
-                  key={preset.topic}
-                  onClick={() => handleSelectPreset(preset)}
-                  className={`text-left p-4 rounded-xl border-2 transition-all ${
-                    scenario?.topic === preset.topic
-                      ? 'border-trebol-primary bg-trebol-primary/5'
-                      : 'border-gray-200 hover:border-trebol-secondary bg-white'
-                  }`}
-                >
-                  <p className="font-bold text-trebol-text text-sm">{preset.topic}</p>
-                  <p className="text-xs text-trebol-text/60 mt-1 line-clamp-2">{preset.situation}</p>
-                </button>
-              ))}
-            </div>
-
-            <button
-              onClick={handleSurpriseMe}
-              disabled={loadingScenario}
-              className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-dashed border-trebol-secondary/50 text-trebol-primary font-semibold hover:bg-trebol-secondary/10 transition-colors disabled:opacity-50"
-            >
-              <span className="flex items-center justify-center w-4 h-4">
-                {loadingScenario ? <Loader2 size={16} className="animate-spin" /> : <Shuffle size={16} />}
-              </span>
-              {loadingScenario ? 'Generating scenario…' : 'Surprise me (AI generated)'}
-            </button>
-          </div>
-
-          <AnimatePresence>
-            {scenario && (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                className="bg-white rounded-xl border border-trebol-secondary/30 p-5 space-y-3 shadow-sm"
-              >
-                <h3 className="font-bold text-trebol-text">{scenario.topic}</h3>
-                <p className="text-sm text-trebol-text/70">{scenario.situation}</p>
-                <p className="text-sm font-semibold text-trebol-primary">{scenario.prompt_question}</p>
-                <div className="flex flex-wrap gap-2">
-                  {scenario.options.map((opt) => (
-                    <span
-                      key={opt}
-                      className="text-xs bg-trebol-secondary/20 text-trebol-text/80 px-2 py-1 rounded-full font-medium"
-                    >
-                      {opt}
-                    </span>
-                  ))}
-                </div>
-
-                <button
-                  onClick={handleStart}
-                  className="w-full mt-2 bg-trebol-primary text-white font-bold py-3 rounded-xl hover:opacity-90 transition-opacity"
-                >
-                  Start Discussion
-                </button>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-      </div>
+          ),
+        }}
+        footerConfig={{ modeLabel: 'B1 PART 3', modelName: ACTIVE_MODEL_LABEL }}
+        inputSlot={introInputSlot}
+        animationKey="b1-intro"
+      >
+        {introBody}
+      </ChatShell>
     );
   }
 
@@ -433,212 +440,227 @@ export function B1CollaborativePractice({ onBack, sessionId: initialSessionId }:
   }
 
   if (phase === 'result' && evaluation) {
-    return (
-      <div className="flex-1 flex flex-col min-h-0 overflow-auto">
-        <div className="max-w-2xl mx-auto w-full px-4 py-8 space-y-8">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={onBack}
-              className="p-2 rounded-lg hover:bg-trebol-secondary/20 text-trebol-text/60 hover:text-trebol-text transition-colors"
-            >
-              <ArrowLeft size={20} />
-            </button>
-            <h1 className="text-2xl font-black text-trebol-text">Your Feedback</h1>
-          </div>
-
-          <FormativeFeedbackPanel feedback={evaluation} />
-
-          <div className="flex gap-3">
-            <button
-              onClick={handleTryAgain}
-              className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-trebol-primary text-trebol-primary font-bold hover:bg-trebol-primary/5 transition-colors"
-            >
-              <RotateCcw size={16} />
-              Try Again
-            </button>
-            <button
-              onClick={onBack}
-              className="flex-1 py-3 rounded-xl bg-trebol-primary text-white font-bold hover:opacity-90 transition-opacity"
-            >
-              Back to Modes
-            </button>
-          </div>
-        </div>
+    const resultInputSlot = (
+      <div className="flex-none border-t border-gray-100 bg-white px-4 py-4 flex gap-3">
+        <button
+          onClick={handleTryAgain}
+          className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-trebol-primary text-trebol-primary font-bold hover:bg-trebol-primary/5 transition-colors"
+        >
+          <RotateCcw size={16} />
+          Try Again
+        </button>
+        <button
+          onClick={onBack}
+          className="flex-1 py-3 rounded-xl bg-trebol-primary text-white font-bold hover:opacity-90 transition-opacity"
+        >
+          Back to Modes
+        </button>
       </div>
+    );
+
+    return (
+      <ChatShell
+        headerConfig={{
+          icon: MessageSquare,
+          title: 'Your Feedback',
+          subtitle: 'Cambridge B1 Preliminary · Part 3',
+          accentColor: 'blue',
+          online: false,
+          leftSlot: (
+            <button
+              onClick={onBack}
+              className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors"
+            >
+              <ArrowLeft size={18} />
+            </button>
+          ),
+        }}
+        footerConfig={{ modeLabel: 'FEEDBACK', modelName: ACTIVE_MODEL_LABEL }}
+        inputSlot={resultInputSlot}
+        animationKey="b1-result"
+      >
+        <FormativeFeedbackPanel feedback={evaluation} />
+      </ChatShell>
     );
   }
 
-  return (
-    <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-100 bg-white shrink-0">
-        <button
-          onClick={onBack}
-          className="p-2 rounded-lg hover:bg-trebol-secondary/20 text-trebol-text/60 hover:text-trebol-text transition-colors"
+  const optionsSidebar = (
+    <div className="hidden md:flex flex-col gap-2 w-44 shrink-0 border-r border-gray-100 bg-gray-50 overflow-y-auto p-3">
+      <p className="text-xs font-bold text-trebol-text/50 uppercase tracking-widest mb-1">Options</p>
+      {scenario?.options.map((option, index) => (
+        <div
+          key={option}
+          className={`flex items-start gap-2 text-xs p-2 rounded-lg transition-colors ${
+            discussedOptions.has(index)
+              ? 'bg-green-100 text-green-700'
+              : 'bg-white text-trebol-text/70 border border-gray-200'
+          }`}
         >
-          <ArrowLeft size={20} />
-        </button>
-        <div className="flex-1 min-w-0">
-          <h1 className="font-black text-trebol-text truncate">{scenario?.topic ?? 'Collaborative Task'}</h1>
-          <p className="text-xs text-trebol-text/50 font-medium">B1 · Part 3</p>
+          {discussedOptions.has(index) ? (
+            <CheckCircle2 size={12} className="mt-0.5 shrink-0" />
+          ) : (
+            <Circle size={12} className="mt-0.5 shrink-0" />
+          )}
+          <span className="font-medium">{option}</span>
         </div>
-        <span className="text-xs font-bold text-trebol-primary bg-trebol-secondary/20 px-3 py-1 rounded-full shrink-0">
-          Turn {userTurns} of {MAX_TURNS}
-        </span>
-      </div>
+      ))}
+    </div>
+  );
 
-      <div className="flex-1 flex min-h-0 overflow-hidden">
-        <aside className="w-44 shrink-0 border-r border-gray-100 bg-gray-50 overflow-y-auto hidden md:flex flex-col p-3 gap-2">
-          <p className="text-xs font-bold text-trebol-text/50 uppercase tracking-widest mb-1">Options</p>
-          {scenario?.options.map((option, index) => (
-            <div
-              key={option}
-              className={`flex items-start gap-2 text-xs p-2 rounded-lg transition-colors ${
-                discussedOptions.has(index)
-                  ? 'bg-green-100 text-green-700'
-                  : 'bg-white text-trebol-text/70 border border-gray-200'
+  const conversationInputSlot = (
+    <div className="flex-none border-t border-gray-100 bg-white">
+      <AnimatePresence>
+        {audioError && (
+          <motion.div
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            className="mx-4 mt-2 text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2"
+          >
+            {audioError}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showTextInput && (
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 8 }}
+            className="px-4 pt-2 flex gap-2"
+          >
+            <input
+              type="text"
+              value={textInput}
+              onChange={(e) => setTextInput(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleTextSubmit()}
+              placeholder="Type your response…"
+              className="flex-1 border border-gray-200 rounded-xl px-4 py-2 text-sm text-trebol-text focus:outline-none focus:border-trebol-primary"
+              autoFocus
+            />
+            <button
+              onClick={handleTextSubmit}
+              disabled={!textInput.trim() || isProcessing}
+              className="bg-trebol-primary text-white px-4 py-2 rounded-xl text-sm font-bold disabled:opacity-50 hover:opacity-90 transition-opacity"
+            >
+              Send
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <div className="px-4 py-4 flex items-center justify-center gap-3 relative">
+        {userTurns >= MAX_TURNS && (
+          <button
+            onClick={handleEvaluate}
+            disabled={isProcessing}
+            className="flex-1 max-w-xs bg-green-500 text-white font-bold py-3 rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            <CheckCircle2 size={18} />
+            Finish & Evaluate
+          </button>
+        )}
+
+        {userTurns < MAX_TURNS && (
+          <>
+            <button
+              onClick={isRecording ? stopRecording : startRecording}
+              disabled={isProcessing || ttsLoading}
+              className={`w-16 h-16 rounded-full flex items-center justify-center transition-all shadow-md disabled:opacity-50 ${
+                isRecording
+                  ? 'bg-red-500 text-white scale-110 animate-pulse'
+                  : 'bg-trebol-primary text-white hover:opacity-90'
               }`}
             >
-              {discussedOptions.has(index) ? (
-                <CheckCircle2 size={12} className="mt-0.5 shrink-0" />
-              ) : (
-                <Circle size={12} className="mt-0.5 shrink-0" />
-              )}
-              <span className="font-medium">{option}</span>
-            </div>
-          ))}
-        </aside>
+              {isRecording ? <MicOff size={24} /> : <Mic size={24} />}
+            </button>
 
-        <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-          <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
-            {history.map((msg, index) => (
-              <motion.div
-                key={index}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-              >
-                <div
-                  className={`max-w-[75%] rounded-2xl px-4 py-3 text-sm ${
-                    msg.role === 'user'
-                      ? 'bg-trebol-primary text-white rounded-br-md'
-                      : 'bg-gray-100 text-trebol-text rounded-bl-md'
-                  }`}
-                >
-                  {msg.role === 'examiner' && (
-                    <p className="text-[10px] font-bold text-trebol-text/50 mb-1 uppercase tracking-wider">
-                      Examiner
-                    </p>
-                  )}
-                  <p className="leading-relaxed">{msg.text}</p>
-                </div>
-              </motion.div>
-            ))}
+            <button
+              onClick={() => setShowTextInput((v) => !v)}
+              disabled={isRecording || isProcessing}
+              className="text-xs text-trebol-text/50 hover:text-trebol-text transition-colors font-medium disabled:opacity-30"
+            >
+              {showTextInput ? 'Hide text' : 'Type instead'}
+            </button>
 
-            {isProcessing && (
-              <div className="flex justify-start">
-                <div className="bg-gray-100 rounded-2xl rounded-bl-md px-4 py-3 flex items-center gap-2">
-                  <Loader2 size={14} className="animate-spin text-trebol-text/50" />
-                  <span className="text-xs text-trebol-text/50">Examiner is responding…</span>
-                </div>
-              </div>
-            )}
-
-            <div ref={messagesEndRef} />
-          </div>
-
-          <AnimatePresence>
-            {audioError && (
-              <motion.div
-                initial={{ opacity: 0, y: 4 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0 }}
-                className="mx-4 mb-2 text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2"
-              >
-                {audioError}
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          <AnimatePresence>
-            {showTextInput && (
-              <motion.div
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 8 }}
-                className="px-4 pb-2 flex gap-2"
-              >
-                <input
-                  type="text"
-                  value={textInput}
-                  onChange={(e) => setTextInput(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleTextSubmit()}
-                  placeholder="Type your response…"
-                  className="flex-1 border border-gray-200 rounded-xl px-4 py-2 text-sm text-trebol-text focus:outline-none focus:border-trebol-primary"
-                  autoFocus
-                />
-                <button
-                  onClick={handleTextSubmit}
-                  disabled={!textInput.trim() || isProcessing}
-                  className="bg-trebol-primary text-white px-4 py-2 rounded-xl text-sm font-bold disabled:opacity-50 hover:opacity-90 transition-opacity"
-                >
-                  Send
-                </button>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          <div className="px-4 py-4 border-t border-gray-100 bg-white flex items-center justify-center gap-3 shrink-0">
-            {userTurns >= MAX_TURNS && (
+            {userTurns >= 4 && (
               <button
                 onClick={handleEvaluate}
-                disabled={isProcessing}
-                className="flex-1 max-w-xs bg-green-500 text-white font-bold py-3 rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
+                disabled={isProcessing || isRecording}
+                className="text-xs text-trebol-text/40 hover:text-trebol-primary transition-colors font-medium disabled:opacity-30"
               >
-                <CheckCircle2 size={18} />
-                Finish & Evaluate
+                Finish early
               </button>
             )}
+          </>
+        )}
 
-            {userTurns < MAX_TURNS && (
-              <>
-                <button
-                  onClick={isRecording ? stopRecording : startRecording}
-                  disabled={isProcessing || ttsLoading}
-                  className={`w-16 h-16 rounded-full flex items-center justify-center transition-all shadow-md disabled:opacity-50 ${
-                    isRecording
-                      ? 'bg-red-500 text-white scale-110 animate-pulse'
-                      : 'bg-trebol-primary text-white hover:opacity-90'
-                  }`}
-                >
-                  {isRecording ? <MicOff size={24} /> : <Mic size={24} />}
-                </button>
-
-                <button
-                  onClick={() => setShowTextInput((v) => !v)}
-                  disabled={isRecording || isProcessing}
-                  className="text-xs text-trebol-text/50 hover:text-trebol-text transition-colors font-medium disabled:opacity-30"
-                >
-                  {showTextInput ? 'Hide text' : 'Type instead'}
-                </button>
-
-                {userTurns >= 4 && (
-                  <button
-                    onClick={handleEvaluate}
-                    disabled={isProcessing || isRecording}
-                    className="text-xs text-trebol-text/40 hover:text-trebol-primary transition-colors font-medium disabled:opacity-30"
-                  >
-                    Finish early
-                  </button>
-                )}
-              </>
-            )}
-
-            {ttsLoading && (
-              <Volume2 size={16} className="text-trebol-text/30 animate-pulse absolute right-6" />
-            )}
-          </div>
-        </div>
+        {ttsLoading && (
+          <Volume2 size={16} className="text-trebol-text/30 animate-pulse absolute right-6" />
+        )}
       </div>
     </div>
+  );
+
+  const conversationBody = (
+    <div className="flex min-h-0 gap-0">
+      {optionsSidebar}
+      <div className="flex-1 space-y-3 min-w-0">
+        {history.map((msg, index) => (
+          <MessageBubble
+            key={index}
+            variant={msg.role === 'user' ? 'user' : 'assistant'}
+            icon={MessageSquare}
+            accentColor="blue"
+            noAnimate
+          >
+            {msg.role === 'examiner' && (
+              <p className="text-[10px] font-bold opacity-50 mb-1 uppercase tracking-wider">Examiner</p>
+            )}
+            <p className="leading-relaxed">{msg.text}</p>
+          </MessageBubble>
+        ))}
+
+        {isProcessing && (
+          <MessageBubble variant="assistant" icon={MessageSquare} accentColor="blue">
+            <div className="flex items-center gap-2">
+              <Loader2 size={14} className="animate-spin" />
+              <span className="text-xs opacity-60">Examiner is responding…</span>
+            </div>
+          </MessageBubble>
+        )}
+      </div>
+    </div>
+  );
+
+  return (
+    <ChatShell
+      headerConfig={{
+        icon: MessageSquare,
+        title: scenario?.topic ?? 'Collaborative Task',
+        subtitle: 'B1 · Part 3',
+        accentColor: 'blue',
+        online: true,
+        leftSlot: (
+          <button
+            onClick={onBack}
+            className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors"
+          >
+            <ArrowLeft size={18} />
+          </button>
+        ),
+        rightSlot: (
+          <span className="text-xs font-bold text-trebol-primary bg-trebol-secondary/20 px-3 py-1 rounded-full">
+            Turn {userTurns} of {MAX_TURNS}
+          </span>
+        ),
+      }}
+      footerConfig={{ modeLabel: 'COLLABORATIVE TASK', modelName: ACTIVE_MODEL_LABEL }}
+      inputSlot={conversationInputSlot}
+      animationKey="b1-conversation"
+    >
+      {conversationBody}
+    </ChatShell>
   );
 }

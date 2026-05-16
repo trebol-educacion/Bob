@@ -19,6 +19,9 @@ import {
 } from '@/actions/modes/toefl_interview';
 import type { FormativeFeedback } from '@/lib/types/practice';
 import { BobMascotLoader } from '@/components/chat/BobMascotLoader';
+import { ChatShell } from '@/components/ChatShell';
+import { MessageBubble, InfoCard } from '@/components/chat';
+import { ACTIVE_MODEL_LABEL } from '@/lib/models';
 
 type InterviewPhase =
   | 'loading'
@@ -323,182 +326,195 @@ export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) 
   const allHighlights = evaluations.flatMap((e) => e.highlights);
   const allSuggestions = evaluations.flatMap((e) => e.suggestions);
 
-  return (
-    <div className="flex-1 flex flex-col min-h-0 overflow-auto bg-trebol-bg">
+  const progressDots = plan ? (
+    <div className="flex gap-1.5">
+      {plan.questions.map((_, i) => (
+        <div
+          key={i}
+          className={`w-2 h-2 rounded-full transition-colors ${
+            i < currentIndex
+              ? 'bg-blue-600'
+              : i === currentIndex
+                ? 'bg-blue-400 ring-2 ring-blue-200'
+                : 'bg-gray-200'
+          }`}
+        />
+      ))}
+    </div>
+  ) : null;
 
-      <div className="sticky top-0 z-10 bg-trebol-bg/90 backdrop-blur-sm border-b border-trebol-border px-4 py-3 flex items-center gap-3">
-        <button
-          onClick={onBack}
-          className="flex items-center gap-1 text-trebol-text/60 hover:text-trebol-text transition-colors text-sm font-medium"
-        >
-          <ArrowLeft size={16} />
-          Back
-        </button>
-        <div className="h-4 w-px bg-trebol-border" />
-        <div className="flex items-center gap-2">
-          <ClipboardList size={16} className="text-trebol-primary" />
-          <span className="text-sm font-black text-trebol-text">
-            TOEFL Interview{plan ? ` — ${plan.topic_name}` : ''}
-          </span>
+  const headerRightSlot = phase === 'question' && plan ? (
+    <div className="flex items-center gap-3">
+      {progressDots}
+      <span className="text-xs font-bold text-gray-400">
+        {currentIndex + 1}/{plan.questions.length}
+      </span>
+    </div>
+  ) : null;
+
+  const inputSlot = (
+    <div className="flex-none border-t border-gray-100 bg-white px-4 py-3">
+      {phase === 'question' && subPhase === 'recording' && (
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-red-500 font-bold text-sm animate-pulse">
+            <Mic size={16} />
+            <span>Recording</span>
+          </div>
+          <button
+            onClick={handleStopRecording}
+            className="flex items-center gap-2 bg-red-500 text-white font-black px-5 py-2.5 rounded-xl hover:bg-red-600 transition-colors"
+          >
+            <Square size={15} />
+            Stop
+          </button>
         </div>
-        {phase === 'question' && plan && (
-          <span className="ml-auto text-xs font-bold text-trebol-text/50">
-            Question {currentIndex + 1} of {plan.questions.length}
-          </span>
-        )}
-      </div>
+      )}
 
-      <div className="flex-1 flex flex-col items-center justify-center p-6 max-w-2xl mx-auto w-full">
+      {phase === 'question' && subPhase === 'result-preview' && currentEval && (
+        <button
+          onClick={handleNext}
+          className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white font-black px-6 py-3 rounded-xl hover:opacity-90 transition-opacity"
+        >
+          {currentIndex + 1 < (plan?.questions.length ?? 0) ? (
+            <>Next Question <ChevronRight size={16} /></>
+          ) : (
+            <>See Results <ChevronRight size={16} /></>
+          )}
+        </button>
+      )}
 
-        {phase === 'loading' && (
-          <>
-            <BobMascotLoader message="Generating your interview session…" />
-            {error && <p className="text-red-500 text-sm text-center">{error}</p>}
-          </>
-        )}
+      {phase === 'intro' && (
+        <button
+          onClick={handleStart}
+          className="w-full bg-blue-600 text-white font-black px-8 py-3 rounded-xl hover:opacity-90 transition-opacity"
+        >
+          Start Interview
+        </button>
+      )}
 
-        {phase === 'intro' && plan && (
-          <div className="flex flex-col items-center gap-6 text-center w-full">
-            <div className="bg-trebol-secondary/10 p-5 rounded-full">
-              <ClipboardList size={48} className="text-trebol-primary" />
-            </div>
+      {phase === 'finished' && (
+        <div className="flex gap-3">
+          <button
+            onClick={handleRestart}
+            className="flex-1 flex items-center justify-center gap-2 border-2 border-blue-600 text-blue-600 font-black px-4 py-2.5 rounded-xl hover:bg-blue-600 hover:text-white transition-colors"
+          >
+            <RotateCcw size={15} />
+            Try Again
+          </button>
+          <button
+            onClick={onBack}
+            className="flex-1 flex items-center justify-center gap-2 bg-blue-600 text-white font-black px-4 py-2.5 rounded-xl hover:opacity-90 transition-opacity"
+          >
+            <ArrowLeft size={15} />
+            Back
+          </button>
+        </div>
+      )}
+    </div>
+  );
+
+  const bodyContent = (
+    <>
+      {phase === 'loading' && (
+        <div className="flex flex-col items-center justify-center py-12 gap-4">
+          <BobMascotLoader message="Generating your interview session…" />
+          {error && <p className="text-red-500 text-sm text-center">{error}</p>}
+        </div>
+      )}
+
+      {phase === 'intro' && plan && (
+        <div className="space-y-4 py-4">
+          <MessageBubble variant="assistant" icon={ClipboardList} accentColor="blue">
+            <p className="font-bold text-base">{plan.topic_name}</p>
+            <p className="text-gray-500 text-sm mt-1">{plan.topic_context}</p>
+          </MessageBubble>
+          <InfoCard title="Interview format" icon={ClipboardList}>
             <div className="space-y-2">
-              <h2 className="text-3xl font-black text-trebol-text">{plan.topic_name}</h2>
-              <p className="text-trebol-text/70 font-medium max-w-md">{plan.topic_context}</p>
-            </div>
-            <div className="flex items-center gap-3 text-xs font-bold text-trebol-text/50 uppercase tracking-widest">
-              <span>4 questions</span>
-              <span>·</span>
-              <span>45 seconds each</span>
-              <span>·</span>
-              <span>TOEFL iBT format</span>
-            </div>
-            <div className="bg-white rounded-xl border border-trebol-border p-4 w-full text-left space-y-2">
+              <p className="text-xs font-bold text-amber-700 uppercase tracking-widest mb-2">
+                4 questions · 45 seconds each · TOEFL iBT format
+              </p>
               {plan.questions.map((q, i) => (
                 <div key={i} className="flex items-center gap-3">
-                  <span className="text-xs font-black text-trebol-primary w-5">{i + 1}</span>
-                  <span className="text-xs font-bold text-trebol-text/40 uppercase tracking-wide">
+                  <span className="text-xs font-black text-blue-600 w-4">{i + 1}</span>
+                  <span className="text-xs font-bold text-amber-700/60 uppercase tracking-wide">
                     {difficultyLabel(q.difficulty)}
                   </span>
                 </div>
               ))}
             </div>
-            <button
-              onClick={handleStart}
-              className="bg-trebol-primary text-white font-black px-10 py-3 rounded-xl hover:opacity-90 transition-opacity text-lg"
-            >
-              Start Interview
-            </button>
-          </div>
-        )}
+          </InfoCard>
+        </div>
+      )}
 
-        {phase === 'question' && plan && (
-          <div className="flex flex-col items-center gap-6 w-full">
-
-            <div className="flex gap-2">
-              {plan.questions.map((_, i) => (
-                <div
-                  key={i}
-                  className={`w-2.5 h-2.5 rounded-full transition-colors ${
-                    i < currentIndex
-                      ? 'bg-trebol-primary'
-                      : i === currentIndex
-                        ? 'bg-trebol-primary/60 ring-2 ring-trebol-primary/30'
-                        : 'bg-trebol-border'
-                  }`}
-                />
-              ))}
-            </div>
-
-            <span className="text-xs font-bold uppercase tracking-widest text-trebol-text/40">
-              {difficultyLabel(plan.questions[currentIndex].difficulty)}
-            </span>
-
-            <div className="bg-white rounded-2xl border border-trebol-border shadow-sm p-6 w-full text-center">
-              <p className="text-xl font-black text-trebol-text leading-relaxed">
+      {phase === 'question' && plan && (
+        <div className="space-y-4 py-2">
+          <MessageBubble variant="assistant" icon={ClipboardList} accentColor="blue">
+            <div className="space-y-1">
+              <p className="text-[10px] font-bold text-blue-400 uppercase tracking-widest">
+                {difficultyLabel(plan.questions[currentIndex].difficulty)}
+              </p>
+              <p className="text-base font-bold leading-snug">
                 {plan.questions[currentIndex].text}
               </p>
             </div>
+          </MessageBubble>
 
-            {(subPhase === 'reading' || subPhase === 'listening') && (
-              <div className="flex flex-col items-center gap-3">
-                <div className="w-10 h-10 border-4 border-trebol-primary border-t-transparent rounded-full animate-spin" />
-                <p className="text-trebol-text/60 font-medium text-sm">
-                  {subPhase === 'reading' ? 'Loading question…' : 'Listen carefully…'}
-                </p>
-              </div>
-            )}
+          {(subPhase === 'reading' || subPhase === 'listening') && (
+            <div className="flex flex-col items-center gap-3 py-4">
+              <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
+              <p className="text-gray-400 font-medium text-sm">
+                {subPhase === 'reading' ? 'Loading question…' : 'Listen carefully…'}
+              </p>
+            </div>
+          )}
 
-            {subPhase === 'prep' && (
-              <div className="flex flex-col items-center gap-3">
-                <CountdownTimer
-                  seconds={PREP_SECONDS}
-                  remaining={prepCountdown.remaining}
-                  isRunning={prepCountdown.isRunning}
-                  size={80}
-                />
-                <p className="text-trebol-text/60 font-medium text-sm">Prepare your answer…</p>
-              </div>
-            )}
+          {subPhase === 'prep' && (
+            <div className="flex flex-col items-center gap-3 py-4">
+              <CountdownTimer
+                seconds={PREP_SECONDS}
+                remaining={prepCountdown.remaining}
+                isRunning={prepCountdown.isRunning}
+                size={80}
+              />
+              <p className="text-gray-400 font-medium text-sm">Prepare your answer…</p>
+            </div>
+          )}
 
-            {subPhase === 'recording' && (
-              <div className="flex flex-col items-center gap-4">
-                <CountdownTimer
-                  seconds={RECORD_SECONDS}
-                  remaining={recordCountdown.remaining}
-                  isRunning={recordCountdown.isRunning}
-                  size={120}
-                />
-                <div className="flex items-center gap-2 text-red-500 font-bold text-sm animate-pulse">
-                  <Mic size={16} />
-                  Recording
-                </div>
-                <p className="text-trebol-text/50 text-xs">Answer clearly and completely</p>
-                <button
-                  onClick={handleStopRecording}
-                  className="flex items-center gap-2 bg-red-500 text-white font-black px-6 py-3 rounded-xl hover:bg-red-600 transition-colors"
-                >
-                  <Square size={16} />
-                  Stop
-                </button>
-              </div>
-            )}
+          {subPhase === 'recording' && (
+            <div className="flex flex-col items-center gap-4 py-4">
+              <CountdownTimer
+                seconds={RECORD_SECONDS}
+                remaining={recordCountdown.remaining}
+                isRunning={recordCountdown.isRunning}
+                size={120}
+              />
+              <p className="text-gray-400 text-xs">Answer clearly and completely</p>
+            </div>
+          )}
 
-            {subPhase === 'evaluating' && (
-              <div className="flex flex-col items-center gap-3">
-                <div className="w-10 h-10 border-4 border-trebol-primary border-t-transparent rounded-full animate-spin" />
-                <p className="text-trebol-text/60 font-medium text-sm">Evaluating your response…</p>
-              </div>
-            )}
+          {subPhase === 'evaluating' && (
+            <div className="flex flex-col items-center gap-3 py-4">
+              <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
+              <p className="text-gray-400 font-medium text-sm">Evaluating your response…</p>
+            </div>
+          )}
 
-            {subPhase === 'result-preview' && currentEval && (
-              <div className="w-full space-y-4">
-                <FormativeFeedbackCard feedback={currentEval} />
-                <button
-                  onClick={handleNext}
-                  className="w-full flex items-center justify-center gap-2 bg-trebol-primary text-white font-black px-6 py-3 rounded-xl hover:opacity-90 transition-opacity"
-                >
-                  {currentIndex + 1 < (plan?.questions.length ?? 0) ? (
-                    <>Next Question <ChevronRight size={16} /></>
-                  ) : (
-                    <>See Results <ChevronRight size={16} /></>
-                  )}
-                </button>
-              </div>
-            )}
+          {subPhase === 'result-preview' && currentEval && (
+            <FormativeFeedbackCard feedback={currentEval} />
+          )}
 
-            {error && (
-              <p className="text-red-500 text-sm text-center">{error}</p>
-            )}
-          </div>
-        )}
+          {error && (
+            <p className="text-red-500 text-sm text-center">{error}</p>
+          )}
+        </div>
+      )}
 
-        {phase === 'finished' && plan && (
-          <div className="flex flex-col gap-6 w-full">
-            <div className="bg-white rounded-2xl border border-trebol-border shadow-sm p-6 space-y-4">
-              <p className="text-xs font-bold text-trebol-text/40 uppercase tracking-widest">Session Feedback</p>
+      {phase === 'finished' && plan && (
+        <div className="space-y-4 py-2">
+          <InfoCard title="Session Feedback" icon={ClipboardList}>
+            <div className="space-y-3">
               {allHighlights.length > 0 && (
-                <div className="bg-green-50 rounded-xl p-4 space-y-1">
+                <div className="space-y-1">
                   <p className="text-xs font-bold text-green-700 uppercase tracking-widest">Strengths across the interview</p>
                   {allHighlights.map((h, i) => (
                     <p key={i} className="text-sm text-green-800">✓ {h}</p>
@@ -506,7 +522,7 @@ export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) 
                 </div>
               )}
               {allSuggestions.length > 0 && (
-                <div className="bg-amber-50 rounded-xl p-4 space-y-1">
+                <div className="space-y-1">
                   <p className="text-xs font-bold text-amber-700 uppercase tracking-widest">Focus areas</p>
                   {allSuggestions.map((s, i) => (
                     <p key={i} className="text-sm text-amber-800">→ {s}</p>
@@ -514,43 +530,58 @@ export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) 
                 </div>
               )}
             </div>
+          </InfoCard>
 
-            <div className="bg-white rounded-2xl border border-trebol-border shadow-sm p-5 space-y-3">
-              <p className="text-xs font-bold text-trebol-text/40 uppercase tracking-widest">Question Breakdown</p>
-              {plan.questions.map((q, i) => {
-                const ev = evaluations[i];
-                if (!ev) return null;
-                return (
-                  <div key={i} className="rounded-xl border border-trebol-border p-3 space-y-1">
-                    <p className="text-xs font-bold text-trebol-text/50">Q{i + 1} · {difficultyLabel(q.difficulty)}</p>
-                    <p className="text-sm font-bold text-trebol-text leading-snug line-clamp-2">{q.text}</p>
+          <div className="space-y-2">
+            {plan.questions.map((q, i) => {
+              const ev = evaluations[i];
+              if (!ev) return null;
+              return (
+                <MessageBubble key={i} variant="assistant" icon={ClipboardList} accentColor="blue" noAnimate>
+                  <div className="space-y-1">
+                    <p className="text-[10px] font-bold text-blue-400 uppercase tracking-widest">
+                      Q{i + 1} · {difficultyLabel(q.difficulty)}
+                    </p>
+                    <p className="text-sm font-bold leading-snug line-clamp-2">{q.text}</p>
                     <p className={`text-xs font-bold ${ev.understood ? 'text-green-600' : 'text-amber-600'}`}>
                       {ev.understood ? 'Message understood ✓' : 'Needs more practice'}
                     </p>
                   </div>
-                );
-              })}
-            </div>
-
-            <div className="flex gap-3">
-              <button
-                onClick={handleRestart}
-                className="flex-1 flex items-center justify-center gap-2 border-2 border-trebol-primary text-trebol-primary font-black px-4 py-3 rounded-xl hover:bg-trebol-primary hover:text-white transition-colors"
-              >
-                <RotateCcw size={16} />
-                Try Again
-              </button>
-              <button
-                onClick={onBack}
-                className="flex-1 flex items-center justify-center gap-2 bg-trebol-primary text-white font-black px-4 py-3 rounded-xl hover:opacity-90 transition-opacity"
-              >
-                <ArrowLeft size={16} />
-                Back to Modes
-              </button>
-            </div>
+                </MessageBubble>
+              );
+            })}
           </div>
-        )}
-      </div>
-    </div>
+        </div>
+      )}
+    </>
+  );
+
+  return (
+    <ChatShell
+      headerConfig={{
+        icon: ClipboardList,
+        title: `TOEFL Interview${plan ? ` — ${plan.topic_name}` : ''}`,
+        subtitle: 'TOEFL iBT FORMAT',
+        accentColor: 'blue',
+        online: true,
+        leftSlot: (
+          <button
+            onClick={onBack}
+            className="flex items-center gap-1 text-gray-400 hover:text-gray-700 transition-colors text-sm font-medium"
+          >
+            <ArrowLeft size={16} />
+          </button>
+        ),
+        rightSlot: headerRightSlot,
+      }}
+      footerConfig={{
+        modeLabel: 'TOEFL INTERVIEW',
+        modelName: ACTIVE_MODEL_LABEL,
+      }}
+      inputSlot={inputSlot}
+      animationKey={`toefl-interview-${phase}`}
+    >
+      {bodyContent}
+    </ChatShell>
   );
 }
