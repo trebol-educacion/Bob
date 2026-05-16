@@ -22,6 +22,22 @@ export type PracticeMode = string | null;
 export type ModeKey = string;
 
 // ---------------------------------------------------------------------------
+// DynamicCard — single row derived from bob_prompts (BD).
+// Source of truth for what activities are visible to a student.
+// Filled by OrganizationContext via the §2.2 query of spec.md.
+// `cefr_level` is nullable to allow universal activities (e.g. generic_conversation).
+// ---------------------------------------------------------------------------
+
+export interface DynamicCard {
+  framework: string;            // 'cambridge' | 'toefl' | 'generic' | ...
+  exam_part: string;            // 'pet_p3', 'toefl_listen_repeat', 'starters_part1', ...
+  cefr_level: CefrLevel | null; // null = universal (no level filter)
+  label: string;                // card title (from bob_prompts.label)
+  description: string | null;   // card description (from bob_prompts.description)
+  mode_key: ModeKey;            // derived: `${framework}_${exam_part}`
+}
+
+// ---------------------------------------------------------------------------
 // ModeDef — describes framework membership and which CEFR levels trigger it.
 // cefrLevels: [] means "always visible" (generic modes).
 // ---------------------------------------------------------------------------

@@ -4,7 +4,7 @@ import React, { createContext, useContext, useEffect, useState, useCallback } fr
 import { Organization, getOrganizationForUser } from '@/lib/organization';
 import { createSupabaseBrowser } from '@/lib/supabase/browser-client';
 import { resolveEnabledModes } from '@/lib/modes';
-import type { ModeKey, ModeFramework, CefrLevel } from '@/lib/types/practice';
+import type { ModeKey, ModeFramework, CefrLevel, DynamicCard } from '@/lib/types/practice';
 
 // ---------------------------------------------------------------------------
 // AvailableMode — a mode row fetched from bob_prompts (DB-driven)
@@ -39,6 +39,12 @@ interface OrganizationContextValue {
   enabledModes: ModeKey[];
   /** DB-driven list of available modes from bob_prompts (generation rows, non-generic). */
   availableModes: AvailableMode[];
+  /**
+   * DB-driven full catalog from bob_prompts (all `activity_type='generation'` rows
+   * including generic_*). Source of truth for ModeSelection in B3. Derived once at
+   * mount; consumers filter client-side per spec §2.2. (bob-core T2.3, D9-1, D9-3.)
+   */
+  allDynamicCards: DynamicCard[];
   cefrActiveLevel: CefrLevel | null;
   cefrLevelLocked: boolean;
   setCefrActiveLevel: (level: CefrLevel) => Promise<void>;
@@ -52,6 +58,7 @@ const OrganizationContext = createContext<OrganizationContextValue>({
   loading: true,
   enabledModes: ['generic_situation', 'generic_image', 'generic_conversation'],
   availableModes: [],
+  allDynamicCards: [],
   cefrActiveLevel: null,
   cefrLevelLocked: false,
   setCefrActiveLevel: async () => {},
@@ -69,6 +76,7 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
     'generic_conversation',
   ]);
   const [availableModes, setAvailableModes] = useState<AvailableMode[]>([]);
+  const [allDynamicCards, setAllDynamicCards] = useState<DynamicCard[]>([]);
   const [cefrActiveLevel, setCefrActiveLevelState] = useState<CefrLevel | null>(null);
   const [cefrLevelLocked, setCefrLevelLocked] = useState(false);
   const [userRole, setUserRole] = useState<string | null>(null);
@@ -110,8 +118,10 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
         setOrganization(org);
         setCachedOrg(org);
 
-        // Parallel fetch: profile (role + CEFR), student frameworks, org frameworks, available modes
-        const [profileResult, studentFwResult, orgFwResult, availableModesResult] = await Promise.all([
+        // Parallel fetch: profile (role + CEFR), student frameworks, org frameworks,
+        // legacy availableModes (non-generic, used by current ModeSelection), and the
+        // new allDynamicCards (all rows, source of truth for B3 spec §2.2).
+        const [profileResult, studentFwResult, orgFwResult, availableModesResult, allCardsResult] = await Promise.all([
           supabase
             .from('profiles')
             .select('role, cefr_active_level, cefr_level_locked')
@@ -133,6 +143,13 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
             .order('framework')
             .order('cefr_level', { ascending: true, nullsFirst: false })
             .order('exam_part'),
+          supabase
+            .from('bob_prompts')
+            .select('framework, exam_part, cefr_level, label, description')
+            .eq('activity_type', 'generation')
+            .order('framework')
+            .order('cefr_level', { ascending: true, nullsFirst: false })
+            .order('exam_part'),
         ]);
 
         if (profileResult.error) {
@@ -146,6 +163,9 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
         }
         if (availableModesResult.error) {
           console.error('[OrganizationContext] bob_prompts (availableModes) query failed:', availableModesResult.error);
+        }
+        if (allCardsResult.error) {
+          console.error('[OrganizationContext] bob_prompts (allDynamicCards) query failed:', allCardsResult.error);
         }
 
         const activeLevel = (profileResult.data?.cefr_active_level ?? null) as CefrLevel | null;
@@ -192,11 +212,39 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
         setCachedStudentFrameworks(studentFrameworks);
         setCachedOrgFrameworks(orgFrameworks);
 
+        // Build allDynamicCards from the unfiltered query (spec §2.2).
+        // Dedup by (framework, exam_part, cefr_level); derive mode_key.
+        const rawAll = (allCardsResult.data ?? []) as Array<{
+          framework: string;
+          exam_part: string;
+          cefr_level: string | null;
+          label: string;
+          description: string | null;
+        }>;
+        const seenAll = new Set<string>();
+        const dedupedAll: DynamicCard[] = [];
+        for (const row of rawAll) {
+          const key = `${row.framework}|${row.exam_part}|${row.cefr_level ?? ''}`;
+          if (!seenAll.has(key)) {
+            seenAll.add(key);
+            dedupedAll.push({
+              framework: row.framework,
+              exam_part: row.exam_part,
+              cefr_level: (row.cefr_level ?? null) as CefrLevel | null,
+              label: row.label,
+              description: row.description,
+              mode_key: `${row.framework}_${row.exam_part}`,
+            });
+          }
+        }
+        setAllDynamicCards(dedupedAll);
+
         const modes = resolveEnabledModes({
           isBobEnabled: org?.is_bob_enabled ?? false,
           studentActiveCefr: activeLevel,
           studentFrameworks,
           orgFrameworks,
+          allDynamicCards: dedupedAll,
         });
 
         setEnabledModes(modes);
@@ -260,9 +308,10 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
       studentActiveCefr: level,
       studentFrameworks: cachedStudentFrameworks,
       orgFrameworks: cachedOrgFrameworks,
+      allDynamicCards,
     });
     setEnabledModes(newModes);
-  }, [cefrLevelLocked, cachedOrg, cachedStudentFrameworks, cachedOrgFrameworks]);
+  }, [cefrLevelLocked, cachedOrg, cachedStudentFrameworks, cachedOrgFrameworks, allDynamicCards]);
 
   const accessGranted = accessDenialReason === null && !loading;
 
@@ -272,6 +321,7 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
       loading,
       enabledModes,
       availableModes,
+      allDynamicCards,
       cefrActiveLevel,
       cefrLevelLocked,
       setCefrActiveLevel,

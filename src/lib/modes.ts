@@ -1,4 +1,4 @@
-import { CefrLevel, MODE_CATALOG, ModeFramework, ModeKey } from './types/practice';
+import type { CefrLevel, DynamicCard, ModeFramework, ModeKey } from './types/practice';
 
 export interface ResolveModesArgs {
   isBobEnabled: boolean;
@@ -8,47 +8,50 @@ export interface ResolveModesArgs {
   studentFrameworks: ModeFramework[];
   /** Frameworks enabled at the org level. */
   orgFrameworks: ModeFramework[];
+  /**
+   * Full catalog from bob_prompts (BD). Source of truth for what activities exist.
+   * Replaces the previous static catalog iteration. See spec.md §2.2.
+   */
+  allDynamicCards: DynamicCard[];
 }
 
 /**
  * Returns the list of ModeKeys the student can access.
  *
- * Inclusion rules (per spec Domain 4):
+ * Inclusion rules (per spec §2.2):
  *   1. Mode M is included iff `isBobEnabled` AND one of:
- *      a. M.framework === 'generic'
- *         AND (M.cefrLevels is empty  ← always-visible generic modes
- *              OR M.cefrLevels includes studentActiveCefr)
+ *      a. M.framework === 'generic' (fallback, visible only when the student
+ *         has NO framework assigned). Cards with `cefr_level === null` are
+ *         universal; otherwise must match studentActiveCefr.
  *      b. M.framework ∈ (studentFrameworks ∩ orgFrameworks)
- *         AND M.cefrLevels includes studentActiveCefr
+ *         AND M.cefr_level === studentActiveCefr
  *
- *   2. studentActiveCefr === null → only generic modes whose cefrLevels=[].
+ *   2. studentActiveCefr === null → only universal generics (`cefr_level=null`).
  */
 export function resolveEnabledModes({
   isBobEnabled,
   studentActiveCefr,
   studentFrameworks,
   orgFrameworks,
+  allDynamicCards,
 }: ResolveModesArgs): ModeKey[] {
   if (!isBobEnabled) return [];
 
   const effectiveFrameworks = studentFrameworks.filter(f => orgFrameworks.includes(f));
   const hasAssignedFrameworks = effectiveFrameworks.length > 0;
 
-  return (Object.keys(MODE_CATALOG) as ModeKey[]).filter(key => {
-    const def = MODE_CATALOG[key];
-
-    if (def.framework === 'generic') {
-      // Generic modes are fallback: only visible when the student has NO
-      // framework assigned. As soon as a framework is enabled, hide them.
-      if (hasAssignedFrameworks) return false;
-      if (def.cefrLevels.length === 0) return true;
+  return allDynamicCards
+    .filter(card => {
+      if (card.framework === 'generic') {
+        if (hasAssignedFrameworks) return false;
+        if (card.cefr_level === null) return true;
+        if (studentActiveCefr === null) return false;
+        return card.cefr_level === studentActiveCefr;
+      }
+      // Non-generic
       if (studentActiveCefr === null) return false;
-      return def.cefrLevels.includes(studentActiveCefr);
-    }
-
-    // Non-generic: requires matching framework AND active CEFR level
-    if (studentActiveCefr === null) return false;
-    if (!effectiveFrameworks.includes(def.framework)) return false;
-    return def.cefrLevels.includes(studentActiveCefr);
-  });
+      if (!(effectiveFrameworks as string[]).includes(card.framework)) return false;
+      return card.cefr_level === studentActiveCefr;
+    })
+    .map(card => card.mode_key);
 }
