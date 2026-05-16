@@ -92,6 +92,33 @@ export function getModeSection(card: DynamicCard): string {
   return 'Other';
 }
 
+const YL_FAMILY_WEIGHT: Record<string, number> = {
+  starters: 1,
+  movers: 2,
+  flyers: 3,
+};
+
+export function getModeSortWeight(card: DynamicCard): number {
+  const { framework, exam_part } = card;
+
+  if (framework === 'cambridge') {
+    const ylMatch = exam_part.match(/^(starters|movers|flyers)_part(\d+)$/);
+    if (ylMatch) {
+      const family = YL_FAMILY_WEIGHT[ylMatch[1]] ?? 99;
+      const part = parseInt(ylMatch[2], 10);
+      return family * 100 + part;
+    }
+    const partMatch = exam_part.match(/_p?(\d+)([a-z]?)$/);
+    if (partMatch) {
+      const part = parseInt(partMatch[1], 10);
+      const suffix = partMatch[2] ? partMatch[2].charCodeAt(0) - 96 : 0;
+      return part * 10 + suffix;
+    }
+  }
+
+  return Number.MAX_SAFE_INTEGER;
+}
+
 /** Returns the display title for a card. */
 export function getModeTitle(card: DynamicCard): string {
   return card.label;

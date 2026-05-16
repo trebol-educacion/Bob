@@ -19,7 +19,7 @@ import type { ModeKey, PracticeMode, CefrLevel, DynamicCard } from '@/lib/types/
 import { CefrLevelSelector } from '@/components/CefrLevelSelector';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import type { AvailableMode } from '@/contexts/OrganizationContext';
-import { getModeIcon, getModeBadge, getModeSection, getModeTitle, getModeDescription } from '@/lib/mode-ui';
+import { getModeIcon, getModeBadge, getModeSection, getModeTitle, getModeDescription, getModeSortWeight } from '@/lib/mode-ui';
 
 const ICON_MAP: Record<string, React.FC<{ size?: number; className?: string }>> = {
   MessageSquare,
@@ -121,6 +121,9 @@ export const ModeSelection = forwardRef<HTMLDivElement, ModeSelectionProps>(func
     const existing = sectionMap.get(section) ?? [];
     existing.push(card);
     sectionMap.set(section, existing);
+  }
+  for (const cards of sectionMap.values()) {
+    cards.sort((a, b) => getModeSortWeight(a) - getModeSortWeight(b));
   }
 
   function renderCard(card: DynamicCard) {
