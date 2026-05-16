@@ -15,3 +15,5 @@ Referencias/
 .playwright-mcp/
 .sdd/
 supabase/.temp/
+test-results/
+playwright-report/
