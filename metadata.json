@@ -1,5 +1,5 @@
 {
-  "name": "PronunciaBien",
+  "name": "Bob",
   "description": "App para practicar pronunciación en inglés con evaluación de IA.",
   "requestFramePermissions": ["microphone"]
 }

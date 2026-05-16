@@ -15,10 +15,11 @@ import {
   MessageCircle,
   BookImage,
 } from 'lucide-react';
-import type { ModeKey, PracticeMode, CefrLevel } from '@/lib/types/practice';
-import { MODE_UI_METADATA } from '@/lib/types/practice';
+import type { ModeKey, PracticeMode, CefrLevel, DynamicCard } from '@/lib/types/practice';
 import { CefrLevelSelector } from '@/components/CefrLevelSelector';
+import { useOrganization } from '@/contexts/OrganizationContext';
 import type { AvailableMode } from '@/contexts/OrganizationContext';
+import { getModeIcon, getModeBadge, getModeSection, getModeTitle, getModeDescription } from '@/lib/mode-ui';
 
 const ICON_MAP: Record<string, React.FC<{ size?: number; className?: string }>> = {
   MessageSquare,
@@ -42,11 +43,6 @@ function resolveIcon(name: string, size = 28, className?: string): React.ReactNo
   if (Icon) return <Icon size={size} className={className} />;
   return <Sparkles size={size} className={className} />;
 }
-
-const FRAMEWORK_SECTION: Record<string, string> = {
-  cambridge: 'Cambridge English',
-  toefl: 'TOEFL iBT',
-};
 
 interface ModeCardProps {
   mode: ModeKey;
@@ -97,8 +93,7 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 
 interface ModeSelectionProps {
   onSelect: (mode: PracticeMode) => void;
-  enabledModes?: PracticeMode[];
-  /** DB-driven modes from OrganizationContext — used as fallback display data */
+  enabledModes?: ModeKey[];
   availableModes?: AvailableMode[];
   cefrActiveLevel?: CefrLevel | null;
   cefrLevelLocked?: boolean;
@@ -106,78 +101,37 @@ interface ModeSelectionProps {
 }
 
 export const ModeSelection = forwardRef<HTMLDivElement, ModeSelectionProps>(function ModeSelection(
-  { onSelect, enabledModes = [], availableModes = [], cefrActiveLevel = null, cefrLevelLocked = false, onCefrChange },
+  { onSelect, cefrActiveLevel = null, cefrLevelLocked = false, onCefrChange },
   selectorRef
 ) {
+  const { allDynamicCards, enabledModes } = useOrganization();
   const iconClass = 'text-trebol-primary group-hover:text-white transition-colors';
 
-  const genericEnabled = enabledModes.filter(
-    (m): m is ModeKey => m !== null && (m as string).startsWith('generic_')
-  );
-  const frameworkEnabled = enabledModes.filter(
-    (m): m is ModeKey => m !== null && !(m as string).startsWith('generic_')
-  );
+  const enabledSet = new Set(enabledModes);
+  const visibleCards = allDynamicCards.filter(card => enabledSet.has(card.mode_key));
 
-  // Free Practice section is only shown when there are no framework modes.
-  // resolveEnabledModes already removes generic modes when frameworks are assigned,
-  // so genericEnabled will be empty when frameworkEnabled is non-empty.
-  const showFreePractice = frameworkEnabled.length === 0;
+  const genericCards = visibleCards.filter(card => card.framework === 'generic');
+  const frameworkCards = visibleCards.filter(card => card.framework !== 'generic');
 
-  // Build an index from availableModes for O(1) fallback display data lookup
-  // key: `${framework}_${exam_part}` (matches PracticeMode pattern)
-  const availableModeIndex = new Map<string, AvailableMode>();
-  for (const am of availableModes) {
-    const key = `${am.framework}_${am.exam_part}`;
-    if (!availableModeIndex.has(key)) availableModeIndex.set(key, am);
+  const showFreePractice = frameworkCards.length === 0;
+
+  const sectionMap = new Map<string, DynamicCard[]>();
+  for (const card of frameworkCards) {
+    const section = getModeSection(card);
+    const existing = sectionMap.get(section) ?? [];
+    existing.push(card);
+    sectionMap.set(section, existing);
   }
 
-  const sectionMap = new Map<string, ModeKey[]>();
-  for (const mode of frameworkEnabled) {
-    const meta = MODE_UI_METADATA[mode];
-    let sectionName: string;
-    if (meta?.section) {
-      sectionName = meta.section;
-    } else {
-      const framework = (mode as string).split('_')[0];
-      sectionName = FRAMEWORK_SECTION[framework] ?? 'Other';
-    }
-    const existing = sectionMap.get(sectionName) ?? [];
-    existing.push(mode);
-    sectionMap.set(sectionName, existing);
-  }
-
-  function renderFrameworkCard(mode: ModeKey) {
-    const meta = MODE_UI_METADATA[mode];
-    const amFallback = availableModeIndex.get(mode as string);
-
-    if (meta) {
-      return (
-        <ModeCard
-          key={mode}
-          mode={mode}
-          icon={resolveIcon(meta.icon, 28, iconClass)}
-          title={meta.title}
-          description={meta.description}
-          badge={meta.badge}
-          onSelect={onSelect}
-        />
-      );
-    }
-
-    const title = amFallback?.label ?? mode;
-    const description = amFallback?.description ?? '';
-    const cefrBadge = amFallback?.cefr_level
-      ? `${amFallback.cefr_level.toUpperCase()} · ${amFallback.exam_part}`
-      : amFallback?.exam_part ?? '';
-
+  function renderCard(card: DynamicCard) {
     return (
       <ModeCard
-        key={mode}
-        mode={mode}
-        icon={<Sparkles size={28} className={iconClass} />}
-        title={title}
-        description={description}
-        badge={cefrBadge || undefined}
+        key={card.mode_key}
+        mode={card.mode_key}
+        icon={resolveIcon(getModeIcon(card), 28, iconClass)}
+        title={getModeTitle(card)}
+        description={getModeDescription(card)}
+        badge={getModeBadge(card)}
         onSelect={onSelect}
       />
     );
@@ -203,40 +157,20 @@ export const ModeSelection = forwardRef<HTMLDivElement, ModeSelectionProps>(func
         />
       </div>
 
-      {showFreePractice && (
+      {showFreePractice && genericCards.length > 0 && (
         <div>
           <SectionTitle>Free Practice</SectionTitle>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <ModeCard
-              mode="generic_situation"
-              icon={<MessageSquare size={28} className={iconClass} />}
-              title="Práctica de Situación"
-              description="Practica frases útiles para situaciones reales personalizadas por ti."
-              onSelect={onSelect}
-            />
-            <ModeCard
-              mode="generic_image"
-              icon={<ImageIcon size={28} className={iconClass} />}
-              title="Descripción de Imagen"
-              description="Prepárate para el examen B1 describiendo escenas generadas por IA."
-              onSelect={onSelect}
-            />
-            <ModeCard
-              mode="generic_conversation"
-              icon={<Mic2 size={28} className={iconClass} />}
-              title="Conversación Fluida"
-              description="Interactúa en una conversación real con IA sobre cualquier tema."
-              onSelect={onSelect}
-            />
+            {genericCards.map(renderCard)}
           </div>
         </div>
       )}
 
-      {Array.from(sectionMap.entries()).map(([sectionName, modes]) => (
+      {Array.from(sectionMap.entries()).map(([sectionName, cards]) => (
         <div key={sectionName}>
           <SectionTitle>{sectionName}</SectionTitle>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {modes.map(renderFrameworkCard)}
+            {cards.map(renderCard)}
           </div>
         </div>
       ))}

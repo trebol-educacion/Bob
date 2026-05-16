@@ -14,70 +14,23 @@ import { createSupabaseBrowser } from '@/lib/supabase/browser-client';
 import { Navbar } from '@/components/Navbar';
 import { useSessionState } from '@/hooks/useSessionState';
 import { useOrganization } from '@/hooks/useOrganization';
-import { B1CollaborativePractice } from '@/components/B1CollaborativePractice';
-import { A2Part1Practice } from '@/components/A2Part1Practice';
-import { ToeflListenRepeatPractice } from '@/components/ToeflListenRepeatPractice';
-import { ToeflInterviewPractice } from '@/components/ToeflInterviewPractice';
 import {
-  YLPart1Practice,
-  YLPart2Practice,
-  YLPart3Practice,
-  YLPart4Practice,
-  YLPointingPractice,
-} from '@/components/practice/yl';
-import type { PracticeMode, ModeKey } from '@/lib/types/practice';
+  getRouteForMode,
+  isExamMode,
+  isConversationMode,
+  isFceImageMode,
+  type AppState,
+  type YLRenderProps,
+  type ExamRenderProps,
+} from '@/lib/routing';
+import type { PracticeMode } from '@/lib/types/practice';
 import type { StoredMessage } from '@/actions/messages';
-
-type AppState =
-  | 'mode-selection'
-  | 'practicing'
-  | 'conversation-practicing'
-  | 'exam-practicing'
-  | 'dashboard';
-
-/** All 9 Cambridge A1 Young Learners mode keys. */
-const YL_MODES = new Set<ModeKey>([
-  'cambridge_starters_part1',
-  'cambridge_starters_part2',
-  'cambridge_starters_part3',
-  'cambridge_starters_part4',
-  'cambridge_movers_part1',
-  'cambridge_movers_part2',
-  'cambridge_movers_part3',
-  'cambridge_movers_part4',
-  'cambridge_movers_part5',
-]);
-
-interface YLRenderProps {
-  onBack: () => void;
-  sessionId?: string;
-  initialMessages?: StoredMessage[];
-  onSessionCreated?: (sessionId: string) => void;
-}
-
-/**
- * Maps each YL mode key to a factory that renders the correct component
- * with the right `exam` and `part` props pre-bound.
- * O(1) lookup — avoids long switch chains.
- */
-const MODE_COMPONENT_MAP: Partial<Record<ModeKey, (props: YLRenderProps) => React.JSX.Element>> = {
-  cambridge_starters_part1: (p) => <YLPointingPractice exam="starters" part={1} {...p} />,
-  cambridge_starters_part2: (p) => <YLPart2Practice exam="starters" part={2} {...p} />,
-  cambridge_starters_part3: (p) => <YLPart3Practice exam="starters" part={3} {...p} />,
-  cambridge_starters_part4: (p) => <YLPart4Practice exam="starters" part={4} {...p} />,
-  cambridge_movers_part1:   (p) => <YLPart1Practice exam="movers"   part={1} {...p} />,
-  cambridge_movers_part2:   (p) => <YLPart2Practice exam="movers"   part={2} {...p} />,
-  cambridge_movers_part3:   (p) => <YLPart3Practice exam="movers"   part={3} {...p} />,
-  cambridge_movers_part4:   (p) => <YLPart4Practice exam="movers"   part={4} {...p} />,
-  cambridge_movers_part5:   (p) => <YLPart4Practice exam="movers"   part={5} {...p} />,
-};
 
 export default function App() {
   const [appState, setAppState] = useState<AppState>('mode-selection');
   const [userEmail, setUserEmail] = useState<string | undefined>();
   const { organization, enabledModes, availableModes, cefrActiveLevel, cefrLevelLocked, setCefrActiveLevel, loading: orgLoading, accessDenialReason } = useOrganization();
 
-  // Ref forwarded to ModeSelection so the banner can scroll to the selector
   const cefrSelectorRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -127,16 +80,10 @@ export default function App() {
   const onSelectSession = useCallback(async (id: string) => {
     await handleSelectSession(id, (sessionMode, sessionTopic) => {
       setMode(sessionMode as PracticeMode);
-      if (sessionMode === 'generic_conversation') {
+      if (isConversationMode(sessionMode)) {
         setTopic(sessionTopic);
         setAppState('conversation-practicing');
-      } else if (
-        YL_MODES.has(sessionMode as ModeKey) ||
-        sessionMode === 'cambridge_pet_p3' ||
-        sessionMode === 'cambridge_ket_part1' ||
-        sessionMode === 'toefl_listen_repeat' ||
-        sessionMode === 'toefl_interview'
-      ) {
+      } else if (isExamMode(sessionMode)) {
         setAppState('exam-practicing');
       } else {
         setAppState('practicing');
@@ -150,15 +97,9 @@ export default function App() {
 
   const handleModeSelect = (m: PracticeMode) => {
     setMode(m);
-    if (m === 'generic_conversation') {
+    if (isConversationMode(m ?? '')) {
       setAppState('conversation-practicing');
-    } else if (
-      (m !== null && YL_MODES.has(m)) ||
-      m === 'cambridge_pet_p3' ||
-      m === 'cambridge_ket_part1' ||
-      m === 'toefl_listen_repeat' ||
-      m === 'toefl_interview'
-    ) {
+    } else if (m !== null && isExamMode(m)) {
       setAppState('exam-practicing');
     } else {
       setAppState('practicing');
@@ -185,6 +126,17 @@ export default function App() {
   if (!orgLoading && accessDenialReason) {
     return <BobAccessDenied reason={accessDenialReason} />;
   }
+
+  const ylProps: YLRenderProps = {
+    onBack: onFinish,
+    sessionId: activeSessionId ?? undefined,
+    initialMessages: selectedMessages.length > 0 ? selectedMessages : undefined,
+    onSessionCreated: handleYLSessionCreated,
+  };
+
+  const examProps: ExamRenderProps = {
+    onBack: () => setAppState('mode-selection'),
+  };
 
   return (
     <div className="h-screen bg-trebol-bg flex flex-col overflow-hidden">
@@ -244,7 +196,7 @@ export default function App() {
             )}
 
 
-            {appState === 'practicing' && mode && mode !== 'generic_conversation' && (
+            {appState === 'practicing' && mode && !isConversationMode(mode) && (
               <motion.div
                 key={`practicing-${mode}-${selectedMessages.length > 0 ? activeSessionId : 'new'}`}
                 initial={{ opacity: 0 }}
@@ -252,7 +204,7 @@ export default function App() {
                 exit={{ opacity: 0 }}
                 className="flex-1 flex flex-col min-h-0"
               >
-                {mode === 'cambridge_fce_p1' ? (
+                {isFceImageMode(mode) ? (
                   <BobPracticeChat
                     mode="image"
                     level="b2"
@@ -306,24 +258,8 @@ export default function App() {
                 exit={{ opacity: 0 }}
                 className="flex-1 flex flex-col min-h-0"
               >
-                {YL_MODES.has(mode) && MODE_COMPONENT_MAP[mode]?.({
-                  onBack: onFinish,
-                  sessionId: activeSessionId ?? undefined,
-                  initialMessages: selectedMessages.length > 0 ? selectedMessages : undefined,
-                  onSessionCreated: handleYLSessionCreated,
-                })}
-
-                {mode === 'cambridge_pet_p3' && (
-                  <B1CollaborativePractice onBack={() => setAppState('mode-selection')} />
-                )}
-                {mode === 'cambridge_ket_part1' && (
-                  <A2Part1Practice onBack={() => setAppState('mode-selection')} />
-                )}
-                {mode === 'toefl_listen_repeat' && (
-                  <ToeflListenRepeatPractice onBack={() => setAppState('mode-selection')} />
-                )}
-                {mode === 'toefl_interview' && (
-                  <ToeflInterviewPractice onBack={() => setAppState('mode-selection')} />
+                {getRouteForMode(mode)?.render(
+                  getRouteForMode(mode)?.kind === 'yl' ? ylProps : examProps
                 )}
               </motion.div>
             )}
