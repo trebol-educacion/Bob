@@ -13,6 +13,9 @@ import { A2Part1Practice } from '@/components/A2Part1Practice';
 import { ToeflListenRepeatPractice } from '@/components/ToeflListenRepeatPractice';
 import { ToeflInterviewPractice } from '@/components/ToeflInterviewPractice';
 import { ListenChooseResponsePractice } from '@/components/practice/ListenChooseResponsePractice';
+import { BuildSentencePractice } from '@/components/practice/BuildSentencePractice';
+import { EmailWritingPractice } from '@/components/practice/EmailWritingPractice';
+import { AcademicWritingPractice } from '@/components/practice/AcademicWritingPractice';
 
 export type AppState =
   | 'mode-selection'
@@ -115,6 +118,31 @@ export const EXAM_PART_COMPONENT_MAP: Record<ModeKey, RouteEntry> = {
     appState: 'exam-practicing',
     kind: 'exam',
     render: (p) => React.createElement(ListenChooseResponsePractice, { onBack: (p as ExamRenderProps).onBack }),
+  },
+  toefl_writing_build_sentence: {
+    appState: 'exam-practicing',
+    kind: 'exam',
+    render: (p) => React.createElement(BuildSentencePractice, { onBack: (p as ExamRenderProps).onBack }),
+  },
+  toefl_writing_email: {
+    appState: 'exam-practicing',
+    kind: 'exam',
+    render: (p) => React.createElement(EmailWritingPractice, { mode: 'toefl_writing_email', onBack: (p as ExamRenderProps).onBack }),
+  },
+  cambridge_pet_writing_part1: {
+    appState: 'exam-practicing',
+    kind: 'exam',
+    render: (p) => React.createElement(EmailWritingPractice, { mode: 'cambridge_pet_writing_part1', onBack: (p as ExamRenderProps).onBack }),
+  },
+  toefl_writing_academic_discussion: {
+    appState: 'exam-practicing',
+    kind: 'exam',
+    render: (p) => React.createElement(AcademicWritingPractice, { mode: 'toefl_writing_academic_discussion', onBack: (p as ExamRenderProps).onBack }),
+  },
+  cambridge_fce_writing_part1: {
+    appState: 'exam-practicing',
+    kind: 'exam',
+    render: (p) => React.createElement(AcademicWritingPractice, { mode: 'cambridge_fce_writing_part1', onBack: (p as ExamRenderProps).onBack }),
   },
 };
 

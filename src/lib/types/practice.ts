@@ -173,3 +173,25 @@ export const ClosedItemSchema = z.object({
 
 /** Single row from bob_closed_items; shape mirrors the Zod schema above. */
 export type ClosedItem = z.infer<typeof ClosedItemSchema>;
+
+/** User's raw writing submission for an open writing task. */
+export interface WritingResponse {
+  text: string;
+  word_count: number;
+  time_spent_ms: number;
+}
+
+/** Formative (non-graded) feedback for open writing tasks — no numeric score. */
+export interface WritingFormativeFeedback {
+  kind: 'writing_formative';
+  understood: boolean;
+  highlights: string[];
+  suggestions: string[];
+  model_answer?: string;
+  indicators: {
+    word_count: number;
+    target_word_count_range: [number, number];
+    covered_bullets?: string[];
+    missing_bullets?: string[];
+  };
+}
