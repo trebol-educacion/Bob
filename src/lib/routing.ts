@@ -45,6 +45,19 @@ export interface RouteEntry {
 }
 
 /**
+ * Key used to force remount of a YL component when switching between two
+ * persisted sessions (history-history). Returns 'new' while the session has
+ * no persisted messages — including the moment right after creation, before
+ * the new session has any messages stored — so we don't remount and lose
+ * the freshly-generated plan/images.
+ */
+function ylInstanceKey(p: YLRenderProps): string {
+  return p.initialMessages && p.initialMessages.length > 0
+    ? p.sessionId ?? 'new'
+    : 'new';
+}
+
+/**
  * Single source of truth for mode-key → component mapping.
  * Indexed by full mode_key (not exam_part) because different frameworks
  * reuse part numbers (e.g. starters_part1 ≠ flyers_part1 ≠ ket_part1).
@@ -53,47 +66,47 @@ export const EXAM_PART_COMPONENT_MAP: Record<ModeKey, RouteEntry> = {
   cambridge_starters_part1: {
     appState: 'exam-practicing',
     kind: 'yl',
-    render: (p) => React.createElement(YLPointingPractice, { key: (p as YLRenderProps).sessionId ?? 'new', exam: 'starters', part: 1, ...(p as YLRenderProps) }),
+    render: (p) => React.createElement(YLPointingPractice, { key: ylInstanceKey(p as YLRenderProps), exam: 'starters', part: 1, ...(p as YLRenderProps) }),
   },
   cambridge_starters_part2: {
     appState: 'exam-practicing',
     kind: 'yl',
-    render: (p) => React.createElement(YLPart2Practice, { key: (p as YLRenderProps).sessionId ?? 'new', exam: 'starters', part: 2, ...(p as YLRenderProps) }),
+    render: (p) => React.createElement(YLPart2Practice, { key: ylInstanceKey(p as YLRenderProps), exam: 'starters', part: 2, ...(p as YLRenderProps) }),
   },
   cambridge_starters_part3: {
     appState: 'exam-practicing',
     kind: 'yl',
-    render: (p) => React.createElement(YLPart3Practice, { key: (p as YLRenderProps).sessionId ?? 'new', exam: 'starters', part: 3, ...(p as YLRenderProps) }),
+    render: (p) => React.createElement(YLPart3Practice, { key: ylInstanceKey(p as YLRenderProps), exam: 'starters', part: 3, ...(p as YLRenderProps) }),
   },
   cambridge_starters_part4: {
     appState: 'exam-practicing',
     kind: 'yl',
-    render: (p) => React.createElement(YLPart4Practice, { key: (p as YLRenderProps).sessionId ?? 'new', exam: 'starters', part: 4, ...(p as YLRenderProps) }),
+    render: (p) => React.createElement(YLPart4Practice, { key: ylInstanceKey(p as YLRenderProps), exam: 'starters', part: 4, ...(p as YLRenderProps) }),
   },
   cambridge_movers_part1: {
     appState: 'exam-practicing',
     kind: 'yl',
-    render: (p) => React.createElement(YLPart1Practice, { key: (p as YLRenderProps).sessionId ?? 'new', exam: 'movers', part: 1, ...(p as YLRenderProps) }),
+    render: (p) => React.createElement(YLPart1Practice, { key: ylInstanceKey(p as YLRenderProps), exam: 'movers', part: 1, ...(p as YLRenderProps) }),
   },
   cambridge_movers_part2: {
     appState: 'exam-practicing',
     kind: 'yl',
-    render: (p) => React.createElement(YLPart2Practice, { key: (p as YLRenderProps).sessionId ?? 'new', exam: 'movers', part: 2, ...(p as YLRenderProps) }),
+    render: (p) => React.createElement(YLPart2Practice, { key: ylInstanceKey(p as YLRenderProps), exam: 'movers', part: 2, ...(p as YLRenderProps) }),
   },
   cambridge_movers_part3: {
     appState: 'exam-practicing',
     kind: 'yl',
-    render: (p) => React.createElement(YLPart3Practice, { key: (p as YLRenderProps).sessionId ?? 'new', exam: 'movers', part: 3, ...(p as YLRenderProps) }),
+    render: (p) => React.createElement(YLPart3Practice, { key: ylInstanceKey(p as YLRenderProps), exam: 'movers', part: 3, ...(p as YLRenderProps) }),
   },
   cambridge_movers_part4: {
     appState: 'exam-practicing',
     kind: 'yl',
-    render: (p) => React.createElement(YLPart4Practice, { key: (p as YLRenderProps).sessionId ?? 'new', exam: 'movers', part: 4, ...(p as YLRenderProps) }),
+    render: (p) => React.createElement(YLPart4Practice, { key: ylInstanceKey(p as YLRenderProps), exam: 'movers', part: 4, ...(p as YLRenderProps) }),
   },
   cambridge_movers_part5: {
     appState: 'exam-practicing',
     kind: 'yl',
-    render: (p) => React.createElement(YLPart4Practice, { key: (p as YLRenderProps).sessionId ?? 'new', exam: 'movers', part: 5, ...(p as YLRenderProps) }),
+    render: (p) => React.createElement(YLPart4Practice, { key: ylInstanceKey(p as YLRenderProps), exam: 'movers', part: 5, ...(p as YLRenderProps) }),
   },
   cambridge_pet_p3: {
     appState: 'exam-practicing',
