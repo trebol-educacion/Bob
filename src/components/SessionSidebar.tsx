@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { MessageSquare, Image as ImageIcon, MessagesSquare, Users, BookOpen, Headphones, Mic, Plus, ChevronLeft, ChevronRight, Trash2, Hand, HelpCircle, User, GitCompare, MessageCircle, BookImage } from 'lucide-react';
+import { ListenAndPointIcon } from '@/components/icons/ModeIcons';
 import { BobSession, SessionMode } from '@/actions/sessions';
 import { cn } from '@/lib/utils';
 
@@ -18,7 +19,7 @@ const MODE_ICON: Record<NonNullable<SessionMode>, React.ElementType> = {
   generic_situation: MessageSquare,
   generic_image: ImageIcon,
   generic_conversation: MessagesSquare,
-  cambridge_starters_part1: Hand,
+  cambridge_starters_part1: ListenAndPointIcon,
   cambridge_starters_part2: HelpCircle,
   cambridge_starters_part3: BookOpen,
   cambridge_starters_part4: User,

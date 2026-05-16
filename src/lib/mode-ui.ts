@@ -129,6 +129,62 @@ export function getModeDescription(card: DynamicCard): string {
   return card.description ?? '';
 }
 
+export type YLFamily = 'starters' | 'movers' | 'flyers';
+
+export function getYLFamily(card: DynamicCard): YLFamily | null {
+  const m = card.exam_part.match(/^(starters|movers|flyers)_/);
+  return m ? (m[1] as YLFamily) : null;
+}
+
+export interface YLCardTheme {
+  cardBg: string;
+  cardRing: string;
+  iconBg: string;
+  iconText: string;
+  badgeBg: string;
+  badgeText: string;
+  titleText: string;
+  decoration: string;
+}
+
+const YL_THEMES: Record<YLFamily, YLCardTheme> = {
+  starters: {
+    cardBg: 'bg-white',
+    cardRing: 'ring-1 ring-violet-100 hover:ring-violet-300 hover:ring-2',
+    iconBg: 'bg-violet-50 group-hover:bg-violet-100',
+    iconText: 'text-violet-700',
+    badgeBg: 'bg-white ring-1 ring-violet-200',
+    badgeText: 'text-violet-700',
+    titleText: 'text-slate-900',
+    decoration: 'text-violet-100',
+  },
+  movers: {
+    cardBg: 'bg-white',
+    cardRing: 'ring-1 ring-amber-100 hover:ring-amber-300 hover:ring-2',
+    iconBg: 'bg-amber-50 group-hover:bg-amber-100',
+    iconText: 'text-amber-800',
+    badgeBg: 'bg-white ring-1 ring-amber-200',
+    badgeText: 'text-amber-800',
+    titleText: 'text-slate-900',
+    decoration: 'text-amber-100',
+  },
+  flyers: {
+    cardBg: 'bg-white',
+    cardRing: 'ring-1 ring-indigo-100 hover:ring-indigo-300 hover:ring-2',
+    iconBg: 'bg-indigo-50 group-hover:bg-indigo-100',
+    iconText: 'text-indigo-700',
+    badgeBg: 'bg-white ring-1 ring-indigo-200',
+    badgeText: 'text-indigo-700',
+    titleText: 'text-slate-900',
+    decoration: 'text-indigo-100',
+  },
+};
+
+export function getYLCardTheme(card: DynamicCard): YLCardTheme | null {
+  const family = getYLFamily(card);
+  return family ? YL_THEMES[family] : null;
+}
+
 /**
  * Official Cambridge / TOEFL name surfaced under the kid-friendly title,
  * so teachers and parents still recognise the exam reference. Returns

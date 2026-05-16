@@ -10,7 +10,8 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'motion/react';
-import { ArrowLeft, MapPin } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
+import { ListenAndPointIcon } from '@/components/icons/ModeIcons';
 import { ACTIVE_MODEL_LABEL } from '@/lib/models';
 import {
   startYLSessionAction,
@@ -346,7 +347,7 @@ export function YLPointingPractice({
   );
 
   const partBadge = (
-    <span className="text-xs font-bold bg-amber-50 text-amber-700 px-2 py-1 rounded-md">
+    <span className="text-xs font-bold bg-white ring-1 ring-violet-200 text-violet-700 px-2 py-1 rounded-md">
       POINTING
     </span>
   );
@@ -381,7 +382,7 @@ export function YLPointingPractice({
 
     return (
       <ChatShell
-        headerConfig={{ icon: MapPin, title: 'Starters — Pointing', subtitle: 'Practice history', accentColor: 'amber', leftSlot: backButton, rightSlot: <div className="flex items-center gap-3">{progressDots}{partBadge}</div>, online: false }}
+        headerConfig={{ icon: ListenAndPointIcon, title: 'Listen and Point', subtitle: 'Practice history', accentColor: 'violet', leftSlot: backButton, rightSlot: <div className="flex items-center gap-3">{progressDots}{partBadge}</div>, online: false }}
         footerConfig={{ modeLabel: 'YL · POINTING', modelName: ACTIVE_MODEL_LABEL }}
         inputSlot={null}
         animationKey="yl-pointing-readonly"
@@ -489,7 +490,7 @@ export function YLPointingPractice({
 
   return (
     <ChatShell
-      headerConfig={{ icon: MapPin, title: 'Starters — Pointing', subtitle: `Ages 6–8 · Round ${cueIndex + 1}/${totalCues}`, accentColor: 'amber', leftSlot: backButton, rightSlot: <div className="flex items-center gap-3">{progressDots}{partBadge}</div>, online: true }}
+      headerConfig={{ icon: ListenAndPointIcon, title: 'Listen and Point', subtitle: `Ages 6–8 · Round ${cueIndex + 1}/${totalCues}`, accentColor: 'violet', leftSlot: backButton, rightSlot: <div className="flex items-center gap-3">{progressDots}{partBadge}</div>, online: true }}
       footerConfig={{ modeLabel: 'YL · POINTING', modelName: ACTIVE_MODEL_LABEL }}
       inputSlot={bottomBar}
       animationKey="yl-pointing"

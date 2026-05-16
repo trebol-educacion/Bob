@@ -4,11 +4,13 @@ import React, { useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
 import type { LucideIcon } from 'lucide-react';
 
-export type ChatAccentColor = 'amber' | 'blue' | 'purple' | 'green';
+type ChatIcon = LucideIcon | React.FC<{ size?: number; className?: string }>;
+
+export type ChatAccentColor = 'amber' | 'blue' | 'purple' | 'green' | 'violet';
 
 export type ChatHeaderConfig = {
   /** Lucide icon rendered inside the avatar circle */
-  icon: LucideIcon;
+  icon: ChatIcon;
   /** Primary heading */
   title: string;
   /** Secondary line */
@@ -53,6 +55,7 @@ const ACCENT: Record<
   amber:  { avatarBg: 'bg-amber-50',  avatarBorder: 'border-amber-100',  avatarIcon: 'text-amber-600',  badgeBg: 'bg-amber-100', badgeText: 'text-amber-700' },
   purple: { avatarBg: 'bg-purple-50', avatarBorder: 'border-purple-100', avatarIcon: 'text-purple-600', badgeBg: 'bg-purple-50', badgeText: 'text-purple-600' },
   green:  { avatarBg: 'bg-green-50',  avatarBorder: 'border-green-100',  avatarIcon: 'text-green-600',  badgeBg: 'bg-green-50',  badgeText: 'text-green-600' },
+  violet: { avatarBg: 'bg-violet-50', avatarBorder: 'border-violet-100', avatarIcon: 'text-violet-700', badgeBg: 'bg-white ring-1 ring-violet-200', badgeText: 'text-violet-700' },
 };
 
 function AssistantAvatar({
@@ -60,7 +63,7 @@ function AssistantAvatar({
   accentColor = 'amber',
   online = true,
 }: {
-  icon: LucideIcon;
+  icon: ChatIcon;
   accentColor?: ChatAccentColor;
   online?: boolean;
 }) {

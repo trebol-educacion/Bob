@@ -19,7 +19,7 @@ import type { ModeKey, PracticeMode, CefrLevel, DynamicCard } from '@/lib/types/
 import { CefrLevelSelector } from '@/components/CefrLevelSelector';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import type { AvailableMode } from '@/contexts/OrganizationContext';
-import { getModeIcon, getModeBadge, getModeSection, getModeTitle, getModeDescription, getModeSortWeight, getModeOfficialName } from '@/lib/mode-ui';
+import { getModeIcon, getModeBadge, getModeSection, getModeTitle, getModeDescription, getModeSortWeight, getModeOfficialName, getYLCardTheme, type YLCardTheme } from '@/lib/mode-ui';
 import { ListenAndPointIcon } from '@/components/icons/ModeIcons';
 
 const ICON_MAP: Record<string, React.FC<{ size?: number; className?: string }>> = {
@@ -53,11 +53,45 @@ interface ModeCardProps {
   description: string;
   badge?: string;
   officialName?: string;
+  theme?: YLCardTheme | null;
   disabled?: boolean;
   onSelect: (mode: ModeKey) => void;
 }
 
-function ModeCard({ mode, icon, title, description, badge, officialName, disabled, onSelect }: ModeCardProps) {
+function ModeCard({ mode, icon, title, description, badge, officialName, theme, disabled, onSelect }: ModeCardProps) {
+  if (theme) {
+    return (
+      <motion.button
+        whileHover={disabled ? {} : { y: -2 }}
+        whileTap={disabled ? {} : { scale: 0.99 }}
+        onClick={() => !disabled && onSelect(mode)}
+        disabled={disabled}
+        className={`font-nunito ${theme.cardBg} ${theme.cardRing} shadow-[0_1px_2px_rgba(0,0,0,0.04)] hover:shadow-md rounded-2xl p-6 text-left space-y-4 transition-all duration-200 group relative overflow-hidden
+          ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+      >
+        <div className="flex items-start justify-between gap-2">
+          <div className={`${theme.iconBg} ${theme.iconText} p-3.5 rounded-xl w-fit transition-colors duration-200`}>
+            {icon}
+          </div>
+          {badge && (
+            <span className={`text-[11px] font-bold ${theme.badgeBg} ${theme.badgeText} px-2.5 py-1 rounded-full shrink-0 tracking-wide`}>
+              {badge}
+            </span>
+          )}
+        </div>
+        <div>
+          <h3 className={`text-xl font-extrabold ${theme.titleText} leading-tight tracking-tight`}>{title}</h3>
+          <p className="text-slate-500 font-medium mt-2 text-sm leading-snug">{description}</p>
+          {officialName && (
+            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mt-3">
+              {officialName}
+            </p>
+          )}
+        </div>
+      </motion.button>
+    );
+  }
+
   return (
     <motion.button
       whileHover={disabled ? {} : { scale: 1.02 }}
@@ -65,7 +99,7 @@ function ModeCard({ mode, icon, title, description, badge, officialName, disable
       onClick={() => !disabled && onSelect(mode)}
       disabled={disabled}
       className={`bg-white shadow-md rounded-xl p-6 text-left space-y-3 hover:shadow-lg transition-shadow group relative overflow-hidden
-        ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+        ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
     >
       <div className="flex items-start justify-between">
         <div className="bg-trebol-secondary/20 p-3 rounded-lg w-fit group-hover:bg-trebol-primary group-hover:text-white transition-colors">
@@ -135,15 +169,20 @@ export const ModeSelection = forwardRef<HTMLDivElement, ModeSelectionProps>(func
   }
 
   function renderCard(card: DynamicCard) {
+    const ylTheme = getYLCardTheme(card);
+    const iconColorClass = ylTheme
+      ? `${ylTheme.iconText} transition-colors duration-200`
+      : iconClass;
     return (
       <ModeCard
         key={card.mode_key}
         mode={card.mode_key}
-        icon={resolveIcon(getModeIcon(card), 28, iconClass)}
+        icon={resolveIcon(getModeIcon(card), 28, iconColorClass)}
         title={getModeTitle(card)}
         description={getModeDescription(card)}
         badge={getModeBadge(card)}
         officialName={getModeOfficialName(card)}
+        theme={ylTheme}
         onSelect={onSelect}
       />
     );

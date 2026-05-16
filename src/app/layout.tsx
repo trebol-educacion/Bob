@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Poppins } from "next/font/google";
+import { Poppins, Nunito } from "next/font/google";
 import "./globals.css";
 import { OrganizationProvider } from '@/contexts/OrganizationContext';
 import { BrandingProvider } from '@/components/BrandingProvider';
@@ -9,6 +9,13 @@ const poppins = Poppins({
   subsets: ['latin'],
   display: 'swap',
   variable: '--font-poppins',
+});
+
+const nunito = Nunito({
+  weight: ['400', '500', '700', '800', '900'],
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-nunito',
 });
 
 export const metadata: Metadata = {
@@ -22,7 +29,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="es" className={`${poppins.variable} h-full`}>
+    <html lang="es" className={`${poppins.variable} ${nunito.variable} h-full`}>
       <body className="font-sans antialiased h-full">
         <OrganizationProvider>
           <BrandingProvider>

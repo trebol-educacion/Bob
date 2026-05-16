@@ -9,6 +9,7 @@
   --color-trebol-border: #e2e8f0;
   --color-bob-brand: #3660AB;
   --font-sans: var(--font-poppins), system-ui, -apple-system, sans-serif;
+  --font-nunito: var(--font-nunito), system-ui, -apple-system, sans-serif;
 }
 
 *,
