@@ -263,10 +263,35 @@ export async function generateYLContentAction(
 ): Promise<YLPlan> {
   const avoidList = options?.avoidList ?? '(none)';
 
+  const isPointingMode = exam === 'starters' && part === 1;
+  const preselectedWords = isPointingMode
+    ? await pickVocabularyForActivity({
+        framework: 'cambridge',
+        cefr_level: 'pre_a1',
+        count: 4,
+        distinctCategories: true,
+      })
+    : [];
+
+  const promptVariables: Record<string, string> = {
+    AVOID_LIST: avoidList,
+  };
+  if (preselectedWords.length === 4) {
+    promptVariables.WORD_1 = preselectedWords[0].word;
+    promptVariables.WORD_2 = preselectedWords[1].word;
+    promptVariables.WORD_3 = preselectedWords[2].word;
+    promptVariables.WORD_4 = preselectedWords[3].word;
+  }
+
+  const cacheInputs: Record<string, unknown> = { avoidList };
+  if (preselectedWords.length === 4) {
+    cacheInputs.words = preselectedWords.map((w) => w.word).join(',');
+  }
+
   const cached = await getOrCreateCachedContent<YLPlan>(
-    { kind: 'plan', promptKey: `yl-content-${exam}-part${part}`, inputs: { avoidList } },
+    { kind: 'plan', promptKey: `yl-content-${exam}-part${part}`, inputs: cacheInputs },
     async () => {
-      const promptText = await getPrompt(generationKey(exam, part), { AVOID_LIST: avoidList });
+      const promptText = await getPrompt(generationKey(exam, part), promptVariables);
 
       const result = await callGemini(
         { promptKey: generationKey(exam, part), model: MODELS.FLASH_LITE_PREVIEW },
@@ -398,27 +423,45 @@ export async function generateYLImageAction(
  * generations + Supabase Storage uploads on the server. Returns URLs only,
  * so payload stays tiny. Bypasses Next.js Server Action client queue, which
  * would otherwise serialise N separate `generateYLImageAction` calls.
+ *
+ * Accepts both shapes for backwards compatibility:
+ *   - `string[]` (legacy)  → no word-image pool reuse, always generates.
+ *   - `Array<{word, scenePrompt}>` → checks bob_word_images pool first
+ *     (70% probability of reuse if pool has entries for that word).
  */
 export async function generateYLImagesParallelAction(
   exam: YLExam,
   part: number,
-  imagePrompts: string[],
+  imagePrompts: string[] | Array<{ word: string; scenePrompt: string }>,
   sessionId: string,
   characterDescription?: string
 ): Promise<string[]> {
   const supabase = await createSupabaseServer();
   const { data: { user } } = await supabase.auth.getUser();
 
+  const items: Array<{ word?: string; scenePrompt: string }> = imagePrompts.map((p) =>
+    typeof p === 'string' ? { scenePrompt: p } : p
+  );
+
   return Promise.all(
-    imagePrompts.map(async (imagePrompt, idx) => {
-      const cacheInputs: Record<string, unknown> = { exam, part, imagePrompt };
+    items.map(async (item, idx) => {
+      if (item.word) {
+        const fromPool = await tryPickFromImagePool({
+          framework: 'cambridge',
+          cefr_level: 'pre_a1',
+          word: item.word,
+        });
+        if (fromPool) return fromPool;
+      }
+
+      const cacheInputs: Record<string, unknown> = { exam, part, imagePrompt: item.scenePrompt };
       if (characterDescription) cacheInputs.characterDescription = characterDescription;
 
       const cached = await getOrCreateCachedContent<string>(
         { kind: 'image', promptKey: `yl-image-${exam}-part${part}`, inputs: cacheInputs },
         async () => {
           const key = imageGenKey(exam, part);
-          const imagenPrompt = buildDirectImagenPrompt(imagePrompt, characterDescription);
+          const imagenPrompt = buildDirectImagenPrompt(item.scenePrompt, characterDescription);
           const pixels = await generateImageWithFallback(key, imagenPrompt);
           if (!pixels) throw new Error('empty image after all attempts');
 
@@ -442,7 +485,18 @@ export async function generateYLImagesParallelAction(
       );
 
       if (typeof cached === 'object' && 'error' in cached) return YL_IMAGE_PLACEHOLDER;
-      return cached as string;
+
+      const url = cached as string;
+      if (item.word && url.startsWith('https://')) {
+        void addImageToPool({
+          framework: 'cambridge',
+          cefr_level: 'pre_a1',
+          word: item.word,
+          image_url: url,
+          scene_prompt: item.scenePrompt,
+        });
+      }
+      return url;
     })
   );
 }
@@ -721,4 +775,96 @@ import { getMessagesAction } from '@/actions/messages';
 
 export async function getSessionMessagesAction(sessionId: string) {
   return getMessagesAction(sessionId);
+}
+
+const POOL_REUSE_PROBABILITY = 0.7;
+
+type VocabPick = { word: string; category: string };
+
+async function pickVocabularyForActivity(opts: {
+  framework: string;
+  cefr_level: string;
+  count: number;
+  distinctCategories?: boolean;
+}): Promise<VocabPick[]> {
+  const { framework, cefr_level, count, distinctCategories = true } = opts;
+  const supabase = await createSupabaseServer();
+  const { data, error } = await supabase
+    .from('bob_vocabulary')
+    .select('word, category')
+    .eq('framework', framework)
+    .eq('cefr_level', cefr_level)
+    .eq('pointable', true);
+
+  if (error || !data || data.length === 0) {
+    console.warn('[pickVocabularyForActivity] empty vocab pool', { framework, cefr_level, error });
+    return [];
+  }
+
+  const rows = data as VocabPick[];
+  const shuffled = [...rows].sort(() => Math.random() - 0.5);
+
+  if (!distinctCategories) {
+    return shuffled.slice(0, count);
+  }
+
+  const picked: VocabPick[] = [];
+  const usedCategories = new Set<string>();
+  for (const row of shuffled) {
+    if (picked.length === count) break;
+    if (usedCategories.has(row.category)) continue;
+    picked.push(row);
+    usedCategories.add(row.category);
+  }
+  for (const row of shuffled) {
+    if (picked.length === count) break;
+    if (picked.includes(row)) continue;
+    picked.push(row);
+  }
+  return picked;
+}
+
+async function tryPickFromImagePool(opts: {
+  framework: string;
+  cefr_level: string;
+  word: string;
+}): Promise<string | null> {
+  if (Math.random() >= POOL_REUSE_PROBABILITY) return null;
+  const supabase = await createSupabaseServer();
+  const { data } = await supabase
+    .from('bob_word_images')
+    .select('id, image_url')
+    .eq('framework', opts.framework)
+    .eq('cefr_level', opts.cefr_level)
+    .eq('word', opts.word)
+    .limit(50);
+  const rows = (data ?? []) as Array<{ id: number; image_url: string }>;
+  if (rows.length === 0) return null;
+  const pick = rows[Math.floor(Math.random() * rows.length)];
+  void supabase
+    .from('bob_word_images')
+    .update({ last_used_at: new Date().toISOString() })
+    .eq('id', pick.id)
+    .then(() => undefined, () => undefined);
+  return pick.image_url;
+}
+
+async function addImageToPool(opts: {
+  framework: string;
+  cefr_level: string;
+  word: string;
+  image_url: string;
+  scene_prompt: string;
+}): Promise<void> {
+  const supabase = await createSupabaseServer();
+  await supabase
+    .from('bob_word_images')
+    .insert({
+      framework: opts.framework,
+      cefr_level: opts.cefr_level,
+      word: opts.word,
+      image_url: opts.image_url,
+      scene_prompt: opts.scene_prompt,
+    })
+    .then(() => undefined, (err) => console.warn('[addImageToPool] insert failed', err));
 }

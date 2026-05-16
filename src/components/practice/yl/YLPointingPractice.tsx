@@ -102,10 +102,15 @@ export function YLPointingPractice({
         onSessionCreated?.(sid);
         setPlan(p);
         if (p.option_image_prompts && p.option_image_prompts.length > 0) {
+          const words = p.options ?? [];
+          const items = p.option_image_prompts.map((scenePrompt, i) => ({
+            word: words[i] ?? '',
+            scenePrompt,
+          }));
           const urls = await generateYLImagesParallelAction(
             exam,
             part,
-            p.option_image_prompts,
+            items,
             sid,
             p.character_description
           );
