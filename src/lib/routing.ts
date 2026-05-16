@@ -12,6 +12,7 @@ import { B1CollaborativePractice } from '@/components/B1CollaborativePractice';
 import { A2Part1Practice } from '@/components/A2Part1Practice';
 import { ToeflListenRepeatPractice } from '@/components/ToeflListenRepeatPractice';
 import { ToeflInterviewPractice } from '@/components/ToeflInterviewPractice';
+import { ListenChooseResponsePractice } from '@/components/practice/ListenChooseResponsePractice';
 
 export type AppState =
   | 'mode-selection'
@@ -109,6 +110,11 @@ export const EXAM_PART_COMPONENT_MAP: Record<ModeKey, RouteEntry> = {
     appState: 'exam-practicing',
     kind: 'exam',
     render: (p) => React.createElement(ToeflInterviewPractice, { onBack: (p as ExamRenderProps).onBack }),
+  },
+  toefl_listen_choose_response: {
+    appState: 'exam-practicing',
+    kind: 'exam',
+    render: (p) => React.createElement(ListenChooseResponsePractice, { onBack: (p as ExamRenderProps).onBack }),
   },
 };
 

@@ -102,3 +102,38 @@ export type CambridgeEvaluation = z.infer<typeof CambridgeEvaluationSchema>;
 export type ToeflEvaluation = z.infer<typeof ToeflEvaluationSchema>;
 export type RepetitionEvaluation = z.infer<typeof RepetitionEvaluationSchema>;
 export type CollaborativeEvaluation = z.infer<typeof CollaborativeEvaluationSchema>;
+
+/** Deterministic result for a single closed-comprehension item (no LLM involved). */
+export interface ClosedEvaluation {
+  kind: 'closed';
+  correct: boolean;
+  selected: string;
+  expected: string;
+  explanation: string | null;
+}
+
+/** Schema for a single row in bob_closed_items. */
+export const ClosedItemSchema = z.object({
+  id: z.string(),
+  framework: z.string(),
+  exam_part: z.string(),
+  cefr_level: z.enum(['a1', 'a2', 'b1', 'b2', 'c1', 'c2']).nullable(),
+  variant_id: z.string(),
+  stimulus_audio_url: z.string().nullable(),
+  stimulus_text: z.string().nullable(),
+  stimulus_image_url: z.string().nullable(),
+  question: z.string(),
+  options: z.array(
+    z.object({
+      key: z.string(),
+      label: z.string(),
+      image_url: z.string().optional(),
+    })
+  ),
+  correct_key: z.string(),
+  explanation: z.string().nullable(),
+  source: z.enum(['curated', 'official', 'generated_then_curated']),
+});
+
+/** Single row from bob_closed_items; shape mirrors the Zod schema above. */
+export type ClosedItem = z.infer<typeof ClosedItemSchema>;
