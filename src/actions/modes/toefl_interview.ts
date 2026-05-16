@@ -2,13 +2,13 @@
 
 import { z } from 'zod';
 import { Type } from '@google/genai';
-import { getAiClient } from '../_shared';
 import { MODELS } from '@/lib/models';
 import { ToeflEvaluationSchema } from '@/lib/types/practice';
 import type { ToeflEvaluation } from '@/lib/types/practice';
 import { getPrompt } from '@/lib/prompts/db-prompts';
 import { persistMessage, readSessionMessages } from '@/lib/persist-activity';
 import { getOrCreateCachedContent } from '@/lib/cache';
+import { callGemini, safeParseFallback } from '@/lib/gemini-client';
 
 const ToeflQuestionSchema = z.object({
   text: z.string(),
@@ -26,56 +26,85 @@ const ToeflInterviewPlanSchema = z.object({
 export type ToeflInterviewPlan = z.infer<typeof ToeflInterviewPlanSchema>;
 export type ToeflQuestion = z.infer<typeof ToeflQuestionSchema>;
 
+const PlanFallback: ToeflInterviewPlan = {
+  topic_id: 'daily_life',
+  topic_name: 'Daily Life',
+  topic_context: 'Talk about your everyday routines and activities.',
+  questions: [
+    { text: 'Can you describe a typical day in your life?', difficulty: 1, suggested_time: 45 },
+    { text: 'What do you usually do in your free time?', difficulty: 2, suggested_time: 45 },
+    { text: 'How has technology changed the way you spend your time?', difficulty: 3, suggested_time: 60 },
+    { text: 'What would your ideal daily routine look like and why?', difficulty: 4, suggested_time: 60 },
+  ],
+};
+
+const EvaluationFallback: ToeflEvaluation = {
+  score: 0,
+  fluency: 0,
+  vocabulary: 0,
+  grammar: 0,
+  feedback: 'Unable to evaluate at this time. Please try again.',
+  transcribed_text: '',
+};
+
 /** Generates a TOEFL Interview session plan with 4 progressive questions. */
 export async function generateToeflInterviewAction(): Promise<ToeflInterviewPlan> {
-  const ai = getAiClient();
-
   const cached = await getOrCreateCachedContent<ToeflInterviewPlan>(
     { kind: 'plan', promptKey: 'toefl-interview-b2-plan', inputs: {} },
     async () => {
       const prompt = await getPrompt('toefl_interview_b2_generation');
 
-      const response = await ai.models.generateContent({
-        model: MODELS.FLASH_LITE_PREVIEW,
-        contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        config: {
-          responseMimeType: 'application/json',
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              topic_id: { type: Type.STRING },
-              topic_name: { type: Type.STRING },
-              topic_context: { type: Type.STRING },
-              questions: {
-                type: Type.ARRAY,
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    text: { type: Type.STRING },
-                    difficulty: { type: Type.NUMBER },
-                    suggested_time: { type: Type.NUMBER },
+      const result = await callGemini(
+        { promptKey: 'toefl_interview_b2_generation', model: MODELS.FLASH_LITE_PREVIEW },
+        (ai) => ai.models.generateContent({
+          model: MODELS.FLASH_LITE_PREVIEW,
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          config: {
+            responseMimeType: 'application/json',
+            responseSchema: {
+              type: Type.OBJECT,
+              properties: {
+                topic_id: { type: Type.STRING },
+                topic_name: { type: Type.STRING },
+                topic_context: { type: Type.STRING },
+                questions: {
+                  type: Type.ARRAY,
+                  items: {
+                    type: Type.OBJECT,
+                    properties: {
+                      text: { type: Type.STRING },
+                      difficulty: { type: Type.NUMBER },
+                      suggested_time: { type: Type.NUMBER },
+                    },
+                    required: ['text', 'difficulty', 'suggested_time'],
                   },
-                  required: ['text', 'difficulty', 'suggested_time'],
                 },
               },
+              required: ['topic_id', 'topic_name', 'topic_context', 'questions'],
             },
-            required: ['topic_id', 'topic_name', 'topic_context', 'questions'],
           },
-        },
-      });
+        })
+      );
 
-      const raw = response.text ?? '';
-      const parsed = ToeflInterviewPlanSchema.safeParse(JSON.parse(raw));
-      if (!parsed.success) {
-        throw new Error(`Invalid TOEFL interview plan: ${parsed.error.message}`);
+      if (!result.ok || !result.data.text) {
+        console.error(JSON.stringify({ event: 'generateToeflInterviewAction', error: result.ok ? 'empty response' : result.error }));
+        return PlanFallback;
       }
-      return parsed.data;
+
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(result.data.text);
+      } catch {
+        return PlanFallback;
+      }
+      return safeParseFallback(ToeflInterviewPlanSchema, parsed, PlanFallback);
     },
     { storeAs: 'json' }
   );
 
   if ('error' in cached) {
-    throw new Error(cached.error);
+    console.error(JSON.stringify({ event: 'generateToeflInterviewAction_cache', error: cached.error }));
+    return PlanFallback;
   }
   return cached;
 }
@@ -88,49 +117,51 @@ export async function evaluateToeflResponseAction(
   audioBase64: string,
   mimeType: string
 ): Promise<ToeflEvaluation> {
-  const ai = getAiClient();
   const prompt = await getPrompt('toefl_interview_b2_evaluation', { QUESTION: question, TOPIC: '', USER_TRANSCRIPT: '', AUDIO_DURATION_SECONDS: 0 });
 
-  const response = await ai.models.generateContent({
-    model: MODELS.FLASH_LITE_PREVIEW,
-    contents: [
-      {
-        role: 'user',
-        parts: [
-          {
-            inlineData: {
-              mimeType,
-              data: audioBase64,
-            },
-          },
-          { text: prompt },
-        ],
-      },
-    ],
-    config: {
-      responseMimeType: 'application/json',
-      responseSchema: {
-        type: Type.OBJECT,
-        properties: {
-          score: { type: Type.NUMBER },
-          fluency: { type: Type.NUMBER },
-          vocabulary: { type: Type.NUMBER },
-          grammar: { type: Type.NUMBER },
-          feedback: { type: Type.STRING },
-          transcribed_text: { type: Type.STRING },
+  const result = await callGemini(
+    { promptKey: 'toefl_interview_b2_evaluation', model: MODELS.FLASH_LITE_PREVIEW },
+    (ai) => ai.models.generateContent({
+      model: MODELS.FLASH_LITE_PREVIEW,
+      contents: [
+        {
+          role: 'user',
+          parts: [
+            { inlineData: { mimeType, data: audioBase64 } },
+            { text: prompt },
+          ],
         },
-        required: ['score', 'fluency', 'vocabulary', 'grammar', 'feedback', 'transcribed_text'],
+      ],
+      config: {
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            score: { type: Type.NUMBER },
+            fluency: { type: Type.NUMBER },
+            vocabulary: { type: Type.NUMBER },
+            grammar: { type: Type.NUMBER },
+            feedback: { type: Type.STRING },
+            transcribed_text: { type: Type.STRING },
+          },
+          required: ['score', 'fluency', 'vocabulary', 'grammar', 'feedback', 'transcribed_text'],
+        },
       },
-    },
-  });
+    })
+  );
 
-  const raw = response.text ?? '';
-  const parsed = ToeflEvaluationSchema.safeParse(JSON.parse(raw));
-  if (!parsed.success) {
-    throw new Error(`Invalid TOEFL response evaluation: ${parsed.error.message}`);
+  if (!result.ok || !result.data.text) {
+    console.error(JSON.stringify({ event: 'evaluateToeflResponseAction', error: result.ok ? 'empty response' : result.error }));
+    return EvaluationFallback;
   }
 
-  return parsed.data;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(result.data.text);
+  } catch {
+    return EvaluationFallback;
+  }
+  return safeParseFallback(ToeflEvaluationSchema, parsed, EvaluationFallback);
 }
 
 /** Persists the generated question plan as a single phrase row in bob_messages. */

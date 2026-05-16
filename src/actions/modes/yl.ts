@@ -1,7 +1,6 @@
 'use server';
 
 import { z } from 'zod';
-import { getAiClient } from '../_shared';
 import { MODELS } from '@/lib/models';
 import { EvalResponseSchema, type EvalResponse, type ModeKey } from '@/lib/types/practice';
 import { YLPlanSchema, type YLPlan, type YLExam, type YLTurnEvalResult } from '@/lib/types/yl';
@@ -9,11 +8,15 @@ import { getPrompt } from '@/lib/prompts/db-prompts';
 import { createSupabaseServer } from '@/lib/supabase/server';
 import { persistMessage, persistMessages } from '@/lib/persist-activity';
 import { getOrCreateCachedContent } from '@/lib/cache';
+import { callGemini, safeParseFallback } from '@/lib/gemini-client';
 
 /** Map a ModeKey to exam + part number. */
 function parseYLMode(mode: ModeKey): { exam: YLExam; part: number } {
   const match = mode.match(/^cambridge_(starters|movers)_part(\d+)$/);
-  if (!match) throw new Error(`[yl.ts] Unrecognised YL mode key: ${mode}`);
+  if (!match) {
+    console.error(JSON.stringify({ event: 'parseYLMode', error: `Unrecognised YL mode key: ${mode}` }));
+    return { exam: 'starters', part: 1 };
+  }
   return { exam: match[1] as YLExam, part: Number(match[2]) };
 }
 
@@ -37,6 +40,20 @@ function imageGenKey(exam: YLExam, part: number): string {
   return `cambridge_${exam}_part${part}_a1_image_gen`;
 }
 
+const YLPlanFallback: YLPlan = {
+  cues: ['Point to something red.', 'Point to something big.', 'Point to a cat.', 'Point to a house.'],
+  image_prompts: ['A colourful room with many objects including red and big items, a cat, and a house.'],
+};
+
+const EvalFallback: EvalResponse = {
+  score: 5,
+  score_max: 15,
+  cefr_band: 'a1',
+  feedback: '¡Buen intento! Sigue practicando.',
+};
+
+const TRANSPARENT_PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
+
 export async function startYLSessionAction(input: {
   mode: ModeKey;
 }): Promise<{ sessionId: string; plan: YLPlan }> {
@@ -46,7 +63,10 @@ export async function startYLSessionAction(input: {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) throw new Error('[startYLSessionAction] Not authenticated');
+  if (!user) {
+    console.error(JSON.stringify({ event: 'startYLSessionAction', error: 'Not authenticated' }));
+    return { sessionId: '', plan: YLPlanFallback };
+  }
 
   const partTitles: Record<string, string> = {
     starters_1: 'Starters Part 1 — Señalar imágenes',
@@ -75,7 +95,8 @@ export async function startYLSessionAction(input: {
     .single();
 
   if (sessionErr || !session) {
-    throw new Error(`[startYLSessionAction] Failed to create session: ${sessionErr?.message}`);
+    console.error(JSON.stringify({ event: 'startYLSessionAction', error: sessionErr?.message ?? 'no session' }));
+    return { sessionId: '', plan: YLPlanFallback };
   }
 
   const { data: recent } = await supabase
@@ -122,7 +143,10 @@ export async function persistYLImageAction(
 ): Promise<void> {
   const supabase = await createSupabaseServer();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('[persistYLImageAction] Not authenticated');
+  if (!user) {
+    console.error(JSON.stringify({ event: 'persistYLImageAction', error: 'Not authenticated' }));
+    return;
+  }
 
   await persistMessage({
     sessionId,
@@ -156,7 +180,10 @@ export async function saveYLFinalEvalAction(
 ): Promise<void> {
   const supabase = await createSupabaseServer();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('[saveYLFinalEvalAction] Not authenticated');
+  if (!user) {
+    console.error(JSON.stringify({ event: 'saveYLFinalEvalAction', error: 'Not authenticated' }));
+    return;
+  }
   await persistMessage({
     sessionId,
     userId: user.id,
@@ -175,7 +202,10 @@ export async function getOrCreateCueAudioAction(
 ): Promise<{ data: string; mimeType: string }> {
   const supabase = await createSupabaseServer();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('[getOrCreateCueAudioAction] Not authenticated');
+  if (!user) {
+    console.error(JSON.stringify({ event: 'getOrCreateCueAudioAction', error: 'Not authenticated' }));
+    return { data: '', mimeType: 'audio/L16;codec=pcm;rate=24000' };
+  }
 
   const { data: existing } = await supabase
     .from('bob_messages')
@@ -212,7 +242,6 @@ export async function generateYLContentAction(
   part: number,
   options?: { avoidList?: string }
 ): Promise<YLPlan> {
-  const ai = getAiClient();
   const avoidList = options?.avoidList ?? '(none)';
 
   const cached = await getOrCreateCachedContent<YLPlan>(
@@ -220,20 +249,26 @@ export async function generateYLContentAction(
     async () => {
       const promptText = await getPrompt(generationKey(exam, part), { AVOID_LIST: avoidList });
 
-      const response = await ai.models.generateContent({
-        model: MODELS.FLASH_LITE_PREVIEW,
-        contents: [{ role: 'user', parts: [{ text: promptText }] }],
-        config: {
-          responseMimeType: 'application/json',
-        },
-      });
+      const result = await callGemini(
+        { promptKey: generationKey(exam, part), model: MODELS.FLASH_LITE_PREVIEW },
+        (ai) => ai.models.generateContent({
+          model: MODELS.FLASH_LITE_PREVIEW,
+          contents: [{ role: 'user', parts: [{ text: promptText }] }],
+          config: { responseMimeType: 'application/json' },
+        })
+      );
 
-      const raw = response.text ?? '';
+      if (!result.ok || !result.data.text) {
+        console.error(JSON.stringify({ event: 'generateYLContentAction', error: result.ok ? 'empty response' : result.error }));
+        return YLPlanFallback;
+      }
+
       let parsed: unknown;
       try {
-        parsed = JSON.parse(raw);
+        parsed = JSON.parse(result.data.text);
       } catch {
-        throw new Error('[generateYLContentAction] Gemini returned invalid JSON');
+        console.error(JSON.stringify({ event: 'generateYLContentAction', error: 'invalid JSON' }));
+        return YLPlanFallback;
       }
 
       const p = (parsed ?? {}) as Record<string, unknown>;
@@ -267,19 +302,14 @@ export async function generateYLContentAction(
         pointing_cues: isPointing ? (p.cues as unknown[]) : undefined,
       };
 
-      const result = YLPlanSchema.safeParse(normalized);
-      if (!result.success) {
-        throw new Error(
-          `[generateYLContentAction] Invalid YL plan from AI: ${result.error.message}`
-        );
-      }
-      return result.data;
+      return safeParseFallback(YLPlanSchema, normalized, YLPlanFallback);
     },
     { storeAs: 'json' }
   );
 
   if ('error' in cached) {
-    throw new Error(cached.error);
+    console.error(JSON.stringify({ event: 'generateYLContentAction_cache', error: cached.error }));
+    return YLPlanFallback;
   }
   return cached;
 }
@@ -305,7 +335,6 @@ export async function generateYLImageAction(
     { kind: 'image', promptKey: `yl-image-${exam}-part${part}`, inputs: cacheInputs },
     async () => {
       const key = imageGenKey(exam, part);
-      const ai = getAiClient();
       const t0 = Date.now();
 
       const params: Record<string, string> = {
@@ -323,13 +352,22 @@ export async function generateYLImageAction(
       let mime = 'image/png';
       for (let attempt = 0; attempt < 2; attempt++) {
         const tImg = Date.now();
-        const response = await ai.models.generateContent({
-          model: MODELS.IMAGE,
-          contents: [{ role: 'user', parts: [{ text: fullPrompt }] }],
-          config: { responseModalities: ['IMAGE'] },
-        });
+        const result = await callGemini(
+          { promptKey: key, model: MODELS.IMAGE },
+          (ai) => ai.models.generateContent({
+            model: MODELS.IMAGE,
+            contents: [{ role: 'user', parts: [{ text: fullPrompt }] }],
+            config: { responseModalities: ['IMAGE'] },
+          })
+        );
         console.log(`[YL][${exam}_part${part}] image ${idx + 1} attempt ${attempt + 1} returned in ${Date.now() - tImg}ms (elapsed ${Date.now() - t0}ms)`);
-        const parts = response.candidates?.[0]?.content?.parts ?? [];
+
+        if (!result.ok) {
+          console.warn(`[generateYLImageAction] gemini error attempt ${attempt + 1}:`, result.error);
+          continue;
+        }
+
+        const parts = result.data.candidates?.[0]?.content?.parts ?? [];
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const imagePart = parts.find((p: any) => p.inlineData);
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -345,12 +383,15 @@ export async function generateYLImageAction(
       }
 
       if (!imgB64) {
-        return 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
+        return TRANSPARENT_PNG;
       }
 
       const supabase = await createSupabaseServer();
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('[generateYLImageAction] Not authenticated');
+      if (!user) {
+        console.error(JSON.stringify({ event: 'generateYLImageAction', error: 'Not authenticated for storage upload' }));
+        return `data:${mime};base64,${imgB64}`;
+      }
 
       const ext = mime.includes('jpeg') ? 'jpg' : 'png';
       const path = `${user.id}/${sessionId}/${idx}.${ext}`;
@@ -370,7 +411,7 @@ export async function generateYLImageAction(
   );
 
   if (typeof cached === 'object' && 'error' in cached) {
-    return 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
+    return TRANSPARENT_PNG;
   }
   return cached as string;
 }
@@ -389,7 +430,6 @@ export async function generateYLImagesAction(
   characterDescription?: string
 ): Promise<string[]> {
   const key = imageGenKey(exam, part);
-  const ai = getAiClient();
 
   console.log(`[YL][${exam}_part${part}] generating ${imagePrompts.length} image(s)`);
   const t0 = Date.now();
@@ -410,13 +450,22 @@ export async function generateYLImagesAction(
 
       for (let attempt = 0; attempt < 2; attempt++) {
         const tImg = Date.now();
-        const response = await ai.models.generateContent({
-          model: MODELS.IMAGE,
-          contents: [{ role: 'user', parts: [{ text: fullPrompt }] }],
-          config: { responseModalities: ['IMAGE'] },
-        });
+        const result = await callGemini(
+          { promptKey: key, model: MODELS.IMAGE },
+          (ai) => ai.models.generateContent({
+            model: MODELS.IMAGE,
+            contents: [{ role: 'user', parts: [{ text: fullPrompt }] }],
+            config: { responseModalities: ['IMAGE'] },
+          })
+        );
         console.log(`[YL][${exam}_part${part}] image ${idx + 1} attempt ${attempt + 1} returned in ${Date.now() - tImg}ms (total elapsed ${Date.now() - t0}ms)`);
-        const parts = response.candidates?.[0]?.content?.parts ?? [];
+
+        if (!result.ok) {
+          console.warn(`[generateYLImagesAction] gemini error attempt ${attempt + 1}:`, result.error);
+          continue;
+        }
+
+        const parts = result.data.candidates?.[0]?.content?.parts ?? [];
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const imagePart = parts.find((p: any) => p.inlineData);
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -428,7 +477,7 @@ export async function generateYLImagesAction(
         }
         console.warn(`[generateYLImagesAction] empty image (attempt ${attempt + 1}); prompt:`, fullPrompt.slice(0, 200));
       }
-      return 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
+      return TRANSPARENT_PNG;
     })
   );
 }
@@ -448,7 +497,10 @@ export async function saveYLTurnAction(
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) throw new Error('[saveYLTurnAction] Not authenticated');
+  if (!user) {
+    console.error(JSON.stringify({ event: 'saveYLTurnAction', error: 'Not authenticated' }));
+    return;
+  }
 
   const result = await persistMessages([
     {
@@ -478,7 +530,7 @@ export async function saveYLTurnAction(
   ]);
 
   if ('error' in result) {
-    throw new Error(`[saveYLTurnAction] Failed to save turn: ${result.error}`);
+    console.error(JSON.stringify({ event: 'saveYLTurnAction', error: result.error }));
   }
 }
 
@@ -516,21 +568,22 @@ export async function evaluateYLTurnAction(input: {
     };
   }
 
-  const ai = getAiClient();
-
-  const transcribeResponse = await ai.models.generateContent({
-    model: MODELS.FLASH_LITE_PREVIEW,
-    contents: [
-      {
-        role: 'user',
-        parts: [
-          { text: `Transcribe exactly what the child says in English. Output only the transcription, nothing else. If nothing was said, output "(silence)".` },
-          { inlineData: { mimeType: input.mimeType, data: input.audioBase64 } },
-        ],
-      },
-    ],
-  });
-  const transcribed = (transcribeResponse.text ?? '(silence)').trim();
+  const transcribeResult = await callGemini(
+    { promptKey: `${exam}_part${part}_a1_transcribe`, model: MODELS.FLASH_LITE_PREVIEW },
+    (ai) => ai.models.generateContent({
+      model: MODELS.FLASH_LITE_PREVIEW,
+      contents: [
+        {
+          role: 'user',
+          parts: [
+            { text: `Transcribe exactly what the child says in English. Output only the transcription, nothing else. If nothing was said, output "(silence)".` },
+            { inlineData: { mimeType: input.mimeType, data: input.audioBase64 } },
+          ],
+        },
+      ],
+    })
+  );
+  const transcribed = transcribeResult.ok ? (transcribeResult.data.text ?? '(silence)').trim() : '(silence)';
 
   const sharedParams = {
     USER_TRANSCRIPT: transcribed,
@@ -546,45 +599,43 @@ export async function evaluateYLTurnAction(input: {
   const evalPrompt = await getPrompt(evaluationKey(exam, part), sharedParams);
   const reactionPrompt = await getPrompt(reactionKey(exam, part), sharedParams);
 
-  const [evalResponse, reactionResponse] = await Promise.all([
-    ai.models.generateContent({
-      model: MODELS.FLASH_LITE_PREVIEW,
-      contents: [{ role: 'user', parts: [{ text: evalPrompt }] }],
-      config: { responseMimeType: 'application/json' },
-    }),
-    ai.models.generateContent({
-      model: MODELS.FLASH_LITE_PREVIEW,
-      contents: [{ role: 'user', parts: [{ text: reactionPrompt }] }],
-    }),
+  const [evalResult, reactionResult] = await Promise.all([
+    callGemini(
+      { promptKey: evaluationKey(exam, part), model: MODELS.FLASH_LITE_PREVIEW },
+      (ai) => ai.models.generateContent({
+        model: MODELS.FLASH_LITE_PREVIEW,
+        contents: [{ role: 'user', parts: [{ text: evalPrompt }] }],
+        config: { responseMimeType: 'application/json' },
+      })
+    ),
+    callGemini(
+      { promptKey: reactionKey(exam, part), model: MODELS.FLASH_LITE_PREVIEW },
+      (ai) => ai.models.generateContent({
+        model: MODELS.FLASH_LITE_PREVIEW,
+        contents: [{ role: 'user', parts: [{ text: reactionPrompt }] }],
+      })
+    ),
   ]);
 
-  const reaction = (reactionResponse.text ?? '').trim() || '¡Muy bien! 🌟';
+  const reaction = reactionResult.ok ? (reactionResult.data.text ?? '').trim() || '¡Muy bien! 🌟' : '¡Muy bien! 🌟';
 
-  const raw = evalResponse.text ?? '';
+  if (!evalResult.ok || !evalResult.data.text) {
+    console.error(JSON.stringify({ event: 'evaluateYLTurnAction', error: evalResult.ok ? 'empty response' : evalResult.error }));
+    return { ...EvalFallback, reaction };
+  }
+
   let parsed: unknown;
   try {
-    parsed = JSON.parse(raw);
+    parsed = JSON.parse(evalResult.data.text);
   } catch {
-    console.error('[evaluateYLTurnAction] Failed to parse eval JSON:', raw);
-    return {
-      score: 5,
-      score_max: 15,
-      cefr_band: 'a1',
-      feedback: '¡Buen intento! Sigue practicando.',
-      reaction,
-    };
+    console.error('[evaluateYLTurnAction] Failed to parse eval JSON');
+    return { ...EvalFallback, reaction };
   }
 
   const result = EvalResponseSchema.safeParse(parsed);
   if (!result.success) {
     console.error('[evaluateYLTurnAction] Invalid eval schema:', result.error.message);
-    return {
-      score: 5,
-      score_max: 15,
-      cefr_band: 'a1',
-      feedback: '¡Buen intento! Sigue practicando.',
-      reaction,
-    };
+    return { ...EvalFallback, reaction };
   }
 
   return { ...result.data, reaction };
@@ -600,7 +651,10 @@ export async function evaluateYLFinalAction(input: {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) throw new Error('[evaluateYLFinalAction] Not authenticated');
+  if (!user) {
+    console.error(JSON.stringify({ event: 'evaluateYLFinalAction', error: 'Not authenticated' }));
+    return EvalFallback;
+  }
 
   const { data: messages } = await supabase
     .from('bob_messages')
@@ -616,7 +670,6 @@ export async function evaluateYLFinalAction(input: {
     )
     .join('\n');
 
-  const ai = getAiClient();
   const promptText = await getPrompt(evaluationKey(exam, part), {
     USER_TRANSCRIPT: transcript,
     QUESTION: `Full session — ${input.turnsCount} turns`,
@@ -625,26 +678,28 @@ export async function evaluateYLFinalAction(input: {
     AUDIO_DURATION_SECONDS: 30,
   });
 
-  const response = await ai.models.generateContent({
-    model: MODELS.FLASH_LITE_PREVIEW,
-    contents: [{ role: 'user', parts: [{ text: promptText }] }],
-    config: { responseMimeType: 'application/json' },
-  });
+  const result = await callGemini(
+    { promptKey: evaluationKey(exam, part), model: MODELS.FLASH_LITE_PREVIEW, userId: user.id },
+    (ai) => ai.models.generateContent({
+      model: MODELS.FLASH_LITE_PREVIEW,
+      contents: [{ role: 'user', parts: [{ text: promptText }] }],
+      config: { responseMimeType: 'application/json' },
+    })
+  );
 
-  const raw = response.text ?? '';
+  if (!result.ok || !result.data.text) {
+    console.error(JSON.stringify({ event: 'evaluateYLFinalAction', error: result.ok ? 'empty response' : result.error }));
+    return EvalFallback;
+  }
+
   let parsed: unknown;
   try {
-    parsed = JSON.parse(raw);
+    parsed = JSON.parse(result.data.text);
   } catch {
-    throw new Error('[evaluateYLFinalAction] Gemini returned invalid JSON');
+    return EvalFallback;
   }
 
-  const result = EvalResponseSchema.safeParse(parsed);
-  if (!result.success) {
-    throw new Error(`[evaluateYLFinalAction] Invalid eval schema: ${result.error.message}`);
-  }
-
-  const evalResult = result.data;
+  const evalResult = safeParseFallback(EvalResponseSchema, parsed, EvalFallback);
 
   await persistMessage({
     sessionId: input.sessionId,
@@ -657,8 +712,6 @@ export async function evaluateYLFinalAction(input: {
   return evalResult;
 }
 
-// Server-action files only allow async function exports; this wraps the
-// re-export from messages.ts as a thin async function to satisfy that constraint.
 import { getMessagesAction } from '@/actions/messages';
 
 export async function getSessionMessagesAction(sessionId: string) {

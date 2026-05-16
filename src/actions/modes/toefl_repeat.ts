@@ -1,13 +1,13 @@
 'use server';
 
 import { z } from 'zod';
-import { GoogleGenAI, Type, Part } from '@google/genai';
-import { getAiClient } from '../_shared';
+import { Type, Part } from '@google/genai';
 import { MODELS } from '@/lib/models';
 import { RepetitionEvaluationSchema, RepetitionEvaluation } from '@/lib/types/practice';
 import { getPrompt } from '@/lib/prompts/db-prompts';
 import { persistMessage, readSessionMessages } from '@/lib/persist-activity';
 import { getOrCreateCachedContent } from '@/lib/cache';
+import { callGemini, safeParseFallback } from '@/lib/gemini-client';
 
 const ToeflRepeatItemSchema = z.object({
   text: z.string(),
@@ -25,6 +25,20 @@ export type ToeflAudioChunk = {
   mimeType: string;
 };
 
+const SessionFallback: ToeflRepeatItem[] = Array.from({ length: 10 }, (_, i) => ({
+  text: `Please repeat this sentence clearly and naturally. Number ${i + 1}.`,
+  difficulty: Math.min(5, Math.floor(i / 2) + 1),
+}));
+
+const EvaluationFallback: RepetitionEvaluation = {
+  score: 0,
+  accuracy: 0,
+  pronunciation: 0,
+  feedback: 'Unable to evaluate at this time. Please try again.',
+  transcribed_text: '',
+  original_text: '',
+};
+
 /**
  * Generates 10 progressive TOEFL Listen & Repeat items and persists the phrase plan.
  */
@@ -32,50 +46,59 @@ export async function generateToeflRepeatSessionAction(
   sessionId: string,
   userId: string
 ): Promise<ToeflRepeatItem[]> {
-  const ai = getAiClient();
-
   const cached = await getOrCreateCachedContent<ToeflRepeatItem[]>(
     { kind: 'plan', promptKey: 'toefl-listen-repeat-b1-plan', inputs: {} },
     async () => {
       const prompt = await getPrompt('toefl_listen_repeat_b1_generation');
 
-      const response = await ai.models.generateContent({
-        model: MODELS.FLASH_LITE_PREVIEW,
-        contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        config: {
-          responseMimeType: 'application/json',
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              items: {
-                type: Type.ARRAY,
+      const result = await callGemini(
+        { promptKey: 'toefl_listen_repeat_b1_generation', model: MODELS.FLASH_LITE_PREVIEW, userId },
+        (ai) => ai.models.generateContent({
+          model: MODELS.FLASH_LITE_PREVIEW,
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          config: {
+            responseMimeType: 'application/json',
+            responseSchema: {
+              type: Type.OBJECT,
+              properties: {
                 items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    text: { type: Type.STRING },
-                    difficulty: { type: Type.NUMBER },
+                  type: Type.ARRAY,
+                  items: {
+                    type: Type.OBJECT,
+                    properties: {
+                      text: { type: Type.STRING },
+                      difficulty: { type: Type.NUMBER },
+                    },
+                    required: ['text', 'difficulty'],
                   },
-                  required: ['text', 'difficulty'],
                 },
               },
+              required: ['items'],
             },
-            required: ['items'],
           },
-        },
-      });
+        })
+      );
 
-      const raw = response.text ?? '';
-      const parsed = ToeflRepeatSessionSchema.safeParse(JSON.parse(raw));
-      if (!parsed.success) {
-        throw new Error(`Invalid TOEFL session data: ${parsed.error.message}`);
+      if (!result.ok || !result.data.text) {
+        console.error(JSON.stringify({ event: 'generateToeflRepeatSessionAction', error: result.ok ? 'empty response' : result.error }));
+        return SessionFallback;
       }
-      return parsed.data.items;
+
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(result.data.text);
+      } catch {
+        return SessionFallback;
+      }
+      const validated = safeParseFallback(ToeflRepeatSessionSchema, parsed, { items: SessionFallback });
+      return validated.items;
     },
     { storeAs: 'json' }
   );
 
   if ('error' in cached) {
-    throw new Error(cached.error);
+    console.error(JSON.stringify({ event: 'generateToeflRepeatSessionAction_cache', error: cached.error }));
+    return SessionFallback;
   }
 
   const persistResult = await persistMessage({
@@ -99,7 +122,7 @@ export async function generateToeflRepeatSessionAction(
 export async function generateToeflRepeatAudiosAction(
   phrases: string[]
 ): Promise<ToeflAudioChunk[]> {
-  const ai = getAiClient();
+  const audioFallback: ToeflAudioChunk = { data: '', mimeType: 'audio/L16;codec=pcm;rate=24000' };
   const CONCURRENCY = 3;
   const results: ToeflAudioChunk[] = [];
 
@@ -107,30 +130,37 @@ export async function generateToeflRepeatAudiosAction(
     const cached = await getOrCreateCachedContent<ToeflAudioChunk>(
       { kind: 'tts', promptKey: 'toefl-listen-repeat-phrase-tts', inputs: { text: phrase, voice: 'Sadaltager' } },
       async () => {
-        const response = await ai.models.generateContent({
-          model: MODELS.TTS,
-          contents: [
-            {
-              role: 'user',
-              parts: [{ text: `Read this sentence aloud with clear, natural pronunciation: "${phrase}"` }],
-            },
-          ],
-          config: {
-            responseModalities: ['audio'],
-            speechConfig: {
-              voiceConfig: {
-                prebuiltVoiceConfig: {
-                  voiceName: 'Sadaltager',
+        const result = await callGemini(
+          { promptKey: 'toefl-listen-repeat-phrase-tts', model: MODELS.TTS },
+          (ai) => ai.models.generateContent({
+            model: MODELS.TTS,
+            contents: [
+              {
+                role: 'user',
+                parts: [{ text: `Read this sentence aloud with clear, natural pronunciation: "${phrase}"` }],
+              },
+            ],
+            config: {
+              responseModalities: ['audio'],
+              speechConfig: {
+                voiceConfig: {
+                  prebuiltVoiceConfig: { voiceName: 'Sadaltager' },
                 },
               },
             },
-          },
-        });
+          })
+        );
 
-        const audioPart = response.candidates?.[0]?.content?.parts?.find((p: Part) => p.inlineData);
+        if (!result.ok) {
+          console.error(JSON.stringify({ event: 'generateToeflRepeatAudiosAction', phrase: phrase.slice(0, 40), error: result.error }));
+          return audioFallback;
+        }
+
+        const audioPart = result.data.candidates?.[0]?.content?.parts?.find((p: Part) => p.inlineData);
 
         if (!audioPart?.inlineData?.data) {
-          throw new Error(`No audio data received for phrase: "${phrase}"`);
+          console.error(JSON.stringify({ event: 'generateToeflRepeatAudiosAction', phrase: phrase.slice(0, 40), error: 'no audio data' }));
+          return audioFallback;
         }
 
         return {
@@ -142,7 +172,8 @@ export async function generateToeflRepeatAudiosAction(
     );
 
     if ('error' in cached) {
-      throw new Error(cached.error);
+      console.error(JSON.stringify({ event: 'generateToeflRepeatAudiosAction_cache', error: cached.error }));
+      return audioFallback;
     }
     return cached;
   };
@@ -167,49 +198,52 @@ export async function evaluateRepetitionAction(
   userId: string,
   phraseIndex: number
 ): Promise<RepetitionEvaluation> {
-  const ai = getAiClient();
   const prompt = await getPrompt('toefl_listen_repeat_b1_evaluation', { TARGET_SENTENCE: originalText, TARGET_DURATION_SECONDS: 0, USER_TRANSCRIPT: '' });
 
-  const response = await ai.models.generateContent({
-    model: MODELS.FLASH_LITE_PREVIEW,
-    contents: [
-      {
-        role: 'user',
-        parts: [
-          {
-            inlineData: {
-              mimeType,
-              data: audioBase64,
-            },
-          },
-          { text: prompt },
-        ],
-      },
-    ],
-    config: {
-      responseMimeType: 'application/json',
-      responseSchema: {
-        type: Type.OBJECT,
-        properties: {
-          score: { type: Type.NUMBER },
-          accuracy: { type: Type.NUMBER },
-          pronunciation: { type: Type.NUMBER },
-          feedback: { type: Type.STRING },
-          transcribed_text: { type: Type.STRING },
-          original_text: { type: Type.STRING },
+  const result = await callGemini(
+    { promptKey: 'toefl_listen_repeat_b1_evaluation', model: MODELS.FLASH_LITE_PREVIEW, userId },
+    (ai) => ai.models.generateContent({
+      model: MODELS.FLASH_LITE_PREVIEW,
+      contents: [
+        {
+          role: 'user',
+          parts: [
+            { inlineData: { mimeType, data: audioBase64 } },
+            { text: prompt },
+          ],
         },
-        required: ['score', 'accuracy', 'pronunciation', 'feedback', 'transcribed_text', 'original_text'],
+      ],
+      config: {
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            score: { type: Type.NUMBER },
+            accuracy: { type: Type.NUMBER },
+            pronunciation: { type: Type.NUMBER },
+            feedback: { type: Type.STRING },
+            transcribed_text: { type: Type.STRING },
+            original_text: { type: Type.STRING },
+          },
+          required: ['score', 'accuracy', 'pronunciation', 'feedback', 'transcribed_text', 'original_text'],
+        },
       },
-    },
-  });
+    })
+  );
 
-  const raw = response.text ?? '';
-  const parsed = RepetitionEvaluationSchema.safeParse(JSON.parse(raw));
-  if (!parsed.success) {
-    throw new Error(`Invalid repetition evaluation: ${parsed.error.message}`);
+  if (!result.ok || !result.data.text) {
+    console.error(JSON.stringify({ event: 'evaluateRepetitionAction', error: result.ok ? 'empty response' : result.error }));
+    return { ...EvaluationFallback, original_text: originalText };
   }
 
-  const evaluation = parsed.data;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(result.data.text);
+  } catch {
+    return { ...EvaluationFallback, original_text: originalText };
+  }
+
+  const evaluation = safeParseFallback(RepetitionEvaluationSchema, parsed, { ...EvaluationFallback, original_text: originalText });
 
   const audioResult = await persistMessage({
     sessionId,

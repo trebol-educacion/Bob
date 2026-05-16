@@ -9,10 +9,39 @@ export interface PersistMessageInput {
   contentJson?: Record<string, unknown> | unknown[] | null;
 }
 
+/** Returns true only when the user's org has allow_voice_storage=true; defaults to false on any error. */
+async function isVoiceStorageAllowed(userId: string): Promise<boolean> {
+  const supabase = await createSupabaseServer();
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('organization_id')
+    .eq('id', userId)
+    .single();
+
+  if (profileError || !profile?.organization_id) return false;
+
+  const { data: org, error: orgError } = await supabase
+    .from('organizations')
+    .select('allow_voice_storage')
+    .eq('id', profile.organization_id)
+    .single();
+
+  if (orgError || !org) return false;
+  return org.allow_voice_storage === true;
+}
+
 /** Insert a single message row into bob_messages; returns the new id or an error string. */
 export async function persistMessage(
   input: PersistMessageInput
-): Promise<{ id: string } | { error: string }> {
+): Promise<{ id: string } | { skipped: true } | { error: string }> {
+  if (input.msgType === 'user_audio') {
+    const allowed = await isVoiceStorageAllowed(input.userId);
+    if (!allowed) {
+      console.log(JSON.stringify({ event: 'audio_persist_skipped', userId: input.userId, reason: 'allow_voice_storage=false' }));
+      return { skipped: true };
+    }
+  }
+
   const supabase = await createSupabaseServer();
   const { data, error } = await supabase
     .from('bob_messages')
@@ -40,8 +69,22 @@ export async function persistMessages(
 ): Promise<{ ids: string[] } | { error: string }> {
   if (inputs.length === 0) return { ids: [] };
 
+  const audioInputs = inputs.filter((i) => i.msgType === 'user_audio');
+  let filteredInputs = inputs;
+
+  if (audioInputs.length > 0) {
+    const firstAudioUserId = audioInputs[0].userId;
+    const allowed = await isVoiceStorageAllowed(firstAudioUserId);
+    if (!allowed) {
+      console.log(JSON.stringify({ event: 'audio_persist_skipped', userId: firstAudioUserId, reason: 'allow_voice_storage=false', count: audioInputs.length }));
+      filteredInputs = inputs.filter((i) => i.msgType !== 'user_audio');
+    }
+  }
+
+  if (filteredInputs.length === 0) return { ids: [] };
+
   const supabase = await createSupabaseServer();
-  const rows = inputs.map((input) => ({
+  const rows = filteredInputs.map((input) => ({
     session_id: input.sessionId,
     user_id: input.userId,
     role: input.role,

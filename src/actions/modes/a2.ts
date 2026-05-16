@@ -1,13 +1,13 @@
 'use server';
 
 import { z } from 'zod';
-import { getAiClient } from '../_shared';
 import { MODELS } from '@/lib/models';
 import { CambridgeEvaluationSchema, type CambridgeEvaluation } from '@/lib/types/practice';
 import { getPrompt } from '@/lib/prompts/db-prompts';
 import { persistMessage, readSessionMessages } from '@/lib/persist-activity';
 import { createSupabaseServer } from '@/lib/supabase/server';
 import { getOrCreateCachedContent } from '@/lib/cache';
+import { callGemini, safeParseFallback } from '@/lib/gemini-client';
 
 const A2SessionPlanSchema = z.object({
   phase1_questions: z.array(z.string()).length(3),
@@ -20,39 +20,60 @@ const A2SessionPlanSchema = z.object({
 
 export type A2SessionPlan = z.infer<typeof A2SessionPlanSchema>;
 
+const A2SessionPlanFallback: A2SessionPlan = {
+  phase1_questions: ['What is your name?', 'How old are you?', 'Where do you live?'],
+  topic1: 'School',
+  topic1_questions: ['Do you like school?', 'What is your favourite subject?', 'Who is your best friend?', 'What do you do after school?'],
+  topic2: 'Free time',
+  topic2_questions: ['What do you do at the weekend?', 'Do you play any sports?', 'What is your favourite hobby?'],
+  final_question: 'What do you want to do when you grow up?',
+};
+
+const CambridgeEvaluationFallback: CambridgeEvaluation = {
+  score: 0,
+  grammar: 0,
+  vocabulary: 0,
+  fluency: 0,
+  feedback: 'Unable to evaluate at this time. Please try again.',
+  strengths: [],
+  areas_for_improvement: [],
+};
+
 /** Generate an A2 session plan and persist it as a 'phrase' message in bob_messages. */
 export async function generateA2SessionAction(sessionId: string, userId: string): Promise<A2SessionPlan> {
-  const ai = getAiClient();
-
   const cached = await getOrCreateCachedContent<A2SessionPlan>(
     { kind: 'plan', promptKey: 'cambridge-ket-part1-a2-plan', inputs: {} },
     async () => {
-      const response = await ai.models.generateContent({
-        model: MODELS.FLASH_LITE_PREVIEW,
-        contents: [{ role: 'user', parts: [{ text: await getPrompt('cambridge_ket_part1_a2_generation') }] }],
-        config: {
-          responseMimeType: 'application/json',
-        },
-      });
+      const planPromptText = await getPrompt('cambridge_ket_part1_a2_generation');
+      const result = await callGemini(
+        { promptKey: 'cambridge_ket_part1_a2_generation', model: MODELS.FLASH_LITE_PREVIEW, userId },
+        (ai) => ai.models.generateContent({
+          model: MODELS.FLASH_LITE_PREVIEW,
+          contents: [{ role: 'user', parts: [{ text: planPromptText }] }],
+          config: { responseMimeType: 'application/json' },
+        })
+      );
 
-      const raw = response.text ?? '';
+      if (!result.ok || !result.data.text) {
+        console.error(JSON.stringify({ event: 'generateA2SessionAction', error: result.ok ? 'empty response' : result.error }));
+        return A2SessionPlanFallback;
+      }
+
       let parsed: unknown;
       try {
-        parsed = JSON.parse(raw);
+        parsed = JSON.parse(result.data.text);
       } catch {
-        throw new Error('Gemini returned invalid JSON');
+        console.error(JSON.stringify({ event: 'generateA2SessionAction', error: 'invalid JSON' }));
+        return A2SessionPlanFallback;
       }
-      const result = A2SessionPlanSchema.safeParse(parsed);
-      if (!result.success) {
-        throw new Error(`Invalid A2 session plan from AI: ${result.error.message}`);
-      }
-      return result.data;
+      return safeParseFallback(A2SessionPlanSchema, parsed, A2SessionPlanFallback);
     },
     { storeAs: 'json' }
   );
 
   if ('error' in cached) {
-    throw new Error(cached.error);
+    console.error(JSON.stringify({ event: 'generateA2SessionAction_cache', error: cached.error }));
+    return A2SessionPlanFallback;
   }
 
   const persistResult = await persistMessage({
@@ -77,29 +98,24 @@ export async function processA2AnswerAction(
   sessionId: string,
   userId: string,
 ): Promise<{ transcribed: string; reaction: string }> {
-  const ai = getAiClient();
+  const transcribePromptText = await getPrompt('cambridge_ket_part1_a2_transcribe');
+  const transcribeResult = await callGemini(
+    { promptKey: 'cambridge_ket_part1_a2_transcribe', model: MODELS.FLASH_LITE_PREVIEW, userId },
+    (ai) => ai.models.generateContent({
+      model: MODELS.FLASH_LITE_PREVIEW,
+      contents: [
+        {
+          role: 'user',
+          parts: [
+            { text: transcribePromptText },
+            { inlineData: { mimeType, data: audioBase64 } },
+          ],
+        },
+      ],
+    })
+  );
 
-  const transcribeResponse = await ai.models.generateContent({
-    model: MODELS.FLASH_LITE_PREVIEW,
-    contents: [
-      {
-        role: 'user',
-        parts: [
-          {
-            text: await getPrompt('cambridge_ket_part1_a2_transcribe'),
-          },
-          {
-            inlineData: {
-              mimeType,
-              data: audioBase64,
-            },
-          },
-        ],
-      },
-    ],
-  });
-
-  const transcribed = (transcribeResponse.text ?? '').trim();
+  const transcribed = transcribeResult.ok ? (transcribeResult.data.text ?? '').trim() : '';
 
   const persistResult = await persistMessage({
     sessionId,
@@ -113,17 +129,18 @@ export async function processA2AnswerAction(
     console.error('[A2 persist] user_audio:', persistResult.error);
   }
 
-  const reactionResponse = await ai.models.generateContent({
-    model: MODELS.FLASH_LITE_PREVIEW,
-    contents: [
-      {
-        role: 'user',
-        parts: [{ text: await getPrompt('cambridge_ket_a2_rubric_helper', { QUESTION: question }) }],
-      },
-    ],
-  });
+  const reactionPromptText = await getPrompt('cambridge_ket_a2_rubric_helper', { QUESTION: question });
+  const reactionResult = await callGemini(
+    { promptKey: 'cambridge_ket_a2_rubric_helper', model: MODELS.FLASH_LITE_PREVIEW, userId },
+    (ai) => ai.models.generateContent({
+      model: MODELS.FLASH_LITE_PREVIEW,
+      contents: [
+        { role: 'user', parts: [{ text: reactionPromptText }] },
+      ],
+    })
+  );
 
-  const reaction = (reactionResponse.text ?? '').trim();
+  const reaction = reactionResult.ok ? (reactionResult.data.text ?? '').trim() : '';
 
   return { transcribed, reaction };
 }
@@ -134,46 +151,46 @@ export async function evaluateA2FinalAction(
   sessionId: string,
   userId: string,
 ): Promise<CambridgeEvaluation> {
-  const ai = getAiClient();
-
   const transcript = questionsAndAnswers
     .map((qa, i) => `Q${i + 1}: ${qa.question}\nA: ${qa.answer}`)
     .join('\n\n');
   const prompt = await getPrompt('cambridge_ket_part1_a2_evaluation', { QUESTION: 'Full interview', USER_TRANSCRIPT: transcript, AUDIO_DURATION_SECONDS: 0 });
 
-  const response = await ai.models.generateContent({
-    model: MODELS.FLASH_LITE_PREVIEW,
-    contents: [{ role: 'user', parts: [{ text: prompt }] }],
-    config: {
-      responseMimeType: 'application/json',
-    },
-  });
+  const result = await callGemini(
+    { promptKey: 'cambridge_ket_part1_a2_evaluation', model: MODELS.FLASH_LITE_PREVIEW, userId },
+    (ai) => ai.models.generateContent({
+      model: MODELS.FLASH_LITE_PREVIEW,
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      config: { responseMimeType: 'application/json' },
+    })
+  );
 
-  const raw = response.text ?? '';
+  if (!result.ok || !result.data.text) {
+    console.error(JSON.stringify({ event: 'evaluateA2FinalAction', error: result.ok ? 'empty response' : result.error }));
+    return CambridgeEvaluationFallback;
+  }
+
   let parsed: unknown;
   try {
-    parsed = JSON.parse(raw);
+    parsed = JSON.parse(result.data.text);
   } catch {
-    throw new Error('Gemini returned invalid JSON');
+    return CambridgeEvaluationFallback;
   }
-  const result = CambridgeEvaluationSchema.safeParse(parsed);
 
-  if (!result.success) {
-    throw new Error(`Invalid A2 evaluation from AI: ${result.error.message}`);
-  }
+  const evaluation = safeParseFallback(CambridgeEvaluationSchema, parsed, CambridgeEvaluationFallback);
 
   const persistResult = await persistMessage({
     sessionId,
     userId,
     role: 'bob',
     msgType: 'evaluation',
-    contentJson: result.data as unknown as Record<string, unknown>,
+    contentJson: evaluation as unknown as Record<string, unknown>,
   });
   if ('error' in persistResult) {
     console.error('[A2 persist] evaluation:', persistResult.error);
   }
 
-  return result.data;
+  return evaluation;
 }
 
 /** Read persisted messages for an A2 session and hydrate plan + QAs + evaluation. */

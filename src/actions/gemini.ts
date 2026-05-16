@@ -1,10 +1,11 @@
 'use server';
 
-import { GoogleGenAI, Type, Part } from '@google/genai';
+import { Type, Part } from '@google/genai';
 
 import { MODELS } from '@/lib/models';
 import { getPrompt } from '@/lib/prompts/db-prompts';
 import { getOrCreateCachedContent } from '@/lib/cache';
+import { callGemini, safeParseFallback } from '@/lib/gemini-client';
 import {
   PhraseGenerationSchema,
   ImageSceneSchema,
@@ -15,14 +16,6 @@ import {
   SimulatedConversationResponse,
   QuestionsResponse,
 } from '@/lib/types/gemini';
-
-const apiKey = process.env.GEMINI_API_KEY;
-
-if (!apiKey) {
-  throw new Error('GEMINI_API_KEY is not defined in environment variables');
-}
-
-const ai = new GoogleGenAI({ apiKey });
 
 export interface EvaluationResult {
   score: number;
@@ -57,28 +50,37 @@ export interface ImageScene {
 
 /** Generates high-quality speech for a given text using Gemini's native audio output. */
 export async function generateSpeechAction(text: string): Promise<{ data: string; mimeType: string }> {
+  const fallback = { data: '', mimeType: 'audio/L16;codec=pcm;rate=24000' };
+
   const cached = await getOrCreateCachedContent<{ data: string; mimeType: string }>(
     { kind: 'tts', promptKey: 'gemini-speech', inputs: { text, voice: 'Sadaltager' } },
     async () => {
-      const response = await ai.models.generateContent({
-        model: MODELS.TTS,
-        contents: [{ role: 'user', parts: [{ text: `Read this phrase aloud with clear pronunciation: "${text}"` }] }],
-        config: {
-          responseModalities: ['audio'],
-          speechConfig: {
-            voiceConfig: {
-              prebuiltVoiceConfig: {
-                voiceName: 'Sadaltager',
+      const result = await callGemini(
+        { promptKey: 'gemini-speech', model: MODELS.TTS },
+        (ai) => ai.models.generateContent({
+          model: MODELS.TTS,
+          contents: [{ role: 'user', parts: [{ text: `Read this phrase aloud with clear pronunciation: "${text}"` }] }],
+          config: {
+            responseModalities: ['audio'],
+            speechConfig: {
+              voiceConfig: {
+                prebuiltVoiceConfig: { voiceName: 'Sadaltager' },
               },
             },
           },
-        },
-      });
+        })
+      );
 
-      const audioPart = response.candidates?.[0]?.content?.parts?.find((p: Part) => p.inlineData);
+      if (!result.ok) {
+        console.error(JSON.stringify({ event: 'generateSpeechAction', error: result.error }));
+        return fallback;
+      }
+
+      const audioPart = result.data.candidates?.[0]?.content?.parts?.find((p: Part) => p.inlineData);
 
       if (!audioPart?.inlineData?.data) {
-        throw new Error('No audio data received from Gemini');
+        console.error(JSON.stringify({ event: 'generateSpeechAction', error: 'No audio data in response' }));
+        return fallback;
       }
 
       return {
@@ -90,7 +92,8 @@ export async function generateSpeechAction(text: string): Promise<{ data: string
   );
 
   if ('error' in cached) {
-    throw new Error(cached.error);
+    console.error(JSON.stringify({ event: 'generateSpeechAction_cache', error: cached.error }));
+    return fallback;
   }
   return cached;
 }
@@ -101,8 +104,9 @@ export async function generateSpeechAction(text: string): Promise<{ data: string
 export async function generateTopicPhrasesAction(topic: string): Promise<string[]> {
   const prompt = await getPrompt('generic_situation_a2_generation', { TOPIC: topic });
 
-  try {
-    const response = await ai.models.generateContent({
+  const result = await callGemini(
+    { promptKey: 'generic_situation_a2_generation', model: MODELS.FLASH_LITE_PREVIEW },
+    (ai) => ai.models.generateContent({
       model: MODELS.FLASH_LITE_PREVIEW,
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
       config: {
@@ -119,48 +123,55 @@ export async function generateTopicPhrasesAction(topic: string): Promise<string[
           required: ['phrases'],
         },
       },
-    });
+    })
+  );
 
-    if (!response.text) {
-      throw new Error('No response from Gemini');
-    }
-
-    const result = PhraseGenerationSchema.parse(JSON.parse(response.text));
-    return result.phrases.slice(0, 10);
-  } catch (error) {
-    console.error('Error generating topic phrases:', error);
-    throw error;
+  if (!result.ok || !result.data.text) {
+    console.error(JSON.stringify({ event: 'generateTopicPhrasesAction', error: result.ok ? 'empty response' : result.error }));
+    return [];
   }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(result.data.text);
+  } catch {
+    console.error(JSON.stringify({ event: 'generateTopicPhrasesAction', error: 'invalid JSON' }));
+    return [];
+  }
+  const outcome = PhraseGenerationSchema.safeParse(parsed);
+  if (!outcome.success) return [];
+  return outcome.data.phrases.slice(0, 10);
 }
 
 /**
  * Generates an image using Gemini Image model.
  */
 export async function generateImageAction(prompt: string): Promise<string> {
-  try {
-    const response = await ai.models.generateContent({
+  const fullPrompt = await getPrompt('generic_image_b1_image_gen', { SCENE_DESCRIPTION: prompt });
+
+  const result = await callGemini(
+    { promptKey: 'generic_image_b1_image_gen', model: MODELS.IMAGE },
+    (ai) => ai.models.generateContent({
       model: MODELS.IMAGE,
-      contents: [{
-        role: 'user',
-        parts: [{ text: await getPrompt('generic_image_b1_image_gen', { SCENE_DESCRIPTION: prompt }) }]
-      }],
-      config: {
-        responseModalities: ['IMAGE'],
-      },
-    });
+      contents: [{ role: 'user', parts: [{ text: fullPrompt }] }],
+      config: { responseModalities: ['IMAGE'] },
+    })
+  );
 
-    const candidate = response.candidates?.[0];
-    const imagePart = candidate?.content?.parts?.find((p: Part) => p.inlineData);
-
-    if (!imagePart?.inlineData?.data) {
-      throw new Error('No image data received from Gemini');
-    }
-
-    return `data:${imagePart.inlineData.mimeType || 'image/png'};base64,${imagePart.inlineData.data}`;
-  } catch (error) {
-    console.error('Error generating image:', error);
-    throw error;
+  if (!result.ok) {
+    console.error(JSON.stringify({ event: 'generateImageAction', error: result.error }));
+    return '';
   }
+
+  const candidate = result.data.candidates?.[0];
+  const imagePart = candidate?.content?.parts?.find((p: Part) => p.inlineData);
+
+  if (!imagePart?.inlineData?.data) {
+    console.error(JSON.stringify({ event: 'generateImageAction', error: 'no image data' }));
+    return '';
+  }
+
+  return `data:${imagePart.inlineData.mimeType || 'image/png'};base64,${imagePart.inlineData.data}`;
 }
 
 /**
@@ -172,6 +183,12 @@ export async function generateImageSceneAction(
   difficulty: string = 'intermediate',
   level: 'b1' | 'b2' = 'b1'
 ): Promise<ImageScene> {
+  const fallbackScene: ImageScene = {
+    topic,
+    description: 'A busy street with people going about their day.',
+    image_prompt: 'A busy street scene with people walking.',
+  };
+
   const cached = await getOrCreateCachedContent<ImageScene>(
     { kind: 'scene', promptKey: 'generic-image-scene', inputs: { topic, difficulty, level } },
     async () => {
@@ -180,31 +197,45 @@ export async function generateImageSceneAction(
         { TOPIC: topic, DIFFICULTY: difficulty }
       );
 
-      const response = await ai.models.generateContent({
-        model: MODELS.FLASH_LITE_LATEST,
-        contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        config: {
-          responseMimeType: 'application/json',
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              topic: { type: Type.STRING },
-              description: { type: Type.STRING },
-              image_prompt: { type: Type.STRING },
+      const result = await callGemini(
+        { promptKey: level === 'b2' ? 'generic_image_b2_generation' : 'generic_image_b1_generation', model: MODELS.FLASH_LITE_LATEST },
+        (ai) => ai.models.generateContent({
+          model: MODELS.FLASH_LITE_LATEST,
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          config: {
+            responseMimeType: 'application/json',
+            responseSchema: {
+              type: Type.OBJECT,
+              properties: {
+                topic: { type: Type.STRING },
+                description: { type: Type.STRING },
+                image_prompt: { type: Type.STRING },
+              },
+              required: ['topic', 'description', 'image_prompt'],
             },
-            required: ['topic', 'description', 'image_prompt'],
           },
-        },
-      });
+        })
+      );
 
-      if (!response.text) throw new Error('No response from Gemini');
-      return ImageSceneSchema.parse(JSON.parse(response.text));
+      if (!result.ok || !result.data.text) {
+        console.error(JSON.stringify({ event: 'generateImageSceneAction', error: result.ok ? 'empty response' : result.error }));
+        return fallbackScene;
+      }
+
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(result.data.text);
+      } catch {
+        return fallbackScene;
+      }
+      return safeParseFallback(ImageSceneSchema, parsed, fallbackScene);
     },
     { storeAs: 'json' }
   );
 
   if ('error' in cached) {
-    throw new Error(cached.error);
+    console.error(JSON.stringify({ event: 'generateImageSceneAction_cache', error: cached.error }));
+    return fallbackScene;
   }
   return cached;
 }
@@ -215,13 +246,20 @@ export async function evaluateImageDescriptionAction(
   sceneDescription: string,
   level: 'b1' | 'b2' = 'b1'
 ): Promise<EvaluationResult> {
+  const fallback: EvaluationResult = {
+    score: 0,
+    feedback: 'Unable to evaluate at this time. Please try again.',
+    transcribed_text: '',
+  };
+
   const prompt = await getPrompt(
     level === 'b2' ? 'generic_image_b2_evaluation' : 'generic_image_b1_evaluation',
     { SCENE_DESCRIPTION: sceneDescription, AUDIO_DURATION_SECONDS: 0 }
   );
 
-  try {
-    const response = await ai.models.generateContent({
+  const result = await callGemini(
+    { promptKey: level === 'b2' ? 'generic_image_b2_evaluation' : 'generic_image_b1_evaluation', model: MODELS.FLASH_LITE_PREVIEW },
+    (ai) => ai.models.generateContent({
       model: MODELS.FLASH_LITE_PREVIEW,
       contents: {
         parts: [
@@ -252,14 +290,21 @@ export async function evaluateImageDescriptionAction(
           required: ['score', 'feedback', 'transcribed_text', 'details'],
         },
       },
-    });
+    })
+  );
 
-    if (!response.text) throw new Error('No response from Gemini');
-    return ImageDescriptionEvaluationSchema.parse(JSON.parse(response.text));
-  } catch (error) {
-    console.error('Error evaluating image description:', error);
-    throw error;
+  if (!result.ok || !result.data.text) {
+    console.error(JSON.stringify({ event: 'evaluateImageDescriptionAction', error: result.ok ? 'empty response' : result.error }));
+    return fallback;
   }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(result.data.text);
+  } catch {
+    return fallback;
+  }
+  return safeParseFallback(ImageDescriptionEvaluationSchema, parsed, fallback);
 }
 
 export async function evaluatePronunciationAction(
@@ -267,10 +312,17 @@ export async function evaluatePronunciationAction(
   mimeType: string,
   targetPhrase: string
 ): Promise<EvaluationResult> {
+  const fallback: EvaluationResult = {
+    score: 0,
+    feedback: 'Unable to evaluate at this time. Please try again.',
+    transcribed_text: '',
+  };
+
   const prompt = await getPrompt('generic_situation_a2_evaluation', { TARGET_PHRASE: targetPhrase, AUDIO_DURATION_SECONDS: 0 });
 
-  try {
-    const response = await ai.models.generateContent({
+  const result = await callGemini(
+    { promptKey: 'generic_situation_a2_evaluation', model: MODELS.FLASH_LITE_PREVIEW },
+    (ai) => ai.models.generateContent({
       model: MODELS.FLASH_LITE_PREVIEW,
       contents: {
         parts: [
@@ -290,14 +342,21 @@ export async function evaluatePronunciationAction(
           required: ['score', 'feedback', 'transcribed_text'],
         },
       },
-    });
+    })
+  );
 
-    if (!response.text) throw new Error('No response from Gemini');
-    return PronunciationEvaluationSchema.parse(JSON.parse(response.text));
-  } catch (error) {
-    console.error('Error evaluating pronunciation:', error);
-    throw error;
+  if (!result.ok || !result.data.text) {
+    console.error(JSON.stringify({ event: 'evaluatePronunciationAction', error: result.ok ? 'empty response' : result.error }));
+    return fallback;
   }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(result.data.text);
+  } catch {
+    return fallback;
+  }
+  return safeParseFallback(PronunciationEvaluationSchema, parsed, fallback);
 }
 
 export interface InitialChatResult {
@@ -310,10 +369,16 @@ export interface InitialChatResult {
  * Falls back gracefully — intentional fallback, do NOT convert to throw.
  */
 export async function generateInitialChatAction(topic: string): Promise<InitialChatResult> {
+  const defaultResult: InitialChatResult = {
+    framing: 'La conversación está lista.',
+    message: "Hello! I'm ready to start when you are.",
+  };
+
   const prompt = await getPrompt('generic_conversation_shared_initial', { TOPIC: topic, CEFR_LEVEL: 'b1' });
 
-  try {
-    const response = await ai.models.generateContent({
+  const result = await callGemini(
+    { promptKey: 'generic_conversation_shared_initial', model: MODELS.FLASH_LITE_PREVIEW },
+    (ai) => ai.models.generateContent({
       model: MODELS.FLASH_LITE_PREVIEW,
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
       config: {
@@ -327,17 +392,18 @@ export async function generateInitialChatAction(topic: string): Promise<InitialC
           required: ['framing', 'message'],
         },
       },
-    });
+    })
+  );
 
-    if (!response.text) throw new Error('No response from Gemini');
-    return JSON.parse(response.text) as InitialChatResponse;
-  } catch (error) {
-    console.error('Error generating initial chat:', error);
-    return {
-      framing: "La conversación está lista.",
-      message: "Hello! I'm ready to start when you are."
-    };
+  if (!result.ok || !result.data.text) return defaultResult;
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(result.data.text);
+  } catch {
+    return defaultResult;
   }
+  return (parsed as InitialChatResponse) ?? defaultResult;
 }
 
 export interface Question {
@@ -356,8 +422,9 @@ export async function simulateConversationAction(
 ): Promise<ChatMessage[]> {
   const prompt = await getPrompt('generic_conversation_shared_simulate', { TOPIC: topic, CEFR_LEVEL: 'b1', USER_TURN: '', HISTORY: '' });
 
-  try {
-    const response = await ai.models.generateContent({
+  const result = await callGemini(
+    { promptKey: 'generic_conversation_shared_simulate', model: MODELS.FLASH_LITE_PREVIEW },
+    (ai) => ai.models.generateContent({
       model: MODELS.FLASH_LITE_PREVIEW,
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
       config: {
@@ -380,15 +447,18 @@ export async function simulateConversationAction(
           required: ['full_history'],
         },
       },
-    });
+    })
+  );
 
-    if (!response.text) throw new Error('No response from Gemini');
-    const result = JSON.parse(response.text) as SimulatedConversationResponse;
-    return result.full_history;
-  } catch (error) {
-    console.error('Error simulating conversation:', error);
+  if (!result.ok || !result.data.text) return history;
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(result.data.text);
+  } catch {
     return history;
   }
+  return (parsed as SimulatedConversationResponse).full_history ?? history;
 }
 
 /**
@@ -402,8 +472,9 @@ export async function generateQuestionsAction(
   const historyText = history.map(m => `${m.role}: ${m.text}`).join('\n');
   const prompt = await getPrompt('generic_conversation_shared_questions', { TRANSCRIPT: historyText, CEFR_LEVEL: 'b1' });
 
-  try {
-    const response = await ai.models.generateContent({
+  const result = await callGemini(
+    { promptKey: 'generic_conversation_shared_questions', model: MODELS.FLASH_LITE_PREVIEW },
+    (ai) => ai.models.generateContent({
       model: MODELS.FLASH_LITE_PREVIEW,
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
       config: {
@@ -427,15 +498,18 @@ export async function generateQuestionsAction(
           required: ['questions'],
         },
       },
-    });
+    })
+  );
 
-    if (!response.text) throw new Error('No response from Gemini');
-    const result = JSON.parse(response.text) as QuestionsResponse;
-    return result.questions;
-  } catch (error) {
-    console.error('Error generating questions:', error);
+  if (!result.ok || !result.data.text) return [];
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(result.data.text);
+  } catch {
     return [];
   }
+  return (parsed as QuestionsResponse).questions ?? [];
 }
 
 /**
@@ -448,8 +522,9 @@ export async function simulateUserResponseAction(
 ): Promise<string> {
   const prompt = await getPrompt('generic_conversation_shared_simulate_user', { TOPIC: topic, CEFR_LEVEL: 'b1', LAST_TURN: '' });
 
-  try {
-    const response = await ai.models.generateContent({
+  const result = await callGemini(
+    { promptKey: 'generic_conversation_shared_simulate_user', model: MODELS.FLASH_LITE_PREVIEW },
+    (ai) => ai.models.generateContent({
       model: MODELS.FLASH_LITE_PREVIEW,
       contents: [
         ...history.map(msg => ({
@@ -458,13 +533,11 @@ export async function simulateUserResponseAction(
         })),
         { role: 'user', parts: [{ text: prompt }] }
       ],
-    });
+    })
+  );
 
-    return response.text?.trim() || "I'm not sure what to say.";
-  } catch (error) {
-    console.error('Error simulating user response:', error);
-    return "That's interesting, tell me more.";
-  }
+  if (!result.ok) return "That's interesting, tell me more.";
+  return result.data.text?.trim() || "I'm not sure what to say.";
 }
 
 /**
@@ -475,20 +548,23 @@ export async function chatTextConversationAction(
   history: ChatMessage[],
   topic: string
 ): Promise<ChatTurnResult> {
+  const fallback: ChatTurnResult = {
+    evaluation: { score: 0, feedback: 'Unable to evaluate. Please try again.', transcribed_text: userText },
+    ai_response: "I'm sorry, I couldn't process that. Could you try again?",
+  };
+
   const prompt = await getPrompt('generic_conversation_shared_eval_audio', { TOPIC: topic, CEFR_LEVEL: 'b1' });
 
-  try {
-    const response = await ai.models.generateContent({
+  const result = await callGemini(
+    { promptKey: 'generic_conversation_shared_eval_audio', model: MODELS.FLASH_LITE_PREVIEW },
+    (ai) => ai.models.generateContent({
       model: MODELS.FLASH_LITE_PREVIEW,
       contents: [
         ...history.map(msg => ({
           role: msg.role,
           parts: [{ text: msg.text }]
         })),
-        {
-          role: 'user',
-          parts: [{ text: prompt }]
-        }
+        { role: 'user', parts: [{ text: prompt }] }
       ],
       config: {
         responseMimeType: 'application/json',
@@ -509,25 +585,28 @@ export async function chatTextConversationAction(
           required: ['evaluation', 'ai_response'],
         },
       },
-    });
+    })
+  );
 
-    if (!response.text) throw new Error('No response from Gemini');
-    const result = ChatTurnSchema.parse(JSON.parse(response.text));
+  if (!result.ok || !result.data.text) return fallback;
 
-    const speech = await generateSpeechAction(result.ai_response);
-
-    return {
-      evaluation: {
-        ...result.evaluation,
-        transcribed_text: userText
-      },
-      ai_response: result.ai_response,
-      ai_audio: speech
-    };
-  } catch (error) {
-    console.error('Error in text conversation:', error);
-    throw error;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(result.data.text);
+  } catch {
+    return fallback;
   }
+
+  const validated = ChatTurnSchema.safeParse(parsed);
+  if (!validated.success) return fallback;
+
+  const speech = await generateSpeechAction(validated.data.ai_response);
+
+  return {
+    evaluation: { ...validated.data.evaluation, transcribed_text: userText },
+    ai_response: validated.data.ai_response,
+    ai_audio: speech.data ? speech : undefined,
+  };
 }
 
 /**
@@ -539,10 +618,16 @@ export async function chatConversationAction(
   history: ChatMessage[],
   topic: string
 ): Promise<ChatTurnResult> {
+  const fallback: ChatTurnResult = {
+    evaluation: { score: 0, feedback: 'Unable to evaluate. Please try again.', transcribed_text: '' },
+    ai_response: "I'm sorry, I couldn't process that. Could you try again?",
+  };
+
   const prompt = await getPrompt('generic_conversation_shared_eval_audio', { TOPIC: topic, CEFR_LEVEL: 'b1' });
 
-  try {
-    const response = await ai.models.generateContent({
+  const result = await callGemini(
+    { promptKey: 'generic_conversation_shared_eval_audio', model: MODELS.FLASH_LITE_PREVIEW },
+    (ai) => ai.models.generateContent({
       model: MODELS.FLASH_LITE_PREVIEW,
       contents: [
         ...history.map(msg => ({
@@ -576,20 +661,26 @@ export async function chatConversationAction(
           required: ['evaluation', 'ai_response'],
         },
       },
-    });
+    })
+  );
 
-    if (!response.text) throw new Error('No response from Gemini');
-    const result = ChatTurnSchema.parse(JSON.parse(response.text));
+  if (!result.ok || !result.data.text) return fallback;
 
-    const speech = await generateSpeechAction(result.ai_response);
-
-    return {
-      evaluation: result.evaluation,
-      ai_response: result.ai_response,
-      ai_audio: speech
-    };
-  } catch (error) {
-    console.error('Error in chat conversation:', error);
-    throw error;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(result.data.text);
+  } catch {
+    return fallback;
   }
+
+  const validated = ChatTurnSchema.safeParse(parsed);
+  if (!validated.success) return fallback;
+
+  const speech = await generateSpeechAction(validated.data.ai_response);
+
+  return {
+    evaluation: validated.data.evaluation,
+    ai_response: validated.data.ai_response,
+    ai_audio: speech.data ? speech : undefined,
+  };
 }

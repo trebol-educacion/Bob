@@ -1,7 +1,6 @@
 'use server';
 
 import { z } from 'zod';
-import { getAiClient } from '../_shared';
 import { MODELS } from '@/lib/models';
 import {
   CollaborativeEvaluationSchema,
@@ -12,6 +11,7 @@ import { createSupabaseServer } from '@/lib/supabase/server';
 import { persistMessage, readSessionMessages } from '@/lib/persist-activity';
 import type { PersistMessageInput } from '@/lib/persist-activity';
 import { getOrCreateCachedContent } from '@/lib/cache';
+import { callGemini, safeParseFallback } from '@/lib/gemini-client';
 
 export type Part3Scenario = {
   topic: string;
@@ -37,6 +37,24 @@ const Part3ChatResponseSchema = z.object({
   examiner_response: z.string(),
 });
 
+const ScenarioFallback: Part3Scenario = {
+  topic: 'Organising a school trip',
+  situation: 'You and a friend are planning a day trip for your class.',
+  prompt_question: 'Which of these places would be best for your class trip?',
+  options: ['the beach', 'a museum', 'a theme park', 'the countryside', 'a sports centre'],
+};
+
+const EvaluationFallback: CollaborativeEvaluation = {
+  score: 0,
+  task_achievement: 0,
+  interaction: 0,
+  grammar: 0,
+  vocabulary: 0,
+  feedback: 'Unable to evaluate at this time. Please try again.',
+  strengths: [],
+  areas_for_improvement: [],
+};
+
 async function resolveUserId(): Promise<string | null> {
   const supabase = await createSupabaseServer();
   const { data: { user } } = await supabase.auth.getUser();
@@ -52,37 +70,38 @@ async function safePersist(input: PersistMessageInput): Promise<void> {
 
 /** Generate a new B1 Collaborative scenario and persist it as setup. */
 export async function generatePart3ScenarioAction(sessionId?: string): Promise<Part3Scenario> {
-  const ai = getAiClient();
-
   const cached = await getOrCreateCachedContent<Part3Scenario>(
     { kind: 'plan', promptKey: 'cambridge-pet-p3-b1-scenario', inputs: {} },
     async () => {
-      const response = await ai.models.generateContent({
-        model: MODELS.FLASH_LITE_PREVIEW,
-        contents: [{ role: 'user', parts: [{ text: await getPrompt('cambridge_pet_p3_b1_generation') }] }],
-        config: {
-          responseMimeType: 'application/json',
-        },
-      });
+      const promptText = await getPrompt('cambridge_pet_p3_b1_generation');
+      const result = await callGemini(
+        { promptKey: 'cambridge_pet_p3_b1_generation', model: MODELS.FLASH_LITE_PREVIEW },
+        (ai) => ai.models.generateContent({
+          model: MODELS.FLASH_LITE_PREVIEW,
+          contents: [{ role: 'user', parts: [{ text: promptText }] }],
+          config: { responseMimeType: 'application/json' },
+        })
+      );
 
-      const raw = response.text ?? '';
+      if (!result.ok || !result.data.text) {
+        console.error(JSON.stringify({ event: 'generatePart3ScenarioAction', error: result.ok ? 'empty response' : result.error }));
+        return ScenarioFallback;
+      }
+
       let parsed: unknown;
       try {
-        parsed = JSON.parse(raw);
+        parsed = JSON.parse(result.data.text);
       } catch {
-        throw new Error('Gemini returned invalid JSON');
+        return ScenarioFallback;
       }
-      const result = Part3ScenarioSchema.safeParse(parsed);
-      if (!result.success) {
-        throw new Error(`Invalid scenario from AI: ${result.error.message}`);
-      }
-      return result.data;
+      return safeParseFallback(Part3ScenarioSchema, parsed, ScenarioFallback);
     },
     { storeAs: 'json' }
   );
 
   if ('error' in cached) {
-    throw new Error(cached.error);
+    console.error(JSON.stringify({ event: 'generatePart3ScenarioAction_cache', error: cached.error }));
+    return ScenarioFallback;
   }
 
   if (sessionId) {
@@ -109,8 +128,6 @@ export async function chatPart3Action(
   scenario: Part3Scenario,
   sessionId?: string
 ): Promise<{ transcribed: string; examinerResponse: string }> {
-  const ai = getAiClient();
-
   const historyText = history
     .map((h) => `${h.role === 'examiner' ? 'Examiner' : 'Candidate'}: ${h.text}`)
     .join('\n') || '(just starting)';
@@ -124,52 +141,53 @@ export async function chatPart3Action(
 
   const prompt = await getPrompt('cambridge_pet_p3_b1_partner_turn_audio');
 
-  const response = await ai.models.generateContent({
-    model: MODELS.FLASH_LITE_PREVIEW,
-    contents: [
-      {
-        role: 'user',
-        parts: [
-          { text: systemInstruction },
-          {
-            inlineData: {
-              mimeType,
-              data: audioBase64,
-            },
-          },
-          { text: prompt },
-        ],
-      },
-    ],
-    config: {
-      responseMimeType: 'application/json',
-    },
-  });
+  const result = await callGemini(
+    { promptKey: 'cambridge_pet_p3_b1_partner_turn', model: MODELS.FLASH_LITE_PREVIEW },
+    (ai) => ai.models.generateContent({
+      model: MODELS.FLASH_LITE_PREVIEW,
+      contents: [
+        {
+          role: 'user',
+          parts: [
+            { text: systemInstruction },
+            { inlineData: { mimeType, data: audioBase64 } },
+            { text: prompt },
+          ],
+        },
+      ],
+      config: { responseMimeType: 'application/json' },
+    })
+  );
 
-  const raw = response.text ?? '';
+  if (!result.ok || !result.data.text) {
+    console.error(JSON.stringify({ event: 'chatPart3Action', error: result.ok ? 'empty response' : result.error }));
+    return { transcribed: '', examinerResponse: "Let's continue. What do you think?" };
+  }
+
   let parsed: unknown;
   try {
-    parsed = JSON.parse(raw);
+    parsed = JSON.parse(result.data.text);
   } catch {
-    throw new Error('Gemini returned invalid JSON');
+    return { transcribed: '', examinerResponse: "Let's continue. What do you think?" };
   }
-  const result = Part3ChatResponseSchema.safeParse(parsed);
 
-  if (!result.success) {
-    throw new Error(`Invalid chat response from AI: ${result.error.message}`);
-  }
+  const validated = safeParseFallback(
+    Part3ChatResponseSchema,
+    parsed,
+    { transcribed: '', examiner_response: "Let's continue. What do you think?" }
+  );
 
   if (sessionId) {
     const userId = await resolveUserId();
     if (userId) {
-      await safePersist({ sessionId, userId, role: 'user', msgType: 'text', contentText: result.data.transcribed });
-      await safePersist({ sessionId, userId, role: 'bob', msgType: 'text', contentText: result.data.examiner_response });
+      await safePersist({ sessionId, userId, role: 'user', msgType: 'text', contentText: validated.transcribed });
+      await safePersist({ sessionId, userId, role: 'bob', msgType: 'text', contentText: validated.examiner_response });
     }
   }
 
   return {
-    transcribed: result.data.transcribed,
-    examinerResponse: result.data.examiner_response,
+    transcribed: validated.transcribed,
+    examinerResponse: validated.examiner_response,
   };
 }
 
@@ -180,8 +198,6 @@ export async function chatPart3TextAction(
   scenario: Part3Scenario,
   sessionId?: string
 ): Promise<{ examinerResponse: string }> {
-  const ai = getAiClient();
-
   const historyText = history
     .map((h) => `${h.role === 'examiner' ? 'Examiner' : 'Candidate'}: ${h.text}`)
     .join('\n') || '(just starting)';
@@ -199,12 +215,15 @@ The candidate just said: "${text}"
 
 Respond with ONLY your next examiner line (no labels, no quotes, under 30 words).`;
 
-  const response = await ai.models.generateContent({
-    model: MODELS.FLASH_LITE_PREVIEW,
-    contents: [{ role: 'user', parts: [{ text: prompt }] }],
-  });
+  const result = await callGemini(
+    { promptKey: 'cambridge_pet_p3_b1_partner_turn_text', model: MODELS.FLASH_LITE_PREVIEW },
+    (ai) => ai.models.generateContent({
+      model: MODELS.FLASH_LITE_PREVIEW,
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+    })
+  );
 
-  const examinerResponse = (response.text ?? '').trim();
+  const examinerResponse = result.ok ? (result.data.text ?? '').trim() : "Let's continue. What do you think?";
 
   if (sessionId) {
     const userId = await resolveUserId();
@@ -223,8 +242,6 @@ export async function evaluatePart3Action(
   scenario: Part3Scenario,
   sessionId?: string
 ): Promise<CollaborativeEvaluation> {
-  const ai = getAiClient();
-
   const historyText = history
     .map((h) => `${h.role === 'examiner' ? 'Examiner' : 'Candidate'}: ${h.text}`)
     .join('\n');
@@ -234,26 +251,28 @@ export async function evaluatePart3Action(
     HISTORY_TEXT: historyText,
   });
 
-  const response = await ai.models.generateContent({
-    model: MODELS.FLASH_LITE_PREVIEW,
-    contents: [{ role: 'user', parts: [{ text: prompt }] }],
-    config: {
-      responseMimeType: 'application/json',
-    },
-  });
+  const result = await callGemini(
+    { promptKey: 'cambridge_pet_p3_b1_evaluation', model: MODELS.FLASH_LITE_PREVIEW },
+    (ai) => ai.models.generateContent({
+      model: MODELS.FLASH_LITE_PREVIEW,
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      config: { responseMimeType: 'application/json' },
+    })
+  );
 
-  const raw = response.text ?? '';
+  if (!result.ok || !result.data.text) {
+    console.error(JSON.stringify({ event: 'evaluatePart3Action', error: result.ok ? 'empty response' : result.error }));
+    return EvaluationFallback;
+  }
+
   let parsed: unknown;
   try {
-    parsed = JSON.parse(raw);
+    parsed = JSON.parse(result.data.text);
   } catch {
-    throw new Error('Gemini returned invalid JSON');
+    return EvaluationFallback;
   }
-  const result = CollaborativeEvaluationSchema.safeParse(parsed);
 
-  if (!result.success) {
-    throw new Error(`Invalid evaluation from AI: ${result.error.message}`);
-  }
+  const evaluation = safeParseFallback(CollaborativeEvaluationSchema, parsed, EvaluationFallback);
 
   if (sessionId) {
     const userId = await resolveUserId();
@@ -263,12 +282,12 @@ export async function evaluatePart3Action(
         userId,
         role: 'bob',
         msgType: 'evaluation',
-        contentJson: result.data as unknown as Record<string, unknown>,
+        contentJson: evaluation as unknown as Record<string, unknown>,
       });
     }
   }
 
-  return result.data;
+  return evaluation;
 }
 
 /** Read persisted messages for a B1 session and hydrate into Part3ChatMessage shape. */
