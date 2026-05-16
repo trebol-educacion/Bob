@@ -394,6 +394,60 @@ export async function generateYLImageAction(
 }
 
 /**
+ * Parallel batch variant. One Server Action call → `Promise.all` of N
+ * generations + Supabase Storage uploads on the server. Returns URLs only,
+ * so payload stays tiny. Bypasses Next.js Server Action client queue, which
+ * would otherwise serialise N separate `generateYLImageAction` calls.
+ */
+export async function generateYLImagesParallelAction(
+  exam: YLExam,
+  part: number,
+  imagePrompts: string[],
+  sessionId: string,
+  characterDescription?: string
+): Promise<string[]> {
+  const supabase = await createSupabaseServer();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  return Promise.all(
+    imagePrompts.map(async (imagePrompt, idx) => {
+      const cacheInputs: Record<string, unknown> = { exam, part, imagePrompt };
+      if (characterDescription) cacheInputs.characterDescription = characterDescription;
+
+      const cached = await getOrCreateCachedContent<string>(
+        { kind: 'image', promptKey: `yl-image-${exam}-part${part}`, inputs: cacheInputs },
+        async () => {
+          const key = imageGenKey(exam, part);
+          const imagenPrompt = buildDirectImagenPrompt(imagePrompt, characterDescription);
+          const pixels = await generateImageWithFallback(key, imagenPrompt);
+          if (!pixels) throw new Error('empty image after all attempts');
+
+          const { b64: imgB64, mime } = pixels;
+          if (!user) return `data:${mime};base64,${imgB64}`;
+
+          const ext = mime.includes('jpeg') ? 'jpg' : 'png';
+          const path = `${user.id}/${sessionId}/${idx}.${ext}`;
+          const bytes = Buffer.from(imgB64, 'base64');
+          const upload = await supabase.storage
+            .from('bob-images')
+            .upload(path, bytes, { contentType: mime, upsert: true });
+          if (upload.error) {
+            console.error('[generateYLImagesParallelAction] storage upload failed:', upload.error);
+            return `data:${mime};base64,${imgB64}`;
+          }
+          const { data: pub } = supabase.storage.from('bob-images').getPublicUrl(path);
+          return pub.publicUrl;
+        },
+        { storeAs: 'blob', validate: (url) => typeof url === 'string' && url.startsWith('https://') }
+      );
+
+      if (typeof cached === 'object' && 'error' in cached) return YL_IMAGE_PLACEHOLDER;
+      return cached as string;
+    })
+  );
+}
+
+/**
  * @deprecated batched variant — kept temporarily for callers that still
  * pass an array. Internally fans out to generateYLImageAction one at a
  * time on the SERVER, but the response (array of 4 base64) is still huge

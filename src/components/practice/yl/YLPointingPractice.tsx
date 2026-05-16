@@ -14,9 +14,9 @@ import { ArrowLeft, MapPin } from 'lucide-react';
 import { ACTIVE_MODEL_LABEL } from '@/lib/models';
 import {
   startYLSessionAction,
-  generateYLImageAction,
+  generateYLImagesParallelAction,
   saveYLTurnAction,
-  persistYLImageAction,
+  persistYLImagesAction,
   saveYLFinalEvalAction,
 } from '@/actions/modes/yl';
 import type { YLExam, YLPlan } from '@/lib/types/yl';
@@ -102,19 +102,16 @@ export function YLPointingPractice({
         onSessionCreated?.(sid);
         setPlan(p);
         if (p.option_image_prompts && p.option_image_prompts.length > 0) {
-          const total = p.option_image_prompts.length;
-          await Promise.all(
-            p.option_image_prompts.map(async (prompt, idx) => {
-              const img = await generateYLImageAction(exam, part, prompt, idx, total, sid);
-              setImages((prev) => {
-                const next = [...prev];
-                next[idx] = img;
-                return next;
-              });
-              persistYLImageAction(sid, img, idx).catch((err) =>
-                console.warn('[YL] persist image', idx, 'failed:', err)
-              );
-            })
+          const urls = await generateYLImagesParallelAction(
+            exam,
+            part,
+            p.option_image_prompts,
+            sid,
+            p.character_description
+          );
+          setImages(urls);
+          persistYLImagesAction(sid, urls).catch((err) =>
+            console.warn('[YL] persist images failed:', err)
           );
         }
         setPhase('ready');

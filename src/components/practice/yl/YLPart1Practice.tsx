@@ -18,7 +18,7 @@ import { blobToBase64 } from '@/lib/audio';
 import { ACTIVE_MODEL_LABEL } from '@/lib/models';
 import {
   startYLSessionAction,
-  generateYLImagesAction,
+  generateYLImagesParallelAction,
   evaluateYLTurnAction,
   saveYLTurnAction,
   evaluateYLFinalAction,
@@ -26,6 +26,12 @@ import {
   pregenerateYLCueAudiosAction,
 } from '@/actions/modes/yl';
 import type { YLExam, YLPlan } from '@/lib/types/yl';
+
+const IMAGE_PLACEHOLDER =
+  'data:image/svg+xml,' +
+  encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400"><rect width="400" height="400" fill="#E5E7EB"/><circle cx="200" cy="160" r="48" fill="#D1D5DB"/><rect x="120" y="230" width="160" height="100" rx="12" fill="#D1D5DB"/></svg>'
+  );
 import type { EvalResponse, ModeKey } from '@/lib/types/practice';
 import { ChatShell } from '@/components/ChatShell';
 import {
@@ -167,24 +173,24 @@ export function YLPart1Practice({
         onSessionCreated?.(sid);
         setPlan(p);
 
-        const imagesPromise = p.image_prompts && p.image_prompts.length > 0
-          ? generateYLImagesAction(
-              exam,
-              part,
-              p.image_prompts,
-              p.character_description,
-              sid,
-            )
-          : Promise.resolve<string[]>([]);
-
-        const audiosPromise = p.cues && p.cues.length > 0
-          ? pregenerateYLCueAudiosAction(sid, p.cues)
-          : Promise.resolve();
-
-        const [imgs] = await Promise.all([imagesPromise, audiosPromise]);
-        if (imgs.length > 0) setImages(imgs);
+        const prompts = p.image_prompts ?? [];
+        if (prompts.length > 0) {
+          setImages(new Array(prompts.length).fill(IMAGE_PLACEHOLDER));
+        }
 
         setPhase('ready');
+
+        void pregenerateYLCueAudiosAction(sid, p.cues ?? []);
+
+        if (prompts.length > 0) {
+          void generateYLImagesParallelAction(exam, part, prompts, sid, p.character_description)
+            .then((urls) => {
+              setImages(urls);
+            })
+            .catch(() => {
+              // placeholders permanecen si falla
+            });
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Error al preparar la sesión');
       }
