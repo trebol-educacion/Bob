@@ -19,6 +19,7 @@ import {
   persistYLImagesAction,
   saveYLFinalEvalAction,
   getYLSessionPlanAction,
+  pregenerateYLCueAudiosAction,
 } from '@/actions/modes/yl';
 import type { YLExam, YLPlan } from '@/lib/types/yl';
 import type { EvalResponse, ModeKey } from '@/lib/types/practice';
@@ -208,6 +209,25 @@ export function YLPointingPractice({
             console.warn('[YL] persist images failed:', err)
           );
         }
+
+        const cuesTexts = (p.pointing_cues ?? []).map((c) => c.text);
+        const opts = p.options ?? [];
+        const reactionTexts: string[] = [];
+        for (const cue of p.pointing_cues ?? []) {
+          const target = opts[cue.target_index] ?? '';
+          if (target) reactionTexts.push(`Excellent! That's the ${target}. Well done!`);
+          for (const chosen of opts) {
+            if (!chosen || chosen === target) continue;
+            reactionTexts.push(
+              `Not quite. That's the ${chosen}. The ${target} is over there. Try the next one!`
+            );
+          }
+        }
+        const allTexts = [...cuesTexts, ...reactionTexts];
+        if (allTexts.length > 0) {
+          void pregenerateYLCueAudiosAction(sid, allTexts);
+        }
+
         setPhase('ready');
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Error preparing the session');
@@ -509,7 +529,7 @@ export function YLPointingPractice({
               text={t.reactionText}
               side="bob"
               sessionId={sessionId}
-              autoPlay={t.id === `turn-${cueIndex - 1}` || (phase === 'answered' && t.id === `turn-${cueIndex}`)}
+              autoPlay={phase === 'answered' && t.id === `turn-${cueIndex}`}
             />
           )}
         </React.Fragment>
