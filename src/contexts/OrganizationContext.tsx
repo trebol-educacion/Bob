@@ -6,9 +6,7 @@ import { createSupabaseBrowser } from '@/lib/supabase/browser-client';
 import { resolveEnabledModes } from '@/lib/modes';
 import type { ModeKey, ModeFramework, CefrLevel, DynamicCard } from '@/lib/types/practice';
 
-// ---------------------------------------------------------------------------
-// AvailableMode — a mode row fetched from bob_prompts (DB-driven)
-// ---------------------------------------------------------------------------
+/** AvailableMode — a mode row fetched from bob_prompts (DB-driven). */
 export interface AvailableMode {
   framework: ModeFramework;
   exam_part: string;
@@ -82,7 +80,7 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
   const [userRole, setUserRole] = useState<string | null>(null);
   const [accessDenialReason, setAccessDenialReason] = useState<BobAccessDenialReason | null>(null);
 
-  // Cached framework data for re-running resolveEnabledModes on level change
+  // Cached for re-running resolveEnabledModes on CEFR level change without a full re-fetch.
   const [cachedOrg, setCachedOrg] = useState<Organization | null>(null);
   const [cachedStudentFrameworks, setCachedStudentFrameworks] = useState<ModeFramework[]>([]);
   const [cachedOrgFrameworks, setCachedOrgFrameworks] = useState<ModeFramework[]>([]);
@@ -91,8 +89,8 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
     const supabase = createSupabaseBrowser();
 
     (async () => {
-      // Try session first (sync read from cookies / storage). getUser validates
-      // remotely and can return null in incognito or transient network issues.
+      // getSession reads from cookies/storage (fast); getUser validates remotely — can
+      // return null in incognito or on transient network issues, so we fall back.
       const sessionRes = await supabase.auth.getSession();
       let user = sessionRes.data.session?.user ?? null;
 
@@ -118,9 +116,6 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
         setOrganization(org);
         setCachedOrg(org);
 
-        // Parallel fetch: profile (role + CEFR), student frameworks, org frameworks,
-        // legacy availableModes (non-generic, used by current ModeSelection), and the
-        // new allDynamicCards (all rows, source of truth for B3 spec §2.2).
         const [profileResult, studentFwResult, orgFwResult, availableModesResult, allCardsResult] = await Promise.all([
           supabase
             .from('profiles')
@@ -176,7 +171,6 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
         setCefrLevelLocked(levelLocked);
         setUserRole(role);
 
-        // Access gate — don't trigger denial when profile query errored (likely transient RLS / cookie hydration)
         if (profileResult.error) {
           console.warn('[Bob access gate] profile query errored, deferring denial', profileResult.error);
           setAccessDenialReason(null);
@@ -212,8 +206,6 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
         setCachedStudentFrameworks(studentFrameworks);
         setCachedOrgFrameworks(orgFrameworks);
 
-        // Build allDynamicCards from the unfiltered query (spec §2.2).
-        // Dedup by (framework, exam_part, cefr_level); derive mode_key.
         const rawAll = (allCardsResult.data ?? []) as Array<{
           framework: string;
           exam_part: string;
@@ -249,7 +241,6 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
 
         setEnabledModes(modes);
 
-        // Deduplicate availableModes by (framework, exam_part, cefr_level) — take first row per combo
         const rawModes = (availableModesResult.data ?? []) as Array<{
           framework: string;
           exam_part: string;
@@ -300,7 +291,6 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
       throw new Error(error.message);
     }
 
-    // Optimistic update
     setCefrActiveLevelState(level);
 
     const newModes = resolveEnabledModes({

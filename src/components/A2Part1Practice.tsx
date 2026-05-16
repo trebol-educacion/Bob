@@ -21,12 +21,12 @@ type A2Phase =
   | 'finished';
 
 type QuestionStep =
-  | 'playing-question'  // TTS of question playing
-  | 'countdown'         // "Recording in 2..."
-  | 'recording'         // user is recording
-  | 'processing'        // sending to AI
-  | 'reaction'          // showing examiner reaction + TTS
-  | 'transition';       // brief pause before next
+  | 'playing-question'
+  | 'countdown'
+  | 'recording'
+  | 'processing'
+  | 'reaction'
+  | 'transition';
 
 interface QA {
   question: string;
@@ -84,7 +84,7 @@ function CefrBadge({ level }: { level: string }) {
 export function A2Part1Practice({ onBack }: A2Part1PracticeProps) {
   const [phase, setPhase] = useState<A2Phase>('loading');
   const [plan, setPlan] = useState<A2SessionPlan | null>(null);
-  const [questionIndex, setQuestionIndex] = useState(0); // 0-10 (total 11 questions)
+  const [questionIndex, setQuestionIndex] = useState(0);
   const [questionStep, setQuestionStep] = useState<QuestionStep>('playing-question');
   const [countdown, setCountdown] = useState(2);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
@@ -98,7 +98,6 @@ export function A2Part1Practice({ onBack }: A2Part1PracticeProps) {
   const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const currentAudioRef = useRef<HTMLAudioElement | null>(null);
 
-  // Build flat question list from plan
   const getAllQuestions = useCallback((p: A2SessionPlan): string[] => {
     return [
       ...p.phase1_questions,
@@ -140,7 +139,6 @@ export function A2Part1Practice({ onBack }: A2Part1PracticeProps) {
     }
   }, [stopCurrentAudio]);
 
-  // Audio recorder
   const recordedBlobRef = useRef<Blob | null>(null);
 
   const { isRecording, startRecording, stopRecording } = useAudioRecorder({
@@ -149,7 +147,6 @@ export function A2Part1Practice({ onBack }: A2Part1PracticeProps) {
     },
   });
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
       stopCurrentAudio();
@@ -157,7 +154,6 @@ export function A2Part1Practice({ onBack }: A2Part1PracticeProps) {
     };
   }, [stopCurrentAudio]);
 
-  // Initialize: generate plan and create session
   useEffect(() => {
     async function init() {
       try {
@@ -174,7 +170,6 @@ export function A2Part1Practice({ onBack }: A2Part1PracticeProps) {
     void init();
   }, []);
 
-  // Orchestrate question flow when phase or index changes
   useEffect(() => {
     if (!plan || phase === 'loading' || phase === 'evaluating' || phase === 'finished') return;
 
@@ -186,10 +181,8 @@ export function A2Part1Practice({ onBack }: A2Part1PracticeProps) {
     setQuestionStep('playing-question');
 
     void (async () => {
-      // 1. Play TTS of the question
       await playTTS(question);
 
-      // 2. Countdown
       setQuestionStep('countdown');
       setCountdown(2);
 
@@ -205,14 +198,12 @@ export function A2Part1Practice({ onBack }: A2Part1PracticeProps) {
         }, 1000);
       });
 
-      // 3. Start recording
       setQuestionStep('recording');
       setRecordingSeconds(0);
       recordedBlobRef.current = null;
 
       await startRecording();
 
-      // Auto-stop at max
       let elapsed = 0;
       recordingTimerRef.current = setInterval(() => {
         elapsed += 1;
@@ -226,12 +217,10 @@ export function A2Part1Practice({ onBack }: A2Part1PracticeProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [plan, questionIndex, phase]);
 
-  // When recording stops, process the answer
   useEffect(() => {
     if (questionStep !== 'recording') return;
-    if (isRecording) return; // still recording
+    if (isRecording) return;
 
-    // Recording just stopped
     if (recordingTimerRef.current) {
       clearInterval(recordingTimerRef.current);
       recordingTimerRef.current = null;
@@ -256,10 +245,8 @@ export function A2Part1Practice({ onBack }: A2Part1PracticeProps) {
         setCurrentReaction(reaction);
         setQuestionStep('reaction');
 
-        // Play reaction TTS
         await playTTS(reaction);
 
-        // Pause before next
         await new Promise<void>((resolve) => setTimeout(resolve, REACTION_PAUSE_MS));
 
         setQuestionStep('transition');
@@ -277,7 +264,6 @@ export function A2Part1Practice({ onBack }: A2Part1PracticeProps) {
     const nextIndex = questionIndex + 1;
 
     if (nextIndex >= questions.length) {
-      // All done — evaluate
       setPhase('evaluating');
       return;
     }
@@ -285,7 +271,6 @@ export function A2Part1Practice({ onBack }: A2Part1PracticeProps) {
     const currentPhase = getPhaseForIndex(questionIndex);
     const nextPhase = getPhaseForIndex(nextIndex);
 
-    // Show phase transition banner when moving between phases
     if (currentPhase !== nextPhase) {
       let label = '';
       if (nextPhase === 'phase2-topic1') label = `Phase 2: Topic — ${plan.topic1}`;
@@ -303,7 +288,6 @@ export function A2Part1Practice({ onBack }: A2Part1PracticeProps) {
     setPhase(nextPhase);
   }, [plan, questionIndex, getAllQuestions, getPhaseForIndex]);
 
-  // Trigger evaluation when phase is 'evaluating'
   useEffect(() => {
     if (phase !== 'evaluating') return;
 
@@ -318,7 +302,6 @@ export function A2Part1Practice({ onBack }: A2Part1PracticeProps) {
     })();
   }, [phase, qas]);
 
-  // Manual stop recording handler
   const handleManualStop = useCallback(() => {
     if (isRecording) {
       if (recordingTimerRef.current) {
@@ -353,8 +336,6 @@ export function A2Part1Practice({ onBack }: A2Part1PracticeProps) {
 
   const totalQuestions = 11;
   const progress = Math.round(((questionIndex + (questionStep === 'reaction' ? 1 : 0)) / totalQuestions) * 100);
-
-  // ── RENDER ────────────────────────────────────────────────────────────────
 
   if (error) {
     return (
@@ -403,14 +384,12 @@ export function A2Part1Practice({ onBack }: A2Part1PracticeProps) {
         animate={{ opacity: 1, y: 0 }}
         className="flex-1 overflow-y-auto p-6 max-w-2xl mx-auto w-full space-y-6"
       >
-        {/* Header */}
         <div className="text-center space-y-2">
           <CheckCircle className="mx-auto text-trebol-primary" size={48} />
           <h2 className="text-2xl font-black text-trebol-text">Interview Complete!</h2>
           <p className="text-trebol-text/60 font-medium">A2 Key — Part 1 Speaking</p>
         </div>
 
-        {/* Score */}
         <div className="bg-trebol-primary rounded-2xl p-6 text-center text-white space-y-1">
           <p className="text-sm font-bold uppercase tracking-widest opacity-80">Overall Score</p>
           <p className="text-7xl font-black">{evaluation.score}</p>
@@ -422,7 +401,6 @@ export function A2Part1Practice({ onBack }: A2Part1PracticeProps) {
           )}
         </div>
 
-        {/* Sub-scores */}
         <div className="bg-white rounded-2xl p-5 shadow-sm space-y-4">
           <h3 className="font-black text-trebol-text">Skill Breakdown</h3>
           <ScoreBar label="Grammar" value={evaluation.grammar} />
@@ -430,13 +408,11 @@ export function A2Part1Practice({ onBack }: A2Part1PracticeProps) {
           <ScoreBar label="Fluency" value={evaluation.fluency} />
         </div>
 
-        {/* Feedback */}
         <div className="bg-white rounded-2xl p-5 shadow-sm space-y-2">
           <h3 className="font-black text-trebol-text">Examiner Feedback</h3>
           <p className="text-trebol-text/80 text-sm leading-relaxed">{evaluation.feedback}</p>
         </div>
 
-        {/* Strengths */}
         {evaluation.strengths.length > 0 && (
           <div className="bg-white rounded-2xl p-5 shadow-sm space-y-3">
             <h3 className="font-black text-trebol-text text-green-700">Strengths</h3>
@@ -451,7 +427,6 @@ export function A2Part1Practice({ onBack }: A2Part1PracticeProps) {
           </div>
         )}
 
-        {/* Areas for improvement */}
         {evaluation.areas_for_improvement.length > 0 && (
           <div className="bg-white rounded-2xl p-5 shadow-sm space-y-3">
             <h3 className="font-black text-trebol-text text-amber-700">Areas to Improve</h3>
@@ -466,7 +441,6 @@ export function A2Part1Practice({ onBack }: A2Part1PracticeProps) {
           </div>
         )}
 
-        {/* Actions */}
         <div className="flex gap-3 pb-4">
           <button
             onClick={handleTryAgain}
@@ -485,13 +459,10 @@ export function A2Part1Practice({ onBack }: A2Part1PracticeProps) {
     );
   }
 
-  // ── INTERVIEW PHASE UI ────────────────────────────────────────────────────
-
   const questionNumber = questionIndex + 1;
 
   return (
     <div className="flex-1 flex flex-col min-h-0">
-      {/* Toolbar */}
       <div className="flex items-center gap-4 px-4 py-3 border-b border-trebol-border bg-white shrink-0">
         <button
           onClick={onBack}
@@ -508,7 +479,6 @@ export function A2Part1Practice({ onBack }: A2Part1PracticeProps) {
         </div>
       </div>
 
-      {/* Progress bar */}
       <div className="h-1.5 bg-trebol-border shrink-0">
         <motion.div
           animate={{ width: `${progress}%` }}
@@ -517,10 +487,8 @@ export function A2Part1Practice({ onBack }: A2Part1PracticeProps) {
         />
       </div>
 
-      {/* Content */}
       <div className="flex-1 flex flex-col items-center justify-center p-6 gap-8 overflow-hidden">
         <AnimatePresence mode="wait">
-          {/* Phase transition banner */}
           {phaseTransition && (
             <motion.div
               key="phase-banner"
@@ -536,7 +504,6 @@ export function A2Part1Practice({ onBack }: A2Part1PracticeProps) {
             </motion.div>
           )}
 
-          {/* Question card */}
           <motion.div
             key={`question-${questionIndex}`}
             initial={{ opacity: 0, y: 16 }}
@@ -556,7 +523,6 @@ export function A2Part1Practice({ onBack }: A2Part1PracticeProps) {
             </div>
           </motion.div>
 
-          {/* Status area */}
           <motion.div
             key={`status-${questionStep}`}
             initial={{ opacity: 0 }}

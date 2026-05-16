@@ -62,7 +62,6 @@ export function useCountdown({ seconds, onComplete }: UseCountdownOptions) {
     setRemaining(seconds);
   }, [seconds, stop]);
 
-  // Cleanup on unmount
   useEffect(() => () => {
     if (intervalRef.current) clearInterval(intervalRef.current);
   }, []);

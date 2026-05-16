@@ -35,10 +35,6 @@ type AppState =
   | 'exam-practicing'
   | 'dashboard';
 
-// ---------------------------------------------------------------------------
-// YL mode routing
-// ---------------------------------------------------------------------------
-
 /** All 9 Cambridge A1 Young Learners mode keys. */
 const YL_MODES = new Set<ModeKey>([
   'cambridge_starters_part1',
@@ -310,7 +306,6 @@ export default function App() {
                 exit={{ opacity: 0 }}
                 className="flex-1 flex flex-col min-h-0"
               >
-                {/* Cambridge YL (A1) — dispatched via MODE_COMPONENT_MAP */}
                 {YL_MODES.has(mode) && MODE_COMPONENT_MAP[mode]?.({
                   onBack: onFinish,
                   sessionId: activeSessionId ?? undefined,

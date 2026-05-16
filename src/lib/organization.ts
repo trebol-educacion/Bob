@@ -17,7 +17,6 @@ export interface Organization {
 export async function getOrganizationForUser(userId: string): Promise<Organization | null> {
   const supabase = createSupabaseBrowser();
 
-  // 1. Buscar profile del usuario (profiles.id = auth.users.id)
   const { data: profile } = await supabase
     .from('profiles')
     .select('organization_id')
@@ -26,7 +25,6 @@ export async function getOrganizationForUser(userId: string): Promise<Organizati
 
   if (!profile?.organization_id) return null;
 
-  // 2. Cargar organización
   const { data: org } = await supabase
     .from('organizations')
     .select(

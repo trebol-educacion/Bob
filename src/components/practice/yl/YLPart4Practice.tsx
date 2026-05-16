@@ -43,10 +43,6 @@ import {
   YLReadOnlyMessage,
 } from './_shared';
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
 type Phase =
   | 'loading'
   | 'ready'
@@ -75,10 +71,6 @@ export interface YLPart4PracticeProps {
   initialMessages?: BobMessageShape[];
   onSessionCreated?: (sessionId: string) => void;
 }
-
-// ---------------------------------------------------------------------------
-// Component
-// ---------------------------------------------------------------------------
 
 export function YLPart4Practice({
   exam,
@@ -119,8 +111,6 @@ export function YLPart4Practice({
     };
   }, []);
 
-  // ── Init ──────────────────────────────────────────────────────────────────
-
   useEffect(() => {
     if (isReadOnly) return;
 
@@ -130,7 +120,6 @@ export function YLPart4Practice({
         setSessionId(sid);
         onSessionCreated?.(sid);
         setPlan(p);
-        // No images for personal questions
         setPhase('ready');
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Error al preparar la sesión');
@@ -139,8 +128,6 @@ export function YLPart4Practice({
 
     void init();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // ── Turn orchestration ────────────────────────────────────────────────────
 
   const runTurn = useCallback(
     async (idx: number) => {
@@ -190,7 +177,6 @@ export function YLPart4Practice({
     }
   }, [phase, plan, runTurn]);
 
-  // When recording stops → process
   useEffect(() => {
     if (phase !== 'recording') return;
     if (isRecording) return;
@@ -249,7 +235,6 @@ export function YLPart4Practice({
     })();
   }, [isRecording, phase]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Final evaluation
   useEffect(() => {
     if (phase !== 'evaluating' || !sessionId || !plan) return;
 
@@ -277,8 +262,6 @@ export function YLPart4Practice({
       stopRecording();
     }
   }, [isRecording, stopRecording]);
-
-  // ── Labels & header config ─────────────────────────────────────────────────
 
   const partLabel = (() => {
     if (exam === 'starters' && part === 4) return 'Starters Part 4 — Preguntas personales';
@@ -317,8 +300,6 @@ export function YLPart4Practice({
       {partBadgeLabel}
     </span>
   );
-
-  // ── Renders ───────────────────────────────────────────────────────────────
 
   if (error) return <YLErrorScreen error={error} onBack={onBack} />;
   if (phase === 'loading') return <YLLoadingScreen message="Preparando tus preguntas..." />;
@@ -367,7 +348,6 @@ export function YLPart4Practice({
     );
   }
 
-  // Active practice — no images, just a friendly avatar area
   const progressBar = (
     <div className="w-20 h-1.5 bg-gray-100 rounded-full overflow-hidden">
       <motion.div
@@ -386,7 +366,6 @@ export function YLPart4Practice({
       animationKey={`yl-part${part}`}
     >
       <div className="flex flex-col items-center justify-center gap-6 py-4">
-        {/* Bob avatar placeholder */}
         <motion.div
           animate={phase === 'playing-cue' ? { scale: [1, 1.05, 1] } : {}}
           transition={{ repeat: Infinity, duration: 1.5 }}
@@ -395,7 +374,6 @@ export function YLPart4Practice({
           <User size={40} className="text-amber-600" />
         </motion.div>
 
-        {/* Examiner cue */}
         <AnimatePresence mode="wait">
           <motion.div
             key={`cue-${cueIndex}`}
@@ -408,7 +386,6 @@ export function YLPart4Practice({
           </motion.div>
         </AnimatePresence>
 
-        {/* Status area */}
         <AnimatePresence mode="wait">
           <motion.div
             key={`status-${phase}`}

@@ -19,8 +19,6 @@ import { createSupabaseBrowser } from '@/lib/supabase/browser-client';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
 import { getScoreColor } from '@/lib/score';
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
 export type ChatPhase =
   | 'topic-input'
   | 'image-config'
@@ -36,8 +34,6 @@ export type ChatMsg = {
   role: 'bob' | 'user';
   content: React.ReactNode;
 };
-
-// ─── Shared render helpers ────────────────────────────────────────────────────
 
 export function renderEvaluationContent(
   score: number,
@@ -123,8 +119,6 @@ export function restoreMessages(stored: StoredMessage[]): ChatMsg[] {
   });
 }
 
-// ─── Hook interface ───────────────────────────────────────────────────────────
-
 export interface UsePracticeChatProps {
   mode: 'situation' | 'image';
   onBack: () => void;
@@ -135,7 +129,6 @@ export interface UsePracticeChatProps {
 }
 
 export interface UsePracticeChatReturn {
-  // State
   phase: ChatPhase;
   messages: ChatMsg[];
   topic: string;
@@ -146,9 +139,7 @@ export interface UsePracticeChatReturn {
   currentResult: EvaluationResult | null;
   isRecording: boolean;
   saveError: string | null;
-  // Setters needed by sub-components
   setInputText: (v: string) => void;
-  // Handlers
   handleTopicSubmit: () => Promise<void>;
   handleNextImage: (config?: SceneConfig) => Promise<void>;
   handleAudioStart: () => Promise<void>;
@@ -157,14 +148,10 @@ export interface UsePracticeChatReturn {
   handleRetry: () => void;
   handleListen: (text: string) => Promise<void>;
   handleImageConfig: (config: SceneConfig) => Promise<void>;
-  // Refs needed by JSX
   messagesEndRef: React.RefObject<HTMLDivElement | null>;
-  // Props passthrough
   mode: 'situation' | 'image';
   onBack: () => void;
 }
-
-// ─── Hook ─────────────────────────────────────────────────────────────────────
 
 export function usePracticeChat({
   mode,
@@ -233,19 +220,15 @@ export function usePracticeChat({
   const greetingAddedRef = useRef(false);
   const sessionIdRef = useRef<string | null>(sessionId ?? null);
 
-  // Sync sessionId prop → ref
   useEffect(() => {
     if (sessionId) sessionIdRef.current = sessionId;
   }, [sessionId]);
 
-  // Scroll to bottom on new messages
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // ── Audio recorder ────────────────────────────────────────────────────────
-
-  // Stable ref so useAudioRecorder never captures a stale callback
+  // Stable ref so useAudioRecorder never captures a stale handleAudioRecorded closure.
   const onRecordedRef = useRef<(blob: Blob) => void>(() => {});
 
   const { isRecording, startRecording: startRecordingHook, stopRecording } = useAudioRecorder({
@@ -262,8 +245,6 @@ export function usePracticeChat({
     }, []),
   });
 
-  // ── Message helpers ───────────────────────────────────────────────────────
-
   const addBobMessage = (content: React.ReactNode) => {
     setMessages(prev => [...prev, { id: crypto.randomUUID(), role: 'bob', content }]);
   };
@@ -279,12 +260,9 @@ export function usePracticeChat({
     if (error) {
       console.error('[saveMsg] failed:', error, 'msg_type:', input.msg_type);
       setSaveError(`Error saving message (${input.msg_type})`);
-      // Auto-clear after 4 seconds
       setTimeout(() => setSaveError(null), 4000);
     }
   };
-
-  // ── Render helpers (phrase / scene / result) ──────────────────────────────
 
   const renderPhrase = (phrase: string, index: number, total: number) => (
     <div className="space-y-3">
@@ -320,8 +298,6 @@ export function usePracticeChat({
     </div>
   );
 
-  // ── Initial greeting ──────────────────────────────────────────────────────
-
   useEffect(() => {
     if (isHistory || greetingAddedRef.current) return;
     greetingAddedRef.current = true;
@@ -355,8 +331,6 @@ export function usePracticeChat({
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // ── Handlers ──────────────────────────────────────────────────────────────
 
   const handleListen = async (text: string) => {
     try {
@@ -521,7 +495,6 @@ export function usePracticeChat({
     }
   };
 
-  // Keep the ref in sync so the hook always calls the latest version
   onRecordedRef.current = handleAudioRecorded;
 
   const handleAudioStart = async () => {

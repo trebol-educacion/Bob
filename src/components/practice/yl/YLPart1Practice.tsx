@@ -45,19 +45,15 @@ import {
   YLChatMicBar,
 } from './_shared';
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
 type Phase =
   | 'loading'
   | 'ready'
-  | 'cue-ready'      // cue text visible, alumno decides cuando escuchar o hablar
-  | 'playing-cue'    // TTS in flight
-  | 'recording'      // alumno grabando
-  | 'processing'     // upload + eval
-  | 'reaction-ready' // reacción visible, alumno decide cuándo seguir
-  | 'evaluating'     // eval final
+  | 'cue-ready'
+  | 'playing-cue'
+  | 'recording'
+  | 'processing'
+  | 'reaction-ready'
+  | 'evaluating'
   | 'finished';
 
 interface BobMessageShape {
@@ -77,10 +73,6 @@ export interface YLPart1PracticeProps {
   onSessionCreated?: (sessionId: string) => void;
 }
 
-// ---------------------------------------------------------------------------
-// Component
-// ---------------------------------------------------------------------------
-
 export function YLPart1Practice({
   exam,
   part,
@@ -91,7 +83,6 @@ export function YLPart1Practice({
 }: YLPart1PracticeProps) {
   const mode: ModeKey = `cambridge_${exam}_part${part}` as ModeKey;
 
-  // Read-only history mode
   const isReadOnly = !!initialMessages && initialMessages.length > 0;
 
   const [phase, setPhase] = useState<Phase>(isReadOnly ? 'finished' : 'loading');
@@ -118,15 +109,12 @@ export function YLPart1Practice({
     },
   });
 
-  // Cleanup
   useEffect(() => {
     return () => {
       stopCurrentAudio();
       if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
     };
   }, []);
-
-  // ── Init ──────────────────────────────────────────────────────────────────
 
   const initStartedRef = useRef(false);
   useEffect(() => {
@@ -190,8 +178,6 @@ export function YLPart1Practice({
     void init();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Turn orchestration ────────────────────────────────────────────────────
-
   const loadCue = useCallback(
     (idx: number) => {
       if (!plan) return;
@@ -203,14 +189,11 @@ export function YLPart1Practice({
     [plan]
   );
 
-  // Show the first cue when ready (no auto-play, no auto-record)
   useEffect(() => {
     if (phase === 'ready' && plan) {
       loadCue(0);
     }
   }, [phase, plan, loadCue]);
-
-  // User-driven actions — audio playback is owned per-bubble by YLVoiceNote.
 
   const handleStartRecording = useCallback(async () => {
     stopCurrentAudio();
@@ -257,7 +240,6 @@ export function YLPart1Practice({
     }
   }, [cueIndex, plan, loadCue]);
 
-  // When recording stops → process
   useEffect(() => {
     if (phase !== 'recording') return;
     if (isRecording) return;
@@ -289,7 +271,6 @@ export function YLPart1Practice({
           cueIndex,
         });
 
-        // Save turn
         await saveYLTurnAction(sessionId!, {
           cue: currentCue,
           cueIndex,
@@ -303,7 +284,6 @@ export function YLPart1Practice({
         setCurrentReaction(evalResult.reaction);
         setPhase('reaction-ready');
 
-        // Play once automatically; alumno can replay or advance manually.
         void playTTS(evalResult.reaction);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Error procesando respuesta');
@@ -311,7 +291,6 @@ export function YLPart1Practice({
     })();
   }, [isRecording, phase]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Trigger final evaluation
   useEffect(() => {
     if (phase !== 'evaluating' || !sessionId || !plan) return;
 
@@ -330,8 +309,6 @@ export function YLPart1Practice({
     })();
   }, [phase, sessionId, plan, mode]);
 
-
-  // ── Labels & header config ─────────────────────────────────────────────────
 
   const partLabel =
     exam === 'starters'
@@ -362,25 +339,17 @@ export function YLPart1Practice({
     </span>
   );
 
-  // ── Render: error ─────────────────────────────────────────────────────────
-
   if (error) {
     return <YLErrorScreen error={error} onBack={onBack} />;
   }
-
-  // ── Render: loading ───────────────────────────────────────────────────────
 
   if (phase === 'loading') {
     return <YLLoadingScreen message="Getting your practice ready…" />;
   }
 
-  // ── Render: evaluating ────────────────────────────────────────────────────
-
   if (phase === 'evaluating') {
     return <YLLoadingScreen message="Calculating your final score…" />;
   }
-
-  // ── Render: finished — read-only history ──────────────────────────────────
 
   if (phase === 'finished' && isReadOnly) {
     return (
@@ -403,8 +372,6 @@ export function YLPart1Practice({
     );
   }
 
-  // ── Render: finished — results ────────────────────────────────────────────
-
   if (phase === 'finished' && finalEval) {
     return (
       <motion.div
@@ -426,8 +393,6 @@ export function YLPart1Practice({
       </motion.div>
     );
   }
-
-  // ── Render: active practice (chat-style) ─────────────────────────────────
 
   type ChatItem =
     | { kind: 'image'; id: string; src: string }

@@ -18,7 +18,7 @@ export async function createSupabaseServer() {
               cookieStore.set(name, value, options)
             )
           } catch {
-            // Ignorado en Server Components — middleware se encarga
+            // Intentionally ignored in Server Components — middleware handles cookie writes.
           }
         },
       },

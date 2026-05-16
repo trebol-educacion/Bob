@@ -34,7 +34,6 @@ export function useAudioRecorder({
   const audioChunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
       if (streamRef.current) {
@@ -62,7 +61,6 @@ export function useAudioRecorder({
       };
 
       mediaRecorder.onstop = () => {
-        // Release the stream
         stream.getTracks().forEach((track) => track.stop());
         streamRef.current = null;
 

@@ -7,7 +7,8 @@ interface UseQuestionsFlowReturn {
   questionAnswers: Record<number, EvaluationResult>;
   setQuestions: (questions: Question[]) => void;
   recordAnswer: (index: number, result: EvaluationResult) => void;
-  advanceQuestion: () => boolean; // returns true if there are more questions
+  /** Returns true if there are more questions remaining. */
+  advanceQuestion: () => boolean;
 }
 
 export function useQuestionsFlow(): UseQuestionsFlowReturn {

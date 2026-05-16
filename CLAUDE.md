@@ -69,7 +69,7 @@ Hay **un único hilo de verdad**: `.sdd/bob-core/`.
 - `bob-core` **absorbe** `.sdd/bob-dynamic-modes/` (catálogo dinámico desde
   `bob_prompts`; eliminar `MODE_CATALOG`; `PracticeMode → string`).
 - `bob-core` **reconcilia** `.sdd/bob-a1-yl/` (su trabajo NO se tira: los
-  prompts YL ya están en BD por la migración `20260514_bob_a1_yl.sql` y los
+  prompts YL ya están en BD por la migración `04_seed_bob_a1_yl.sql` y los
   componentes `src/components/practice/yl/` se conservan; solo se elimina la
   parte que metió YL en `MODE_CATALOG` hardcoded).
 - **`bob-a1-yl` y `bob-dynamic-modes` están SUPERSEDED.** No los ejecutes por
@@ -119,6 +119,34 @@ estas, **para y avisa a la desarrolladora**. No "interpretes" alrededor.
     NO se regenera con LLM si existe versión oficial. Aplicable a Cambridge
     (specs `.docx`, vocabulary list, sample tests) y TOEFL (audios `.ogg`
     pre-generados, Practice Test 1 con keys, rúbricas PDF oficiales).
+13. **Sin comentarios inline en el código.** Documentación solo vía:
+    - **JSDoc** (`/** ... */`) encima de funciones, clases, tipos,
+      interfaces o constantes **exportadas**. Una o dos líneas; nada de
+      novelas.
+    - **Bloque corto y digno** (`//` o `/* */`) **solo si explica un WHY
+      no-obvio** (constraint oculto, workaround, decisión arquitectónica
+      que no se deduce del código). Máximo 1-2 líneas.
+
+    Prohibidos sin excepción:
+    - Comentarios al final de la línea de código (`const x = 5; // ...`).
+    - `//` que reformulan QUÉ hace el código (eso ya lo dice el código).
+    - Bloques de banner `// ----------------------- SECCIÓN --------------------`.
+    - Comentarios "checkpoint" tipo `// TODO without ticket`, `// FIXME`,
+      `// NOTE` sueltos sin contexto.
+    - Cualquier comentario en español dentro de código TS/TSX
+      (excepción: prompts pedagógicos en `bob_prompts` que sí van en
+      español/inglés según el idioma del alumno).
+
+    Si dudás, no lo escribas. Si lo escribiste y no añade información que
+    el código no transmite por sí mismo, borralo.
+14. **Nombres de migraciones Supabase: `NN_<funcionalidad>.sql`** con
+    correlativo de dos dígitos empezando en `01_` y un slug en
+    `snake_case` que describa la funcionalidad. Ejemplos válidos:
+    `01_create_bob_sessions.sql`, `02_create_bob_messages.sql`,
+    `03_extend_bob_sessions_mode.sql`, `04_seed_bob_a1_yl.sql`. Prohibido
+    usar timestamps (`20260512000000_...`) o nombres sin correlativo. El
+    siguiente número es **el inmediatamente posterior al mayor existente**
+    en `supabase/migrations/`; no saltar números, no reutilizar.
 
 ---
 

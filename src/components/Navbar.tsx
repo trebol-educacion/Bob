@@ -33,7 +33,6 @@ export function Navbar({ userEmail, onOpenDashboard }: NavbarProps) {
       className="w-full px-6 py-3 shadow-md bg-bob-brand"
     >
       <div className="flex items-center justify-between">
-        {/* Logo */}
         {organization?.logo_url ? (
           <img
             src={organization.logo_url}
@@ -48,7 +47,6 @@ export function Navbar({ userEmail, onOpenDashboard }: NavbarProps) {
           />
         )}
 
-        {/* User menu */}
         <div className="relative">
           <button
             onClick={() => setOpen((v) => !v)}
@@ -66,7 +64,6 @@ export function Navbar({ userEmail, onOpenDashboard }: NavbarProps) {
           <AnimatePresence>
             {open && (
               <>
-                {/* Backdrop */}
                 <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
                 <motion.div
                   initial={{ opacity: 0, scale: 0.95, y: -8 }}

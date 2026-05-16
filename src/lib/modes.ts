@@ -48,7 +48,6 @@ export function resolveEnabledModes({
         if (studentActiveCefr === null) return false;
         return card.cefr_level === studentActiveCefr;
       }
-      // Non-generic
       if (studentActiveCefr === null) return false;
       if (!(effectiveFrameworks as string[]).includes(card.framework)) return false;
       return card.cefr_level === studentActiveCefr;

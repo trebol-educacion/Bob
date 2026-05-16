@@ -20,10 +20,6 @@ import { MODE_UI_METADATA } from '@/lib/types/practice';
 import { CefrLevelSelector } from '@/components/CefrLevelSelector';
 import type { AvailableMode } from '@/contexts/OrganizationContext';
 
-// ---------------------------------------------------------------------------
-// Icon resolver — maps lucide icon name string → JSX element
-// ---------------------------------------------------------------------------
-
 const ICON_MAP: Record<string, React.FC<{ size?: number; className?: string }>> = {
   MessageSquare,
   Image: ImageIcon,
@@ -47,18 +43,10 @@ function resolveIcon(name: string, size = 28, className?: string): React.ReactNo
   return <Sparkles size={size} className={className} />;
 }
 
-// ---------------------------------------------------------------------------
-// Friendly section names for frameworks
-// ---------------------------------------------------------------------------
-
 const FRAMEWORK_SECTION: Record<string, string> = {
   cambridge: 'Cambridge English',
   toefl: 'TOEFL iBT',
 };
-
-// ---------------------------------------------------------------------------
-// Sub-components
-// ---------------------------------------------------------------------------
 
 interface ModeCardProps {
   mode: ModeKey;
@@ -107,10 +95,6 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
   );
 }
 
-// ---------------------------------------------------------------------------
-// ModeSelection props
-// ---------------------------------------------------------------------------
-
 interface ModeSelectionProps {
   onSelect: (mode: PracticeMode) => void;
   enabledModes?: PracticeMode[];
@@ -121,17 +105,12 @@ interface ModeSelectionProps {
   onCefrChange?: (level: CefrLevel) => void;
 }
 
-// ---------------------------------------------------------------------------
-// Main component
-// ---------------------------------------------------------------------------
-
 export const ModeSelection = forwardRef<HTMLDivElement, ModeSelectionProps>(function ModeSelection(
   { onSelect, enabledModes = [], availableModes = [], cefrActiveLevel = null, cefrLevelLocked = false, onCefrChange },
   selectorRef
 ) {
   const iconClass = 'text-trebol-primary group-hover:text-white transition-colors';
 
-  // Separate generic modes from framework modes
   const genericEnabled = enabledModes.filter(
     (m): m is ModeKey => m !== null && (m as string).startsWith('generic_')
   );
@@ -152,16 +131,13 @@ export const ModeSelection = forwardRef<HTMLDivElement, ModeSelectionProps>(func
     if (!availableModeIndex.has(key)) availableModeIndex.set(key, am);
   }
 
-  // Group framework modes by their section name
   const sectionMap = new Map<string, ModeKey[]>();
   for (const mode of frameworkEnabled) {
     const meta = MODE_UI_METADATA[mode];
-    // Determine section name: prefer metadata, then derive from framework prefix, then fallback
     let sectionName: string;
     if (meta?.section) {
       sectionName = meta.section;
     } else {
-      // Derive framework from mode key prefix (e.g. 'cambridge_...' → 'cambridge')
       const framework = (mode as string).split('_')[0];
       sectionName = FRAMEWORK_SECTION[framework] ?? 'Other';
     }
@@ -170,7 +146,6 @@ export const ModeSelection = forwardRef<HTMLDivElement, ModeSelectionProps>(func
     sectionMap.set(sectionName, existing);
   }
 
-  // Render a single card for a framework mode
   function renderFrameworkCard(mode: ModeKey) {
     const meta = MODE_UI_METADATA[mode];
     const amFallback = availableModeIndex.get(mode as string);
@@ -189,7 +164,6 @@ export const ModeSelection = forwardRef<HTMLDivElement, ModeSelectionProps>(func
       );
     }
 
-    // Fallback: use availableModes data or generic presentation
     const title = amFallback?.label ?? mode;
     const description = amFallback?.description ?? '';
     const cefrBadge = amFallback?.cefr_level
@@ -220,7 +194,6 @@ export const ModeSelection = forwardRef<HTMLDivElement, ModeSelectionProps>(func
         </p>
       </div>
 
-      {/* CEFR Level Selector */}
       <div ref={selectorRef} className="flex justify-center">
         <CefrLevelSelector
           value={cefrActiveLevel}
@@ -230,7 +203,6 @@ export const ModeSelection = forwardRef<HTMLDivElement, ModeSelectionProps>(func
         />
       </div>
 
-      {/* Free Practice — shown only when no framework modes are active */}
       {showFreePractice && (
         <div>
           <SectionTitle>Free Practice</SectionTitle>
@@ -260,7 +232,6 @@ export const ModeSelection = forwardRef<HTMLDivElement, ModeSelectionProps>(func
         </div>
       )}
 
-      {/* Dynamic framework sections */}
       {Array.from(sectionMap.entries()).map(([sectionName, modes]) => (
         <div key={sectionName}>
           <SectionTitle>{sectionName}</SectionTitle>

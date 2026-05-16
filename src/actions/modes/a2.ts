@@ -51,7 +51,6 @@ export async function processA2AnswerAction(
 ): Promise<{ transcribed: string; reaction: string }> {
   const ai = getAiClient();
 
-  // Step 1: Transcribe the audio
   const transcribeResponse = await ai.models.generateContent({
     model: MODELS.FLASH_LITE_PREVIEW,
     contents: [
@@ -74,13 +73,11 @@ export async function processA2AnswerAction(
 
   const transcribed = (transcribeResponse.text ?? '').trim();
 
-  // Step 2: Generate examiner reaction based on transcribed answer
   const reactionResponse = await ai.models.generateContent({
     model: MODELS.FLASH_LITE_PREVIEW,
     contents: [
       {
         role: 'user',
-        // Use rubric helper to generate a brief model-answer acknowledgement
         parts: [{ text: await getPrompt('cambridge_ket_a2_rubric_helper', { QUESTION: question }) }],
       },
     ],

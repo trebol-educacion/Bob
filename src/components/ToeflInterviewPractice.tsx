@@ -15,8 +15,6 @@ import {
 } from '@/actions/modes/toefl_interview';
 import type { ToeflEvaluation } from '@/lib/types/practice';
 
-// ── Types ──────────────────────────────────────────────────────────────────────
-
 type InterviewPhase =
   | 'loading'
   | 'intro'
@@ -33,8 +31,6 @@ type QuestionSubPhase =
 
 const PREP_SECONDS = 5;
 const RECORD_SECONDS = 45;
-
-// ── Helpers ────────────────────────────────────────────────────────────────────
 
 function scoreColor(score: number): string {
   if (score >= 4) return 'text-green-600';
@@ -79,13 +75,9 @@ function ProgressBar({ value, max = 5 }: { value: number; max?: number }) {
   );
 }
 
-// ── Props ──────────────────────────────────────────────────────────────────────
-
 interface ToeflInterviewPracticeProps {
   onBack: () => void;
 }
-
-// ── Component ──────────────────────────────────────────────────────────────────
 
 export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) {
   const [phase, setPhase] = useState<InterviewPhase>('loading');
@@ -101,7 +93,6 @@ export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) 
   const autoStartedRef = useRef(false);
   const sessionCreatedRef = useRef(false);
 
-  // ── Countdown for prep phase (5s) ──────────────────────────────────────────
   const prepCountdown = useCountdown({
     seconds: PREP_SECONDS,
     onComplete: useCallback(() => {
@@ -109,7 +100,6 @@ export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) 
     }, []),
   });
 
-  // ── Countdown for recording phase (45s) ────────────────────────────────────
   const recordCountdown = useCountdown({
     seconds: RECORD_SECONDS,
     onComplete: useCallback(() => {
@@ -118,7 +108,6 @@ export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) 
     }, []),
   });
 
-  // ── Audio recorder ─────────────────────────────────────────────────────────
   const { isRecording, startRecording, stopRecording } = useAudioRecorder({
     onRecorded: (blob) => {
       recordedBlobRef.current = blob;
@@ -130,7 +119,6 @@ export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) 
     },
   });
 
-  // ── Loading phase ──────────────────────────────────────────────────────────
   useEffect(() => {
     let cancelled = false;
     async function load() {
@@ -150,7 +138,6 @@ export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) 
     return () => { cancelled = true; };
   }, []);
 
-  // ── Create session on intro start ──────────────────────────────────────────
   const handleStart = useCallback(async () => {
     if (!plan) return;
     if (!sessionCreatedRef.current) {
@@ -167,7 +154,6 @@ export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) 
     autoStartedRef.current = false;
   }, [plan]);
 
-  // ── Reading sub-phase: auto-play TTS ──────────────────────────────────────
   useEffect(() => {
     if (phase !== 'question' || subPhase !== 'reading') return;
     if (!plan) return;
@@ -212,14 +198,12 @@ export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, subPhase, currentIndex]);
 
-  // ── Prep sub-phase: start prep countdown ──────────────────────────────────
   useEffect(() => {
     if (phase !== 'question' || subPhase !== 'prep') return;
     prepCountdown.start();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, subPhase]);
 
-  // ── Recording sub-phase: auto-start recording ─────────────────────────────
   useEffect(() => {
     if (phase !== 'question' || subPhase !== 'recording') {
       autoStartedRef.current = false;
@@ -234,7 +218,6 @@ export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, subPhase]);
 
-  // ── Evaluating sub-phase ───────────────────────────────────────────────────
   useEffect(() => {
     if (phase !== 'question' || subPhase !== 'evaluating') return;
     if (!recordedBlobRef.current || !plan) return;
@@ -271,7 +254,6 @@ export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, subPhase]);
 
-  // ── Handlers ───────────────────────────────────────────────────────────────
   const handleStopRecording = useCallback(() => {
     recordCountdown.stop();
     stopRecording();
@@ -303,7 +285,6 @@ export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) 
     sessionCreatedRef.current = false;
   }, []);
 
-  // ── Computed aggregates ────────────────────────────────────────────────────
   const avgScore = evaluations.length > 0
     ? evaluations.reduce((s, e) => s + e.score, 0) / evaluations.length
     : 0;
@@ -317,11 +298,9 @@ export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) 
     ? evaluations.reduce((s, e) => s + e.grammar, 0) / evaluations.length
     : 0;
 
-  // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="flex-1 flex flex-col min-h-0 overflow-auto bg-trebol-bg">
 
-      {/* Header */}
       <div className="sticky top-0 z-10 bg-trebol-bg/90 backdrop-blur-sm border-b border-trebol-border px-4 py-3 flex items-center gap-3">
         <button
           onClick={onBack}
@@ -344,10 +323,8 @@ export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) 
         )}
       </div>
 
-      {/* Body */}
       <div className="flex-1 flex flex-col items-center justify-center p-6 max-w-2xl mx-auto w-full">
 
-        {/* ── Loading ── */}
         {phase === 'loading' && (
           <div className="flex flex-col items-center gap-4 text-center">
             <div className="w-12 h-12 border-4 border-trebol-primary border-t-transparent rounded-full animate-spin" />
@@ -356,7 +333,6 @@ export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) 
           </div>
         )}
 
-        {/* ── Intro ── */}
         {phase === 'intro' && plan && (
           <div className="flex flex-col items-center gap-6 text-center w-full">
             <div className="bg-trebol-secondary/10 p-5 rounded-full">
@@ -392,11 +368,9 @@ export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) 
           </div>
         )}
 
-        {/* ── Question flow ── */}
         {phase === 'question' && plan && (
           <div className="flex flex-col items-center gap-6 w-full">
 
-            {/* Progress dots */}
             <div className="flex gap-2">
               {plan.questions.map((_, i) => (
                 <div
@@ -412,21 +386,16 @@ export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) 
               ))}
             </div>
 
-            {/* Difficulty badge */}
             <span className="text-xs font-bold uppercase tracking-widest text-trebol-text/40">
               {difficultyLabel(plan.questions[currentIndex].difficulty)}
             </span>
 
-            {/* Question card */}
             <div className="bg-white rounded-2xl border border-trebol-border shadow-sm p-6 w-full text-center">
               <p className="text-xl font-black text-trebol-text leading-relaxed">
                 {plan.questions[currentIndex].text}
               </p>
             </div>
 
-            {/* Sub-phase states */}
-
-            {/* Reading / Listening */}
             {(subPhase === 'reading' || subPhase === 'listening') && (
               <div className="flex flex-col items-center gap-3">
                 <div className="w-10 h-10 border-4 border-trebol-primary border-t-transparent rounded-full animate-spin" />
@@ -436,7 +405,6 @@ export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) 
               </div>
             )}
 
-            {/* Prep countdown */}
             {subPhase === 'prep' && (
               <div className="flex flex-col items-center gap-3">
                 <CountdownTimer
@@ -449,7 +417,6 @@ export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) 
               </div>
             )}
 
-            {/* Recording */}
             {subPhase === 'recording' && (
               <div className="flex flex-col items-center gap-4">
                 <CountdownTimer
@@ -473,7 +440,6 @@ export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) 
               </div>
             )}
 
-            {/* Evaluating */}
             {subPhase === 'evaluating' && (
               <div className="flex flex-col items-center gap-3">
                 <div className="w-10 h-10 border-4 border-trebol-primary border-t-transparent rounded-full animate-spin" />
@@ -481,7 +447,6 @@ export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) 
               </div>
             )}
 
-            {/* Result preview */}
             {subPhase === 'result-preview' && currentEval && (
               <div className={`w-full rounded-2xl border p-5 space-y-4 ${scoreBg(currentEval.score)}`}>
                 <div className="flex items-center justify-between">
@@ -540,10 +505,8 @@ export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) 
           </div>
         )}
 
-        {/* ── Finished ── */}
         {phase === 'finished' && plan && (
           <div className="flex flex-col gap-6 w-full">
-            {/* Average score */}
             <div className="bg-white rounded-2xl border border-trebol-border shadow-sm p-6 text-center space-y-2">
               <p className="text-xs font-bold text-trebol-text/40 uppercase tracking-widest">Overall Score</p>
               <div className={`text-6xl font-black ${scoreColor(avgScore)}`}>
@@ -553,7 +516,6 @@ export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) 
               <p className={`text-sm font-bold ${scoreColor(avgScore)}`}>{scoreBand(avgScore)}</p>
             </div>
 
-            {/* Criteria averages */}
             <div className="bg-white rounded-2xl border border-trebol-border shadow-sm p-5 space-y-4">
               <p className="text-xs font-bold text-trebol-text/40 uppercase tracking-widest">Skill Breakdown</p>
               <div className="space-y-3">
@@ -581,7 +543,6 @@ export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) 
               </div>
             </div>
 
-            {/* Per-question breakdown */}
             <div className="bg-white rounded-2xl border border-trebol-border shadow-sm p-5 space-y-3">
               <p className="text-xs font-bold text-trebol-text/40 uppercase tracking-widest">Question Breakdown</p>
               {plan.questions.map((q, i) => {
@@ -604,7 +565,6 @@ export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) 
               })}
             </div>
 
-            {/* Actions */}
             <div className="flex gap-3">
               <button
                 onClick={handleRestart}

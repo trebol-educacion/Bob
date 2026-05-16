@@ -13,16 +13,8 @@ import { getOrCreateCueAudioAction } from '@/actions/modes/yl';
 import { pcmToWavBase64 } from '@/lib/audio';
 import type { EvalResponse } from '@/lib/types/practice';
 
-// ---------------------------------------------------------------------------
-// Constants
-// ---------------------------------------------------------------------------
-
 export const RECORDING_MAX_SECONDS = 45;
 export const REACTION_PAUSE_MS = 1200;
-
-// ---------------------------------------------------------------------------
-// TTS helper (module-level singleton so unmount cleans it up)
-// ---------------------------------------------------------------------------
 
 let _currentAudio: HTMLAudioElement | null = null;
 let _currentText: string | null = null;
@@ -82,10 +74,6 @@ export async function playTTS(text: string): Promise<void> {
     // Non-fatal — continue even if TTS fails
   }
 }
-
-// ---------------------------------------------------------------------------
-// Shared UI sub-components
-// ---------------------------------------------------------------------------
 
 export function YLLoadingScreen({ message }: { message: string }) {
   return (
@@ -270,10 +258,6 @@ export function YLReactionCard({ reaction }: { reaction: string }) {
   );
 }
 
-// ---------------------------------------------------------------------------
-// Voice-note message — WhatsApp-style audio bubble using cached TTS
-// ---------------------------------------------------------------------------
-
 export function YLVoiceNote({
   text,
   side = 'bob',
@@ -355,7 +339,6 @@ export function YLVoiceNote({
     }
   }, [playing, stop, text, sessionId]);
 
-  // Auto-play once on mount when the parent requests it
   React.useEffect(() => {
     if (!autoPlay || autoPlayedRef.current) return;
     autoPlayedRef.current = true;
@@ -388,20 +371,17 @@ export function YLVoiceNote({
           aria-label={playing ? 'Pause' : hasPlayed ? 'Replay' : 'Play'}
         >
           {playing ? (
-            // Pause icon
-            <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
+              <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
               <rect x="6" y="5" width="4" height="14" rx="1" />
               <rect x="14" y="5" width="4" height="14" rx="1" />
             </svg>
           ) : hasPlayed ? (
-            // Replay (circular arrow) icon
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
               <path d="M3 12a9 9 0 1 0 3-6.7" />
               <polyline points="3 4 3 10 9 10" />
             </svg>
           ) : (
-            // Play (triangle) icon
-            <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
+              <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
               <path d="M8 5v14l11-7z" />
             </svg>
           )}
@@ -520,10 +500,6 @@ export function YLChatMicBar({
   );
 }
 
-// ---------------------------------------------------------------------------
-// Audio player controls — circular icon buttons (Zoe-style)
-// ---------------------------------------------------------------------------
-
 interface YLAudioControlsProps {
   isPlaying: boolean;
   isPaused: boolean;
@@ -578,7 +554,6 @@ export function YLAudioControls({
 
   return (
     <div className="flex items-center gap-3 justify-center">
-      {/* Play / Pause */}
       {isPlaying && !isPaused ? (
         <Btn onClick={onPause} title="Pause">
           <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
@@ -594,7 +569,6 @@ export function YLAudioControls({
         </Btn>
       )}
 
-      {/* Replay */}
       <Btn onClick={onReplay} title="Restart">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
           <path d="M3 12a9 9 0 1 0 3-6.7" />
@@ -602,7 +576,6 @@ export function YLAudioControls({
         </svg>
       </Btn>
 
-      {/* Record */}
       {showRecord && onRecord && (
         <Btn onClick={onRecord} title="Start speaking" accent>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
@@ -613,7 +586,6 @@ export function YLAudioControls({
         </Btn>
       )}
 
-      {/* Next */}
       {showNext && onNext && (
         <Btn onClick={onNext} title="Siguiente" primary>
           <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">

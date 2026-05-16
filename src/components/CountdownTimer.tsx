@@ -42,7 +42,6 @@ export function CountdownTimer({
         className="-rotate-90"
         aria-hidden="true"
       >
-        {/* Background track */}
         <circle
           cx={center}
           cy={center}
@@ -51,7 +50,6 @@ export function CountdownTimer({
           stroke="#e5e7eb"
           strokeWidth={strokeWidth}
         />
-        {/* Progress arc */}
         <circle
           cx={center}
           cy={center}
@@ -65,7 +63,6 @@ export function CountdownTimer({
           style={{ transition: isRunning ? 'stroke-dashoffset 0.1s linear, stroke 0.3s ease' : 'stroke 0.3s ease' }}
         />
       </svg>
-      {/* Number in center */}
       <span
         className="absolute font-black tabular-nums"
         style={{

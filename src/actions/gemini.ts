@@ -503,13 +503,12 @@ export async function chatTextConversationAction(
     if (!response.text) throw new Error('No response from Gemini');
     const result = ChatTurnSchema.parse(JSON.parse(response.text));
 
-    // Generate AI Speech for the response
     const speech = await generateSpeechAction(result.ai_response);
 
     return {
       evaluation: {
         ...result.evaluation,
-        transcribed_text: userText // Use original text
+        transcribed_text: userText
       },
       ai_response: result.ai_response,
       ai_audio: speech
@@ -532,7 +531,6 @@ export async function chatConversationAction(
   const prompt = await getPrompt('generic_conversation_shared_eval_audio', { TOPIC: topic, CEFR_LEVEL: 'b1' });
 
   try {
-    // 1. Get Evaluation and Text Response
     const response = await ai.models.generateContent({
       model: MODELS.FLASH_LITE_PREVIEW,
       contents: [
@@ -572,7 +570,6 @@ export async function chatConversationAction(
     if (!response.text) throw new Error('No response from Gemini');
     const result = ChatTurnSchema.parse(JSON.parse(response.text));
 
-    // 2. Generate AI Speech for the response
     const speech = await generateSpeechAction(result.ai_response);
 
     return {

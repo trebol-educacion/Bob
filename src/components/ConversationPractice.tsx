@@ -35,7 +35,6 @@ export function ConversationPractice({ topic: topicProp = '', onFinish, noFrame,
   const conv = useConversationState(topicProp);
   const qf = useQuestionsFlow();
 
-  // Stable ref so useAudioRecorder never captures a stale callback
   const onRecordedRef = useRef<(blob: Blob) => void>(() => {});
 
   const { isRecording, startRecording, stopRecording } = useAudioRecorder({
@@ -45,7 +44,7 @@ export function ConversationPractice({ topic: topicProp = '', onFinish, noFrame,
     }, []),
   });
 
-  const MAX_TURNS = 12; // ~6 iterations
+  const MAX_TURNS = 12;
 
   useEffect(() => {
     if (!onPhaseChange) return;
@@ -57,7 +56,6 @@ export function ConversationPractice({ topic: topicProp = '', onFinish, noFrame,
     }
   }, [conv.phase, conv.messages.length, onPhaseChange]);
 
-  // Initialize conversation (fires once when internalTopic is first set)
   const initDoneRef = useRef(false);
   useEffect(() => {
     if (initDoneRef.current || !conv.internalTopic) return;
@@ -120,7 +118,6 @@ export function ConversationPractice({ topic: topicProp = '', onFinish, noFrame,
       conv.setCurrentEvaluation(result.evaluation);
       conv.setShowEvaluation(true);
 
-      // Auto-play the model's response
       const modelMsgIndex = newMessages.length - 1;
       setTimeout(() => handleListen(modelMsg.text, modelMsgIndex), 500);
 
@@ -158,6 +155,7 @@ export function ConversationPractice({ topic: topicProp = '', onFinish, noFrame,
       setTimeout(() => handleListen(modelMsg.text, modelMsgIndex), 500);
     } catch (error) {
       console.error('Text conversation error:', error);
+
       alert('Error al enviar el mensaje. Inténtalo de nuevo.');
     } finally {
       conv.setIsProcessing(false);
@@ -189,6 +187,7 @@ export function ConversationPractice({ topic: topicProp = '', onFinish, noFrame,
       setTimeout(() => handleListen(modelMsg.text, modelMsgIndex), 500);
     } catch (error) {
       console.error('Simulation error:', error);
+
     } finally {
       conv.setIsProcessing(false);
     }
@@ -199,7 +198,6 @@ export function ConversationPractice({ topic: topicProp = '', onFinish, noFrame,
     try {
       let finalHistory = conv.messages;
       if (conv.messages.length < MAX_TURNS) {
-        // Simulate missing turns
         finalHistory = await simulateConversationAction(conv.messages, conv.internalTopic);
         conv.setMessages(finalHistory);
       }
@@ -242,7 +240,6 @@ export function ConversationPractice({ topic: topicProp = '', onFinish, noFrame,
     }
   };
 
-  // Keep the ref in sync — dispatches to conversation or question handler based on current phase
   onRecordedRef.current = async (blob: Blob) => {
     if (conv.phase === 'conversation') {
       await handleSendMessage(blob);
@@ -259,8 +256,6 @@ export function ConversationPractice({ topic: topicProp = '', onFinish, noFrame,
     conv.setPhase('conversation');
   };
 
-  // Determine header icon based on input mode (text vs audio)
-  // We infer from whether inputText is the active input (text mode) vs recording (audio mode)
   const isTextMode = !isRecording && conv.phase !== 'questions';
   const headerIcon = isTextMode ? MessageSquare : Mic;
   const headerTitle = isTextMode ? 'Bob — Chat' : 'Bob — Conversación';
@@ -284,11 +279,8 @@ export function ConversationPractice({ topic: topicProp = '', onFinish, noFrame,
     );
   }
 
-  // ── Controls (input slot) ────────────────────────────────────────────────────
-
   const controlsSlot = (
     <div className="flex-none border-t border-gray-100 bg-white px-4 py-3 space-y-3">
-      {/* Evaluation feedback strip */}
       <AnimatePresence>
         {conv.showEvaluation && conv.currentEvaluation && !isRecording && !conv.isProcessing && conv.phase === 'conversation' && (
           <motion.div
@@ -339,7 +331,6 @@ export function ConversationPractice({ topic: topicProp = '', onFinish, noFrame,
 
       {conv.phase === 'conversation' && (
         <div className="flex flex-col space-y-4">
-          {/* Input row */}
           <div className="flex items-center space-x-2">
             <div className="flex-1 relative">
               <input
@@ -380,7 +371,6 @@ export function ConversationPractice({ topic: topicProp = '', onFinish, noFrame,
             </div>
           </div>
 
-          {/* Actions row */}
           <div className="flex items-center justify-between">
             <Button
               variant="secondary"
@@ -440,8 +430,6 @@ export function ConversationPractice({ topic: topicProp = '', onFinish, noFrame,
       )}
     </div>
   );
-
-  // ── Body content ──────────────────────────────────────────────────────────────
 
   const bodyContent = (
     <>

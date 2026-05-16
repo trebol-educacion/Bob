@@ -70,7 +70,6 @@ export function ToeflListenRepeatPractice({ onBack }: ToeflListenRepeatPracticeP
   const autoRecordStartedRef = useRef(false);
   const readyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Countdown for recording
   const countdown = useCountdown({
     seconds: RECORD_SECONDS,
     onComplete: () => {
@@ -78,7 +77,6 @@ export function ToeflListenRepeatPractice({ onBack }: ToeflListenRepeatPracticeP
     },
   });
 
-  // Audio recorder
   const { isRecording, startRecording, stopRecording } = useAudioRecorder({
     onRecorded: (blob) => {
       recordedBlobRef.current = blob;
@@ -90,19 +88,16 @@ export function ToeflListenRepeatPractice({ onBack }: ToeflListenRepeatPracticeP
     },
   });
 
-  // ── Loading phase ───────────────────────────────────────────────────────────
   useEffect(() => {
     let cancelled = false;
 
     async function load() {
       try {
-        // Step 1: Generate session items
         const sessionItems = await generateToeflRepeatSessionAction();
         if (cancelled) return;
         setItems(sessionItems);
         setLoadingProgress(1);
 
-        // Step 2: Pre-generate all TTS audio in batches of 3
         const phrases = sessionItems.map((it) => it.text);
         const BATCH_SIZE = 3;
         const allChunks: ToeflAudioChunk[] = new Array(phrases.length);
@@ -134,7 +129,6 @@ export function ToeflListenRepeatPractice({ onBack }: ToeflListenRepeatPracticeP
     return () => { cancelled = true; };
   }, []);
 
-  // ── Play phase: auto-play TTS when phase becomes 'play' ────────────────────
   useEffect(() => {
     if (phase !== 'play') return;
     const chunk = audioChunks[currentIndex];
@@ -168,7 +162,6 @@ export function ToeflListenRepeatPractice({ onBack }: ToeflListenRepeatPracticeP
     };
   }, [phase, currentIndex, audioChunks]);
 
-  // ── Record phase: auto-start recording ─────────────────────────────────────
   useEffect(() => {
     if (phase !== 'record') {
       autoRecordStartedRef.current = false;
@@ -183,7 +176,6 @@ export function ToeflListenRepeatPractice({ onBack }: ToeflListenRepeatPracticeP
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase]);
 
-  // ── Evaluating phase ────────────────────────────────────────────────────────
   useEffect(() => {
     if (phase !== 'evaluating') return;
     if (!recordedBlobRef.current) return;
@@ -247,7 +239,6 @@ export function ToeflListenRepeatPractice({ onBack }: ToeflListenRepeatPracticeP
     autoRecordStartedRef.current = false;
   }, []);
 
-  // ── Computed aggregates ─────────────────────────────────────────────────────
   const avgScore = results.length > 0
     ? results.reduce((s, r) => s + r.evaluation.score, 0) / results.length
     : 0;
@@ -258,10 +249,8 @@ export function ToeflListenRepeatPractice({ onBack }: ToeflListenRepeatPracticeP
     ? results.reduce((s, r) => s + r.evaluation.pronunciation, 0) / results.length
     : 0;
 
-  // ── Render ──────────────────────────────────────────────────────────────────
   return (
     <div className="flex-1 flex flex-col min-h-0 overflow-auto bg-trebol-bg">
-      {/* Header */}
       <div className="sticky top-0 z-10 bg-trebol-bg/90 backdrop-blur-sm border-b border-trebol-border px-4 py-3 flex items-center gap-3">
         <button
           onClick={onBack}
@@ -282,10 +271,8 @@ export function ToeflListenRepeatPractice({ onBack }: ToeflListenRepeatPracticeP
         )}
       </div>
 
-      {/* Body */}
       <div className="flex-1 flex flex-col items-center justify-center px-4 py-8 gap-6 max-w-lg mx-auto w-full">
 
-        {/* ── LOADING ── */}
         {phase === 'loading' && (
           <div className="w-full space-y-6 text-center">
             <div className="space-y-2">
@@ -299,7 +286,6 @@ export function ToeflListenRepeatPractice({ onBack }: ToeflListenRepeatPracticeP
                   : `Loading audio ${loadingProgress} of ${items.length || 10}...`}
               </p>
             </div>
-            {/* Progress bar */}
             <div className="w-full bg-trebol-border rounded-full h-2 overflow-hidden">
               <div
                 className="bg-trebol-primary h-full rounded-full transition-all duration-500"
@@ -309,7 +295,6 @@ export function ToeflListenRepeatPractice({ onBack }: ToeflListenRepeatPracticeP
           </div>
         )}
 
-        {/* ── PLAY ── */}
         {phase === 'play' && items[currentIndex] && (
           <div className="w-full space-y-6 text-center">
             <div className="bg-trebol-primary/10 rounded-full p-5 w-24 h-24 mx-auto flex items-center justify-center">
@@ -325,7 +310,6 @@ export function ToeflListenRepeatPractice({ onBack }: ToeflListenRepeatPracticeP
           </div>
         )}
 
-        {/* ── READY ── */}
         {phase === 'ready' && items[currentIndex] && (
           <div className="w-full space-y-6 text-center">
             <div className="space-y-2">
@@ -351,7 +335,6 @@ export function ToeflListenRepeatPractice({ onBack }: ToeflListenRepeatPracticeP
           </div>
         )}
 
-        {/* ── RECORD ── */}
         {phase === 'record' && (
           <div className="w-full space-y-6 text-center">
             <div className="space-y-4">
@@ -385,7 +368,6 @@ export function ToeflListenRepeatPractice({ onBack }: ToeflListenRepeatPracticeP
           </div>
         )}
 
-        {/* ── EVALUATING ── */}
         {phase === 'evaluating' && (
           <div className="w-full space-y-4 text-center">
             <div className="bg-trebol-primary/10 rounded-full p-4 w-20 h-20 mx-auto flex items-center justify-center">
@@ -396,10 +378,8 @@ export function ToeflListenRepeatPractice({ onBack }: ToeflListenRepeatPracticeP
           </div>
         )}
 
-        {/* ── RESULT ── */}
         {phase === 'result' && currentEvaluation && items[currentIndex] && (
           <div className="w-full space-y-4">
-            {/* Score badge */}
             <div className={`rounded-2xl border-2 p-6 text-center ${scoreBg(currentEvaluation.score)}`}>
               <p className="text-xs font-bold uppercase tracking-widest text-trebol-text/50 mb-1">
                 Item {currentIndex + 1} Score
@@ -412,7 +392,6 @@ export function ToeflListenRepeatPractice({ onBack }: ToeflListenRepeatPracticeP
               </p>
             </div>
 
-            {/* Sub-scores */}
             <div className="grid grid-cols-2 gap-3">
               <div className="bg-white border border-trebol-border rounded-xl p-3 text-center">
                 <p className="text-xs text-trebol-text/50 font-semibold uppercase tracking-wide">Accuracy</p>
@@ -428,7 +407,6 @@ export function ToeflListenRepeatPractice({ onBack }: ToeflListenRepeatPracticeP
               </div>
             </div>
 
-            {/* Text comparison */}
             <div className="bg-white border border-trebol-border rounded-xl p-4 space-y-3">
               <div>
                 <p className="text-xs font-bold text-trebol-text/40 uppercase tracking-widest mb-1">Original</p>
@@ -442,12 +420,10 @@ export function ToeflListenRepeatPractice({ onBack }: ToeflListenRepeatPracticeP
               )}
             </div>
 
-            {/* Feedback */}
             <div className="bg-trebol-secondary/10 border border-trebol-secondary/20 rounded-xl p-4">
               <p className="text-trebol-text text-sm font-medium">{currentEvaluation.feedback}</p>
             </div>
 
-            {/* Next button */}
             <button
               onClick={handleNext}
               className="w-full bg-trebol-primary hover:bg-trebol-primary/90 text-white font-bold py-3 rounded-xl transition-colors flex items-center justify-center gap-2"
@@ -471,10 +447,8 @@ export function ToeflListenRepeatPractice({ onBack }: ToeflListenRepeatPracticeP
           </div>
         )}
 
-        {/* ── FINISHED ── */}
         {phase === 'finished' && (
           <div className="w-full space-y-6">
-            {/* Overall score */}
             <div className={`rounded-2xl border-2 p-6 text-center ${scoreBg(avgScore)}`}>
               <p className="text-xs font-bold uppercase tracking-widest text-trebol-text/50 mb-1">Session Score</p>
               <p className={`text-7xl font-black ${scoreColor(avgScore)}`}>
@@ -485,7 +459,6 @@ export function ToeflListenRepeatPractice({ onBack }: ToeflListenRepeatPracticeP
               </p>
             </div>
 
-            {/* Sub-score breakdown */}
             <div className="grid grid-cols-2 gap-3">
               <div className="bg-white border border-trebol-border rounded-xl p-3 text-center">
                 <p className="text-xs text-trebol-text/50 font-semibold uppercase tracking-wide">Avg Accuracy</p>
@@ -501,7 +474,6 @@ export function ToeflListenRepeatPractice({ onBack }: ToeflListenRepeatPracticeP
               </div>
             </div>
 
-            {/* Item grid */}
             <div>
               <p className="text-xs font-bold text-trebol-text/40 uppercase tracking-widest mb-3">Item Breakdown</p>
               <div className="grid grid-cols-5 gap-2">
@@ -520,7 +492,6 @@ export function ToeflListenRepeatPractice({ onBack }: ToeflListenRepeatPracticeP
               </div>
             </div>
 
-            {/* Actions */}
             <div className="flex gap-3">
               <button
                 onClick={handleRestart}

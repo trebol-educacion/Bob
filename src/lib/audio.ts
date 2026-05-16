@@ -15,7 +15,6 @@ export function blobToBase64(blob: Blob): Promise<string> {
  * Converts raw PCM audio data to a playable WAV base64 string.
  */
 export function pcmToWavBase64(rawData: string, mimeType: string): string {
-  // Parse MimeType: audio/L16;codec=pcm;rate=24000
   const parts = mimeType.split(';');
   let sampleRate = 24000;
   let bitsPerSample = 16;
@@ -71,7 +70,6 @@ export function pcmToWavBase64(rawData: string, mimeType: string): string {
   // data chunk length
   view.setUint32(40, dataLength, true);
 
-  // write data
   for (let i = 0; i < dataLength; i++) {
     view.setUint8(44 + i, binaryData.charCodeAt(i));
   }

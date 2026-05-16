@@ -49,7 +49,6 @@ export function ImageConfigSelection({ onConfirm }: ImageConfigSelectionProps) {
       </div>
 
       <div className="space-y-6">
-        {/* Temáticas */}
         <div className="space-y-3">
           <h3 className="text-sm font-black text-trebol-text uppercase tracking-widest opacity-40">
             1. Elige una Temática
@@ -72,7 +71,6 @@ export function ImageConfigSelection({ onConfirm }: ImageConfigSelectionProps) {
           </div>
         </div>
 
-        {/* Dificultad */}
         <div className="space-y-3">
           <h3 className="text-sm font-black text-trebol-text uppercase tracking-widest opacity-40">
             2. Elige la Dificultad

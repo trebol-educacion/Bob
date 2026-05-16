@@ -9,8 +9,6 @@ import { ACTIVE_MODEL_LABEL } from '@/lib/models';
 import { PhrasePhase } from './PhrasePhase';
 import { ImagePhase } from './ImagePhase';
 
-// ─── Save error banner ────────────────────────────────────────────────────────
-
 function SaveErrorBanner({ error }: { error: string | null }) {
   if (!error) return null;
   return (
@@ -19,8 +17,6 @@ function SaveErrorBanner({ error }: { error: string | null }) {
     </div>
   );
 }
-
-// ─── Main component ───────────────────────────────────────────────────────────
 
 export function BobPracticeChat(props: UsePracticeChatProps) {
   const chat = usePracticeChat(props);
@@ -81,7 +77,6 @@ export function BobPracticeChat(props: UsePracticeChatProps) {
       </>
     );
 
-  // Build a back button for the left slot
   const backButton = (
     <button
       onClick={handleBackWithRecordingGuard}
@@ -117,7 +112,6 @@ export function BobPracticeChat(props: UsePracticeChatProps) {
       {(chat.phase === 'evaluating' || chat.phase === 'generating') && (
         <TypingIndicator />
       )}
-      {/* Suggestion chips — shown only in phrase-ready state for situation mode */}
       {props.mode === 'situation' && chat.phase === 'phrase-ready' && chat.dynamicPhrases.length > 0 && (
         <div className="flex flex-wrap gap-2 mt-2">
           {chat.dynamicPhrases.slice(0, 3).map((phrase, i) => (

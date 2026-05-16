@@ -77,7 +77,6 @@ export function YLPointingPractice({
   const [finalEval, setFinalEval] = useState<EvalResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [messages] = useState<BobMessageShape[]>(initialMessages ?? []);
-  // Conversation log shown in the chat below the click grid
   type TurnEntry = {
     id: string;
     cueText: string;
@@ -134,7 +133,6 @@ export function YLPointingPractice({
     })();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Cleanup audio on unmount
   useEffect(() => () => stopCurrentAudio(), []);
 
   const currentCue = plan?.pointing_cues?.[cueIndex];
@@ -168,7 +166,6 @@ export function YLPointingPractice({
       },
     ]);
 
-    // Reaction is auto-played by the YLVoiceNote bubble below (autoPlay)
     try {
       await saveYLTurnAction(sessionId, {
         cue: currentCue.text,
@@ -192,7 +189,6 @@ export function YLPointingPractice({
     }
   };
 
-  // Final evaluation
   useEffect(() => {
     if (phase !== 'evaluating' || !sessionId || !plan) return;
     (async () => {
@@ -369,14 +365,10 @@ export function YLPointingPractice({
       inputSlot={bottomBar}
       animationKey="yl-pointing"
     >
-      {/* Conversation log for previously answered rounds */}
       {turns.map((t) => (
         <React.Fragment key={t.id}>
-          {/* Bob asks (text shown so the kid can read along) */}
           <YLBobTextMessage text={t.cueText} />
-          {/* User's pick */}
           <YLUserTextMessage text={`👉 ${t.userPicked} ${t.correct ? '✓' : '✗'}`} />
-          {/* Bob's reaction: voice note only (no text). Auto-plays the latest one. */}
           {sessionId && (
             <YLVoiceNote
               text={t.reactionText}
@@ -388,7 +380,6 @@ export function YLPointingPractice({
         </React.Fragment>
       ))}
 
-      {/* Current cue (voice only, NO text). Auto-plays once on mount. */}
       {currentCue && sessionId && phase === 'ready' && (
         <YLVoiceNote
           key={`cue-${cueIndex}`}
@@ -399,7 +390,6 @@ export function YLPointingPractice({
         />
       )}
 
-      {/* Final results inline in chat */}
       {phase === 'finished' && finalEval && !isReadOnly && (
         <motion.div
           initial={{ opacity: 0, y: 12 }}
@@ -412,7 +402,6 @@ export function YLPointingPractice({
         </motion.div>
       )}
 
-      {/* 4-option grid (only while waiting for an answer) */}
       {phase === 'ready' && plan?.options && images.length === plan.options.length && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 max-w-3xl">
           {plan.options.map((label, idx) => (

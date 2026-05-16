@@ -5,10 +5,6 @@
 
 import { z } from 'zod';
 
-// ---------------------------------------------------------------------------
-// Zod schemas — used in Server Actions that throw on bad responses
-// ---------------------------------------------------------------------------
-
 export const PhraseGenerationSchema = z.object({
   phrases: z.array(z.string()),
 });
@@ -45,11 +41,6 @@ export const ChatTurnSchema = z.object({
   ai_response: z.string(),
 });
 
-// ---------------------------------------------------------------------------
-// TypeScript interfaces — inferred from Zod schemas where possible,
-// hand-written for shapes without a schema (fallback actions).
-// ---------------------------------------------------------------------------
-
 export type PhraseGenerationResponse = z.infer<typeof PhraseGenerationSchema>;
 export type ImageSceneResponse = z.infer<typeof ImageSceneSchema>;
 export type PronunciationEvaluationResponse = z.infer<typeof PronunciationEvaluationSchema>;
@@ -64,7 +55,7 @@ export interface EvaluationDetails {
 export type ImageDescriptionEvaluationResponse = z.infer<typeof ImageDescriptionEvaluationSchema>;
 export type ChatTurnResponse = z.infer<typeof ChatTurnSchema>;
 
-// Fallback-action types — no Zod schema needed; these use intentional catch fallbacks
+/** Fallback-action types — no Zod schema; these use intentional catch fallbacks. */
 export interface InitialChatResponse {
   framing: string;
   message: string;

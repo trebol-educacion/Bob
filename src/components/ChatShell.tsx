@@ -4,10 +4,6 @@ import React, { useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
 import type { LucideIcon } from 'lucide-react';
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
 export type ChatAccentColor = 'amber' | 'blue' | 'purple' | 'green';
 
 export type ChatHeaderConfig = {
@@ -47,10 +43,6 @@ export type ChatShellProps = {
   animationKey?: string;
 };
 
-// ---------------------------------------------------------------------------
-// Accent color lookup table
-// ---------------------------------------------------------------------------
-
 const ACCENT: Record<
   ChatAccentColor,
   { avatarBg: string; avatarBorder: string; avatarIcon: string; badgeBg: string; badgeText: string }
@@ -60,10 +52,6 @@ const ACCENT: Record<
   purple: { avatarBg: 'bg-purple-50', avatarBorder: 'border-purple-100', avatarIcon: 'text-purple-600', badgeBg: 'bg-purple-50', badgeText: 'text-purple-600' },
   green:  { avatarBg: 'bg-green-50',  avatarBorder: 'border-green-100',  avatarIcon: 'text-green-600',  badgeBg: 'bg-green-50',  badgeText: 'text-green-600' },
 };
-
-// ---------------------------------------------------------------------------
-// Internal sub-components
-// ---------------------------------------------------------------------------
 
 function AssistantAvatar({
   icon: Icon,
@@ -139,10 +127,7 @@ function ChatFooter({
   );
 }
 
-// ---------------------------------------------------------------------------
-// ChatShell — main export
-// ---------------------------------------------------------------------------
-
+/** Composable chat layout: sticky header, scrollable body, fixed input slot, footer. */
 export function ChatShell({
   headerConfig: header,
   footerConfig: footer,
@@ -153,7 +138,6 @@ export function ChatShell({
   const bodyRef = useRef<HTMLDivElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
 
-  // Auto-scroll to bottom whenever children change (new message added)
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [children]);

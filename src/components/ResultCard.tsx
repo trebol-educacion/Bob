@@ -20,7 +20,6 @@ export function ResultCard({ result, onNext }: ResultCardProps) {
       className="w-full max-w-2xl mx-auto space-y-6"
     >
       <div className="bg-white border-4 border-trebol-border rounded-sm overflow-hidden shadow-xl">
-        {/* Header con Puntuación */}
         <div className="p-8 text-center border-b-2 border-trebol-border bg-trebol-bg">
           <div className="inline-block relative">
             <div className={`text-7xl font-black ${getScoreColor(score)}`}>
@@ -36,7 +35,6 @@ export function ResultCard({ result, onNext }: ResultCardProps) {
         </div>
 
         <div className="p-8 space-y-8">
-          {/* Transcripción */}
           <div className="space-y-3">
             <h3 className="text-sm font-black text-trebol-text uppercase tracking-widest flex items-center space-x-2">
               <MessageCircle size={18} className="text-trebol-secondary" />
@@ -47,7 +45,6 @@ export function ResultCard({ result, onNext }: ResultCardProps) {
             </div>
           </div>
 
-          {/* Detalles Potentes si existen */}
           {details && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-4">

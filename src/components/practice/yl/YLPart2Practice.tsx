@@ -41,10 +41,6 @@ import {
   YLReadOnlyMessage,
 } from './_shared';
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
 type Phase =
   | 'loading'
   | 'ready'
@@ -72,10 +68,6 @@ export interface YLPart2PracticeProps {
   initialMessages?: BobMessageShape[];
   onSessionCreated?: (sessionId: string) => void;
 }
-
-// ---------------------------------------------------------------------------
-// Component
-// ---------------------------------------------------------------------------
 
 export function YLPart2Practice({
   exam,
@@ -117,8 +109,6 @@ export function YLPart2Practice({
     };
   }, []);
 
-  // ── Init ──────────────────────────────────────────────────────────────────
-
   useEffect(() => {
     if (isReadOnly) return;
 
@@ -142,8 +132,6 @@ export function YLPart2Practice({
 
     void init();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // ── Turn orchestration ────────────────────────────────────────────────────
 
   const runTurn = useCallback(
     async (idx: number) => {
@@ -193,7 +181,6 @@ export function YLPart2Practice({
     }
   }, [phase, plan, runTurn]);
 
-  // When recording stops → process
   useEffect(() => {
     if (phase !== 'recording') return;
     if (isRecording) return;
@@ -252,7 +239,6 @@ export function YLPart2Practice({
     })();
   }, [isRecording, phase]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Final evaluation
   useEffect(() => {
     if (phase !== 'evaluating' || !sessionId || !plan) return;
 
@@ -280,8 +266,6 @@ export function YLPart2Practice({
       stopRecording();
     }
   }, [isRecording, stopRecording]);
-
-  // ── Labels & header config ─────────────────────────────────────────────────
 
   const partLabel =
     exam === 'starters'
@@ -311,8 +295,6 @@ export function YLPart2Practice({
       {partBadgeLabel}
     </span>
   );
-
-  // ── Renders ───────────────────────────────────────────────────────────────
 
   if (error) return <YLErrorScreen error={error} onBack={onBack} />;
   if (phase === 'loading') return <YLLoadingScreen message="Getting your practice ready…" />;
@@ -350,7 +332,6 @@ export function YLPart2Practice({
         <YLScoreDisplay evalResult={finalEval} />
         <YLFeedbackCard feedback={finalEval.feedback} />
 
-        {/* Movers P2: show info exchange cards from plan */}
         {exam === 'movers' && plan?.student_card && (
           <div className="bg-white rounded-2xl p-5 shadow-sm space-y-2">
             <h3 className="font-black text-gray-900">Tu tarjeta de información</h3>
@@ -384,7 +365,6 @@ export function YLPart2Practice({
     </div>
   );
 
-  // Active practice
   return (
     <ChatShell
       headerConfig={{ icon: headerIcon, title: headerTitle, subtitle: `${headerSubtitle} · Q ${cueIndex + 1}/${totalCues}`, accentColor: 'amber', leftSlot: backButton, rightSlot: <div className="flex items-center gap-2">{progressBar}{partBadge}</div>, online: true }}
@@ -392,7 +372,6 @@ export function YLPart2Practice({
       inputSlot={null}
       animationKey="yl-part2"
     >
-      {/* Image (Starters: 1 scene image; Movers: context card image) */}
       {images.length > 0 && (
         <div className="max-w-lg mx-auto w-full rounded-2xl overflow-hidden shadow-md bg-white">
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -404,7 +383,6 @@ export function YLPart2Practice({
         </div>
       )}
 
-      {/* Movers: show student info card */}
       {exam === 'movers' && plan?.student_card && (
         <div className="max-w-lg mx-auto w-full bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-1">
           <p className="text-xs font-bold text-amber-700 uppercase tracking-wide">Tu tarjeta</p>
@@ -416,7 +394,6 @@ export function YLPart2Practice({
         </div>
       )}
 
-      {/* Examiner cue + status */}
       <div className="flex flex-col items-center gap-4 w-full">
         <AnimatePresence mode="wait">
           <motion.div

@@ -28,7 +28,6 @@ export type ToeflAudioChunk = {
  */
 export async function generateToeflRepeatSessionAction(): Promise<ToeflRepeatItem[]> {
   const ai = getAiClient();
-  // Default to B1 level for listen & repeat session generation
   const prompt = await getPrompt('toefl_listen_repeat_b1_generation');
 
   const response = await ai.models.generateContent({
@@ -127,7 +126,6 @@ export async function evaluateRepetitionAction(
   mimeType: string
 ): Promise<RepetitionEvaluation> {
   const ai = getAiClient();
-  // Default to B1 level for repetition evaluation
   const prompt = await getPrompt('toefl_listen_repeat_b1_evaluation', { TARGET_SENTENCE: originalText, TARGET_DURATION_SECONDS: 0, USER_TRANSCRIPT: '' });
 
   const response = await ai.models.generateContent({

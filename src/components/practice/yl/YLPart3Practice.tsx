@@ -43,10 +43,6 @@ import {
   YLReadOnlyMessage,
 } from './_shared';
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
 type Phase =
   | 'loading'
   | 'generating-images'
@@ -80,10 +76,6 @@ export interface YLPart3PracticeProps {
   initialMessages?: BobMessageShape[];
   onSessionCreated?: (sessionId: string) => void;
 }
-
-// ---------------------------------------------------------------------------
-// Component
-// ---------------------------------------------------------------------------
 
 export function YLPart3Practice({
   exam,
@@ -126,8 +118,6 @@ export function YLPart3Practice({
     };
   }, []);
 
-  // ── Init ──────────────────────────────────────────────────────────────────
-
   useEffect(() => {
     if (isReadOnly) return;
 
@@ -138,7 +128,6 @@ export function YLPart3Practice({
         onSessionCreated?.(sid);
         setPlan(p);
 
-        // Generate all 4 story images with CHARACTER_DESCRIPTION for visual consistency
         if (p.image_prompts && p.image_prompts.length > 0) {
           setPhase('generating-images');
           const imgs = await generateYLImagesAction(
@@ -159,11 +148,8 @@ export function YLPart3Practice({
     void init();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Turn orchestration ────────────────────────────────────────────────────
-
   const getCueForImage = useCallback(
     (idx: number, p: YLPlan): string => {
-      // story_beats if available, else fall back to cues
       if (p.story_beats && p.story_beats[idx]) return p.story_beats[idx];
       if (p.cues[idx]) return p.cues[idx];
       return `Tell me about image ${idx + 1}.`;
@@ -219,7 +205,6 @@ export function YLPart3Practice({
     }
   }, [phase, plan, runTurn]);
 
-  // When recording stops → evaluate per turn
   useEffect(() => {
     if (phase !== 'recording') return;
     if (isRecording) return;
@@ -259,7 +244,6 @@ export function YLPart3Practice({
           evalResult,
         });
 
-        // Track per-turn eval
         setTurnEvals((prev) => [...prev, { imageIndex: currentImageIdx, evalResult }]);
 
         setCurrentReaction(evalResult.reaction);
@@ -281,7 +265,6 @@ export function YLPart3Practice({
     })();
   }, [isRecording, phase]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Final evaluation
   useEffect(() => {
     if (phase !== 'evaluating' || !sessionId || !plan) return;
 
@@ -309,8 +292,6 @@ export function YLPart3Practice({
       stopRecording();
     }
   }, [isRecording, stopRecording]);
-
-  // ── Labels & header config ─────────────────────────────────────────────────
 
   const partLabel =
     exam === 'starters'
@@ -342,8 +323,6 @@ export function YLPart3Practice({
       {partBadgeLabel}
     </span>
   );
-
-  // ── Renders ───────────────────────────────────────────────────────────────
 
   if (error) return <YLErrorScreen error={error} onBack={onBack} />;
 
@@ -383,7 +362,6 @@ export function YLPart3Practice({
   }
 
   if (phase === 'finished' && finalEval) {
-    // Average per-turn scores for breakdown
     const avgScore =
       turnEvals.length > 0
         ? Math.round(turnEvals.reduce((s, e) => s + e.evalResult.score, 0) / turnEvals.length)
@@ -397,7 +375,6 @@ export function YLPart3Practice({
       >
         <YLResultsHeader title="¡Historia completada!" subtitle={partLabel} />
 
-        {/* Story strip — all 4 images */}
         {images.length > 0 && (
           <div className="grid grid-cols-2 gap-2">
             {images.map((src, i) => (
@@ -416,7 +393,6 @@ export function YLPart3Practice({
         <YLScoreDisplay evalResult={{ ...finalEval, score: avgScore }} />
         <YLFeedbackCard feedback={finalEval.feedback} />
 
-        {/* Per-turn breakdown */}
         {turnEvals.length > 0 && (
           <div className="bg-white rounded-2xl p-5 shadow-sm space-y-3">
             <h3 className="font-black text-gray-900">Score per picture</h3>
@@ -443,7 +419,6 @@ export function YLPart3Practice({
     );
   }
 
-  // Active practice
   const currentImage = images[currentImageIdx];
 
   const progressBar = (
@@ -463,14 +438,12 @@ export function YLPart3Practice({
       inputSlot={null}
       animationKey="yl-part3"
     >
-      {/* Story title */}
       {plan?.story_title && (
         <p className="text-center text-sm font-bold text-amber-700/70">
           {plan.story_title}
         </p>
       )}
 
-      {/* Current image (large) */}
       {currentImage && (
         <AnimatePresence mode="wait">
           <motion.div
@@ -490,7 +463,6 @@ export function YLPart3Practice({
         </AnimatePresence>
       )}
 
-      {/* Thumbnail strip for previously seen images */}
       {images.length > 1 && (
         <div className="flex gap-2 justify-center">
           {images.map((src, i) => (
@@ -517,7 +489,6 @@ export function YLPart3Practice({
         </div>
       )}
 
-      {/* Examiner cue + status */}
       <div className="flex flex-col items-center gap-4 w-full">
         <AnimatePresence mode="wait">
           <motion.div

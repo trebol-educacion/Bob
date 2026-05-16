@@ -15,48 +15,38 @@ interface SessionSidebarProps {
 }
 
 const MODE_ICON: Record<NonNullable<SessionMode>, React.ElementType> = {
-  // Generic
   generic_situation: MessageSquare,
   generic_image: ImageIcon,
   generic_conversation: MessagesSquare,
-  // Cambridge YL — Starters
   cambridge_starters_part1: Hand,
   cambridge_starters_part2: HelpCircle,
   cambridge_starters_part3: BookOpen,
   cambridge_starters_part4: User,
-  // Cambridge YL — Movers
   cambridge_movers_part1: GitCompare,
   cambridge_movers_part2: MessageCircle,
   cambridge_movers_part3: BookImage,
   cambridge_movers_part4: User,
   cambridge_movers_part5: ImageIcon,
-  // Cambridge YL — Flyers
   cambridge_flyers_part1: BookOpen,
-  // Cambridge KET
   cambridge_ket_part1: BookOpen,
   cambridge_ket_part2: BookOpen,
-  // Cambridge PET
   cambridge_pet_p1: Users,
   cambridge_pet_p2: Users,
   cambridge_pet_p3: Users,
   cambridge_pet_p4: Users,
-  // Cambridge FCE
   cambridge_fce_p1: ImageIcon,
   cambridge_fce_p2: ImageIcon,
   cambridge_fce_p3: ImageIcon,
   cambridge_fce_p4: ImageIcon,
-  // Cambridge CAE
   cambridge_cae_p1: MessageSquare,
   cambridge_cae_p2: MessageSquare,
   cambridge_cae_p3: MessageSquare,
   cambridge_cae_p4: MessageSquare,
-  // Cambridge CPE
   cambridge_cpe_p1: MessageSquare,
   cambridge_cpe_p2: MessageSquare,
   cambridge_cpe_p3a: MessageSquare,
   cambridge_cpe_p3b: MessageSquare,
   cambridge_cpe_p4: MessageSquare,
-  // TOEFL
   toefl_listen_repeat: Headphones,
   toefl_interview: Mic,
 };
@@ -90,7 +80,6 @@ export function SessionSidebar({
       'shrink-0 h-full bg-white border-r-2 border-trebol-border flex flex-col transition-[width] duration-200 ease-out overflow-hidden',
       collapsed ? 'w-14' : 'w-72'
     )}>
-      {/* Header */}
       <div className="flex items-center gap-2 px-3 py-3 border-b border-trebol-border shrink-0 min-h-[52px]">
         {!collapsed && (
           <span className="flex-1 text-[11px] font-black uppercase tracking-widest text-trebol-text/60">
@@ -107,7 +96,6 @@ export function SessionSidebar({
         </button>
       </div>
 
-      {/* New session button */}
       <div className="px-2 py-2 shrink-0">
         <button
           type="button"
@@ -124,7 +112,6 @@ export function SessionSidebar({
         </button>
       </div>
 
-      {/* List */}
       <nav aria-label="Sesiones" className="flex-1 overflow-y-auto px-2 pb-3 space-y-0.5">
         {loading && !collapsed && (
           <div className="text-xs text-trebol-text/50 px-2 py-3">Cargando…</div>

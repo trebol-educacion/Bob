@@ -53,7 +53,6 @@ export default function LoginPage() {
         className="relative w-full max-w-md"
         style={{ zIndex: 1 }}
       >
-        {/* Avatar + Logo */}
         <div className="text-center mb-6">
           <div className="flex justify-center mb-4">
             <div
@@ -79,9 +78,7 @@ export default function LoginPage() {
           </div>
         </div>
 
-        {/* Card */}
         <div className="bg-white rounded-xl shadow-2xl">
-          {/* CardHeader */}
           <div className="p-6 pb-0">
             <h2 className="text-2xl font-extrabold text-gray-900">Bienvenido</h2>
             <p className="text-sm text-gray-500 mt-1">
@@ -89,10 +86,8 @@ export default function LoginPage() {
             </p>
           </div>
 
-          {/* CardContent */}
           <div className="p-6">
             <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Email */}
               <div className="space-y-2">
                 <label htmlFor="email" className="text-sm font-semibold text-gray-700 block">
                   Email o Usuario
@@ -116,7 +111,6 @@ export default function LoginPage() {
                 </div>
               </div>
 
-              {/* Password */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <label htmlFor="password" className="text-sm font-semibold text-gray-700">
@@ -173,7 +167,6 @@ export default function LoginPage() {
             </form>
           </div>
 
-          {/* CardFooter */}
           <div className="px-6 pb-6 flex flex-col space-y-4">
             <div className="text-center text-sm text-gray-500">
               <p>Próximamente:</p>

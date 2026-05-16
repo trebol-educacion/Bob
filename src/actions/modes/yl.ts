@@ -8,10 +8,6 @@ import { YLPlanSchema, type YLPlan, type YLExam, type YLTurnEvalResult } from '@
 import { getPrompt } from '@/lib/prompts/db-prompts';
 import { createSupabaseServer } from '@/lib/supabase/server';
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
 /** Map a ModeKey to exam + part number. */
 function parseYLMode(mode: ModeKey): { exam: YLExam; part: number } {
   const match = mode.match(/^cambridge_(starters|movers)_part(\d+)$/);
@@ -39,11 +35,6 @@ function imageGenKey(exam: YLExam, part: number): string {
   return `cambridge_${exam}_part${part}_a1_image_gen`;
 }
 
-// ---------------------------------------------------------------------------
-// T3.2 — startYLSessionAction
-// Creates a bob_sessions row and generates the YL session plan via Gemini.
-// ---------------------------------------------------------------------------
-
 export async function startYLSessionAction(input: {
   mode: ModeKey;
 }): Promise<{ sessionId: string; plan: YLPlan }> {
@@ -55,7 +46,6 @@ export async function startYLSessionAction(input: {
   } = await supabase.auth.getUser();
   if (!user) throw new Error('[startYLSessionAction] Not authenticated');
 
-  // Map part numbers to readable titles
   const partTitles: Record<string, string> = {
     starters_1: 'Starters Part 1 — Señalar imágenes',
     starters_2: 'Starters Part 2 — Preguntas sobre escena',
@@ -71,8 +61,6 @@ export async function startYLSessionAction(input: {
   const title = partTitles[titleKey] ?? `Cambridge ${exam} Part ${part}`;
 
   const t0 = Date.now();
-  console.log(`[YL][${input.mode}] start — creating session`);
-
   const { data: session, error: sessionErr } = await supabase
     .from('bob_sessions')
     .insert({
@@ -88,9 +76,6 @@ export async function startYLSessionAction(input: {
     throw new Error(`[startYLSessionAction] Failed to create session: ${sessionErr?.message}`);
   }
 
-  console.log(`[YL][${input.mode}] session ${session.id} created in ${Date.now() - t0}ms — generating plan`);
-
-  // Fetch the last 20 plans of this user+mode to discourage repetition.
   const { data: recent } = await supabase
     .from('bob_sessions')
     .select('plan_json')
@@ -114,21 +99,14 @@ export async function startYLSessionAction(input: {
 
   const avoidList = avoidSummary ? `- ${avoidSummary}` : '(none yet — feel free to pick any topic)';
 
-  // Generate the session plan
   const t1 = Date.now();
   const plan = await generateYLContentAction(exam, part, { avoidList });
   console.log(`[YL][${input.mode}] plan ready in ${Date.now() - t1}ms (cues=${plan.cues?.length ?? 0}, images=${plan.image_prompts?.length ?? 0})`);
 
-  // Persist the plan in the session so future generations know what to avoid
   await supabase.from('bob_sessions').update({ plan_json: plan }).eq('id', session.id);
 
   return { sessionId: session.id as string, plan };
 }
-
-// ---------------------------------------------------------------------------
-// Persist scene image(s) so reopening the session shows them without
-// regenerating from Gemini. Idempotent per (session, image_index).
-// ---------------------------------------------------------------------------
 
 /**
  * Persist a single scene image. Called once per image from the client to
@@ -187,11 +165,6 @@ export async function saveYLFinalEvalAction(
   });
 }
 
-// ---------------------------------------------------------------------------
-// TTS cache per (session, cue_text). First call hits Gemini and persists the
-// audio in bob_messages; subsequent calls return the cached blob.
-// ---------------------------------------------------------------------------
-
 import { generateSpeechAction } from '@/actions/gemini';
 
 export async function getOrCreateCueAudioAction(
@@ -202,7 +175,6 @@ export async function getOrCreateCueAudioAction(
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('[getOrCreateCueAudioAction] Not authenticated');
 
-  // Look up cached audio
   const { data: existing } = await supabase
     .from('bob_messages')
     .select('content_json')
@@ -219,7 +191,6 @@ export async function getOrCreateCueAudioAction(
     }
   }
 
-  // Cache miss → call Gemini and persist
   const { data, mimeType } = await generateSpeechAction(cueText);
 
   await supabase.from('bob_messages').insert({
@@ -233,13 +204,6 @@ export async function getOrCreateCueAudioAction(
 
   return { data, mimeType };
 }
-
-// ---------------------------------------------------------------------------
-// T3.3 — generateYLContentAction
-// Calls Gemini to produce the YL session plan (cues + image prompts if needed).
-// For parts that require images, also returns image_prompts to pass to
-// generateYLImagesAction.
-// ---------------------------------------------------------------------------
 
 export async function generateYLContentAction(
   exam: YLExam,
@@ -267,12 +231,11 @@ export async function generateYLContentAction(
     throw new Error('[generateYLContentAction] Gemini returned invalid JSON');
   }
 
-  // The seeded generation prompts use mixed key names across exam parts
-  // (examiner_cues vs cues, image_prompt vs image_prompts, etc.). Normalize
-  // to the canonical YLPlanSchema shape before validating.
+  // Generation prompts use mixed key names across exam parts; normalize to
+  // canonical YLPlanSchema shape before validating.
   const p = (parsed ?? {}) as Record<string, unknown>;
 
-  // Pointing-shape detection (Starters P1 / Movers P1 click activity)
+  // Pointing-shape: Starters P1 / Movers P1 click activity.
   const isPointing =
     Array.isArray(p.options) &&
     Array.isArray(p.option_image_prompts) &&
@@ -312,12 +275,6 @@ export async function generateYLContentAction(
   return result.data;
 }
 
-// ---------------------------------------------------------------------------
-// T3.4 — generateYLImagesAction
-// Generates N images in parallel using the YL image_gen prompt.
-// For story parts (3), passes CHARACTER_DESCRIPTION for visual consistency.
-// ---------------------------------------------------------------------------
-
 /**
  * Generate a single YL image. Called one-at-a-time from the client to
  * avoid Next.js server-action "Maximum array nesting" when several large
@@ -335,7 +292,6 @@ export async function generateYLImageAction(
   const key = imageGenKey(exam, part);
   const ai = getAiClient();
   const t0 = Date.now();
-  console.log(`[YL][${exam}_part${part}] generating image ${idx + 1}/${totalImages}`);
 
   const params: Record<string, string> = {
     IMAGE_PROMPT: imagePrompt,
@@ -374,12 +330,10 @@ export async function generateYLImageAction(
   }
 
   if (!imgB64) {
-    // Transparent 1×1 PNG fallback as data URI (short enough to serialize fine)
     return 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
   }
 
-  // Upload to Supabase Storage so the server action only returns a short URL.
-  // Avoids Next.js "Maximum array nesting / body" limits for big base64 payloads.
+  // Upload to Supabase Storage — avoids Next.js body size limits for large base64 payloads.
   const supabase = await createSupabaseServer();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('[generateYLImageAction] Not authenticated');
@@ -392,7 +346,6 @@ export async function generateYLImageAction(
     .upload(path, bytes, { contentType: mime, upsert: true });
   if (upload.error) {
     console.error('[generateYLImageAction] storage upload failed:', upload.error);
-    // Fallback to data URI inline (will probably hit serializer limit but at least content exists)
     return `data:${mime};base64,${imgB64}`;
   }
 
@@ -433,12 +386,8 @@ export async function generateYLImagesAction(
 
       const fullPrompt = await getPrompt(key, params);
 
-      // Retry once if the model returns no image data (occasional empty
-      // response or safety filter trip). After two empties → return a
-      // transparent placeholder so the rest of the activity still works.
       for (let attempt = 0; attempt < 2; attempt++) {
         const tImg = Date.now();
-        console.log(`[YL][${exam}_part${part}] image ${idx + 1}/${imagePrompts.length} sent to Gemini (attempt ${attempt + 1})`);
         const response = await ai.models.generateContent({
           model: MODELS.IMAGE,
           contents: [{ role: 'user', parts: [{ text: fullPrompt }] }],
@@ -457,18 +406,10 @@ export async function generateYLImagesAction(
         }
         console.warn(`[generateYLImagesAction] empty image (attempt ${attempt + 1}); prompt:`, fullPrompt.slice(0, 200));
       }
-      // 1×1 transparent PNG placeholder so the activity continues
       return 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
     })
   );
 }
-
-// ---------------------------------------------------------------------------
-// T3.5 — saveYLTurnAction
-// Persists 2 bob_messages rows per turn:
-//   - role='user'  msg_type='user_audio'  → transcript + cue context
-//   - role='bob'   msg_type='yl_cue'      → reaction
-// ---------------------------------------------------------------------------
 
 export async function saveYLTurnAction(
   sessionId: string,
@@ -522,12 +463,6 @@ export async function saveYLTurnAction(
   }
 }
 
-// ---------------------------------------------------------------------------
-// T3.6 — evaluateYLTurnAction
-// Evaluates one YL turn.
-// HARD RULE: audioDuration ≤ 0.3s → score 0 immediately.
-// ---------------------------------------------------------------------------
-
 const YLTurnEvalSchema = EvalResponseSchema.extend({
   reaction: z.string(),
 });
@@ -543,7 +478,6 @@ export async function evaluateYLTurnAction(input: {
 }): Promise<YLTurnEvalResult> {
   const { exam, part } = parseYLMode(input.mode);
 
-  // HARD RULE: reject micro-recordings silently with a gentle message
   if (input.audioDuration <= 0.3) {
     console.info(
       `[evaluateYLTurnAction] Audio too short (${input.audioDuration}s) — returning score 0`
@@ -565,7 +499,6 @@ export async function evaluateYLTurnAction(input: {
 
   const ai = getAiClient();
 
-  // Step 1: Transcribe the audio
   const transcribeResponse = await ai.models.generateContent({
     model: MODELS.FLASH_LITE_PREVIEW,
     contents: [
@@ -580,7 +513,6 @@ export async function evaluateYLTurnAction(input: {
   });
   const transcribed = (transcribeResponse.text ?? '(silence)').trim();
 
-  // Step 2: Evaluate + get examiner reaction
   const sharedParams = {
     USER_TRANSCRIPT: transcribed,
     QUESTION: input.cue,
@@ -595,7 +527,6 @@ export async function evaluateYLTurnAction(input: {
   const evalPrompt = await getPrompt(evaluationKey(exam, part), sharedParams);
   const reactionPrompt = await getPrompt(reactionKey(exam, part), sharedParams);
 
-  // Run evaluation and reaction in parallel
   const [evalResponse, reactionResponse] = await Promise.all([
     ai.models.generateContent({
       model: MODELS.FLASH_LITE_PREVIEW,
@@ -615,7 +546,6 @@ export async function evaluateYLTurnAction(input: {
   try {
     parsed = JSON.parse(raw);
   } catch {
-    // Fallback on parse error — don't crash the turn
     console.error('[evaluateYLTurnAction] Failed to parse eval JSON:', raw);
     return {
       score: 5,
@@ -641,11 +571,6 @@ export async function evaluateYLTurnAction(input: {
   return { ...result.data, reaction };
 }
 
-// ---------------------------------------------------------------------------
-// T3.6 — evaluateYLFinalAction
-// Holistic evaluation over all turns. Persists a final evaluation message.
-// ---------------------------------------------------------------------------
-
 export async function evaluateYLFinalAction(input: {
   sessionId: string;
   mode: ModeKey;
@@ -658,7 +583,6 @@ export async function evaluateYLFinalAction(input: {
   } = await supabase.auth.getUser();
   if (!user) throw new Error('[evaluateYLFinalAction] Not authenticated');
 
-  // Fetch all user messages for this session
   const { data: messages } = await supabase
     .from('bob_messages')
     .select('content_text, content_json, role, msg_type')
@@ -679,7 +603,7 @@ export async function evaluateYLFinalAction(input: {
     QUESTION: `Full session — ${input.turnsCount} turns`,
     STORY_BEAT: `Full session — ${input.turnsCount} turns`,
     DIFFERENCE: `Full session — ${input.turnsCount} turns`,
-    AUDIO_DURATION_SECONDS: 30, // safe fallback for final eval
+    AUDIO_DURATION_SECONDS: 30,
   });
 
   const response = await ai.models.generateContent({
@@ -703,7 +627,6 @@ export async function evaluateYLFinalAction(input: {
 
   const evalResult = result.data;
 
-  // Persist final evaluation row
   await supabase.from('bob_messages').insert({
     session_id: input.sessionId,
     user_id: user.id,
@@ -715,14 +638,8 @@ export async function evaluateYLFinalAction(input: {
   return evalResult;
 }
 
-// ---------------------------------------------------------------------------
-// T3.7 — getSessionMessagesAction
-// Returns all messages for a session ordered by created_at.
-// Note: getMessagesAction is exported from src/actions/messages.ts.
-// Server-action files only allow async function exports, so the alias is
-// declared here as a thin async wrapper instead of a re-export.
-// ---------------------------------------------------------------------------
-
+// Server-action files only allow async function exports; this wraps the
+// re-export from messages.ts as a thin async function to satisfy that constraint.
 import { getMessagesAction } from '@/actions/messages';
 
 export async function getSessionMessagesAction(sessionId: string) {

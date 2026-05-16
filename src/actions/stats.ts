@@ -21,7 +21,6 @@ export async function getStudentStatsAction(): Promise<StudentStatsResult> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { rows: [], total_sessions: 0, global_avg: null };
 
-  // Pull all final evaluations + their session mode in a single query.
   const { data: evalRows } = await supabase
     .from('bob_messages')
     .select('content_json, created_at, session_id, bob_sessions!inner(mode)')
