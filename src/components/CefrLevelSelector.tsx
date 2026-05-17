@@ -3,16 +3,17 @@
 import React from 'react';
 import { Lock } from 'lucide-react';
 import { motion } from 'motion/react';
+import { useTranslations } from 'next-intl';
 import type { CefrLevel } from '@/lib/types/practice';
 
-const CEFR_OPTIONS: { value: CefrLevel; label: string; color: string; soft: string }[] = [
+const CEFR_OPTIONS: { value: CefrLevel; label: string; color: string; soft: string; comingSoon?: boolean }[] = [
   { value: 'pre_a1', label: 'Pre-A1', color: '#8B5CF6', soft: '#ede9fe' },
   { value: 'a1', label: 'A1', color: '#469E7B', soft: '#dcebe3' },
   { value: 'a2', label: 'A2', color: '#3660AB', soft: '#dde4f2' },
   { value: 'b1', label: 'B1', color: '#F8AC37', soft: '#fde9c8' },
   { value: 'b2', label: 'B2', color: '#E62D2B', soft: '#fad6d5' },
-  { value: 'c1', label: 'C1', color: '#1E1E1C', soft: '#e5e5e2' },
-  { value: 'c2', label: 'C2', color: '#1E1E1C', soft: '#e5e5e2' },
+  { value: 'c1', label: 'C1', color: '#1E1E1C', soft: '#e5e5e2', comingSoon: true },
+  { value: 'c2', label: 'C2', color: '#1E1E1C', soft: '#e5e5e2', comingSoon: true },
 ];
 
 interface CefrLevelSelectorProps {
@@ -23,23 +24,24 @@ interface CefrLevelSelectorProps {
 }
 
 export function CefrLevelSelector({ value, onChange, disabled, locked }: CefrLevelSelectorProps) {
+  const t = useTranslations('common');
   const isDisabled = disabled || locked;
 
   return (
     <div className="inline-flex items-center gap-3">
       <span className="text-[10px] font-bold uppercase tracking-[0.22em] text-trebol-text/55 shrink-0">
-        Nivel
+        {t('level.label')}
       </span>
       <div
         role="radiogroup"
         aria-label="Nivel CEFR"
-        title={locked ? 'Tu colegio bloqueó tu nivel CEFR' : undefined}
+        title={locked ? t('level.lockedByOrg') : undefined}
         className="relative inline-flex items-center gap-0.5 rounded-full bg-white p-1 border border-[#ece8de]"
         style={{ boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.04)' }}
       >
-        {CEFR_OPTIONS.map(({ value: v, label, color }) => {
+        {CEFR_OPTIONS.map(({ value: v, label, color, comingSoon }) => {
           const isActive = value === v;
-          const itemDisabled = isDisabled && !isActive;
+          const itemDisabled = (isDisabled && !isActive) || Boolean(comingSoon);
           return (
             <button
               key={v}
@@ -47,7 +49,8 @@ export function CefrLevelSelector({ value, onChange, disabled, locked }: CefrLev
               role="radio"
               aria-checked={isActive}
               disabled={itemDisabled}
-              onClick={() => !isDisabled && onChange(v)}
+              title={comingSoon ? t('level.comingSoon') : undefined}
+              onClick={() => !isDisabled && !comingSoon && onChange(v)}
               className="relative px-3 py-1.5 text-xs font-bold rounded-full transition-colors cursor-pointer disabled:cursor-not-allowed"
               style={{
                 color: isActive
@@ -87,8 +90,8 @@ export function CefrLevelSelector({ value, onChange, disabled, locked }: CefrLev
       {locked && (
         <span
           className="inline-flex items-center gap-1 text-[10px] font-bold text-trebol-text/45"
-          aria-label="Bloqueado por tu colegio"
-          title="Bloqueado por tu colegio"
+          aria-label={t('level.lockedAria')}
+          title={t('level.lockedAria')}
         >
           <Lock size={11} strokeWidth={2.2} />
         </span>
