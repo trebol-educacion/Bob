@@ -1,1 +1,79 @@
-{}
+{
+  "common": {
+    "tryAgain": "Try Again",
+    "back": "Back",
+    "backToModes": "Back to Modes",
+    "send": "Send",
+    "stop": "Stop",
+    "evaluatingPerformance": "Evaluating your performance…"
+  },
+  "a2": {
+    "part1": {
+      "preparingInterview": "Preparing your A2 interview…",
+      "interviewComplete": "Interview Complete!",
+      "subtitle": "A2 Key — Part 1 Speaking",
+      "headerTitle": "A2 Key – Part 1 Interview",
+      "interviewCompleteSubtitle": "Interview complete",
+      "questionOf": "Question {current} of {total}",
+      "phase2Topic": "Phase 2: Topic — {topic}",
+      "finalQuestion": "Final Question",
+      "listeningToExaminer": "Listening to examiner...",
+      "recordingIn": "Recording in {countdown}…",
+      "processingAnswer": "Processing your answer...",
+      "examinerResponding": "Examiner responding...",
+      "nextQuestion": "Next question...",
+      "recording": "Recording",
+      "recordingCountdownLabel": "Recording in"
+    }
+  },
+  "b1": {
+    "collaborative": {
+      "headerTitle": "B1 Collaborative Task",
+      "headerSubtitle": "Cambridge B1 Preliminary · Part 3",
+      "conversationSubtitle": "B1 · Part 3",
+      "feedbackTitle": "Your Feedback",
+      "evaluatingPerformance": "Evaluating your performance…",
+      "howItWorks": "How it works",
+      "howItWorksLine1": "You discuss 5 options with an AI examiner (up to {maxTurns} turns)",
+      "howItWorksLine2": "Speak your opinion on each option — give reasons!",
+      "howItWorksLine3": "After finishing, you get detailed feedback on your performance",
+      "startDiscussion": "Start Discussion",
+      "finishEvaluate": "Finish & Evaluate",
+      "finishEarly": "Finish early",
+      "typeInstead": "Type instead",
+      "hideText": "Hide text",
+      "generatingScenario": "Generating scenario…",
+      "surpriseMe": "Surprise me (AI generated)",
+      "turnOf": "Turn {current} of {max}",
+      "optionsSidebarLabel": "Options",
+      "examiner": "Examiner",
+      "examinerResponding": "Examiner is responding…",
+      "footerModeLabel": "B1 PART 3",
+      "footerFeedbackLabel": "FEEDBACK",
+      "footerCollaborativeLabel": "COLLABORATIVE TASK"
+    }
+  },
+  "ket": {
+    "shortMessage": {
+      "headerTitle": "Short Message",
+      "headerSubtitle": "KET · Writing Part 6",
+      "partBadge": "PART 6",
+      "situation": "Situation",
+      "situationPrompt": "Write a message to <strong>{recipient}</strong>. {scenario}",
+      "wordGoal": "Goal: ~25 words in English",
+      "preparingExercise": "Preparing your writing exercise…",
+      "reviewingMessage": "Reviewing your message…",
+      "yourMessage": "Your message",
+      "youDidIt": "You did it!",
+      "reviewYourMessage": "Review your message",
+      "whatYouDidWell": "What you did well",
+      "toImprove": "To improve",
+      "viewModelAnswer": "View model answer",
+      "back": "Back",
+      "words": "Words:",
+      "wordGoalTarget": "/ goal ~25",
+      "moreToSend": "{remaining} more to send",
+      "sendMessage": "Send message"
+    }
+  }
+}

@@ -33,6 +33,7 @@ import { BobMascotLoader } from '@/components/chat/BobMascotLoader';
 import { ChatShell } from '@/components/ChatShell';
 import { MessageBubble, InfoCard } from '@/components/chat';
 import { ACTIVE_MODEL_LABEL } from '@/lib/models';
+import { useTranslations } from 'next-intl';
 
 interface B1CollaborativePracticeProps {
   onBack: () => void;
@@ -130,6 +131,7 @@ function FormativeFeedbackPanel({ feedback }: { feedback: FormativeFeedback }) {
 
 /** B1 Collaborative Task — Cambridge B1 Preliminary Part 3. */
 export function B1CollaborativePractice({ onBack, sessionId: initialSessionId }: B1CollaborativePracticeProps) {
+  const t = useTranslations('cambridge');
   const [phase, setPhase] = useState<Phase>('intro');
   const [scenario, setScenario] = useState<Part3Scenario | null>(null);
   const [history, setHistory] = useState<Part3ChatMessage[]>([]);
@@ -347,7 +349,7 @@ export function B1CollaborativePractice({ onBack, sessionId: initialSessionId }:
           <span className="flex items-center justify-center w-4 h-4">
             {loadingScenario ? <Loader2 size={16} className="animate-spin" /> : <Shuffle size={16} />}
           </span>
-          {loadingScenario ? 'Generating scenario…' : 'Surprise me (AI generated)'}
+          {loadingScenario ? t('b1.collaborative.generatingScenario') : t('b1.collaborative.surpriseMe')}
         </button>
 
         <AnimatePresence>
@@ -372,7 +374,7 @@ export function B1CollaborativePractice({ onBack, sessionId: initialSessionId }:
                 onClick={handleStart}
                 className="w-full bg-trebol-primary text-white font-bold py-3 rounded-xl hover:opacity-90 transition-opacity"
               >
-                Start Discussion
+                {t('b1.collaborative.startDiscussion')}
               </button>
             </motion.div>
           )}
@@ -383,19 +385,19 @@ export function B1CollaborativePractice({ onBack, sessionId: initialSessionId }:
     const introBody = (
       <div className="space-y-4">
         <MessageBubble variant="assistant" icon={MessageSquare} accentColor="blue" noAnimate>
-          <p className="font-semibold">How it works</p>
+          <p className="font-semibold">{t('b1.collaborative.howItWorks')}</p>
           <ul className="mt-2 space-y-1 text-sm">
             <li className="flex items-start gap-2">
               <ChevronRight size={14} className="mt-0.5 shrink-0" />
-              You discuss 5 options with an AI examiner (up to {MAX_TURNS} turns)
+              {t('b1.collaborative.howItWorksLine1', { maxTurns: MAX_TURNS })}
             </li>
             <li className="flex items-start gap-2">
               <ChevronRight size={14} className="mt-0.5 shrink-0" />
-              Speak your opinion on each option — give reasons!
+              {t('b1.collaborative.howItWorksLine2')}
             </li>
             <li className="flex items-start gap-2">
               <ChevronRight size={14} className="mt-0.5 shrink-0" />
-              After finishing, you get detailed feedback on your performance
+              {t('b1.collaborative.howItWorksLine3')}
             </li>
           </ul>
         </MessageBubble>
@@ -413,8 +415,8 @@ export function B1CollaborativePractice({ onBack, sessionId: initialSessionId }:
       <ChatShell
         headerConfig={{
           icon: MessageSquare,
-          title: 'B1 Collaborative Task',
-          subtitle: 'Cambridge B1 Preliminary · Part 3',
+          title: t('b1.collaborative.headerTitle'),
+          subtitle: t('b1.collaborative.headerSubtitle'),
           accentColor: 'blue',
           online: true,
           leftSlot: (
@@ -426,7 +428,7 @@ export function B1CollaborativePractice({ onBack, sessionId: initialSessionId }:
             </button>
           ),
         }}
-        footerConfig={{ modeLabel: 'B1 PART 3', modelName: ACTIVE_MODEL_LABEL }}
+        footerConfig={{ modeLabel: t('b1.collaborative.footerModeLabel'), modelName: ACTIVE_MODEL_LABEL }}
         inputSlot={introInputSlot}
         animationKey="b1-intro"
       >
@@ -436,7 +438,7 @@ export function B1CollaborativePractice({ onBack, sessionId: initialSessionId }:
   }
 
   if (phase === 'evaluating') {
-    return <BobMascotLoader message="Evaluating your performance…" />;
+    return <BobMascotLoader message={t('b1.collaborative.evaluatingPerformance')} />;
   }
 
   if (phase === 'result' && evaluation) {
@@ -447,13 +449,13 @@ export function B1CollaborativePractice({ onBack, sessionId: initialSessionId }:
           className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-trebol-primary text-trebol-primary font-bold hover:bg-trebol-primary/5 transition-colors"
         >
           <RotateCcw size={16} />
-          Try Again
+          {t('common.tryAgain')}
         </button>
         <button
           onClick={onBack}
           className="flex-1 py-3 rounded-xl bg-trebol-primary text-white font-bold hover:opacity-90 transition-opacity"
         >
-          Back to Modes
+          {t('common.backToModes')}
         </button>
       </div>
     );
@@ -462,8 +464,8 @@ export function B1CollaborativePractice({ onBack, sessionId: initialSessionId }:
       <ChatShell
         headerConfig={{
           icon: MessageSquare,
-          title: 'Your Feedback',
-          subtitle: 'Cambridge B1 Preliminary · Part 3',
+          title: t('b1.collaborative.feedbackTitle'),
+          subtitle: t('b1.collaborative.headerSubtitle'),
           accentColor: 'blue',
           online: false,
           leftSlot: (
@@ -475,7 +477,7 @@ export function B1CollaborativePractice({ onBack, sessionId: initialSessionId }:
             </button>
           ),
         }}
-        footerConfig={{ modeLabel: 'FEEDBACK', modelName: ACTIVE_MODEL_LABEL }}
+        footerConfig={{ modeLabel: t('b1.collaborative.footerFeedbackLabel'), modelName: ACTIVE_MODEL_LABEL }}
         inputSlot={resultInputSlot}
         animationKey="b1-result"
       >
@@ -486,7 +488,7 @@ export function B1CollaborativePractice({ onBack, sessionId: initialSessionId }:
 
   const optionsSidebar = (
     <div className="hidden md:flex flex-col gap-2 w-44 shrink-0 border-r border-gray-100 bg-gray-50 overflow-y-auto p-3">
-      <p className="text-xs font-bold text-trebol-text/50 uppercase tracking-widest mb-1">Options</p>
+      <p className="text-xs font-bold text-trebol-text/50 uppercase tracking-widest mb-1">{t('b1.collaborative.optionsSidebarLabel')}</p>
       {scenario?.options.map((option, index) => (
         <div
           key={option}
@@ -544,7 +546,7 @@ export function B1CollaborativePractice({ onBack, sessionId: initialSessionId }:
               disabled={!textInput.trim() || isProcessing}
               className="bg-trebol-primary text-white px-4 py-2 rounded-xl text-sm font-bold disabled:opacity-50 hover:opacity-90 transition-opacity"
             >
-              Send
+              {t('common.send')}
             </button>
           </motion.div>
         )}
@@ -558,7 +560,7 @@ export function B1CollaborativePractice({ onBack, sessionId: initialSessionId }:
             className="flex-1 max-w-xs bg-green-500 text-white font-bold py-3 rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
           >
             <CheckCircle2 size={18} />
-            Finish & Evaluate
+            {t('b1.collaborative.finishEvaluate')}
           </button>
         )}
 
@@ -581,7 +583,7 @@ export function B1CollaborativePractice({ onBack, sessionId: initialSessionId }:
               disabled={isRecording || isProcessing}
               className="text-xs text-trebol-text/50 hover:text-trebol-text transition-colors font-medium disabled:opacity-30"
             >
-              {showTextInput ? 'Hide text' : 'Type instead'}
+              {showTextInput ? t('b1.collaborative.hideText') : t('b1.collaborative.typeInstead')}
             </button>
 
             {userTurns >= 4 && (
@@ -590,7 +592,7 @@ export function B1CollaborativePractice({ onBack, sessionId: initialSessionId }:
                 disabled={isProcessing || isRecording}
                 className="text-xs text-trebol-text/40 hover:text-trebol-primary transition-colors font-medium disabled:opacity-30"
               >
-                Finish early
+                {t('b1.collaborative.finishEarly')}
               </button>
             )}
           </>
@@ -616,7 +618,7 @@ export function B1CollaborativePractice({ onBack, sessionId: initialSessionId }:
             noAnimate
           >
             {msg.role === 'examiner' && (
-              <p className="text-[10px] font-bold opacity-50 mb-1 uppercase tracking-wider">Examiner</p>
+              <p className="text-[10px] font-bold opacity-50 mb-1 uppercase tracking-wider">{t('b1.collaborative.examiner')}</p>
             )}
             <p className="leading-relaxed">{msg.text}</p>
           </MessageBubble>
@@ -626,7 +628,7 @@ export function B1CollaborativePractice({ onBack, sessionId: initialSessionId }:
           <MessageBubble variant="assistant" icon={MessageSquare} accentColor="blue">
             <div className="flex items-center gap-2">
               <Loader2 size={14} className="animate-spin" />
-              <span className="text-xs opacity-60">Examiner is responding…</span>
+              <span className="text-xs opacity-60">{t('b1.collaborative.examinerResponding')}</span>
             </div>
           </MessageBubble>
         )}
@@ -639,7 +641,7 @@ export function B1CollaborativePractice({ onBack, sessionId: initialSessionId }:
       headerConfig={{
         icon: MessageSquare,
         title: scenario?.topic ?? 'Collaborative Task',
-        subtitle: 'B1 · Part 3',
+        subtitle: t('b1.collaborative.conversationSubtitle'),
         accentColor: 'blue',
         online: true,
         leftSlot: (
@@ -652,11 +654,11 @@ export function B1CollaborativePractice({ onBack, sessionId: initialSessionId }:
         ),
         rightSlot: (
           <span className="text-xs font-bold text-trebol-primary bg-trebol-secondary/20 px-3 py-1 rounded-full">
-            Turn {userTurns} of {MAX_TURNS}
+            {t('b1.collaborative.turnOf', { current: userTurns, max: MAX_TURNS })}
           </span>
         ),
       }}
-      footerConfig={{ modeLabel: 'COLLABORATIVE TASK', modelName: ACTIVE_MODEL_LABEL }}
+      footerConfig={{ modeLabel: t('b1.collaborative.footerCollaborativeLabel'), modelName: ACTIVE_MODEL_LABEL }}
       inputSlot={conversationInputSlot}
       animationKey="b1-conversation"
     >

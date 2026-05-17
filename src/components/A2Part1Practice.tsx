@@ -14,6 +14,7 @@ import { BobMascotLoader } from '@/components/chat/BobMascotLoader';
 import { ChatShell } from '@/components/ChatShell';
 import { MessageBubble, InfoCard } from '@/components/chat';
 import { ACTIVE_MODEL_LABEL } from '@/lib/models';
+import { useTranslations } from 'next-intl';
 
 type A2Phase =
   | 'loading'
@@ -93,6 +94,7 @@ function FormativeFeedbackPanel({ feedback }: { feedback: FormativeFeedback }) {
 
 /** A2 Key Part 1 Speaking practice — Cambridge KET interview simulation. */
 export function A2Part1Practice({ onBack }: A2Part1PracticeProps) {
+  const t = useTranslations('cambridge');
   const [phase, setPhase] = useState<A2Phase>('loading');
   const [plan, setPlan] = useState<A2SessionPlan | null>(null);
   const [questionIndex, setQuestionIndex] = useState(0);
@@ -287,9 +289,9 @@ export function A2Part1Practice({ onBack }: A2Part1PracticeProps) {
 
     if (currentPhase !== nextPhase) {
       let label = '';
-      if (nextPhase === 'phase2-topic1') label = `Phase 2: Topic — ${plan.topic1}`;
-      else if (nextPhase === 'phase2-topic2') label = `Phase 2: Topic — ${plan.topic2}`;
-      else if (nextPhase === 'final-question') label = 'Final Question';
+      if (nextPhase === 'phase2-topic1') label = t('a2.part1.phase2Topic', { topic: plan.topic1 });
+      else if (nextPhase === 'phase2-topic2') label = t('a2.part1.phase2Topic', { topic: plan.topic2 });
+      else if (nextPhase === 'final-question') label = t('a2.part1.finalQuestion');
 
       if (label) {
         setPhaseTransition({ label });
@@ -364,13 +366,13 @@ export function A2Part1Practice({ onBack }: A2Part1PracticeProps) {
             onClick={handleTryAgain}
             className="px-5 py-2 bg-trebol-primary text-white rounded-lg font-semibold"
           >
-            Try Again
+            {t('common.tryAgain')}
           </button>
           <button
             onClick={onBack}
             className="px-5 py-2 bg-trebol-border text-trebol-text rounded-lg font-semibold"
           >
-            Back
+            {t('common.back')}
           </button>
         </div>
       </div>
@@ -378,11 +380,11 @@ export function A2Part1Practice({ onBack }: A2Part1PracticeProps) {
   }
 
   if (phase === 'loading') {
-    return <BobMascotLoader message="Preparing your A2 interview…" />;
+    return <BobMascotLoader message={t('a2.part1.preparingInterview')} />;
   }
 
   if (phase === 'evaluating') {
-    return <BobMascotLoader message="Evaluating your performance…" />;
+    return <BobMascotLoader message={t('common.evaluatingPerformance')} />;
   }
 
   const questionNumber = questionIndex + 1;
@@ -416,8 +418,8 @@ export function A2Part1Practice({ onBack }: A2Part1PracticeProps) {
       >
         <div className="text-center space-y-2 pt-2">
           <CheckCircle className="mx-auto text-blue-600" size={48} />
-          <h2 className="text-2xl font-black text-gray-900">Interview Complete!</h2>
-          <p className="text-gray-400 font-medium">A2 Key — Part 1 Speaking</p>
+          <h2 className="text-2xl font-black text-gray-900">{t('a2.part1.interviewComplete')}</h2>
+          <p className="text-gray-400 font-medium">{t('a2.part1.subtitle')}</p>
         </div>
 
         <FormativeFeedbackPanel feedback={evaluation} />
@@ -427,13 +429,13 @@ export function A2Part1Practice({ onBack }: A2Part1PracticeProps) {
             onClick={handleTryAgain}
             className="flex-1 py-3 bg-blue-600 text-white rounded-xl font-bold hover:opacity-90 transition-opacity"
           >
-            Try Again
+            {t('common.tryAgain')}
           </button>
           <button
             onClick={onBack}
             className="flex-1 py-3 bg-gray-100 text-gray-800 rounded-xl font-bold hover:opacity-90 transition-opacity"
           >
-            Back to Modes
+            {t('common.backToModes')}
           </button>
         </div>
       </motion.div>
@@ -443,8 +445,8 @@ export function A2Part1Practice({ onBack }: A2Part1PracticeProps) {
       <ChatShell
         headerConfig={{
           icon: CheckCircle,
-          title: 'A2 Key – Part 1 Interview',
-          subtitle: 'Interview complete',
+          title: t('a2.part1.headerTitle'),
+          subtitle: t('a2.part1.interviewCompleteSubtitle'),
           accentColor: 'blue',
           leftSlot: backButton,
           online: false,
@@ -474,7 +476,7 @@ export function A2Part1Practice({ onBack }: A2Part1PracticeProps) {
               <Mic size={18} className="text-white" />
             </motion.div>
             <div>
-              <p className="text-sm font-bold text-red-500">Recording</p>
+              <p className="text-sm font-bold text-red-500">{t('a2.part1.recording')}</p>
               <p className="text-xs text-gray-400">
                 {recordingSeconds}s / {RECORDING_MAX_SECONDS}s
               </p>
@@ -485,17 +487,17 @@ export function A2Part1Practice({ onBack }: A2Part1PracticeProps) {
             className="flex items-center gap-2 px-4 py-2 bg-gray-100 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-200 transition-colors"
           >
             <MicOff size={16} />
-            Stop
+            {t('common.stop')}
           </button>
         </div>
       )}
       {questionStep !== 'recording' && (
         <p className="text-xs text-center text-gray-400 py-1">
-          {questionStep === 'playing-question' && 'Listening to examiner...'}
-          {questionStep === 'countdown' && `Recording in ${countdown}…`}
-          {questionStep === 'processing' && 'Processing your answer...'}
-          {questionStep === 'reaction' && 'Examiner responding...'}
-          {questionStep === 'transition' && 'Next question...'}
+          {questionStep === 'playing-question' && t('a2.part1.listeningToExaminer')}
+          {questionStep === 'countdown' && t('a2.part1.recordingIn', { countdown })}
+          {questionStep === 'processing' && t('a2.part1.processingAnswer')}
+          {questionStep === 'reaction' && t('a2.part1.examinerResponding')}
+          {questionStep === 'transition' && t('a2.part1.nextQuestion')}
         </p>
       )}
     </div>
@@ -547,7 +549,7 @@ export function A2Part1Practice({ onBack }: A2Part1PracticeProps) {
 
       {questionStep === 'countdown' && (
         <div className="flex flex-col items-center gap-2 py-4">
-          <p className="text-gray-400 font-semibold text-sm">Recording in</p>
+          <p className="text-gray-400 font-semibold text-sm">{t('a2.part1.recordingCountdownLabel')}</p>
           <motion.span
             key={countdown}
             initial={{ scale: 1.4, opacity: 0 }}
@@ -562,7 +564,7 @@ export function A2Part1Practice({ onBack }: A2Part1PracticeProps) {
       {questionStep === 'processing' && (
         <div className="flex flex-col items-center gap-3 py-4">
           <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
-          <p className="text-gray-400 font-semibold text-sm">Processing your answer...</p>
+          <p className="text-gray-400 font-semibold text-sm">{t('a2.part1.processingAnswer')}</p>
         </div>
       )}
     </>
@@ -572,8 +574,8 @@ export function A2Part1Practice({ onBack }: A2Part1PracticeProps) {
     <ChatShell
       headerConfig={{
         icon: Mic,
-        title: 'A2 Key – Part 1 Interview',
-        subtitle: `Question ${questionNumber} of ${totalQuestions}`,
+        title: t('a2.part1.headerTitle'),
+        subtitle: t('a2.part1.questionOf', { current: questionNumber, total: totalQuestions }),
         accentColor: 'blue',
         leftSlot: backButton,
         rightSlot: progressBar,
