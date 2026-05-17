@@ -39,12 +39,26 @@ export const FindDifferenceSchema = z.object({
 
 export type FindDifference = z.infer<typeof FindDifferenceSchema>;
 
+/** One scene in the Movers Part 3 "Tell the Story" activity. */
+export const StorySceneSchema = z.object({
+  id: z.string(),
+  image_prompt: z.string(),
+  modeled_description: z.string().optional(),
+  expected_keywords: z.array(z.string()).optional(),
+  examiner_cue: z.string().optional(),
+  expected_answer: z.string().optional(),
+});
+
+export type StoryScene = z.infer<typeof StorySceneSchema>;
+
 export const YLPlanSchema = z.object({
   cues: z.array(z.string()).default([]),
   image_prompts: z.array(z.string()).optional(),
   character_description: z.string().optional(),
   story_title: z.string().optional(),
+  story_setup: z.string().optional(),
   story_beats: z.array(z.string()).optional(),
+  scenes: z.array(StorySceneSchema).optional(),
   student_card: z.record(z.string(), z.string()).optional(),
   examiner_card: z.record(z.string(), z.string()).optional(),
   target_questions: z.array(z.string()).optional(),

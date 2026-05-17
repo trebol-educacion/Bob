@@ -266,13 +266,14 @@ export async function generateYLContentAction(
   const isPointingMode = exam === 'starters' && part === 1;
   const isWhatsThisMode = exam === 'starters' && part === 3;
   const isFindDifferencesMode = exam === 'movers' && part === 1;
-  const needsPreselectedWords = isPointingMode || isWhatsThisMode || isFindDifferencesMode;
+  const isTellTheStoryMode = exam === 'movers' && part === 3;
+  const needsPreselectedWords = isPointingMode || isWhatsThisMode || isFindDifferencesMode || isTellTheStoryMode;
 
   const preselectedWords = needsPreselectedWords
     ? await pickVocabularyForActivity({
         framework: 'cambridge',
         cefr_level: isPointingMode || isWhatsThisMode ? 'pre_a1' : 'a1',
-        count: 4,
+        count: isTellTheStoryMode ? 3 : 4,
         distinctCategories: true,
         objectCardFriendlyOnly: isWhatsThisMode,
       })
@@ -281,7 +282,11 @@ export async function generateYLContentAction(
   const promptVariables: Record<string, string> = {
     AVOID_LIST: avoidList,
   };
-  if (preselectedWords.length === 4) {
+  if (isTellTheStoryMode && preselectedWords.length === 3) {
+    promptVariables.WORD_1 = preselectedWords[0].word;
+    promptVariables.WORD_2 = preselectedWords[1].word;
+    promptVariables.WORD_3 = preselectedWords[2].word;
+  } else if (preselectedWords.length === 4) {
     promptVariables.WORD_1 = preselectedWords[0].word;
     promptVariables.WORD_2 = preselectedWords[1].word;
     promptVariables.WORD_3 = preselectedWords[2].word;
@@ -289,7 +294,9 @@ export async function generateYLContentAction(
   }
 
   const cacheInputs: Record<string, unknown> = { avoidList };
-  if (preselectedWords.length === 4) {
+  if (isTellTheStoryMode && preselectedWords.length === 3) {
+    cacheInputs.words = preselectedWords.map((w) => w.word).join(',');
+  } else if (preselectedWords.length === 4) {
     cacheInputs.words = preselectedWords.map((w) => w.word).join(',');
   }
 
@@ -337,6 +344,11 @@ export async function generateYLContentAction(
         typeof p.image_prompt_a === 'string' &&
         typeof p.image_prompt_b === 'string';
 
+      const isTellTheStory =
+        Array.isArray(p.scenes) &&
+        (p.scenes as unknown[]).length === 4 &&
+        typeof p.story_title === 'string';
+
       const normalized: Record<string, unknown> = {
         cues: isPointing
           ? (p.cues as Array<{ text: string }>).map((c) => c.text)
@@ -346,6 +358,10 @@ export async function generateYLContentAction(
             )
           : isFindDiffs
           ? (p.differences as Array<{ examiner_cue: string }>).map((d) => d.examiner_cue)
+          : isTellTheStory
+          ? (p.scenes as Array<{ examiner_cue?: string }>)
+              .slice(1)
+              .map((s) => s.examiner_cue ?? '')
           : (p.cues as unknown[]) ??
             (p.examiner_cues as unknown[]) ??
             (p.target_questions as unknown[]) ??
@@ -356,10 +372,14 @@ export async function generateYLContentAction(
           ? (p.object_cards as Array<{ image_prompt: string }>).map((c) => c.image_prompt)
           : isFindDiffs
           ? [p.image_prompt_a, p.image_prompt_b]
+          : isTellTheStory
+          ? (p.scenes as Array<{ image_prompt: string }>).map((s) => s.image_prompt)
           : (p.image_prompts as unknown[]) ??
             (typeof p.image_prompt === 'string' ? [p.image_prompt] : undefined),
         character_description: p.character_description ?? p.character ?? undefined,
         story_title: p.story_title ?? p.title ?? undefined,
+        story_setup: isTellTheStory ? (p.story_setup as string | undefined) : undefined,
+        scenes: isTellTheStory ? (p.scenes as unknown[]) : undefined,
         story_beats: (p.story_beats as unknown[]) ?? (p.beats as unknown[]) ?? undefined,
         student_card: p.student_card ?? undefined,
         examiner_card: p.examiner_card ?? undefined,
@@ -1181,6 +1201,116 @@ export async function evaluateFindDifferencesAnswerAction(input: {
     });
   } catch (err) {
     console.warn('[evaluateFindDifferencesAnswerAction] saveYLTurnAction failed:', err);
+  }
+
+  return result;
+}
+
+/**
+ * Evaluates a single spoken scene narration for Movers Part 3 "Tell the Story".
+ * Transcribes the audio, evaluates keyword presence, generates a warm reaction,
+ * and persists the turn via saveYLTurnAction.
+ */
+export async function evaluateTellTheStoryAnswerAction(input: {
+  sessionId: string;
+  sceneIndex: number;
+  examinerCue: string;
+  expectedAnswer: string;
+  expectedKeywords: string[];
+  audioBase64: string;
+  mimeType: string;
+  audioDuration: number;
+}): Promise<WhatsThisEvalResult> {
+  if (input.audioDuration <= 0.15) {
+    const silenceResult: WhatsThisEvalResult = {
+      score: 0,
+      score_max: 1,
+      cefr_band: 'a1',
+      correct: false,
+      reaction: "I didn't hear you — let's keep going!",
+      feedback: undefined,
+      transcript_used: '',
+      transcript: '',
+    };
+    try {
+      await saveYLTurnAction(input.sessionId, {
+        cue: input.examinerCue,
+        cueIndex: input.sceneIndex,
+        transcript: '',
+        reaction: silenceResult.reaction,
+      });
+    } catch (err) {
+      console.warn('[evaluateTellTheStoryAnswerAction] saveYLTurnAction failed (silence):', err);
+    }
+    return silenceResult;
+  }
+
+  const transcribeResult = await callGemini(
+    { promptKey: 'tell_the_story_transcribe', model: MODELS.FLASH_LITE_PREVIEW },
+    (ai) => ai.models.generateContent({
+      model: MODELS.FLASH_LITE_PREVIEW,
+      contents: [
+        {
+          role: 'user',
+          parts: [
+            { text: 'Transcribe exactly what the child says in English. Output only the transcription, nothing else. If nothing was said, output "(silence)".' },
+            { inlineData: { mimeType: input.mimeType, data: input.audioBase64 } },
+          ],
+        },
+      ],
+    })
+  );
+  const transcribed = transcribeResult.ok
+    ? (transcribeResult.data.text ?? '(silence)').trim()
+    : '(silence)';
+
+  const evalPromptText = await getPrompt('cambridge_movers_part3_a1_evaluation', {
+    EXAMINER_CUE: input.examinerCue,
+    EXPECTED_ANSWER: input.expectedAnswer,
+    EXPECTED_KEYWORDS: JSON.stringify(input.expectedKeywords),
+    USER_TRANSCRIPT: transcribed,
+    AUDIO_DURATION_SECONDS: input.audioDuration,
+  });
+
+  const evalResult = await callGemini(
+    { promptKey: 'cambridge_movers_part3_a1_evaluation', model: MODELS.FLASH_LITE_PREVIEW },
+    (ai) => ai.models.generateContent({
+      model: MODELS.FLASH_LITE_PREVIEW,
+      contents: [{ role: 'user', parts: [{ text: evalPromptText }] }],
+      config: { responseMimeType: 'application/json' },
+    })
+  );
+
+  if (!evalResult.ok || !evalResult.data.text) {
+    console.error(JSON.stringify({ event: 'evaluateTellTheStoryAnswerAction', error: 'eval failed' }));
+    return { ...WhatsThisEvalFallback, transcript: transcribed };
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(evalResult.data.text);
+  } catch {
+    console.error(JSON.stringify({ event: 'evaluateTellTheStoryAnswerAction', error: 'invalid JSON' }));
+    return { ...WhatsThisEvalFallback, transcript: transcribed };
+  }
+
+  const validated = WhatsThisEvalResultSchema.safeParse(parsed);
+  if (!validated.success) {
+    console.error('[evaluateTellTheStoryAnswerAction] schema mismatch:', validated.error.message);
+    return { ...WhatsThisEvalFallback, transcript: transcribed };
+  }
+
+  const result: WhatsThisEvalResult = { ...validated.data, transcript: transcribed };
+
+  try {
+    await saveYLTurnAction(input.sessionId, {
+      cue: input.examinerCue,
+      cueIndex: input.sceneIndex,
+      transcript: transcribed,
+      reaction: result.reaction,
+    });
+  } catch (err) {
+    console.warn('[evaluateTellTheStoryAnswerAction] saveYLTurnAction failed:', err);
   }
 
   return result;
