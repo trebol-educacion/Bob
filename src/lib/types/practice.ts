@@ -57,6 +57,8 @@ export type ModeKey = string;
  * Filled by OrganizationContext via the §2.2 query of spec.md.
  * `cefr_level` is nullable to allow universal activities (e.g. generic_conversation).
  */
+export type ActivityStatus = 'enabled' | 'coming_soon' | 'hidden';
+
 export interface DynamicCard {
   framework: string;
   exam_part: string;
@@ -64,6 +66,7 @@ export interface DynamicCard {
   label: string;
   description: string | null;
   mode_key: ModeKey;
+  status: ActivityStatus;
 }
 
 export type ExamLevel = 'a2' | 'b1' | 'b2' | 'toefl';

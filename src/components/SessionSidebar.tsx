@@ -3,6 +3,14 @@
 import React, { useState } from 'react';
 import { MessageSquare, Image as ImageIcon, MessagesSquare, Users, BookOpen, Headphones, Mic, Plus, ChevronLeft, ChevronRight, Trash2, Hand, HelpCircle, User, GitCompare, MessageCircle, BookImage } from 'lucide-react';
 import { ListenAndPointIcon } from '@/components/icons/ModeIcons';
+import { LookAndAnswerIcon, TellTheStoryIcon, PersonalQuestionsIcon } from '@/components/icons/StartersIcons';
+import { FindTheDifferencesIcon, InformationExchangeIcon, PictureStoryMoversIcon, PersonalQuestionsMoversIcon, MoreAboutYouIcon } from '@/components/icons/MoversIcons';
+import { FlyersFindDifferencesIcon } from '@/components/icons/FlyersIcons';
+import { KETListeningIcon, KETReadingIcon, KETWritingIcon, KETSpeakingIcon } from '@/components/icons/KETIcons';
+import { PETListeningIcon, PETReadingIcon, PETWritingIcon, PETSpeakingIcon } from '@/components/icons/PETIcons';
+import { FCEListeningIcon, FCEReadingIcon, FCEWritingIcon, FCESpeakingIcon } from '@/components/icons/FCEIcons';
+import { CAEInterviewIcon, CAELongTurnIcon, CAECollaborativeIcon, CAEDiscussionIcon } from '@/components/icons/CAEIcons';
+import { CPEInterviewIcon, CPECollaborativeIcon, CPEMonologueIcon, CPEExtendedDiscussionIcon, CPEFinalDiscussionIcon } from '@/components/icons/CPEIcons';
 import { BobSession, SessionMode } from '@/actions/sessions';
 import { cn } from '@/lib/utils';
 
@@ -20,34 +28,34 @@ const MODE_ICON: Record<NonNullable<SessionMode>, React.ElementType> = {
   generic_image: ImageIcon,
   generic_conversation: MessagesSquare,
   cambridge_starters_part1: ListenAndPointIcon,
-  cambridge_starters_part2: HelpCircle,
-  cambridge_starters_part3: BookOpen,
-  cambridge_starters_part4: User,
-  cambridge_movers_part1: GitCompare,
-  cambridge_movers_part2: MessageCircle,
-  cambridge_movers_part3: BookImage,
-  cambridge_movers_part4: User,
-  cambridge_movers_part5: ImageIcon,
-  cambridge_flyers_part1: BookOpen,
-  cambridge_ket_part1: BookOpen,
-  cambridge_ket_part2: BookOpen,
-  cambridge_pet_p1: Users,
-  cambridge_pet_p2: Users,
-  cambridge_pet_p3: Users,
-  cambridge_pet_p4: Users,
-  cambridge_fce_p1: ImageIcon,
-  cambridge_fce_p2: ImageIcon,
-  cambridge_fce_p3: ImageIcon,
-  cambridge_fce_p4: ImageIcon,
-  cambridge_cae_p1: MessageSquare,
-  cambridge_cae_p2: MessageSquare,
-  cambridge_cae_p3: MessageSquare,
-  cambridge_cae_p4: MessageSquare,
-  cambridge_cpe_p1: MessageSquare,
-  cambridge_cpe_p2: MessageSquare,
-  cambridge_cpe_p3a: MessageSquare,
-  cambridge_cpe_p3b: MessageSquare,
-  cambridge_cpe_p4: MessageSquare,
+  cambridge_starters_part2: LookAndAnswerIcon,
+  cambridge_starters_part3: TellTheStoryIcon,
+  cambridge_starters_part4: PersonalQuestionsIcon,
+  cambridge_movers_part1: FindTheDifferencesIcon,
+  cambridge_movers_part2: InformationExchangeIcon,
+  cambridge_movers_part3: PictureStoryMoversIcon,
+  cambridge_movers_part4: PersonalQuestionsMoversIcon,
+  cambridge_movers_part5: MoreAboutYouIcon,
+  cambridge_flyers_part1: FlyersFindDifferencesIcon,
+  cambridge_ket_part1: KETSpeakingIcon,
+  cambridge_ket_part2: KETSpeakingIcon,
+  cambridge_pet_p1: PETSpeakingIcon,
+  cambridge_pet_p2: PETSpeakingIcon,
+  cambridge_pet_p3: PETSpeakingIcon,
+  cambridge_pet_p4: PETSpeakingIcon,
+  cambridge_fce_p1: FCESpeakingIcon,
+  cambridge_fce_p2: FCESpeakingIcon,
+  cambridge_fce_p3: FCESpeakingIcon,
+  cambridge_fce_p4: FCESpeakingIcon,
+  cambridge_cae_p1: CAEInterviewIcon,
+  cambridge_cae_p2: CAELongTurnIcon,
+  cambridge_cae_p3: CAECollaborativeIcon,
+  cambridge_cae_p4: CAEDiscussionIcon,
+  cambridge_cpe_p1: CPEInterviewIcon,
+  cambridge_cpe_p2: CPECollaborativeIcon,
+  cambridge_cpe_p3a: CPEMonologueIcon,
+  cambridge_cpe_p3b: CPEExtendedDiscussionIcon,
+  cambridge_cpe_p4: CPEFinalDiscussionIcon,
   toefl_listen_repeat: Headphones,
   toefl_interview: Mic,
 };

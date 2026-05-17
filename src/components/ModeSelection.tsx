@@ -21,6 +21,14 @@ import { useOrganization } from '@/contexts/OrganizationContext';
 import type { AvailableMode } from '@/contexts/OrganizationContext';
 import { getModeIcon, getModeBadge, getModeSection, getModeTitle, getModeDescription, getModeSortWeight, getModeOfficialName, getYLCardTheme, type YLCardTheme } from '@/lib/mode-ui';
 import { ListenAndPointIcon } from '@/components/icons/ModeIcons';
+import { LookAndAnswerIcon, TellTheStoryIcon, PersonalQuestionsIcon } from '@/components/icons/StartersIcons';
+import { FindTheDifferencesIcon, InformationExchangeIcon, PictureStoryMoversIcon, PersonalQuestionsMoversIcon, MoreAboutYouIcon } from '@/components/icons/MoversIcons';
+import { FlyersFindDifferencesIcon } from '@/components/icons/FlyersIcons';
+import { KETListeningIcon, KETReadingIcon, KETWritingIcon, KETSpeakingIcon } from '@/components/icons/KETIcons';
+import { PETListeningIcon, PETReadingIcon, PETWritingIcon, PETSpeakingIcon } from '@/components/icons/PETIcons';
+import { FCEListeningIcon, FCEReadingIcon, FCEWritingIcon, FCESpeakingIcon } from '@/components/icons/FCEIcons';
+import { CAEInterviewIcon, CAELongTurnIcon, CAECollaborativeIcon, CAEDiscussionIcon } from '@/components/icons/CAEIcons';
+import { CPEInterviewIcon, CPECollaborativeIcon, CPEMonologueIcon, CPEExtendedDiscussionIcon, CPEFinalDiscussionIcon } from '@/components/icons/CPEIcons';
 
 const ICON_MAP: Record<string, React.FC<{ size?: number; className?: string }>> = {
   MessageSquare,
@@ -38,6 +46,36 @@ const ICON_MAP: Record<string, React.FC<{ size?: number; className?: string }>> 
   BookImage,
   ImageIcon,
   ListenAndPoint: ListenAndPointIcon,
+  LookAndAnswer: LookAndAnswerIcon,
+  TellTheStory: TellTheStoryIcon,
+  PersonalQuestions: PersonalQuestionsIcon,
+  FindTheDifferences: FindTheDifferencesIcon,
+  InformationExchange: InformationExchangeIcon,
+  PictureStoryMovers: PictureStoryMoversIcon,
+  PersonalQuestionsMovers: PersonalQuestionsMoversIcon,
+  MoreAboutYou: MoreAboutYouIcon,
+  FlyersFindDifferences: FlyersFindDifferencesIcon,
+  KETListening: KETListeningIcon,
+  KETReading: KETReadingIcon,
+  KETWriting: KETWritingIcon,
+  KETSpeaking: KETSpeakingIcon,
+  PETListening: PETListeningIcon,
+  PETReading: PETReadingIcon,
+  PETWriting: PETWritingIcon,
+  PETSpeaking: PETSpeakingIcon,
+  FCEListening: FCEListeningIcon,
+  FCEReading: FCEReadingIcon,
+  FCEWriting: FCEWritingIcon,
+  FCESpeaking: FCESpeakingIcon,
+  CAEInterview: CAEInterviewIcon,
+  CAELongTurn: CAELongTurnIcon,
+  CAECollaborative: CAECollaborativeIcon,
+  CAEDiscussion: CAEDiscussionIcon,
+  CPEInterview: CPEInterviewIcon,
+  CPECollaborative: CPECollaborativeIcon,
+  CPEMonologue: CPEMonologueIcon,
+  CPEExtendedDiscussion: CPEExtendedDiscussionIcon,
+  CPEFinalDiscussion: CPEFinalDiscussionIcon,
 };
 
 function resolveIcon(name: string, size = 28, className?: string): React.ReactNode {
@@ -82,7 +120,11 @@ function ModeCard({ mode, icon, title, description, badge, officialName, theme, 
             {icon}
           </motion.div>
           {badge && (
-            <span className={`text-[11px] font-bold ${theme.badgeBg} ${theme.badgeText} px-2.5 py-1 rounded-full shrink-0 tracking-wide`}>
+            <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full shrink-0 tracking-wide ${
+              disabled
+                ? 'bg-slate-100 text-slate-500 ring-1 ring-slate-200'
+                : `${theme.badgeBg} ${theme.badgeText}`
+            }`}>
               {badge}
             </span>
           )}
@@ -178,6 +220,7 @@ export const ModeSelection = forwardRef<HTMLDivElement, ModeSelectionProps>(func
 
   function renderCard(card: DynamicCard) {
     const ylTheme = getYLCardTheme(card);
+    const isComingSoon = card.status === 'coming_soon';
     const iconColorClass = ylTheme
       ? `${ylTheme.iconText} transition-colors duration-200`
       : iconClass;
@@ -188,9 +231,10 @@ export const ModeSelection = forwardRef<HTMLDivElement, ModeSelectionProps>(func
         icon={resolveIcon(getModeIcon(card), 28, iconColorClass)}
         title={getModeTitle(card)}
         description={getModeDescription(card)}
-        badge={getModeBadge(card)}
+        badge={isComingSoon ? 'Próximamente' : getModeBadge(card)}
         officialName={getModeOfficialName(card)}
         theme={ylTheme}
+        disabled={isComingSoon}
         onSelect={onSelect}
       />
     );

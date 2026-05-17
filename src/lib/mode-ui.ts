@@ -4,34 +4,71 @@ import type { DynamicCard } from '@/lib/types/practice';
 export function getModeIcon(card: DynamicCard): string {
   const PART_ICON: Record<string, string> = {
     starters_part1: 'ListenAndPoint',
-    starters_part2: 'HelpCircle',
-    starters_part3: 'BookOpen',
-    starters_part4: 'User',
-    movers_part1: 'GitCompare',
-    movers_part2: 'MessageCircle',
-    movers_part3: 'BookImage',
-    movers_part4: 'User',
-    movers_part5: 'ImageIcon',
-    flyers_part1: 'BookOpen',
-    ket_part1: 'ClipboardList',
-    ket_part2: 'ClipboardList',
-    pet_p1: 'MessageSquare',
-    pet_p2: 'MessageSquare',
-    pet_p3: 'MessageSquare',
-    pet_p4: 'User',
-    fce_p1: 'MessageSquare',
-    fce_p2: 'Sparkles',
-    fce_p3: 'MessageSquare',
-    fce_p4: 'User',
-    cae_p1: 'MessageSquare',
-    cae_p2: 'Sparkles',
-    cae_p3: 'MessageSquare',
-    cae_p4: 'User',
-    cpe_p1: 'MessageSquare',
-    cpe_p2: 'Sparkles',
-    cpe_p3a: 'MessageSquare',
-    cpe_p3b: 'MessageSquare',
-    cpe_p4: 'User',
+    starters_part2: 'LookAndAnswer',
+    starters_part3: 'TellTheStory',
+    starters_part4: 'PersonalQuestions',
+    movers_part1: 'FindTheDifferences',
+    movers_part2: 'InformationExchange',
+    movers_part3: 'PictureStoryMovers',
+    movers_part4: 'PersonalQuestionsMovers',
+    movers_part5: 'MoreAboutYou',
+    flyers_part1: 'FlyersFindDifferences',
+    ket_listening_part1: 'KETListening',
+    ket_listening_part2: 'KETListening',
+    ket_listening_part3: 'KETListening',
+    ket_listening_part4: 'KETListening',
+    ket_listening_part5: 'KETListening',
+    ket_reading_part1: 'KETReading',
+    ket_reading_part2: 'KETReading',
+    ket_reading_part3: 'KETReading',
+    ket_reading_part4: 'KETReading',
+    ket_reading_part5: 'KETReading',
+    ket_writing_part6: 'KETWriting',
+    ket_writing_part7: 'KETWriting',
+    ket_part1: 'KETSpeaking',
+    ket_part2: 'KETSpeaking',
+    pet_listening_part1: 'PETListening',
+    pet_listening_part2: 'PETListening',
+    pet_listening_part3: 'PETListening',
+    pet_listening_part4: 'PETListening',
+    pet_reading_part1: 'PETReading',
+    pet_reading_part2: 'PETReading',
+    pet_reading_part3: 'PETReading',
+    pet_reading_part4: 'PETReading',
+    pet_reading_part5: 'PETReading',
+    pet_reading_part6: 'PETReading',
+    pet_writing_part1: 'PETWriting',
+    pet_writing_part2: 'PETWriting',
+    pet_p1: 'PETSpeaking',
+    pet_p2: 'PETSpeaking',
+    pet_p3: 'PETSpeaking',
+    pet_p4: 'PETSpeaking',
+    fce_listening_part1: 'FCEListening',
+    fce_listening_part2: 'FCEListening',
+    fce_listening_part3: 'FCEListening',
+    fce_listening_part4: 'FCEListening',
+    fce_reading_part1: 'FCEReading',
+    fce_reading_part2: 'FCEReading',
+    fce_reading_part3: 'FCEReading',
+    fce_reading_part4: 'FCEReading',
+    fce_reading_part5: 'FCEReading',
+    fce_reading_part6: 'FCEReading',
+    fce_reading_part7: 'FCEReading',
+    fce_writing_part1: 'FCEWriting',
+    fce_writing_part2: 'FCEWriting',
+    fce_p1: 'FCESpeaking',
+    fce_p2: 'FCESpeaking',
+    fce_p3: 'FCESpeaking',
+    fce_p4: 'FCESpeaking',
+    cae_p1: 'CAEInterview',
+    cae_p2: 'CAELongTurn',
+    cae_p3: 'CAECollaborative',
+    cae_p4: 'CAEDiscussion',
+    cpe_p1: 'CPEInterview',
+    cpe_p2: 'CPECollaborative',
+    cpe_p3a: 'CPEMonologue',
+    cpe_p3b: 'CPEExtendedDiscussion',
+    cpe_p4: 'CPEFinalDiscussion',
     listen_repeat: 'Headphones',
     interview: 'Mic2',
     situation: 'MessageSquare',
@@ -129,11 +166,18 @@ export function getModeDescription(card: DynamicCard): string {
   return card.description ?? '';
 }
 
+export type CambridgeFamily = 'starters' | 'movers' | 'flyers' | 'ket' | 'pet' | 'fce' | 'cae' | 'cpe';
 export type YLFamily = 'starters' | 'movers' | 'flyers';
 
 export function getYLFamily(card: DynamicCard): YLFamily | null {
   const m = card.exam_part.match(/^(starters|movers|flyers)_/);
   return m ? (m[1] as YLFamily) : null;
+}
+
+export function getCambridgeFamily(card: DynamicCard): CambridgeFamily | null {
+  if (card.framework !== 'cambridge') return null;
+  const m = card.exam_part.match(/^(starters|movers|flyers|ket|pet|fce|cae|cpe)(_|$)/);
+  return m ? (m[1] as CambridgeFamily) : null;
 }
 
 export interface YLCardTheme {
@@ -147,7 +191,7 @@ export interface YLCardTheme {
   decoration: string;
 }
 
-const YL_THEMES: Record<YLFamily, YLCardTheme> = {
+const CAMBRIDGE_THEMES: Record<CambridgeFamily, YLCardTheme> = {
   starters: {
     cardBg: 'bg-white',
     cardRing: 'ring-1 ring-violet-100 hover:ring-violet-300 hover:ring-2',
@@ -178,11 +222,61 @@ const YL_THEMES: Record<YLFamily, YLCardTheme> = {
     titleText: 'text-slate-900',
     decoration: 'text-indigo-100',
   },
+  ket: {
+    cardBg: 'bg-white',
+    cardRing: 'ring-1 ring-rose-100 hover:ring-rose-300 hover:ring-2',
+    iconBg: 'bg-rose-50 group-hover:bg-rose-100',
+    iconText: 'text-rose-700',
+    badgeBg: 'bg-white ring-1 ring-rose-200',
+    badgeText: 'text-rose-700',
+    titleText: 'text-slate-900',
+    decoration: 'text-rose-100',
+  },
+  pet: {
+    cardBg: 'bg-white',
+    cardRing: 'ring-1 ring-emerald-100 hover:ring-emerald-300 hover:ring-2',
+    iconBg: 'bg-emerald-50 group-hover:bg-emerald-100',
+    iconText: 'text-emerald-700',
+    badgeBg: 'bg-white ring-1 ring-emerald-200',
+    badgeText: 'text-emerald-700',
+    titleText: 'text-slate-900',
+    decoration: 'text-emerald-100',
+  },
+  fce: {
+    cardBg: 'bg-white',
+    cardRing: 'ring-1 ring-sky-100 hover:ring-sky-300 hover:ring-2',
+    iconBg: 'bg-sky-50 group-hover:bg-sky-100',
+    iconText: 'text-sky-700',
+    badgeBg: 'bg-white ring-1 ring-sky-200',
+    badgeText: 'text-sky-700',
+    titleText: 'text-slate-900',
+    decoration: 'text-sky-100',
+  },
+  cae: {
+    cardBg: 'bg-white',
+    cardRing: 'ring-1 ring-stone-200 hover:ring-stone-400 hover:ring-2',
+    iconBg: 'bg-stone-100 group-hover:bg-stone-200',
+    iconText: 'text-stone-700',
+    badgeBg: 'bg-white ring-1 ring-stone-300',
+    badgeText: 'text-stone-700',
+    titleText: 'text-slate-900',
+    decoration: 'text-stone-200',
+  },
+  cpe: {
+    cardBg: 'bg-white',
+    cardRing: 'ring-1 ring-zinc-200 hover:ring-zinc-400 hover:ring-2',
+    iconBg: 'bg-zinc-100 group-hover:bg-zinc-200',
+    iconText: 'text-zinc-800',
+    badgeBg: 'bg-white ring-1 ring-zinc-300',
+    badgeText: 'text-zinc-800',
+    titleText: 'text-slate-900',
+    decoration: 'text-zinc-200',
+  },
 };
 
 export function getYLCardTheme(card: DynamicCard): YLCardTheme | null {
-  const family = getYLFamily(card);
-  return family ? YL_THEMES[family] : null;
+  const family = getCambridgeFamily(card);
+  return family ? CAMBRIDGE_THEMES[family] : null;
 }
 
 /**

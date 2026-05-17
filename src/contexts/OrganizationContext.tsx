@@ -140,8 +140,9 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
             .order('exam_part'),
           supabase
             .from('bob_prompts')
-            .select('framework, exam_part, cefr_level, label, description')
+            .select('framework, exam_part, cefr_level, label, description, status')
             .eq('activity_type', 'generation')
+            .neq('status', 'hidden')
             .order('framework')
             .order('cefr_level', { ascending: true, nullsFirst: false })
             .order('exam_part'),
@@ -212,6 +213,7 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
           cefr_level: string | null;
           label: string;
           description: string | null;
+          status: string;
         }>;
         const seenAll = new Set<string>();
         const dedupedAll: DynamicCard[] = [];
@@ -219,6 +221,9 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
           const key = `${row.framework}|${row.exam_part}|${row.cefr_level ?? ''}`;
           if (!seenAll.has(key)) {
             seenAll.add(key);
+            const status = (row.status === 'coming_soon' || row.status === 'enabled')
+              ? row.status
+              : 'enabled';
             dedupedAll.push({
               framework: row.framework,
               exam_part: row.exam_part,
@@ -226,6 +231,7 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
               label: row.label,
               description: row.description,
               mode_key: `${row.framework}_${row.exam_part}`,
+              status,
             });
           }
         }

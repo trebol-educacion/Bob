@@ -14,12 +14,13 @@ export interface StudentStatsResult {
   rows: StudentStatRow[];
   total_sessions: number;
   global_avg: number | null;
+  session_dates: string[];
 }
 
 export async function getStudentStatsAction(): Promise<StudentStatsResult> {
   const supabase = await createSupabaseServer();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { rows: [], total_sessions: 0, global_avg: null };
+  if (!user) return { rows: [], total_sessions: 0, global_avg: null, session_dates: [] };
 
   const { data: evalRows } = await supabase
     .from('bob_messages')
@@ -70,7 +71,14 @@ export async function getStudentStatsAction(): Promise<StudentStatsResult> {
     ? Math.round((totalScore / finals.length) * 10) / 10
     : null;
 
-  return { rows, total_sessions: totalSessions, global_avg: globalAvg };
+  const sessionDates = finals.map((r) => r.created_at);
+
+  return {
+    rows,
+    total_sessions: totalSessions,
+    global_avg: globalAvg,
+    session_dates: sessionDates,
+  };
 }
 
 /**
