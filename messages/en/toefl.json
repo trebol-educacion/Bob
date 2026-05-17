@@ -1,1 +1,90 @@
-{}
+{
+  "common": {
+    "tryAgain": "Try Again",
+    "back": "Back",
+    "seeResults": "See Results",
+    "recording": "Recording",
+    "micError": "Microphone error. Please check permissions and try again."
+  },
+  "interview": {
+    "headerSubtitle": "TOEFL iBT FORMAT",
+    "footerMode": "TOEFL INTERVIEW",
+    "headerTitle": "TOEFL Interview",
+    "headerTitleWithTopic": "TOEFL Interview — {topic}",
+    "loading": "Generating your interview session…",
+    "loadError": "Failed to load interview. Please try again.",
+    "evalError": "Evaluation could not be completed. Please try again.",
+    "startButton": "Start Interview",
+    "stop": "Stop",
+    "nextQuestion": "Next Question",
+    "formatCardTitle": "Interview format",
+    "formatCardSubtitle": "4 questions · 45 seconds each · TOEFL iBT format",
+    "questionLoading": "Loading question…",
+    "listenCarefully": "Listen carefully…",
+    "prepareAnswer": "Prepare your answer…",
+    "answerClearly": "Answer clearly and completely",
+    "evaluating": "Evaluating your response…",
+    "questionLabel": "Q{n} · {difficulty}",
+    "difficulty": {
+      "easy": "Easy",
+      "medium": "Medium",
+      "hard": "Hard",
+      "veryHard": "Very Hard"
+    },
+    "feedback": {
+      "understood": "Your message came through clearly!",
+      "notUnderstood": "Keep going — you are improving!",
+      "strengths": "Strengths",
+      "tips": "Tips",
+      "example": "Example"
+    },
+    "finished": {
+      "sessionFeedback": "Session Feedback",
+      "strengthsTitle": "Strengths across the interview",
+      "focusAreas": "Focus areas",
+      "messageUnderstood": "Message understood ✓",
+      "needsPractice": "Needs more practice"
+    }
+  },
+  "listenRepeat": {
+    "headerTitle": "TOEFL Listen & Repeat",
+    "headerSubtitle": "Listen, then repeat the sentence exactly",
+    "footerMode": "TOEFL · LISTEN & REPEAT",
+    "sessionError": "Could not start session. Please try again.",
+    "loadError": "Failed to load session. Please try again.",
+    "evalFailed": "Evaluation failed. Moving to next item.",
+    "loadingGenerating": "Generating sentences…",
+    "loadingAudio": "Loading audio {current} of {total}…",
+    "preparingSession": "Preparing your session…",
+    "levelItem": "Level {level} · Item {n}",
+    "item": "Item {n}",
+    "listenCarefully": "Listen carefully…",
+    "repeatWhenPrompted": "Repeat the sentence when prompted",
+    "getReady": "Get ready…",
+    "sentenceLabel": "Sentence",
+    "hiddenHint": "Hidden — repeat from memory",
+    "startRecording": "Start Recording",
+    "repeatSentence": "Repeat the sentence!",
+    "speakClearly": "Speak clearly and naturally",
+    "processing": "Processing…",
+    "stopEarly": "Stop Early",
+    "evaluating": "Evaluating…",
+    "analyzingRepetition": "Analyzing your repetition",
+    "perfectRepetition": "Perfect repetition!",
+    "almostThere": "Almost there!",
+    "feedback": {
+      "title": "Feedback",
+      "original": "Original",
+      "youSaid": "You said",
+      "missingWords": "Missing words",
+      "extraWords": "Extra words"
+    },
+    "retry": "Retry",
+    "next": "Next",
+    "finished": {
+      "sessionComplete": "Session Complete",
+      "exactRepetitions": "exact repetitions",
+      "itemBreakdown": "Item Breakdown"
+    }
+  }
+}

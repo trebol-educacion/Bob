@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslations } from 'next-intl';
 import { ArrowLeft, Headphones, Mic, RotateCcw, ChevronRight, CheckCircle2, AlertCircle } from 'lucide-react';
 import { CountdownTimer } from './CountdownTimer';
 import { useCountdown } from '@/hooks/useCountdown';
@@ -42,6 +43,7 @@ interface ToeflListenRepeatPracticeProps {
 
 /** Main component for the TOEFL Listen & Repeat practice mode. */
 export function ToeflListenRepeatPractice({ onBack }: ToeflListenRepeatPracticeProps) {
+  const t = useTranslations('toefl');
   const [phase, setPhase] = useState<Phase>('loading');
   const [items, setItems] = useState<ToeflRepeatItem[]>([]);
   const [audioChunks, setAudioChunks] = useState<ToeflAudioChunk[]>([]);
@@ -72,7 +74,7 @@ export function ToeflListenRepeatPractice({ onBack }: ToeflListenRepeatPracticeP
     },
     onError: (err) => {
       console.error('Recording error:', err);
-      setError('Microphone error. Please check permissions and try again.');
+      setError(t('common.micError'));
     },
   });
 
@@ -84,7 +86,7 @@ export function ToeflListenRepeatPractice({ onBack }: ToeflListenRepeatPracticeP
         const sessionResult = await createSessionAction({ mode: 'toefl_listen_repeat', title: 'TOEFL Listen & Repeat' });
         if (cancelled) return;
         if (!sessionResult.data) {
-          setError('Could not start session. Please try again.');
+          setError(t('listenRepeat.sessionError'));
           return;
         }
         sessionIdRef.current = sessionResult.data.id;
@@ -117,7 +119,7 @@ export function ToeflListenRepeatPractice({ onBack }: ToeflListenRepeatPracticeP
       } catch (err) {
         if (!cancelled) {
           console.error('Load error:', err);
-          setError('Failed to load session. Please try again.');
+          setError(t('listenRepeat.loadError'));
         }
       }
     }
@@ -197,7 +199,7 @@ export function ToeflListenRepeatPractice({ onBack }: ToeflListenRepeatPracticeP
         setPhase('result');
       } catch (err) {
         console.error('Evaluation error:', err);
-        setError('Evaluation failed. Moving to next item.');
+        setError(t('listenRepeat.evalFailed'));
         const item = items[currentIndex];
         const fallback: RepetitionObjectiveFeedback = {
           kind: 'repetition_objective',
@@ -265,7 +267,7 @@ export function ToeflListenRepeatPractice({ onBack }: ToeflListenRepeatPracticeP
       className="flex items-center gap-1 text-gray-500 hover:text-gray-800 transition-colors text-sm font-medium"
     >
       <ArrowLeft size={16} />
-      Back
+      {t('common.back')}
     </button>
   );
 
@@ -279,8 +281,8 @@ export function ToeflListenRepeatPractice({ onBack }: ToeflListenRepeatPracticeP
     <div className="w-full space-y-2">
       <p className="text-xs text-gray-500 text-center">
         {loadingProgress === 0
-          ? 'Generating sentences…'
-          : `Loading audio ${loadingProgress} of ${items.length || 10}…`}
+          ? t('listenRepeat.loadingGenerating')
+          : t('listenRepeat.loadingAudio', { current: loadingProgress, total: items.length || 10 })}
       </p>
       <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
         <div
@@ -296,14 +298,14 @@ export function ToeflListenRepeatPractice({ onBack }: ToeflListenRepeatPracticeP
       animationKey="toefl-listen-repeat"
       headerConfig={{
         icon: Headphones,
-        title: 'TOEFL Listen & Repeat',
-        subtitle: 'Listen, then repeat the sentence exactly',
+        title: t('listenRepeat.headerTitle'),
+        subtitle: t('listenRepeat.headerSubtitle'),
         accentColor: 'blue',
         leftSlot: backButton,
         rightSlot: progressBadge,
       }}
       footerConfig={{
-        modeLabel: 'TOEFL · LISTEN & REPEAT',
+        modeLabel: t('listenRepeat.footerMode'),
         modelName: ACTIVE_MODEL_LABEL,
       }}
       inputSlot={null}
@@ -314,7 +316,7 @@ export function ToeflListenRepeatPractice({ onBack }: ToeflListenRepeatPracticeP
             <Headphones size={36} className="text-blue-600 animate-pulse" />
           </div>
           <MessageBubble variant="assistant" accentColor="blue">
-            <p className="font-semibold">Preparing your session…</p>
+            <p className="font-semibold">{t('listenRepeat.preparingSession')}</p>
             <div className="mt-3">{loadingBar}</div>
           </MessageBubble>
         </div>
@@ -327,10 +329,10 @@ export function ToeflListenRepeatPractice({ onBack }: ToeflListenRepeatPracticeP
           </div>
           <MessageBubble variant="assistant" accentColor="blue">
             <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">
-              Level {items[currentIndex].difficulty} · Item {currentIndex + 1}
+              {t('listenRepeat.levelItem', { level: items[currentIndex].difficulty, n: currentIndex + 1 })}
             </p>
-            <p className="font-semibold">Listen carefully…</p>
-            <p className="text-gray-500 text-xs mt-1">Repeat the sentence when prompted</p>
+            <p className="font-semibold">{t('listenRepeat.listenCarefully')}</p>
+            <p className="text-gray-500 text-xs mt-1">{t('listenRepeat.repeatWhenPrompted')}</p>
           </MessageBubble>
         </div>
       )}
@@ -339,15 +341,15 @@ export function ToeflListenRepeatPractice({ onBack }: ToeflListenRepeatPracticeP
         <div className="flex flex-col gap-4">
           <MessageBubble variant="assistant" accentColor="blue">
             <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">
-              Level {items[currentIndex].difficulty} · Item {currentIndex + 1}
+              {t('listenRepeat.levelItem', { level: items[currentIndex].difficulty, n: currentIndex + 1 })}
             </p>
-            <p className="font-semibold">Get ready…</p>
+            <p className="font-semibold">{t('listenRepeat.getReady')}</p>
             <div className="mt-3 bg-gray-50 border border-gray-200 rounded-xl p-3 text-left">
-              <p className="text-gray-400 text-xs font-semibold uppercase tracking-widest mb-1">Sentence</p>
+              <p className="text-gray-400 text-xs font-semibold uppercase tracking-widest mb-1">{t('listenRepeat.sentenceLabel')}</p>
               <p className="text-gray-800 font-semibold text-sm blur-sm select-none">
                 {items[currentIndex].text}
               </p>
-              <p className="text-xs text-gray-400 mt-1 italic">Hidden — repeat from memory</p>
+              <p className="text-xs text-gray-400 mt-1 italic">{t('listenRepeat.hiddenHint')}</p>
             </div>
           </MessageBubble>
           <button
@@ -355,7 +357,7 @@ export function ToeflListenRepeatPractice({ onBack }: ToeflListenRepeatPracticeP
             className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl transition-colors flex items-center justify-center gap-2"
           >
             <Mic size={18} />
-            Start Recording
+            {t('listenRepeat.startRecording')}
           </button>
         </div>
       )}
@@ -363,9 +365,9 @@ export function ToeflListenRepeatPractice({ onBack }: ToeflListenRepeatPracticeP
       {phase === 'record' && (
         <div className="flex flex-col items-center gap-6 py-4">
           <MessageBubble variant="assistant" accentColor="blue">
-            <p className="font-semibold">Repeat the sentence!</p>
+            <p className="font-semibold">{t('listenRepeat.repeatSentence')}</p>
             <p className="text-gray-500 text-xs mt-1">
-              {countdown.isRunning ? 'Speak clearly and naturally' : 'Processing…'}
+              {countdown.isRunning ? t('listenRepeat.speakClearly') : t('listenRepeat.processing')}
             </p>
           </MessageBubble>
           <CountdownTimer
@@ -377,7 +379,7 @@ export function ToeflListenRepeatPractice({ onBack }: ToeflListenRepeatPracticeP
           />
           <div className="flex items-center gap-2">
             <span className="w-3 h-3 rounded-full bg-red-500 animate-pulse" />
-            <span className="text-sm font-semibold text-red-600">Recording</span>
+            <span className="text-sm font-semibold text-red-600">{t('common.recording')}</span>
           </div>
           <button
             onClick={() => {
@@ -386,7 +388,7 @@ export function ToeflListenRepeatPractice({ onBack }: ToeflListenRepeatPracticeP
             }}
             className="w-full border-2 border-gray-200 hover:border-blue-600 text-gray-700 font-semibold py-3 rounded-xl transition-colors text-sm"
           >
-            Stop Early
+            {t('listenRepeat.stopEarly')}
           </button>
         </div>
       )}
@@ -397,8 +399,8 @@ export function ToeflListenRepeatPractice({ onBack }: ToeflListenRepeatPracticeP
             <span className="text-3xl animate-spin">⚙️</span>
           </div>
           <MessageBubble variant="assistant" accentColor="blue">
-            <p className="font-semibold">Evaluating…</p>
-            <p className="text-gray-500 text-xs mt-1">Analyzing your repetition</p>
+            <p className="font-semibold">{t('listenRepeat.evaluating')}</p>
+            <p className="text-gray-500 text-xs mt-1">{t('listenRepeat.analyzingRepetition')}</p>
           </MessageBubble>
         </div>
       )}
@@ -407,34 +409,34 @@ export function ToeflListenRepeatPractice({ onBack }: ToeflListenRepeatPracticeP
         <div className="flex flex-col gap-4">
           <MessageBubble variant="assistant" accentColor="blue">
             <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">
-              Item {currentIndex + 1}
+              {t('listenRepeat.item', { n: currentIndex + 1 })}
             </p>
             <p className={`font-black text-base ${currentEvaluation.exact_repetition ? 'text-green-600' : 'text-amber-600'}`}>
-              {currentEvaluation.exact_repetition ? 'Perfect repetition!' : 'Almost there!'}
+              {currentEvaluation.exact_repetition ? t('listenRepeat.perfectRepetition') : t('listenRepeat.almostThere')}
             </p>
           </MessageBubble>
 
-          <InfoCard title="Feedback" icon={currentEvaluation.exact_repetition ? CheckCircle2 : AlertCircle}>
+          <InfoCard title={t('listenRepeat.feedback.title')} icon={currentEvaluation.exact_repetition ? CheckCircle2 : AlertCircle}>
             <div className="space-y-2">
               <div>
-                <p className="text-xs font-bold text-amber-700 uppercase tracking-widest mb-0.5">Original</p>
+                <p className="text-xs font-bold text-amber-700 uppercase tracking-widest mb-0.5">{t('listenRepeat.feedback.original')}</p>
                 <p className="text-amber-900 font-medium text-sm">{items[currentIndex].text}</p>
               </div>
               {currentEvaluation.transcribed_text ? (
                 <div>
-                  <p className="text-xs font-bold text-amber-700 uppercase tracking-widest mb-0.5">You said</p>
+                  <p className="text-xs font-bold text-amber-700 uppercase tracking-widest mb-0.5">{t('listenRepeat.feedback.youSaid')}</p>
                   <p className="text-amber-800/70 text-sm italic">{currentEvaluation.transcribed_text}</p>
                 </div>
               ) : null}
               {currentEvaluation.missing_words.length > 0 ? (
                 <div>
-                  <p className="text-xs font-bold text-red-500 uppercase tracking-widest mb-0.5">Missing words</p>
+                  <p className="text-xs font-bold text-red-500 uppercase tracking-widest mb-0.5">{t('listenRepeat.feedback.missingWords')}</p>
                   <p className="text-red-600 text-sm">{currentEvaluation.missing_words.join(', ')}</p>
                 </div>
               ) : null}
               {currentEvaluation.extra_words.length > 0 ? (
                 <div>
-                  <p className="text-xs font-bold text-amber-600 uppercase tracking-widest mb-0.5">Extra words</p>
+                  <p className="text-xs font-bold text-amber-600 uppercase tracking-widest mb-0.5">{t('listenRepeat.feedback.extraWords')}</p>
                   <p className="text-amber-700 text-sm">{currentEvaluation.extra_words.join(', ')}</p>
                 </div>
               ) : null}
@@ -447,7 +449,7 @@ export function ToeflListenRepeatPractice({ onBack }: ToeflListenRepeatPracticeP
               className="flex-1 border-2 border-gray-200 hover:border-blue-600 text-gray-700 font-bold py-3 rounded-xl transition-colors flex items-center justify-center gap-2 text-sm"
             >
               <RotateCcw size={16} />
-              Retry
+              {t('listenRepeat.retry')}
             </button>
             <button
               onClick={handleNext}
@@ -456,11 +458,11 @@ export function ToeflListenRepeatPractice({ onBack }: ToeflListenRepeatPracticeP
               {currentIndex + 1 >= items.length ? (
                 <>
                   <CheckCircle2 size={18} />
-                  See Results
+                  {t('common.seeResults')}
                 </>
               ) : (
                 <>
-                  Next
+                  {t('listenRepeat.next')}
                   <ChevronRight size={18} />
                 </>
               )}
@@ -476,12 +478,12 @@ export function ToeflListenRepeatPractice({ onBack }: ToeflListenRepeatPracticeP
       {phase === 'finished' && (
         <div className="flex flex-col gap-6">
           <MessageBubble variant="assistant" accentColor="blue">
-            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Session Complete</p>
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">{t('listenRepeat.finished.sessionComplete')}</p>
             <p className="text-4xl font-black text-blue-600">{exactCount} / {results.length}</p>
-            <p className="text-sm font-bold text-gray-400 mt-1">exact repetitions</p>
+            <p className="text-sm font-bold text-gray-400 mt-1">{t('listenRepeat.finished.exactRepetitions')}</p>
           </MessageBubble>
 
-          <InfoCard title="Item Breakdown">
+          <InfoCard title={t('listenRepeat.finished.itemBreakdown')}>
             <div className="grid grid-cols-5 gap-2">
               {results.map((r, i) => (
                 <div
@@ -504,14 +506,14 @@ export function ToeflListenRepeatPractice({ onBack }: ToeflListenRepeatPracticeP
               className="flex-1 border-2 border-gray-200 hover:border-blue-600 text-gray-700 font-bold py-3 rounded-xl transition-colors flex items-center justify-center gap-2"
             >
               <RotateCcw size={16} />
-              Try Again
+              {t('common.tryAgain')}
             </button>
             <button
               onClick={onBack}
               className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl transition-colors flex items-center justify-center gap-2"
             >
               <ArrowLeft size={16} />
-              Back
+              {t('common.back')}
             </button>
           </div>
         </div>

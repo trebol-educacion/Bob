@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslations } from 'next-intl';
 import { ArrowLeft, Mic, Square, RotateCcw, ChevronRight, ClipboardList } from 'lucide-react';
 import { CountdownTimer } from '@/components/CountdownTimer';
 import { useCountdown } from '@/hooks/useCountdown';
@@ -40,25 +41,26 @@ type QuestionSubPhase =
 const PREP_SECONDS = 5;
 const RECORD_SECONDS = 45;
 
-function difficultyLabel(difficulty: number): string {
+function difficultyKey(difficulty: number): string {
   switch (difficulty) {
-    case 1: return 'Easy';
-    case 2: return 'Medium';
-    case 3: return 'Hard';
-    case 4: return 'Very Hard';
+    case 1: return 'easy';
+    case 2: return 'medium';
+    case 3: return 'hard';
+    case 4: return 'veryHard';
     default: return '';
   }
 }
 
 function FormativeFeedbackCard({ feedback }: { feedback: FormativeFeedback }) {
+  const t = useTranslations('toefl.interview.feedback');
   return (
     <div className="w-full space-y-3">
       <div className={`text-center py-2 px-4 rounded-xl font-bold text-sm ${feedback.understood ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'}`}>
-        {feedback.understood ? 'Your message came through clearly!' : 'Keep going — you are improving!'}
+        {feedback.understood ? t('understood') : t('notUnderstood')}
       </div>
       {feedback.highlights.length > 0 && (
         <div className="bg-green-50 rounded-xl p-3 space-y-1">
-          <p className="text-xs font-bold text-green-700 uppercase tracking-widest">Strengths</p>
+          <p className="text-xs font-bold text-green-700 uppercase tracking-widest">{t('strengths')}</p>
           {feedback.highlights.map((h, i) => (
             <p key={i} className="text-sm text-green-800">✓ {h}</p>
           ))}
@@ -66,7 +68,7 @@ function FormativeFeedbackCard({ feedback }: { feedback: FormativeFeedback }) {
       )}
       {feedback.suggestions.length > 0 && (
         <div className="bg-amber-50 rounded-xl p-3 space-y-1">
-          <p className="text-xs font-bold text-amber-700 uppercase tracking-widest">Tips</p>
+          <p className="text-xs font-bold text-amber-700 uppercase tracking-widest">{t('tips')}</p>
           {feedback.suggestions.map((s, i) => (
             <p key={i} className="text-sm text-amber-800">→ {s}</p>
           ))}
@@ -74,7 +76,7 @@ function FormativeFeedbackCard({ feedback }: { feedback: FormativeFeedback }) {
       )}
       {feedback.model_answer && (
         <div className="bg-blue-50 rounded-xl p-3 space-y-1">
-          <p className="text-xs font-bold text-blue-600 uppercase tracking-widest">Example</p>
+          <p className="text-xs font-bold text-blue-600 uppercase tracking-widest">{t('example')}</p>
           <p className="text-sm text-blue-800 italic">"{feedback.model_answer}"</p>
         </div>
       )}
@@ -87,6 +89,7 @@ interface ToeflInterviewPracticeProps {
 }
 
 export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) {
+  const t = useTranslations('toefl');
   const [phase, setPhase] = useState<InterviewPhase>('loading');
   const [subPhase, setSubPhase] = useState<QuestionSubPhase>('reading');
   const [plan, setPlan] = useState<ToeflInterviewPlan | null>(null);
@@ -124,7 +127,7 @@ export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) 
     },
     onError: (err) => {
       console.error('Recording error:', err);
-      setError('Microphone error. Please check permissions and try again.');
+      setError(t('common.micError'));
     },
   });
 
@@ -139,7 +142,7 @@ export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) 
       } catch (err) {
         if (!cancelled) {
           console.error('Load error:', err);
-          setError('Failed to load interview. Please try again.');
+          setError(t('interview.loadError'));
         }
       }
     }
@@ -270,7 +273,7 @@ export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) 
           kind: 'formative',
           understood: false,
           highlights: [],
-          suggestions: ['Evaluation could not be completed. Please try again.'],
+          suggestions: [t('interview.evalError')],
         };
         setCurrentEval(fallback);
         setEvaluations((prev) => [...prev, fallback]);
@@ -358,14 +361,14 @@ export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) 
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 text-red-500 font-bold text-sm animate-pulse">
             <Mic size={16} />
-            <span>Recording</span>
+            <span>{t('common.recording')}</span>
           </div>
           <button
             onClick={handleStopRecording}
             className="flex items-center gap-2 bg-red-500 text-white font-black px-5 py-2.5 rounded-xl hover:bg-red-600 transition-colors"
           >
             <Square size={15} />
-            Stop
+            {t('interview.stop')}
           </button>
         </div>
       )}
@@ -376,9 +379,9 @@ export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) 
           className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white font-black px-6 py-3 rounded-xl hover:opacity-90 transition-opacity"
         >
           {currentIndex + 1 < (plan?.questions.length ?? 0) ? (
-            <>Next Question <ChevronRight size={16} /></>
+            <>{t('interview.nextQuestion')} <ChevronRight size={16} /></>
           ) : (
-            <>See Results <ChevronRight size={16} /></>
+            <>{t('common.seeResults')} <ChevronRight size={16} /></>
           )}
         </button>
       )}
@@ -388,7 +391,7 @@ export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) 
           onClick={handleStart}
           className="w-full bg-blue-600 text-white font-black px-8 py-3 rounded-xl hover:opacity-90 transition-opacity"
         >
-          Start Interview
+          {t('interview.startButton')}
         </button>
       )}
 
@@ -399,14 +402,14 @@ export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) 
             className="flex-1 flex items-center justify-center gap-2 border-2 border-blue-600 text-blue-600 font-black px-4 py-2.5 rounded-xl hover:bg-blue-600 hover:text-white transition-colors"
           >
             <RotateCcw size={15} />
-            Try Again
+            {t('common.tryAgain')}
           </button>
           <button
             onClick={onBack}
             className="flex-1 flex items-center justify-center gap-2 bg-blue-600 text-white font-black px-4 py-2.5 rounded-xl hover:opacity-90 transition-opacity"
           >
             <ArrowLeft size={15} />
-            Back
+            {t('common.back')}
           </button>
         </div>
       )}
@@ -417,7 +420,7 @@ export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) 
     <>
       {phase === 'loading' && (
         <div className="flex flex-col items-center justify-center py-12 gap-4">
-          <BobMascotLoader message="Generating your interview session…" />
+          <BobMascotLoader message={t('interview.loading')} />
           {error && <p className="text-red-500 text-sm text-center">{error}</p>}
         </div>
       )}
@@ -428,16 +431,16 @@ export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) 
             <p className="font-bold text-base">{plan.topic_name}</p>
             <p className="text-gray-500 text-sm mt-1">{plan.topic_context}</p>
           </MessageBubble>
-          <InfoCard title="Interview format" icon={ClipboardList}>
+          <InfoCard title={t('interview.formatCardTitle')} icon={ClipboardList}>
             <div className="space-y-2">
               <p className="text-xs font-bold text-amber-700 uppercase tracking-widest mb-2">
-                4 questions · 45 seconds each · TOEFL iBT format
+                {t('interview.formatCardSubtitle')}
               </p>
               {plan.questions.map((q, i) => (
                 <div key={i} className="flex items-center gap-3">
                   <span className="text-xs font-black text-blue-600 w-4">{i + 1}</span>
                   <span className="text-xs font-bold text-amber-700/60 uppercase tracking-wide">
-                    {difficultyLabel(q.difficulty)}
+                    {t(`interview.difficulty.${difficultyKey(q.difficulty)}`)}
                   </span>
                 </div>
               ))}
@@ -451,7 +454,7 @@ export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) 
           <MessageBubble variant="assistant" icon={ClipboardList} accentColor="blue">
             <div className="space-y-1">
               <p className="text-[10px] font-bold text-blue-400 uppercase tracking-widest">
-                {difficultyLabel(plan.questions[currentIndex].difficulty)}
+                {t(`interview.difficulty.${difficultyKey(plan.questions[currentIndex].difficulty)}`)}
               </p>
               <p className="text-base font-bold leading-snug">
                 {plan.questions[currentIndex].text}
@@ -463,7 +466,7 @@ export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) 
             <div className="flex flex-col items-center gap-3 py-4">
               <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
               <p className="text-gray-400 font-medium text-sm">
-                {subPhase === 'reading' ? 'Loading question…' : 'Listen carefully…'}
+                {subPhase === 'reading' ? t('interview.questionLoading') : t('interview.listenCarefully')}
               </p>
             </div>
           )}
@@ -476,7 +479,7 @@ export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) 
                 isRunning={prepCountdown.isRunning}
                 size={80}
               />
-              <p className="text-gray-400 font-medium text-sm">Prepare your answer…</p>
+              <p className="text-gray-400 font-medium text-sm">{t('interview.prepareAnswer')}</p>
             </div>
           )}
 
@@ -488,14 +491,14 @@ export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) 
                 isRunning={recordCountdown.isRunning}
                 size={120}
               />
-              <p className="text-gray-400 text-xs">Answer clearly and completely</p>
+              <p className="text-gray-400 text-xs">{t('interview.answerClearly')}</p>
             </div>
           )}
 
           {subPhase === 'evaluating' && (
             <div className="flex flex-col items-center gap-3 py-4">
               <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
-              <p className="text-gray-400 font-medium text-sm">Evaluating your response…</p>
+              <p className="text-gray-400 font-medium text-sm">{t('interview.evaluating')}</p>
             </div>
           )}
 
@@ -511,11 +514,11 @@ export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) 
 
       {phase === 'finished' && plan && (
         <div className="space-y-4 py-2">
-          <InfoCard title="Session Feedback" icon={ClipboardList}>
+          <InfoCard title={t('interview.finished.sessionFeedback')} icon={ClipboardList}>
             <div className="space-y-3">
               {allHighlights.length > 0 && (
                 <div className="space-y-1">
-                  <p className="text-xs font-bold text-green-700 uppercase tracking-widest">Strengths across the interview</p>
+                  <p className="text-xs font-bold text-green-700 uppercase tracking-widest">{t('interview.finished.strengthsTitle')}</p>
                   {allHighlights.map((h, i) => (
                     <p key={i} className="text-sm text-green-800">✓ {h}</p>
                   ))}
@@ -523,7 +526,7 @@ export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) 
               )}
               {allSuggestions.length > 0 && (
                 <div className="space-y-1">
-                  <p className="text-xs font-bold text-amber-700 uppercase tracking-widest">Focus areas</p>
+                  <p className="text-xs font-bold text-amber-700 uppercase tracking-widest">{t('interview.finished.focusAreas')}</p>
                   {allSuggestions.map((s, i) => (
                     <p key={i} className="text-sm text-amber-800">→ {s}</p>
                   ))}
@@ -540,11 +543,11 @@ export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) 
                 <MessageBubble key={i} variant="assistant" icon={ClipboardList} accentColor="blue" noAnimate>
                   <div className="space-y-1">
                     <p className="text-[10px] font-bold text-blue-400 uppercase tracking-widest">
-                      Q{i + 1} · {difficultyLabel(q.difficulty)}
+                      {t('interview.questionLabel', { n: i + 1, difficulty: t(`interview.difficulty.${difficultyKey(q.difficulty)}`) })}
                     </p>
                     <p className="text-sm font-bold leading-snug line-clamp-2">{q.text}</p>
                     <p className={`text-xs font-bold ${ev.understood ? 'text-green-600' : 'text-amber-600'}`}>
-                      {ev.understood ? 'Message understood ✓' : 'Needs more practice'}
+                      {ev.understood ? t('interview.finished.messageUnderstood') : t('interview.finished.needsPractice')}
                     </p>
                   </div>
                 </MessageBubble>
@@ -560,8 +563,8 @@ export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) 
     <ChatShell
       headerConfig={{
         icon: ClipboardList,
-        title: `TOEFL Interview${plan ? ` — ${plan.topic_name}` : ''}`,
-        subtitle: 'TOEFL iBT FORMAT',
+        title: plan ? t('interview.headerTitleWithTopic', { topic: plan.topic_name }) : t('interview.headerTitle'),
+        subtitle: t('interview.headerSubtitle'),
         accentColor: 'blue',
         online: true,
         leftSlot: (
@@ -575,7 +578,7 @@ export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) 
         rightSlot: headerRightSlot,
       }}
       footerConfig={{
-        modeLabel: 'TOEFL INTERVIEW',
+        modeLabel: t('interview.footerMode'),
         modelName: ACTIVE_MODEL_LABEL,
       }}
       inputSlot={inputSlot}
