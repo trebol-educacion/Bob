@@ -465,14 +465,14 @@ function deriveStats(stats: StudentStatsResult): Derived {
 
   const greeting =
     streak >= 7
-      ? `¡${streak} días seguidos! Eres una leyenda 🔥`
+      ? `${streak} days in a row! You're a legend 🔥`
       : streak >= 3
-        ? `¡${streak} días seguidos! Sigue así 💪`
+        ? `${streak} days in a row! Keep it up 💪`
         : streak === 1
-          ? 'Buen comienzo, ¡vuelve mañana!'
+          ? 'Great start! Come back tomorrow.'
           : stats.total_sessions > 0
-            ? '¡Hola otra vez! ¿Listos para practicar?'
-            : '¡Bienvenido! Vamos a empezar tu aventura.';
+            ? 'Welcome back! Ready to practice?'
+            : "Welcome! Let's start your adventure.";
 
   return { streak, totalXp, goldBadges, totalStars, bySkill, groups, greeting };
 }
@@ -535,29 +535,59 @@ export function StudentStatsPanel({ onBack, onAfterReset }: Props) {
         }}
       />
 
-      <div className="relative z-10 flex items-center gap-4 px-4 py-3 border-b border-trebol-border/60 bg-white/70 backdrop-blur-md shrink-0">
-        <button
-          onClick={onBack}
-          className="p-1.5 rounded-xl hover:bg-trebol-secondary/30 transition-colors"
-          aria-label="Back"
-        >
-          <ArrowLeft size={20} className="text-trebol-text" />
-        </button>
-        <div className="flex-1">
-          <p className="text-sm font-black text-trebol-text flex items-center gap-2 tracking-tight">
-            <BarChart3 size={16} className="text-trebol-primary" />
-            My progress
-          </p>
-          <p className="text-xs text-trebol-text/50 font-semibold">Your practice history at a glance</p>
+      <div className="relative z-10 shrink-0">
+        <div className="flex items-center gap-3 px-4 py-3 bg-white/75 backdrop-blur-md">
+          <button
+            onClick={onBack}
+            className="group relative p-2 rounded-xl bg-white border border-trebol-border/60 hover:border-[#3660AB] hover:bg-[#dde4f2] transition-all shadow-sm"
+            aria-label="Back"
+          >
+            <ArrowLeft size={18} className="text-trebol-text group-hover:text-[#3660AB] group-hover:-translate-x-0.5 transition-transform" strokeWidth={2.5} />
+          </button>
+
+          <div className="relative shrink-0 w-10 h-10 rounded-full bg-white shadow-md ring-2 ring-white overflow-hidden">
+            <Image
+              src="/bob_avatar.png"
+              alt="Bob"
+              fill
+              sizes="40px"
+              className="object-cover"
+              priority
+            />
+          </div>
+
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-1.5">
+              <h1 className="text-base font-black text-trebol-text tracking-tight leading-none">
+                My progress
+              </h1>
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-[#F8AC37]/20 text-[#d98e1d] text-[9px] font-black uppercase tracking-widest">
+                <Sparkles size={8} fill="#d98e1d" strokeWidth={0} />
+                Live
+              </span>
+            </div>
+            <p className="text-[11px] text-trebol-text/55 font-bold mt-0.5 leading-none truncate">
+              Your adventure with Bob
+            </p>
+          </div>
+
+          <button
+            onClick={load}
+            disabled={loading}
+            className="p-2 rounded-xl bg-white border border-trebol-border/60 hover:border-[#469E7B] hover:bg-[#dcebe3] transition-all disabled:opacity-50 shadow-sm group"
+            aria-label="Refresh"
+          >
+            <RefreshCw size={16} strokeWidth={2.5} className={`text-trebol-text/70 group-hover:text-[#469E7B] transition-colors ${loading ? 'animate-spin' : ''}`} />
+          </button>
         </div>
-        <button
-          onClick={load}
-          disabled={loading}
-          className="p-2 rounded-xl hover:bg-trebol-secondary/30 transition-colors disabled:opacity-50"
-          aria-label="Refresh"
-        >
-          <RefreshCw size={16} className={`text-trebol-text/60 ${loading ? 'animate-spin' : ''}`} />
-        </button>
+        <div
+          aria-hidden
+          className="h-[3px] w-full"
+          style={{
+            background:
+              'linear-gradient(90deg, #3660AB 0%, #469E7B 30%, #F8AC37 60%, #E62D2B 100%)',
+          }}
+        />
       </div>
 
       <div className="relative z-10 flex-1 overflow-y-auto px-4 sm:px-6 py-6 max-w-3xl mx-auto w-full">
@@ -589,10 +619,10 @@ export function StudentStatsPanel({ onBack, onAfterReset }: Props) {
               />
             </motion.div>
             <h2 className="text-2xl font-black text-trebol-text mb-2 tracking-tight">
-              ¡Tu aventura empieza aquí!
+              Your adventure starts here!
             </h2>
             <p className="text-sm text-trebol-text/60 font-semibold max-w-xs mx-auto">
-              Elige una actividad y empieza a practicar. Aquí verás tus rachas, badges y todos los retos que vayas conquistando.
+              Pick an activity and start practicing. You&apos;ll see your streaks, badges and every challenge you conquer right here.
             </p>
           </motion.div>
         )}
