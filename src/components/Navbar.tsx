@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { LogOut, User, BarChart3, Menu } from 'lucide-react';
 import { createSupabaseBrowser } from '@/lib/supabase/browser-client';
 import { useOrganization } from '@/hooks/useOrganization';
+import { NavProgressChip } from '@/components/NavProgressChip';
 
 interface NavbarProps {
   userEmail?: string;
@@ -60,10 +61,12 @@ export function Navbar({ userEmail, onOpenDashboard, onToggleSidebar }: NavbarPr
           )}
         </div>
 
+        <div className="flex items-center gap-2">
+          {onOpenDashboard && <NavProgressChip onClick={onOpenDashboard} />}
         <div className="relative">
           <button
             onClick={() => setOpen((v) => !v)}
-            className="flex items-center gap-3 rounded-lg px-2 py-1.5 hover:bg-white/10 transition-colors"
+            className="flex items-center gap-3 rounded-lg px-2 py-1.5 hover:bg-white/10 transition-colors cursor-pointer"
           >
             <div className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
               <User size={18} className="text-white" />
@@ -111,6 +114,7 @@ export function Navbar({ userEmail, onOpenDashboard, onToggleSidebar }: NavbarPr
               </>
             )}
           </AnimatePresence>
+        </div>
         </div>
       </div>
     </motion.header>

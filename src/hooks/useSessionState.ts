@@ -30,6 +30,9 @@ export function useSessionState(userEmail: string | undefined): UseSessionStateR
     const { data } = await getSessionsAction();
     setSessions(data ?? []);
     setSessionsLoading(false);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('bob:stats-changed'));
+    }
   }, []);
 
   useEffect(() => {
