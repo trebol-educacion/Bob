@@ -4,6 +4,7 @@ import React, { useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
 import confetti from 'canvas-confetti';
 import { Trophy, Star, ChevronRight } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 
 export interface CelebrationCardProps {
   score: number;
@@ -70,19 +71,21 @@ export function CelebrationCard({
   scoreMax,
   feedback,
   onAction,
-  actionLabel = 'Back to activities',
+  actionLabel,
   animate = true,
 }: CelebrationCardProps) {
+  const t = useTranslations('yl');
+  const resolvedActionLabel = actionLabel ?? t('celebration.defaultActionLabel');
   const pct = scoreMax > 0 ? Math.round((score / scoreMax) * 100) : 0;
   const stars = pct === 100 ? 3 : pct >= 75 ? 2 : pct >= 50 ? 1 : 0;
   const tier: 'perfect' | 'great' | 'good' | 'keep' =
     pct === 100 ? 'perfect' : pct >= 75 ? 'great' : pct >= 50 ? 'good' : 'keep';
 
   const tierConfig = {
-    perfect: { heading: 'Perfect!', sub: 'You got them all!', accent: 'text-amber-500', ring: 'ring-amber-200', glow: 'from-amber-100 via-violet-50 to-white' },
-    great:   { heading: 'Great job!', sub: 'Almost perfect — keep going!', accent: 'text-violet-600', ring: 'ring-violet-200', glow: 'from-violet-100 via-violet-50 to-white' },
-    good:    { heading: 'Good work!', sub: 'You can do even better next time.', accent: 'text-violet-600', ring: 'ring-violet-100', glow: 'from-violet-50 via-white to-white' },
-    keep:    { heading: 'Keep practising!', sub: 'Try again — you will get there.', accent: 'text-slate-600', ring: 'ring-slate-200', glow: 'from-slate-50 via-white to-white' },
+    perfect: { heading: t('celebration.perfect.heading'), sub: t('celebration.perfect.sub'), accent: 'text-amber-500', ring: 'ring-amber-200', glow: 'from-amber-100 via-violet-50 to-white' },
+    great:   { heading: t('celebration.great.heading'), sub: t('celebration.great.sub'), accent: 'text-violet-600', ring: 'ring-violet-200', glow: 'from-violet-100 via-violet-50 to-white' },
+    good:    { heading: t('celebration.good.heading'), sub: t('celebration.good.sub'), accent: 'text-violet-600', ring: 'ring-violet-100', glow: 'from-violet-50 via-white to-white' },
+    keep:    { heading: t('celebration.keep.heading'), sub: t('celebration.keep.sub'), accent: 'text-slate-600', ring: 'ring-slate-200', glow: 'from-slate-50 via-white to-white' },
   }[tier];
 
   const firedRef = useRef(false);
@@ -160,7 +163,7 @@ export function CelebrationCard({
         <span className="text-2xl font-black text-slate-400">%</span>
       </div>
       <p className="mt-1 text-center text-[11px] font-bold uppercase tracking-widest text-slate-400">
-        {score} / {scoreMax} points
+        {score} / {scoreMax} {t('celebration.pointsLabel')}
       </p>
 
       {feedback && (
@@ -181,7 +184,7 @@ export function CelebrationCard({
           transition={{ delay: 1.05 }}
           className="mt-6 w-full flex items-center justify-center gap-2 py-3 rounded-2xl bg-gradient-to-br from-violet-600 to-violet-700 text-white font-extrabold text-sm shadow-sm group-hover:shadow-md transition-shadow"
         >
-          {actionLabel}
+          {resolvedActionLabel}
           <ChevronRight size={16} strokeWidth={2.6} className="group-hover:translate-x-0.5 transition-transform" />
         </motion.div>
       )}

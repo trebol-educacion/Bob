@@ -10,6 +10,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'motion/react';
 import { ArrowLeft } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import { PictureStoryMoversIcon } from '@/components/icons/MoversIcons';
 import { CelebrationCard } from './CelebrationCard';
 import { ACTIVE_MODEL_LABEL } from '@/lib/models';
@@ -58,6 +59,7 @@ function BobAudioOnly({
   autoPlay?: boolean;
   voiceKey?: string;
 }) {
+  const t = useTranslations('yl');
   const [showText, setShowText] = useState(false);
   return (
     <div className="flex flex-col gap-1">
@@ -71,7 +73,7 @@ function BobAudioOnly({
               onClick={() => setShowText(false)}
               className="text-[11px] font-bold text-slate-500 hover:text-slate-700 underline-offset-2 hover:underline cursor-pointer"
             >
-              Hide text
+              {t('tellTheStory.hideText')}
             </button>
           </div>
         ) : (
@@ -80,7 +82,7 @@ function BobAudioOnly({
             onClick={() => setShowText(true)}
             className="text-[11px] font-bold text-amber-700/70 hover:text-amber-800 underline-offset-2 hover:underline cursor-pointer"
           >
-            👁 Show text
+            {t('tellTheStory.showText')}
           </button>
         )}
       </div>
@@ -143,6 +145,7 @@ export function YLTellTheStoryPractice({
   onSessionFinished,
   onOpenDashboard,
 }: YLTellTheStoryPracticeProps) {
+  const t = useTranslations('yl');
   const mode: ModeKey = `cambridge_${exam}_part${part}` as ModeKey;
   const isReadOnly = !!initialMessages && initialMessages.length > 0;
 
@@ -450,10 +453,10 @@ export function YLTellTheStoryPractice({
   if (phase === 'loading' || phase === 'generating-images')
     return (
       <YLLoadingScreen
-        message={phase === 'generating-images' ? 'Getting the story pictures ready…' : 'Getting your practice ready…'}
+        message={phase === 'generating-images' ? t('tellTheStory.gettingStoryReady') : t('common.gettingPracticeReady')}
       />
     );
-  if (phase === 'evaluating') return <YLLoadingScreen message="Calculating your score…" />;
+  if (phase === 'evaluating') return <YLLoadingScreen message={t('common.calculatingScore')} />;
 
   const backButton = (
     <button
@@ -472,7 +475,7 @@ export function YLTellTheStoryPractice({
   );
 
   const progressDots = (
-    <div className="flex items-center gap-1.5" aria-label={`Turn ${sceneIndex} of ${CHILD_TURNS}`}>
+    <div className="flex items-center gap-1.5" aria-label={t('tellTheStory.turnOf', { current: sceneIndex, total: CHILD_TURNS })}>
       {Array.from({ length: CHILD_TURNS }).map((_, i) => {
         const turnForDot = turns.find((t) => t.sceneIndex === i + 1);
         const isActive = i + 1 === sceneIndex && phase !== 'finished';
@@ -547,8 +550,8 @@ export function YLTellTheStoryPractice({
       <ChatShell
         headerConfig={{
           icon: PictureStoryMoversIcon,
-          title: 'Tell the Story',
-          subtitle: 'Practice history',
+          title: t('tellTheStory.title'),
+          subtitle: t('common.practiceHistory'),
           accentColor: 'amber',
           leftSlot: backButton,
           rightSlot: (
@@ -559,7 +562,7 @@ export function YLTellTheStoryPractice({
           ),
           online: false,
         }}
-        footerConfig={{ modeLabel: 'YL · TELL THE STORY', modelName: ACTIVE_MODEL_LABEL }}
+        footerConfig={{ modeLabel: t('tellTheStory.footerLabel'), modelName: ACTIVE_MODEL_LABEL }}
         inputSlot={null}
         animationKey="yl-tellthestory-readonly"
         maxWidthClass="max-w-full"
@@ -599,7 +602,7 @@ export function YLTellTheStoryPractice({
               scoreMax={savedEval.score_max ?? CHILD_TURNS}
               feedback={savedEval.feedback}
               onAction={onOpenDashboard}
-              actionLabel="Ver mi progreso"
+              actionLabel={t('common.viewMyProgress')}
               animate={false}
             />
           </div>
@@ -610,17 +613,17 @@ export function YLTellTheStoryPractice({
 
   const helperText =
     phase === 'setup'
-      ? '▶ Listen to Bob, then press Continue'
+      ? t('tellTheStory.listenThenContinue')
       : phase === 'ready'
-      ? '🎙 Tap the mic and describe this picture'
+      ? t('tellTheStory.tapMicDescribe')
       : phase === 'recording'
       ? undefined
       : phase === 'processing'
-      ? '⏳ Bob is listening…'
+      ? t('tellTheStory.bobListening')
       : phase === 'reaction'
-      ? '✅ Tap Next when ready'
+      ? t('tellTheStory.tapNext')
       : phase === 'finished'
-      ? '🎉 All done!'
+      ? t('tellTheStory.allDone')
       : '';
 
   const setupBar =
@@ -635,7 +638,7 @@ export function YLTellTheStoryPractice({
           }}
           className="px-6 py-3 rounded-full bg-amber-600 text-white font-bold text-sm hover:opacity-90 transition-opacity cursor-pointer"
         >
-          Continue
+          {t('tellTheStory.continue')}
         </button>
       </div>
     ) : null;
@@ -656,14 +659,14 @@ export function YLTellTheStoryPractice({
     phase === 'reaction' ? (
       <div className="border-t border-gray-100 bg-white/90 backdrop-blur p-3 flex items-center justify-between gap-3">
         <p className="text-xs text-gray-500 font-medium pl-2">
-          {sceneIndex >= CHILD_TURNS ? 'Last picture!' : `Picture ${sceneIndex + 1} of ${TOTAL_IMAGES}`}
+          {sceneIndex >= CHILD_TURNS ? t('tellTheStory.lastPicture') : t('tellTheStory.pictureOf', { current: sceneIndex + 1, total: TOTAL_IMAGES })}
         </p>
         <button
           type="button"
           onClick={handleNext}
           className="px-6 py-3 rounded-full bg-amber-600 text-white font-bold text-sm hover:opacity-90 transition-opacity flex items-center gap-2 cursor-pointer"
         >
-          {sceneIndex >= CHILD_TURNS ? 'See results' : 'Next'}
+          {sceneIndex >= CHILD_TURNS ? t('tellTheStory.seeResults') : t('tellTheStory.next')}
           <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
             <path d="M6 4l12 8-12 8V4z" />
             <rect x="18" y="4" width="2" height="16" />
@@ -680,7 +683,7 @@ export function YLTellTheStoryPractice({
           onClick={onBack}
           className="px-6 py-3 rounded-full bg-amber-600 text-white font-bold text-sm hover:opacity-90 transition-opacity cursor-pointer"
         >
-          Back to activities
+          {t('common.backToActivities')}
         </button>
       </div>
     ) : null;
@@ -689,14 +692,14 @@ export function YLTellTheStoryPractice({
 
   const scene1 = scenes[0];
   const subtitleText = phase === 'setup'
-    ? 'Ages 8–11 · Story intro'
-    : `Ages 8–11 · Picture ${activeImageIndex + 1}/${TOTAL_IMAGES}`;
+    ? t('tellTheStory.storyIntroSubtitle')
+    : t('tellTheStory.pictureSubtitle', { current: activeImageIndex + 1, total: TOTAL_IMAGES });
 
   return (
     <ChatShell
       headerConfig={{
         icon: PictureStoryMoversIcon,
-        title: 'Tell the Story',
+        title: t('tellTheStory.title'),
         subtitle: subtitleText,
         accentColor: 'amber',
         leftSlot: backButton,
@@ -708,7 +711,7 @@ export function YLTellTheStoryPractice({
         ),
         online: true,
       }}
-      footerConfig={{ modeLabel: 'YL · TELL THE STORY', modelName: ACTIVE_MODEL_LABEL }}
+      footerConfig={{ modeLabel: t('tellTheStory.footerLabel'), modelName: ACTIVE_MODEL_LABEL }}
       inputSlot={inputBar}
       animationKey="yl-tellthestory"
       maxWidthClass="max-w-full"
@@ -787,7 +790,7 @@ export function YLTellTheStoryPractice({
               scoreMax={finalEval.score_max ?? CHILD_TURNS}
               feedback={finalEval.feedback}
               onAction={onOpenDashboard ?? onBack}
-              actionLabel={onOpenDashboard ? 'Ver mi progreso' : 'Back to activities'}
+              actionLabel={onOpenDashboard ? t('common.viewMyProgress') : t('common.backToActivities')}
             />
           </motion.div>
         </div>

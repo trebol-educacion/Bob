@@ -9,6 +9,7 @@ import React from 'react';
 import Image from 'next/image';
 import { motion } from 'motion/react';
 import { ArrowLeft, Mic, MicOff, CheckCircle } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import { generateSpeechAction } from '@/actions/gemini';
 import { getOrCreateCueAudioAction } from '@/actions/modes/yl';
 import { pcmToWavBase64 } from '@/lib/audio';
@@ -105,6 +106,7 @@ export function YLErrorScreen({
   onRetry?: () => void;
   onBack: () => void;
 }) {
+  const t = useTranslations('yl');
   return (
     <div className="flex-1 flex flex-col items-center justify-center p-8 gap-6">
       <p className="text-red-500 font-semibold text-center">{error}</p>
@@ -114,14 +116,14 @@ export function YLErrorScreen({
             onClick={onRetry}
             className="px-5 py-2 bg-blue-600 text-white rounded-lg font-semibold"
           >
-            Retry
+            {t('shared.retry')}
           </button>
         )}
         <button
           onClick={onBack}
           className="px-5 py-2 bg-gray-100 text-gray-700 rounded-lg font-semibold"
         >
-          Volver
+          {t('shared.goBack')}
         </button>
       </div>
     </div>
@@ -138,6 +140,7 @@ export function YLRecordingButton({
   seconds: number;
   maxSeconds: number;
 }) {
+  const t = useTranslations('yl');
   return (
     <div className="flex flex-col items-center gap-4">
       <motion.div
@@ -148,7 +151,7 @@ export function YLRecordingButton({
         <Mic size={28} className="text-white" />
       </motion.div>
       <div className="text-center space-y-1">
-        <p className="text-sm font-bold text-red-500">Recording...</p>
+        <p className="text-sm font-bold text-red-500">{t('shared.recordingLabel')}</p>
         <p className="text-xs text-gray-400">
           {seconds}s / {maxSeconds}s
         </p>
@@ -158,7 +161,7 @@ export function YLRecordingButton({
         className="flex items-center gap-2 px-4 py-2 bg-gray-100 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-200 transition-colors"
       >
         <MicOff size={16} />
-        Stop
+        {t('shared.stop')}
       </button>
     </div>
   );
@@ -169,12 +172,13 @@ export function YLRecordingButton({
  * inline in the chat without dominating it.
  */
 export function YLResultCompact({ evalResult }: { evalResult: EvalResponse }) {
+  const t = useTranslations('yl');
   const pct = Math.round((evalResult.score / evalResult.score_max) * 100);
   return (
     <div className="bg-white border border-gray-100 rounded-2xl px-4 py-3 space-y-1 max-w-md shadow-sm">
       <div className="flex items-center gap-2 text-sm">
         <CheckCircle className="text-blue-600 shrink-0" size={16} />
-        <span className="font-bold text-gray-800">Practice complete</span>
+        <span className="font-bold text-gray-800">{t('shared.practiceComplete')}</span>
         <span className="text-gray-300">·</span>
         <span className="font-semibold text-gray-800">
           {evalResult.score}<span className="text-gray-400">/{evalResult.score_max}</span>
@@ -249,11 +253,12 @@ export function YLToolbar({
 }
 
 export function YLExaminerCard({ cue }: { cue: string }) {
+  const t = useTranslations('yl');
   return (
     <div className="bg-white rounded-2xl shadow-md p-6 space-y-4 w-full max-w-lg">
       <div className="flex items-center gap-2">
         <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
-          Examinador
+          {t('shared.examiner')}
         </span>
       </div>
       <p className="text-xl font-black text-gray-900 leading-snug">{cue}</p>
@@ -268,6 +273,13 @@ export function YLReactionCard({ reaction }: { reaction: string }) {
       <p className="text-xs text-gray-400 mt-1">Examiner</p>
     </div>
   );
+}
+
+function VoiceNoteLabel({ playing, hasPlayed }: { playing: boolean; hasPlayed: boolean }) {
+  const t = useTranslations('yl');
+  if (playing) return <span>{t('shared.playing')}</span>;
+  if (hasPlayed) return <span>{t('shared.listenAgain')}</span>;
+  return <span>{t('shared.voiceNote')}</span>;
 }
 
 export function YLVoiceNote({
@@ -404,7 +416,7 @@ export function YLVoiceNote({
             />
           </div>
           <div className={`flex justify-between text-[10px] mt-1 ${isBob ? 'text-gray-400' : 'text-white/70'}`}>
-            <span>{playing ? '▶ Playing…' : hasPlayed ? '🔁 Listen again' : '🎤 Voice note'}</span>
+            <VoiceNoteLabel playing={playing} hasPlayed={hasPlayed} />
             <span>{fmt(duration)}</span>
           </div>
         </div>
@@ -425,23 +437,25 @@ export function YLBobTextMessage({ text }: { text: string }) {
 }
 
 export function YLImageMessage({ src }: { src: string }) {
+  const t = useTranslations('yl');
   const finalSrc = src.startsWith('data:') ? src : `data:image/png;base64,${src}`;
   return (
     <div className="flex justify-start gap-2">
       <BobAvatar />
       <div className="rounded-2xl overflow-hidden shadow bg-white max-w-sm">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={finalSrc} alt="Imagen" className="w-full h-auto block" />
+        <img src={finalSrc} alt={t('shared.image')} className="w-full h-auto block" />
       </div>
     </div>
   );
 }
 
 export function YLUserTextMessage({ text }: { text: string }) {
+  const t = useTranslations('yl');
   return (
     <div className="flex justify-end gap-2 font-nunito">
       <div className="rounded-2xl rounded-tr-sm px-4 py-2.5 bg-gradient-to-br from-violet-600 to-violet-700 text-white text-sm max-w-sm font-bold shadow-sm">
-        {text || <span className="text-white/60 italic">(no audio)</span>}
+        {text || <span className="text-white/60 italic">{t('shared.noAudio')}</span>}
       </div>
     </div>
   );
@@ -464,13 +478,14 @@ export function YLChatMicBar({
   disabled?: boolean;
   helperText?: string;
 }) {
+  const t = useTranslations('yl');
   return (
     <div className="border-t border-gray-100 bg-white/90 backdrop-blur p-3 flex items-center justify-between gap-3">
       <p className="text-xs text-gray-500 font-medium pl-2">
         {isRecording ? (
           <span className="flex items-center gap-2 text-red-500 font-bold">
             <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-            Recording · {seconds}s / {maxSeconds}s
+            {t('shared.recordingProgress', { seconds, maxSeconds })}
           </span>
         ) : (
           helperText ?? ''
@@ -481,7 +496,7 @@ export function YLChatMicBar({
           type="button"
           onClick={onStop}
           className="w-14 h-14 rounded-full bg-red-500 text-white shadow-lg hover:scale-105 active:scale-95 transition-transform flex items-center justify-center"
-          aria-label="Stop"
+          aria-label={t('shared.stop')}
         >
           <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
             <rect x="6" y="6" width="12" height="12" rx="2" />
@@ -493,7 +508,7 @@ export function YLChatMicBar({
           onClick={onStart}
           disabled={disabled}
           className="w-14 h-14 rounded-full bg-blue-600 text-white shadow-lg hover:scale-105 active:scale-95 transition-transform flex items-center justify-center disabled:opacity-40 disabled:hover:scale-100"
-          aria-label="Start speaking"
+          aria-label={t('shared.startSpeaking')}
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
             <rect x="9" y="3" width="6" height="12" rx="3" />
@@ -529,6 +544,7 @@ export function YLAudioControls({
   showRecord = false,
   showNext = false,
 }: YLAudioControlsProps) {
+  const t = useTranslations('yl');
   const Btn = ({
     onClick,
     title,
@@ -568,7 +584,7 @@ export function YLAudioControls({
           </svg>
         </Btn>
       ) : (
-        <Btn onClick={onPlay} title="Reproducir" primary>
+        <Btn onClick={onPlay} title={t('shared.play')} primary>
           <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
             <path d="M8 5v14l11-7z" />
           </svg>
@@ -593,7 +609,7 @@ export function YLAudioControls({
       )}
 
       {showNext && onNext && (
-        <Btn onClick={onNext} title="Siguiente" primary>
+        <Btn onClick={onNext} title={t('shared.next')} primary>
           <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
             <path d="M6 4l12 8-12 8V4z" />
             <rect x="18" y="4" width="2" height="16" />
@@ -615,6 +631,7 @@ export function YLReadOnlyMessage({
   msgType: string;
   contentJson?: Record<string, unknown> | null;
 }) {
+  const t = useTranslations('yl');
   const isBob = role === 'bob';
   const cue =
     contentJson && typeof contentJson === 'object' && 'cue' in contentJson
@@ -626,7 +643,7 @@ export function YLReadOnlyMessage({
       <div className="flex justify-start gap-2">
         <BobAvatar />
         <div className="max-w-xs rounded-2xl rounded-tl-sm px-4 py-3 text-sm bg-white border border-gray-100 text-gray-400 italic">
-          📊 Evaluación guardada
+          {t('shared.evaluationSaved')}
         </div>
       </div>
     );
@@ -649,7 +666,7 @@ export function YLReadOnlyMessage({
       <div className="flex flex-col gap-1 max-w-md">
         {!isBob && cue && (
           <div className="text-xs text-gray-400 italic px-2">
-            Examiner: <span className="text-gray-500">{cue}</span>
+            {t('shared.examinerPrefix')} <span className="text-gray-500">{cue}</span>
           </div>
         )}
         <div
@@ -661,7 +678,7 @@ export function YLReadOnlyMessage({
         >
           {text || (
             <span className={isBob ? 'text-gray-400 italic' : 'text-white/60 italic'}>
-              {isBob ? '...' : '(no audio recorded)'}
+              {isBob ? '...' : t('shared.noAudioRecorded')}
             </span>
           )}
         </div>

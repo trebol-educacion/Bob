@@ -11,6 +11,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'motion/react';
 import { ArrowLeft } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import { FindTheDifferencesIcon } from '@/components/icons/MoversIcons';
 import { CelebrationCard } from './CelebrationCard';
 import { ACTIVE_MODEL_LABEL } from '@/lib/models';
@@ -95,6 +96,7 @@ export function YLFindDifferencesPractice({
   onSessionFinished,
   onOpenDashboard,
 }: YLFindDifferencesPracticeProps) {
+  const t = useTranslations('yl');
   const mode: ModeKey = `cambridge_${exam}_part${part}` as ModeKey;
   const isReadOnly = !!initialMessages && initialMessages.length > 0;
 
@@ -392,10 +394,10 @@ export function YLFindDifferencesPractice({
   if (phase === 'loading' || phase === 'generating-images')
     return (
       <YLLoadingScreen
-        message={phase === 'generating-images' ? 'Getting the pictures ready…' : 'Getting your practice ready…'}
+        message={phase === 'generating-images' ? t('findDifferences.gettingPicturesReady') : t('common.gettingPracticeReady')}
       />
     );
-  if (phase === 'evaluating') return <YLLoadingScreen message="Calculating your score…" />;
+  if (phase === 'evaluating') return <YLLoadingScreen message={t('common.calculatingScore')} />;
 
   const imageA = images[0];
   const imageB = images[1];
@@ -417,7 +419,7 @@ export function YLFindDifferencesPractice({
   );
 
   const progressDots = (
-    <div className="flex items-center gap-1.5" aria-label={`Turn ${turnIndex + 1} of ${TOTAL_TURNS}`}>
+    <div className="flex items-center gap-1.5" aria-label={t('findDifferences.turnOf', { current: turnIndex + 1, total: TOTAL_TURNS })}>
       {Array.from({ length: TOTAL_TURNS }).map((_, i) => {
         const turn = turns[i];
         const isActive = i === turnIndex && phase !== 'finished';
@@ -438,7 +440,7 @@ export function YLFindDifferencesPractice({
       <div className="grid grid-cols-2 gap-3 max-w-2xl mx-auto">
         <div className="flex flex-col gap-1">
           <span className="font-nunito text-[10px] font-bold text-amber-700 uppercase tracking-wider text-center">
-            Bob's picture
+            {t('findDifferences.bobsPicture')}
           </span>
           <div className="rounded-xl overflow-hidden ring-1 ring-amber-200 shadow-sm">
             {imageA ? (
@@ -455,7 +457,7 @@ export function YLFindDifferencesPractice({
         </div>
         <div className="flex flex-col gap-1">
           <span className="font-nunito text-[10px] font-bold text-amber-700 uppercase tracking-wider text-center">
-            Your picture
+            {t('findDifferences.yourPicture')}
           </span>
           <div className="rounded-xl overflow-hidden ring-1 ring-amber-200 shadow-sm">
             {imageB ? (
@@ -489,8 +491,8 @@ export function YLFindDifferencesPractice({
       <ChatShell
         headerConfig={{
           icon: FindTheDifferencesIcon,
-          title: 'Find the Differences',
-          subtitle: 'Practice history',
+          title: t('findDifferences.title'),
+          subtitle: t('common.practiceHistory'),
           accentColor: 'amber',
           leftSlot: backButton,
           rightSlot: (
@@ -501,7 +503,7 @@ export function YLFindDifferencesPractice({
           ),
           online: false,
         }}
-        footerConfig={{ modeLabel: "YL · FIND THE DIFFERENCES", modelName: ACTIVE_MODEL_LABEL }}
+        footerConfig={{ modeLabel: t('findDifferences.footerLabel'), modelName: ACTIVE_MODEL_LABEL }}
         inputSlot={null}
         animationKey="yl-finddiffs-readonly"
         maxWidthClass="max-w-full"
@@ -541,7 +543,7 @@ export function YLFindDifferencesPractice({
               scoreMax={savedEval.score_max ?? TOTAL_TURNS}
               feedback={savedEval.feedback}
               onAction={onOpenDashboard}
-              actionLabel="Ver mi progreso"
+              actionLabel={t('common.viewMyProgress')}
               animate={false}
             />
           </div>
@@ -579,14 +581,14 @@ export function YLFindDifferencesPractice({
     phase === 'reaction' ? (
       <div className="border-t border-gray-100 bg-white/90 backdrop-blur p-3 flex items-center justify-between gap-3">
         <p className="text-xs text-gray-500 font-medium pl-2">
-          {turnIndex + 1 >= TOTAL_TURNS ? 'Last one!' : `Difference ${turnIndex + 1} of ${TOTAL_TURNS}`}
+          {turnIndex + 1 >= TOTAL_TURNS ? t('findDifferences.lastOne') : t('findDifferences.differenceOf', { current: turnIndex + 1, total: TOTAL_TURNS })}
         </p>
         <button
           type="button"
           onClick={handleNext}
           className="px-6 py-3 rounded-full bg-amber-600 text-white font-bold text-sm hover:opacity-90 transition-opacity flex items-center gap-2 cursor-pointer"
         >
-          {turnIndex + 1 >= TOTAL_TURNS ? 'See results' : 'Next'}
+          {turnIndex + 1 >= TOTAL_TURNS ? t('findDifferences.seeResults') : t('shared.next')}
           <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
             <path d="M6 4l12 8-12 8V4z" />
             <rect x="18" y="4" width="2" height="16" />
@@ -603,7 +605,7 @@ export function YLFindDifferencesPractice({
           onClick={onBack}
           className="px-6 py-3 rounded-full bg-amber-600 text-white font-bold text-sm hover:opacity-90 transition-opacity cursor-pointer"
         >
-          Back to activities
+          {t('common.backToActivities')}
         </button>
       </div>
     ) : null;
@@ -614,7 +616,7 @@ export function YLFindDifferencesPractice({
     <ChatShell
       headerConfig={{
         icon: FindTheDifferencesIcon,
-        title: 'Find the Differences',
+        title: t('findDifferences.title'),
         subtitle: `Ages 8–11 · Turn ${turnIndex + 1}/${TOTAL_TURNS}`,
         accentColor: 'amber',
         leftSlot: backButton,
@@ -626,7 +628,7 @@ export function YLFindDifferencesPractice({
         ),
         online: true,
       }}
-      footerConfig={{ modeLabel: "YL · FIND THE DIFFERENCES", modelName: ACTIVE_MODEL_LABEL }}
+      footerConfig={{ modeLabel: t('findDifferences.footerLabel'), modelName: ACTIVE_MODEL_LABEL }}
       inputSlot={inputBar}
       animationKey="yl-finddiffs"
       maxWidthClass="max-w-full"
@@ -688,7 +690,7 @@ export function YLFindDifferencesPractice({
               scoreMax={finalEval.score_max ?? TOTAL_TURNS}
               feedback={finalEval.feedback}
               onAction={onOpenDashboard ?? onBack}
-              actionLabel={onOpenDashboard ? 'Ver mi progreso' : 'Back to activities'}
+              actionLabel={onOpenDashboard ? t('common.viewMyProgress') : t('common.backToActivities')}
             />
           </motion.div>
         </div>

@@ -14,6 +14,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'motion/react';
 import { ArrowLeft } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import { WhatsThisIcon } from '@/components/icons/StartersIcons';
 import { CelebrationCard } from './CelebrationCard';
 import { ACTIVE_MODEL_LABEL } from '@/lib/models';
@@ -95,6 +96,7 @@ export function YLWhatsThisPractice({
   onSessionFinished,
   onOpenDashboard,
 }: YLWhatsThisPracticeProps) {
+  const t = useTranslations('yl');
   const mode: ModeKey = `cambridge_${exam}_part${part}` as ModeKey;
   const isReadOnly = !!initialMessages && initialMessages.length > 0;
 
@@ -408,9 +410,9 @@ export function YLWhatsThisPractice({
 
   if (error) return <YLErrorScreen error={error} onBack={onBack} />;
   if (phase === 'loading' || phase === 'generating-images')
-    return <YLLoadingScreen message={phase === 'generating-images' ? 'Getting the pictures ready…' : 'Getting your practice ready…'} />;
+    return <YLLoadingScreen message={phase === 'generating-images' ? t('findDifferences.gettingPicturesReady') : t('common.gettingPracticeReady')} />;
   if (phase === 'evaluating')
-    return <YLLoadingScreen message="Calculating your score…" />;
+    return <YLLoadingScreen message={t('common.calculatingScore')} />;
 
   const totalCards = currentCards?.length ?? TOTAL_CARDS;
   const currentImageUrl = images[cardIndex];
@@ -432,7 +434,7 @@ export function YLWhatsThisPractice({
   );
 
   const progressDots = (
-    <div className="flex items-center gap-1.5" aria-label={`Turn ${cueIndex + 1} of ${TOTAL_TURNS}`}>
+    <div className="flex items-center gap-1.5" aria-label={t('whatsThis.turnOf', { current: cueIndex + 1, total: TOTAL_TURNS })}>
       {Array.from({ length: TOTAL_TURNS }).map((_, i) => {
         const turn = turns[i];
         const isActive = i === cueIndex && phase !== 'finished';
@@ -463,8 +465,8 @@ export function YLWhatsThisPractice({
       <ChatShell
         headerConfig={{
           icon: WhatsThisIcon,
-          title: "What's This?",
-          subtitle: 'Practice history',
+          title: t('whatsThis.title'),
+          subtitle: t('common.practiceHistory'),
           accentColor: 'violet',
           leftSlot: backButton,
           rightSlot: (
@@ -475,7 +477,7 @@ export function YLWhatsThisPractice({
           ),
           online: false,
         }}
-        footerConfig={{ modeLabel: "YL · WHAT'S THIS?", modelName: ACTIVE_MODEL_LABEL }}
+        footerConfig={{ modeLabel: t('whatsThis.footerLabel'), modelName: ACTIVE_MODEL_LABEL }}
         inputSlot={null}
         animationKey="yl-whatsthis-readonly"
         maxWidthClass="max-w-full"
@@ -533,7 +535,7 @@ export function YLWhatsThisPractice({
               scoreMax={savedEval.score_max ?? TOTAL_TURNS}
               feedback={savedEval.feedback}
               onAction={onOpenDashboard}
-              actionLabel="Ver mi progreso"
+              actionLabel={t('common.viewMyProgress')}
               animate={false}
             />
           </div>
@@ -544,15 +546,15 @@ export function YLWhatsThisPractice({
 
   const helperText =
     phase === 'ready'
-      ? '🎙 Tap the mic and answer Bob\'s question'
+      ? t('whatsThis.tapMicAnswer')
       : phase === 'recording'
       ? undefined
       : phase === 'processing'
-      ? '⏳ Bob is listening…'
+      ? t('whatsThis.bobListening')
       : phase === 'reaction'
-      ? '✅ Great! Tap Next when ready'
+      ? t('whatsThis.tapNextGreat')
       : phase === 'finished'
-      ? '🎉 All done!'
+      ? t('whatsThis.allDone')
       : '';
 
   const micBar = (
@@ -570,14 +572,14 @@ export function YLWhatsThisPractice({
   const nextButton = phase === 'reaction' ? (
     <div className="border-t border-gray-100 bg-white/90 backdrop-blur p-3 flex items-center justify-between gap-3">
       <p className="text-xs text-gray-500 font-medium pl-2">
-        {cueIndex + 1 >= TOTAL_TURNS ? 'Almost there!' : `Question ${cueIndex + 1} of ${TOTAL_TURNS}`}
+        {cueIndex + 1 >= TOTAL_TURNS ? t('whatsThis.almostThere') : t('whatsThis.questionOf', { current: cueIndex + 1, total: TOTAL_TURNS })}
       </p>
       <button
         type="button"
         onClick={handleNext}
         className="px-6 py-3 rounded-full bg-violet-600 text-white font-bold text-sm hover:opacity-90 transition-opacity flex items-center gap-2 cursor-pointer"
       >
-        {cueIndex + 1 >= TOTAL_TURNS ? 'See results' : 'Next'}
+        {cueIndex + 1 >= TOTAL_TURNS ? t('whatsThis.seeResults') : t('whatsThis.next')}
         <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
           <path d="M6 4l12 8-12 8V4z" />
           <rect x="18" y="4" width="2" height="16" />
@@ -593,7 +595,7 @@ export function YLWhatsThisPractice({
         onClick={onBack}
         className="px-6 py-3 rounded-full bg-violet-600 text-white font-bold text-sm hover:opacity-90 transition-opacity cursor-pointer"
       >
-        Back to activities
+        {t('common.backToActivities')}
       </button>
     </div>
   ) : null;
@@ -604,7 +606,7 @@ export function YLWhatsThisPractice({
     <ChatShell
       headerConfig={{
         icon: WhatsThisIcon,
-        title: "What's This?",
+        title: t('whatsThis.title'),
         subtitle: `Ages 6–8 · Card ${cardIndex + 1}/${totalCards} · Q${questionIndex + 1}/2`,
         accentColor: 'violet',
         leftSlot: backButton,
@@ -616,7 +618,7 @@ export function YLWhatsThisPractice({
         ),
         online: true,
       }}
-      footerConfig={{ modeLabel: "YL · WHAT'S THIS?", modelName: ACTIVE_MODEL_LABEL }}
+      footerConfig={{ modeLabel: t('whatsThis.footerLabel'), modelName: ACTIVE_MODEL_LABEL }}
       inputSlot={inputBar}
       animationKey="yl-whatsthis"
       maxWidthClass="max-w-full"
@@ -713,7 +715,7 @@ export function YLWhatsThisPractice({
             scoreMax={finalEval.score_max ?? TOTAL_TURNS}
             feedback={finalEval.feedback}
             onAction={onOpenDashboard ?? onBack}
-            actionLabel={onOpenDashboard ? 'Ver mi progreso' : 'Back to activities'}
+            actionLabel={onOpenDashboard ? t('common.viewMyProgress') : t('common.backToActivities')}
           />
         </div>
       )}

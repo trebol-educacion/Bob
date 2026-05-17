@@ -11,6 +11,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'motion/react';
 import { ArrowLeft } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import { ListenAndPointIcon } from '@/components/icons/ModeIcons';
 import { CelebrationCard } from './CelebrationCard';
 import { ACTIVE_MODEL_LABEL } from '@/lib/models';
@@ -71,6 +72,7 @@ export function YLPointingPractice({
   onSessionFinished,
   onOpenDashboard,
 }: YLPointingPracticeProps) {
+  const t = useTranslations('yl');
   const mode: ModeKey = `cambridge_${exam}_part${part}` as ModeKey;
   const isReadOnly = !!initialMessages && initialMessages.length > 0;
 
@@ -326,9 +328,9 @@ export function YLPointingPractice({
 
   if (error) return <YLErrorScreen error={error} onBack={onBack} />;
   if (phase === 'loading')
-    return <YLLoadingScreen message="Getting your practice ready…" />;
+    return <YLLoadingScreen message={t('common.gettingPracticeReady')} />;
   if (phase === 'evaluating')
-    return <YLLoadingScreen message="Calculating your final score…" />;
+    return <YLLoadingScreen message={t('common.calculatingFinalScore')} />;
 
   const partLabel = 'Starters Part 1 — Point to the picture';
   const progress = Math.round(((cueIndex + (phase === 'answered' ? 1 : 0)) / totalCues) * 100);
@@ -350,7 +352,7 @@ export function YLPointingPractice({
   );
 
   const progressDots = (
-    <div className="flex items-center gap-1.5" aria-label={`Round ${cueIndex + 1} of ${totalCues}`}>
+    <div className="flex items-center gap-1.5" aria-label={t('pointing.roundOf', { current: cueIndex + 1, total: totalCues })}>
       {Array.from({ length: totalCues }).map((_, i) => {
         const turn = turns[i];
         const isActive = i === cueIndex && phase !== 'finished';
@@ -382,8 +384,8 @@ export function YLPointingPractice({
 
     return (
       <ChatShell
-        headerConfig={{ icon: ListenAndPointIcon, title: 'Listen and Point', subtitle: 'Practice history', accentColor: 'violet', leftSlot: backButton, rightSlot: <div className="flex items-center gap-3">{progressDots}{partBadge}</div>, online: false }}
-        footerConfig={{ modeLabel: 'YL · POINTING', modelName: ACTIVE_MODEL_LABEL }}
+        headerConfig={{ icon: ListenAndPointIcon, title: t('pointing.title'), subtitle: t('common.practiceHistory'), accentColor: 'violet', leftSlot: backButton, rightSlot: <div className="flex items-center gap-3">{progressDots}{partBadge}</div>, online: false }}
+        footerConfig={{ modeLabel: t('pointing.footerLabel'), modelName: ACTIVE_MODEL_LABEL }}
         inputSlot={null}
         animationKey="yl-pointing-readonly"
         maxWidthClass="max-w-full"
@@ -447,7 +449,7 @@ export function YLPointingPractice({
               scoreMax={savedEval.score_max ?? 100}
               feedback={savedEval.feedback}
               onAction={onOpenDashboard}
-              actionLabel="Ver mi progreso"
+              actionLabel={t('common.viewMyProgress')}
               animate={false}
             />
           </div>
@@ -460,9 +462,9 @@ export function YLPointingPractice({
   const bottomBar = (
     <div className="border-t border-gray-100 bg-white/90 backdrop-blur p-3 flex items-center justify-between gap-3">
       <p className="text-xs text-gray-500 font-medium pl-2">
-        {phase === 'ready' && '🎧 Listen and tap the correct picture'}
-        {phase === 'answered' && (wasCorrect ? 'Well done!' : 'Almost… let\'s try the next one')}
-        {phase === 'finished' && '✅ Practice complete'}
+        {phase === 'ready' && t('pointing.listenAndTap')}
+        {phase === 'answered' && (wasCorrect ? t('pointing.wellDone') : t('pointing.almostNext'))}
+        {phase === 'finished' && t('pointing.practiceComplete')}
       </p>
       {phase === 'answered' && (
         <button
@@ -470,7 +472,7 @@ export function YLPointingPractice({
           onClick={handleNext}
           className="px-6 py-3 rounded-full bg-blue-600 text-white font-bold text-sm hover:opacity-90 transition-opacity flex items-center gap-2"
         >
-          {cueIndex + 1 >= totalCues ? 'Ver resultados' : 'Siguiente'}
+          {cueIndex + 1 >= totalCues ? t('pointing.seeResults') : t('pointing.next')}
           <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
             <path d="M6 4l12 8-12 8V4z" />
             <rect x="18" y="4" width="2" height="16" />
@@ -483,7 +485,7 @@ export function YLPointingPractice({
           onClick={onBack}
           className="px-6 py-3 rounded-full bg-blue-600 text-white font-bold text-sm hover:opacity-90 transition-opacity"
         >
-          Back to activities
+          {t('common.backToActivities')}
         </button>
       )}
     </div>
@@ -491,8 +493,8 @@ export function YLPointingPractice({
 
   return (
     <ChatShell
-      headerConfig={{ icon: ListenAndPointIcon, title: 'Listen and Point', subtitle: `Ages 6–8 · Round ${cueIndex + 1}/${totalCues}`, accentColor: 'violet', leftSlot: backButton, rightSlot: <div className="flex items-center gap-3">{progressDots}{partBadge}</div>, online: true }}
-      footerConfig={{ modeLabel: 'YL · POINTING', modelName: ACTIVE_MODEL_LABEL }}
+      headerConfig={{ icon: ListenAndPointIcon, title: t('pointing.title'), subtitle: `Ages 6–8 · Round ${cueIndex + 1}/${totalCues}`, accentColor: 'violet', leftSlot: backButton, rightSlot: <div className="flex items-center gap-3">{progressDots}{partBadge}</div>, online: true }}
+      footerConfig={{ modeLabel: t('pointing.footerLabel'), modelName: ACTIVE_MODEL_LABEL }}
       inputSlot={bottomBar}
       animationKey="yl-pointing"
       maxWidthClass="max-w-full"
@@ -564,7 +566,7 @@ export function YLPointingPractice({
             scoreMax={finalEval.score_max ?? 100}
             feedback={finalEval.feedback}
             onAction={onOpenDashboard ?? onBack}
-            actionLabel={onOpenDashboard ? 'Ver mi progreso' : 'Back to activities'}
+            actionLabel={onOpenDashboard ? t('common.viewMyProgress') : t('common.backToActivities')}
           />
         </div>
       )}

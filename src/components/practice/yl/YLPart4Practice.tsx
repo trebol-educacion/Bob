@@ -15,6 +15,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { User, ArrowLeft, Star } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
 import { blobToBase64 } from '@/lib/audio';
 import { ACTIVE_MODEL_LABEL } from '@/lib/models';
@@ -80,6 +81,7 @@ export function YLPart4Practice({
   initialMessages,
   onSessionCreated,
 }: YLPart4PracticeProps) {
+  const t = useTranslations('yl');
   const mode: ModeKey = `cambridge_${exam}_part${part}` as ModeKey;
   const isReadOnly = !!initialMessages && initialMessages.length > 0;
 
@@ -122,7 +124,7 @@ export function YLPart4Practice({
         setPlan(p);
         setPhase('ready');
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Error al preparar la sesión');
+        setError(err instanceof Error ? err.message : 'Error preparing the session');
       }
     }
 
@@ -230,7 +232,7 @@ export function YLPart4Practice({
           void runTurn(nextIndex);
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Error procesando respuesta');
+        setError(err instanceof Error ? err.message : 'Error processing the answer');
       }
     })();
   }, [isRecording, phase]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -248,7 +250,7 @@ export function YLPart4Practice({
         setFinalEval(result);
         setPhase('finished');
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Error en evaluación final');
+        setError(err instanceof Error ? err.message : 'Error in final evaluation');
       }
     })();
   }, [phase, sessionId, plan, mode]);
@@ -264,21 +266,21 @@ export function YLPart4Practice({
   }, [isRecording, stopRecording]);
 
   const partLabel = (() => {
-    if (exam === 'starters' && part === 4) return 'Starters Part 4 — Preguntas personales';
-    if (exam === 'movers' && part === 4) return 'Movers Part 4 — Preguntas personales';
-    if (exam === 'movers' && part === 5) return 'Movers Part 5 — Describe la imagen';
+    if (exam === 'starters' && part === 4) return t('part4.startersPersonalLabel');
+    if (exam === 'movers' && part === 4) return t('part4.moversPersonalLabel');
+    if (exam === 'movers' && part === 5) return t('part4.moversDescribeLabel');
     return `Cambridge ${exam} Part ${part}`;
   })();
 
   const headerTitle = (() => {
-    if (exam === 'starters') return 'Starters — Personal';
-    if (part === 5) return 'Movers — Describe';
-    return 'Movers — Personal';
+    if (exam === 'starters') return t('part4.startersHeaderTitle');
+    if (part === 5) return t('part4.moversDescribeHeaderTitle');
+    return t('part4.moversPersonalHeaderTitle');
   })();
   const headerSubtitle = (() => {
-    if (exam === 'starters') return 'Ages 6–8 · Part 4';
-    if (part === 5) return 'Ages 7–9 · Part 5';
-    return 'Ages 7–9 · Part 4';
+    if (exam === 'starters') return t('part4.startersHeaderSubtitle');
+    if (part === 5) return t('part4.moversPart5HeaderSubtitle');
+    return t('part4.moversPart4HeaderSubtitle');
   })();
   const partBadgeLabel = `PART ${part}`;
 
@@ -302,13 +304,13 @@ export function YLPart4Practice({
   );
 
   if (error) return <YLErrorScreen error={error} onBack={onBack} />;
-  if (phase === 'loading') return <YLLoadingScreen message="Preparando tus preguntas..." />;
-  if (phase === 'evaluating') return <YLLoadingScreen message="Calculating your final score…" />;
+  if (phase === 'loading') return <YLLoadingScreen message={t('common.gettingPracticeReady')} />;
+  if (phase === 'evaluating') return <YLLoadingScreen message={t('common.calculatingFinalScore')} />;
 
   if (phase === 'finished' && isReadOnly) {
     return (
       <ChatShell
-        headerConfig={{ icon: Star, title: headerTitle, subtitle: 'Practice history', accentColor: 'amber', leftSlot: backButton, rightSlot: partBadge, online: false }}
+        headerConfig={{ icon: Star, title: headerTitle, subtitle: t('common.practiceHistory'), accentColor: 'amber', leftSlot: backButton, rightSlot: partBadge, online: false }}
         footerConfig={{ modeLabel: `YL · ${partBadgeLabel}`, modelName: ACTIVE_MODEL_LABEL }}
         inputSlot={null}
         animationKey={`yl-part${part}-readonly`}
@@ -333,7 +335,7 @@ export function YLPart4Practice({
         animate={{ opacity: 1, y: 0 }}
         className="flex-1 overflow-y-auto p-6 max-w-2xl mx-auto w-full space-y-6"
       >
-        <YLResultsHeader title="¡Preguntas completadas!" subtitle={partLabel} />
+        <YLResultsHeader title={t('part4.questionsComplete')} subtitle={partLabel} />
         <YLScoreDisplay evalResult={finalEval} />
         <YLFeedbackCard feedback={finalEval.feedback} />
         <div className="flex gap-3 pb-4">
@@ -341,7 +343,7 @@ export function YLPart4Practice({
             onClick={onBack}
             className="flex-1 py-3 bg-blue-600 text-white rounded-xl font-bold hover:opacity-90 transition-opacity"
           >
-            Back to activities
+            {t('common.backToActivities')}
           </button>
         </div>
       </motion.div>
@@ -396,13 +398,13 @@ export function YLPart4Practice({
           >
             {phase === 'playing-cue' && (
               <p className="text-gray-500 font-semibold text-sm">
-                Escucha la pregunta...
+                {t('part4.listeningToQuestion')}
               </p>
             )}
 
             {phase === 'countdown' && (
               <div className="text-center space-y-1">
-                <p className="text-gray-500 font-semibold text-sm">Grabando en</p>
+                <p className="text-gray-500 font-semibold text-sm">{t('part4.recordingIn')}</p>
                 <motion.span
                   key={countdown}
                   initial={{ scale: 1.4, opacity: 0 }}
@@ -427,7 +429,7 @@ export function YLPart4Practice({
               <div className="flex flex-col items-center gap-3">
                 <div className="w-8 h-8 border-3 border-blue-600 border-t-transparent rounded-full animate-spin" />
                 <p className="text-gray-500 font-semibold text-sm">
-                  Processing your answer…
+                  {t('common.processingAnswer')}
                 </p>
               </div>
             )}

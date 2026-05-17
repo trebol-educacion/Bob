@@ -1,1 +1,141 @@
-{}
+{
+  "shared": {
+    "goBack": "Go back",
+    "retry": "Retry",
+    "play": "Play",
+    "pause": "Pause",
+    "replay": "Replay",
+    "stop": "Stop",
+    "next": "Next",
+    "startSpeaking": "Start speaking",
+    "recordingLabel": "Recording...",
+    "recordingProgress": "Recording · {seconds}s / {maxSeconds}s",
+    "practiceComplete": "Practice complete",
+    "examiner": "Examiner",
+    "examinerPrefix": "Examiner:",
+    "playing": "▶ Playing…",
+    "listenAgain": "🔁 Listen again",
+    "voiceNote": "🎤 Voice note",
+    "image": "Image",
+    "evaluationSaved": "📊 Evaluation saved",
+    "noAudioRecorded": "(no audio recorded)",
+    "noAudio": "(no audio)"
+  },
+  "common": {
+    "backToActivities": "Back to activities",
+    "gettingPracticeReady": "Getting your practice ready…",
+    "calculatingFinalScore": "Calculating your final score…",
+    "calculatingScore": "Calculating your score…",
+    "processingAnswer": "Processing your answer…",
+    "practiceHistory": "Practice history",
+    "viewMyProgress": "View my progress",
+    "listeningProgress": "Listening to the examiner…",
+    "recordingIn": "Recording in",
+    "listenToExaminer": "Listen to the examiner…"
+  },
+  "part2": {
+    "startersLabel": "Starters Part 2 — Scene questions",
+    "moversLabel": "Movers Part 2 — Info exchange",
+    "startersHeaderTitle": "Starters — Listening",
+    "moversHeaderTitle": "Movers — Image",
+    "startersHeaderSubtitle": "Ages 6–8 · Part 2",
+    "moversHeaderSubtitle": "Ages 7–9 · Part 2",
+    "yourInfoCard": "Your info card",
+    "yourCard": "Your card",
+    "sceneImage": "Scene image",
+    "listeningToExaminer": "Listen to the examiner…",
+    "recordingIn": "Recording in"
+  },
+  "part4": {
+    "startersPersonalLabel": "Starters Part 4 — Personal questions",
+    "moversPersonalLabel": "Movers Part 4 — Personal questions",
+    "moversDescribeLabel": "Movers Part 5 — Describe the picture",
+    "startersHeaderTitle": "Starters — Personal",
+    "moversDescribeHeaderTitle": "Movers — Describe",
+    "moversPersonalHeaderTitle": "Movers — Personal",
+    "startersHeaderSubtitle": "Ages 6–8 · Part 4",
+    "moversPart4HeaderSubtitle": "Ages 7–9 · Part 4",
+    "moversPart5HeaderSubtitle": "Ages 7–9 · Part 5",
+    "questionsComplete": "Questions complete!",
+    "listeningToQuestion": "Listen to the question…",
+    "recordingIn": "Recording in"
+  },
+  "findDifferences": {
+    "title": "Find the Differences",
+    "gettingPicturesReady": "Getting the pictures ready…",
+    "bobsPicture": "Bob's picture",
+    "yourPicture": "Your picture",
+    "footerLabel": "YL · FIND THE DIFFERENCES",
+    "lastOne": "Last one!",
+    "differenceOf": "Difference {current} of {total}",
+    "seeResults": "See results",
+    "turnOf": "Turn {current} of {total}"
+  },
+  "pointing": {
+    "title": "Listen and Point",
+    "footerLabel": "YL · POINTING",
+    "partBadge": "POINTING",
+    "listenAndTap": "🎧 Listen and tap the correct picture",
+    "wellDone": "Well done!",
+    "almostNext": "Almost… let's try the next one",
+    "practiceComplete": "✅ Practice complete",
+    "seeResults": "See results",
+    "next": "Next",
+    "roundOf": "Round {current} of {total}"
+  },
+  "tellTheStory": {
+    "title": "Tell the Story",
+    "footerLabel": "YL · TELL THE STORY",
+    "gettingStoryReady": "Getting the story pictures ready…",
+    "listenThenContinue": "▶ Listen to Bob, then press Continue",
+    "tapMicDescribe": "🎙 Tap the mic and describe this picture",
+    "bobListening": "⏳ Bob is listening…",
+    "tapNext": "✅ Tap Next when ready",
+    "allDone": "🎉 All done!",
+    "continue": "Continue",
+    "lastPicture": "Last picture!",
+    "pictureOf": "Picture {current} of {total}",
+    "seeResults": "See results",
+    "next": "Next",
+    "storyIntroSubtitle": "Ages 8–11 · Story intro",
+    "pictureSubtitle": "Ages 8–11 · Picture {current}/{total}",
+    "turnOf": "Turn {current} of {total}",
+    "showText": "👁 Show text",
+    "hideText": "Hide text"
+  },
+  "whatsThis": {
+    "title": "What's This?",
+    "partBadge": "WHAT'S THIS?",
+    "footerLabel": "YL · WHAT'S THIS?",
+    "tapMicAnswer": "🎙 Tap the mic and answer Bob's question",
+    "bobListening": "⏳ Bob is listening…",
+    "tapNextGreat": "✅ Great! Tap Next when ready",
+    "allDone": "🎉 All done!",
+    "almostThere": "Almost there!",
+    "questionOf": "Question {current} of {total}",
+    "seeResults": "See results",
+    "next": "Next",
+    "cardSubtitle": "Ages 6–8 · Card {card}/{totalCards} · Q{q}/2",
+    "turnOf": "Turn {current} of {total}"
+  },
+  "celebration": {
+    "perfect": {
+      "heading": "Perfect!",
+      "sub": "You got them all!"
+    },
+    "great": {
+      "heading": "Great job!",
+      "sub": "Almost perfect — keep going!"
+    },
+    "good": {
+      "heading": "Good work!",
+      "sub": "You can do even better next time."
+    },
+    "keep": {
+      "heading": "Keep practising!",
+      "sub": "Try again — you will get there."
+    },
+    "pointsLabel": "points",
+    "defaultActionLabel": "Back to activities"
+  }
+}

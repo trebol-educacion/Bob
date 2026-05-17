@@ -12,6 +12,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ArrowLeft, Headphones, Image as ImageIcon } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
 import { blobToBase64 } from '@/lib/audio';
 import { ACTIVE_MODEL_LABEL } from '@/lib/models';
@@ -77,6 +78,7 @@ export function YLPart2Practice({
   initialMessages,
   onSessionCreated,
 }: YLPart2PracticeProps) {
+  const t = useTranslations('yl');
   const mode: ModeKey = `cambridge_${exam}_part${part}` as ModeKey;
   const isReadOnly = !!initialMessages && initialMessages.length > 0;
 
@@ -126,7 +128,7 @@ export function YLPart2Practice({
 
         setPhase('ready');
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Error al preparar la sesión');
+        setError(err instanceof Error ? err.message : 'Error preparing the session');
       }
     }
 
@@ -234,7 +236,7 @@ export function YLPart2Practice({
           void runTurn(nextIndex);
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Error procesando respuesta');
+        setError(err instanceof Error ? err.message : 'Error processing the answer');
       }
     })();
   }, [isRecording, phase]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -252,7 +254,7 @@ export function YLPart2Practice({
         setFinalEval(result);
         setPhase('finished');
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Error en evaluación final');
+        setError(err instanceof Error ? err.message : 'Error in final evaluation');
       }
     })();
   }, [phase, sessionId, plan, mode]);
@@ -269,12 +271,12 @@ export function YLPart2Practice({
 
   const partLabel =
     exam === 'starters'
-      ? 'Starters Part 2 — Preguntas sobre escena'
-      : 'Movers Part 2 — Intercambio de información';
+      ? t('part2.startersLabel')
+      : t('part2.moversLabel');
 
   const headerIcon = exam === 'starters' ? Headphones : ImageIcon;
-  const headerTitle = exam === 'starters' ? 'Starters — Listening' : 'Movers — Image';
-  const headerSubtitle = exam === 'starters' ? 'Ages 6–8 · Part 2' : 'Ages 7–9 · Part 2';
+  const headerTitle = exam === 'starters' ? t('part2.startersHeaderTitle') : t('part2.moversHeaderTitle');
+  const headerSubtitle = exam === 'starters' ? t('part2.startersHeaderSubtitle') : t('part2.moversHeaderSubtitle');
   const partBadgeLabel = 'PART 2';
 
   const totalCues = plan?.cues.length ?? 1;
@@ -297,13 +299,13 @@ export function YLPart2Practice({
   );
 
   if (error) return <YLErrorScreen error={error} onBack={onBack} />;
-  if (phase === 'loading') return <YLLoadingScreen message="Getting your practice ready…" />;
-  if (phase === 'evaluating') return <YLLoadingScreen message="Calculating your final score…" />;
+  if (phase === 'loading') return <YLLoadingScreen message={t('common.gettingPracticeReady')} />;
+  if (phase === 'evaluating') return <YLLoadingScreen message={t('common.calculatingFinalScore')} />;
 
   if (phase === 'finished' && isReadOnly) {
     return (
       <ChatShell
-        headerConfig={{ icon: headerIcon, title: headerTitle, subtitle: 'Practice history', accentColor: 'amber', leftSlot: backButton, rightSlot: partBadge, online: false }}
+        headerConfig={{ icon: headerIcon, title: headerTitle, subtitle: t('common.practiceHistory'), accentColor: 'amber', leftSlot: backButton, rightSlot: partBadge, online: false }}
         footerConfig={{ modeLabel: `YL · ${partBadgeLabel}`, modelName: ACTIVE_MODEL_LABEL }}
         inputSlot={null}
         animationKey="yl-part2-readonly"
@@ -328,13 +330,13 @@ export function YLPart2Practice({
         animate={{ opacity: 1, y: 0 }}
         className="flex-1 overflow-y-auto p-6 max-w-2xl mx-auto w-full space-y-6"
       >
-        <YLResultsHeader title="Practice complete!" subtitle={partLabel} />
+        <YLResultsHeader title={t('common.practiceHistory')} subtitle={partLabel} />
         <YLScoreDisplay evalResult={finalEval} />
         <YLFeedbackCard feedback={finalEval.feedback} />
 
         {exam === 'movers' && plan?.student_card && (
           <div className="bg-white rounded-2xl p-5 shadow-sm space-y-2">
-            <h3 className="font-black text-gray-900">Tu tarjeta de información</h3>
+            <h3 className="font-black text-gray-900">{t('part2.yourInfoCard')}</h3>
             {Object.entries(plan.student_card).map(([k, v]) => (
               <p key={k} className="text-sm text-gray-700">
                 <span className="font-semibold">{k}:</span> {v}
@@ -348,7 +350,7 @@ export function YLPart2Practice({
             onClick={onBack}
             className="flex-1 py-3 bg-blue-600 text-white rounded-xl font-bold hover:opacity-90 transition-opacity"
           >
-            Back to activities
+            {t('common.backToActivities')}
           </button>
         </div>
       </motion.div>
@@ -377,7 +379,7 @@ export function YLPart2Practice({
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={(images[0]?.startsWith('data:') ? images[0] : `data:image/png;base64,${images[0] ?? ''}`)}
-            alt="Imagen de la escena"
+            alt={t('part2.sceneImage')}
             className="w-full object-cover"
           />
         </div>
@@ -385,7 +387,7 @@ export function YLPart2Practice({
 
       {exam === 'movers' && plan?.student_card && (
         <div className="max-w-lg mx-auto w-full bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-1">
-          <p className="text-xs font-bold text-amber-700 uppercase tracking-wide">Tu tarjeta</p>
+          <p className="text-xs font-bold text-amber-700 uppercase tracking-wide">{t('part2.yourCard')}</p>
           {Object.entries(plan.student_card).map(([k, v]) => (
             <p key={k} className="text-sm text-gray-700">
               <span className="font-semibold">{k}:</span> {v}
@@ -417,13 +419,13 @@ export function YLPart2Practice({
           >
             {phase === 'playing-cue' && (
               <p className="text-gray-500 font-semibold text-sm">
-                Escucha al examinador...
+                {t('part2.listeningToExaminer')}
               </p>
             )}
 
             {phase === 'countdown' && (
               <div className="text-center space-y-1">
-                <p className="text-gray-500 font-semibold text-sm">Grabando en</p>
+                <p className="text-gray-500 font-semibold text-sm">{t('part2.recordingIn')}</p>
                 <motion.span
                   key={countdown}
                   initial={{ scale: 1.4, opacity: 0 }}
@@ -448,7 +450,7 @@ export function YLPart2Practice({
               <div className="flex flex-col items-center gap-3">
                 <div className="w-8 h-8 border-3 border-blue-600 border-t-transparent rounded-full animate-spin" />
                 <p className="text-gray-500 font-semibold text-sm">
-                  Processing your answer…
+                  {t('common.processingAnswer')}
                 </p>
               </div>
             )}
