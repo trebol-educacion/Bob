@@ -55,8 +55,15 @@ const SKILL_META: Record<Skill, { label: string; color: string; soft: string; ri
   writing: { label: 'Escribir', color: '#E62D2B', soft: '#fad6d5', ring: 'shadow-rose-200' },
 };
 
+const MODE_SKILL_OVERRIDE: Record<string, Skill> = {
+  cambridge_starters_part1: 'listening',
+  toefl_listen_repeat: 'speaking',
+};
+
 function inferSkill(mode: string): Skill {
-  if (mode.includes('listen_repeat') || mode.includes('listening')) return 'listening';
+  const override = MODE_SKILL_OVERRIDE[mode];
+  if (override) return override;
+  if (mode.includes('listening')) return 'listening';
   if (mode.includes('reading')) return 'reading';
   if (mode.includes('writing')) return 'writing';
   return 'speaking';
@@ -579,7 +586,8 @@ export function StudentStatsPanel({ onBack, onAfterReset }: Props) {
         />
       </div>
 
-      <div className="relative z-10 flex-1 overflow-y-auto px-4 sm:px-6 py-6 max-w-3xl mx-auto w-full">
+      <div className="relative z-10 flex-1 overflow-y-auto">
+        <div className="px-4 sm:px-6 py-6 max-w-3xl mx-auto w-full">
         {loading && !stats && (
           <div className="text-center text-sm text-trebol-text/50 py-20 font-semibold">
             Cargando tu aventura…
@@ -778,6 +786,7 @@ export function StudentStatsPanel({ onBack, onAfterReset }: Props) {
             </div>
           </>
         )}
+        </div>
       </div>
 
       {confirmOpen && (
