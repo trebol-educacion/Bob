@@ -8,6 +8,7 @@ import { MessageBubble, TypingIndicator, SuggestionChip } from '@/components/cha
 import { ACTIVE_MODEL_LABEL } from '@/lib/models';
 import { PhrasePhase } from './PhrasePhase';
 import { ImagePhase } from './ImagePhase';
+import { useTranslations } from 'next-intl';
 
 function SaveErrorBanner({ error }: { error: string | null }) {
   if (!error) return null;
@@ -19,6 +20,7 @@ function SaveErrorBanner({ error }: { error: string | null }) {
 }
 
 export function BobPracticeChat(props: UsePracticeChatProps) {
+  const t = useTranslations('chat.bobPractice');
   const chat = usePracticeChat(props);
 
   const handleBackWithRecordingGuard = () => {
@@ -31,14 +33,14 @@ export function BobPracticeChat(props: UsePracticeChatProps) {
   const headerConfig = isImageMode
     ? {
         icon: Image,
-        title: 'Bob — Imágenes',
-        subtitle: 'DESCRIBE LO QUE VES',
+        title: t('headerImage.title'),
+        subtitle: t('headerImage.subtitle'),
         accentColor: 'purple' as const,
       }
     : {
         icon: Mic,
-        title: 'Bob — Situaciones',
-        subtitle: 'PRONUNCIACIÓN EN INGLÉS',
+        title: t('headerSituation.title'),
+        subtitle: t('headerSituation.subtitle'),
         accentColor: 'blue' as const,
       };
 
@@ -81,7 +83,7 @@ export function BobPracticeChat(props: UsePracticeChatProps) {
     <button
       onClick={handleBackWithRecordingGuard}
       className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
-      aria-label="Volver"
+      aria-label={t('backAriaLabel')}
     >
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5 text-gray-500">
         <polyline points="15 18 9 12 15 6" />
@@ -93,7 +95,7 @@ export function BobPracticeChat(props: UsePracticeChatProps) {
     <ChatShell
       headerConfig={{ ...headerConfig, leftSlot: backButton }}
       footerConfig={{
-        modeLabel: isImageMode ? 'MODO IMÁGENES ACTIVO' : 'MODO SITUACIONES ACTIVO',
+        modeLabel: isImageMode ? t('footerModeImage') : t('footerModeSituation'),
         modelName: ACTIVE_MODEL_LABEL,
       }}
       inputSlot={inputArea}

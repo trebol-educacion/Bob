@@ -3,6 +3,7 @@
 import Image from 'next/image';
 import { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
+import { useTranslations } from 'next-intl';
 
 const SIZE_MAP = {
   sm: { avatar: 64, text: 'text-sm', title: 'text-base' },
@@ -10,33 +11,25 @@ const SIZE_MAP = {
   lg: { avatar: 128, text: 'text-base', title: 'text-2xl' },
 } as const;
 
-const TIPS = [
-  'Practicar 10 minutos al día funciona mejor que una hora a la semana.',
-  'Decir las palabras en voz alta ayuda a tu cerebro a recordarlas.',
-  'Los errores son parte del aprendizaje. ¡No te preocupes por equivocarte!',
-  'Repetir lo que escuchas mejora muchísimo tu pronunciación.',
-  'Cuanto más juegas con el idioma, más rápido lo aprendes.',
-  'Respira hondo antes de hablar. ¡Tú puedes!',
-  'Escuchar canciones en inglés también es practicar.',
-  'Bob está aquí para ayudarte. ¡Diviértete con la práctica!',
-];
-
 export function BobMascotLoader({
-  message = 'Bob está pensando…',
+  message,
   size = 'md',
 }: {
   message?: string;
   size?: 'sm' | 'md' | 'lg';
 }) {
+  const t = useTranslations('chat');
+  const tips = t.raw('mascotLoader.tips') as string[];
+  const resolvedMessage = message ?? t('mascotLoader.defaultMessage');
   const { avatar, text, title } = SIZE_MAP[size];
-  const [tipIndex, setTipIndex] = useState(() => Math.floor(Math.random() * TIPS.length));
+  const [tipIndex, setTipIndex] = useState(() => Math.floor(Math.random() * tips.length));
 
   useEffect(() => {
     const id = setInterval(() => {
-      setTipIndex((i) => (i + 1) % TIPS.length);
+      setTipIndex((i) => (i + 1) % tips.length);
     }, 4200);
     return () => clearInterval(id);
-  }, []);
+  }, [tips.length]);
 
   return (
     <div className="flex-1 flex flex-col items-center justify-center px-6 relative overflow-hidden bg-[#fffbf2]">
@@ -97,7 +90,7 @@ export function BobMascotLoader({
 
         <div className="text-center space-y-3 w-full">
           <h2 className={`${title} font-black text-trebol-text tracking-tight leading-tight`}>
-            {message}
+            {resolvedMessage}
             <motion.span
               aria-hidden
               animate={{ opacity: [0.2, 1, 0.2] }}
@@ -147,7 +140,7 @@ export function BobMascotLoader({
             className={`${text} text-trebol-text/55 font-semibold text-center leading-relaxed`}
           >
             <span className="inline-block mr-1.5 text-[#F8AC37]">✨</span>
-            {TIPS[tipIndex]}
+            {tips[tipIndex]}
           </motion.p>
         </div>
       </div>

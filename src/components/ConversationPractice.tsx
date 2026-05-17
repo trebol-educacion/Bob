@@ -22,6 +22,7 @@ import { useConversationState } from '@/hooks/useConversationState';
 import { useQuestionsFlow } from '@/hooks/useQuestionsFlow';
 import { ChatShell } from '@/components/ChatShell';
 import { MessageBubble, InfoCard } from '@/components/chat';
+import { useTranslations } from 'next-intl';
 
 interface ConversationPracticeProps {
   topic?: string;
@@ -32,6 +33,7 @@ interface ConversationPracticeProps {
 }
 
 export function ConversationPractice({ topic: topicProp = '', onFinish, noFrame, onPhaseChange, onSessionStart }: ConversationPracticeProps) {
+  const t = useTranslations('chat.conversation');
   const conv = useConversationState(topicProp);
   const qf = useQuestionsFlow();
 
@@ -40,8 +42,8 @@ export function ConversationPractice({ topic: topicProp = '', onFinish, noFrame,
   const { isRecording, startRecording, stopRecording } = useAudioRecorder({
     onRecorded: useCallback((blob: Blob) => onRecordedRef.current(blob), []),
     onError: useCallback(() => {
-      alert('Por favor, permite el acceso al micrófono.');
-    }, []),
+      alert(t('errors.microphoneAccess'));
+    }, [t]),
   });
 
   const MAX_TURNS = 12;
@@ -50,9 +52,9 @@ export function ConversationPractice({ topic: topicProp = '', onFinish, noFrame,
     if (!onPhaseChange) return;
     if (conv.phase === 'conversation') {
       const iter = Math.floor(conv.messages.length / 2);
-      onPhaseChange('Listening & Speaking', iter > 0 ? `Turno ${iter}` : undefined);
+      onPhaseChange(t('phaseListening'), iter > 0 ? t('turn', { n: iter }) : undefined);
     } else if (conv.phase === 'questions') {
-      onPhaseChange('Comprensión', undefined);
+      onPhaseChange(t('phaseComprehension'), undefined);
     }
   }, [conv.phase, conv.messages.length, onPhaseChange]);
 
@@ -123,7 +125,7 @@ export function ConversationPractice({ topic: topicProp = '', onFinish, noFrame,
 
     } catch (error) {
       console.error('Conversation error:', error);
-      alert('Error en la conversación. Inténtalo de nuevo.');
+      alert(t('errors.conversationError'));
     } finally {
       conv.setIsProcessing(false);
     }
@@ -156,7 +158,7 @@ export function ConversationPractice({ topic: topicProp = '', onFinish, noFrame,
     } catch (error) {
       console.error('Text conversation error:', error);
 
-      alert('Error al enviar el mensaje. Inténtalo de nuevo.');
+      alert(t('errors.sendMessageError'));
     } finally {
       conv.setIsProcessing(false);
     }
@@ -258,9 +260,9 @@ export function ConversationPractice({ topic: topicProp = '', onFinish, noFrame,
 
   const isTextMode = !isRecording && conv.phase !== 'questions';
   const headerIcon = isTextMode ? MessageSquare : Mic;
-  const headerTitle = isTextMode ? 'Bob — Chat' : 'Bob — Conversación';
+  const headerTitle = isTextMode ? t('headerTitleChat') : t('headerTitleConversation');
   const modeLabel =
-    conv.phase === 'questions' ? 'EVALUACIÓN DE COMPRENSIÓN' : 'CONVERSACIÓN';
+    conv.phase === 'questions' ? t('modeLabelEvaluation') : t('modeLabelConversation');
 
   if (conv.phase === 'finished') {
     return (
@@ -269,11 +271,11 @@ export function ConversationPractice({ topic: topicProp = '', onFinish, noFrame,
           <CheckCircle size={64} className="text-blue-600" />
         </div>
         <div className="text-center space-y-2">
-          <h2 className="text-3xl font-black text-gray-900 uppercase tracking-tighter">¡Excelente Trabajo!</h2>
-          <p className="text-gray-500 font-medium">Has completado la simulación y las preguntas de comprensión.</p>
+          <h2 className="text-3xl font-black text-gray-900 uppercase tracking-tighter">{t('finished.heading')}</h2>
+          <p className="text-gray-500 font-medium">{t('finished.body')}</p>
         </div>
         <Button variant="primary" onClick={onFinish} className="px-12 py-4 text-xl">
-          Volver al Inicio
+          {t('finished.backButton')}
         </Button>
       </div>
     );
@@ -315,7 +317,7 @@ export function ConversationPractice({ topic: topicProp = '', onFinish, noFrame,
           <input
             value={conv.topicInput}
             onChange={(e) => conv.setTopicInput(e.target.value)}
-            placeholder="Escribe aquí tu tema..."
+            placeholder={t('placeholderTopic')}
             className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 focus:border-blue-400 focus:outline-none text-sm bg-slate-50"
             autoFocus
           />
@@ -338,7 +340,7 @@ export function ConversationPractice({ topic: topicProp = '', onFinish, noFrame,
                 value={conv.inputText}
                 onChange={(e) => conv.setInputText(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleSendTextMessage()}
-                placeholder="Escribe tu respuesta..."
+                placeholder={t('placeholderAnswer')}
                 disabled={conv.isProcessing || isRecording}
                 className="w-full pl-4 pr-12 py-3 bg-gray-50 border border-gray-200 rounded-full focus:outline-none focus:border-blue-400 font-medium text-sm"
               />
@@ -379,7 +381,7 @@ export function ConversationPractice({ topic: topicProp = '', onFinish, noFrame,
               className="px-4 py-2 text-xs flex items-center space-x-2"
             >
               <ArrowRight size={14} />
-              <span>Saltar a Preguntas</span>
+              <span>{t('skipToQuestions')}</span>
             </Button>
 
             <button
@@ -388,7 +390,7 @@ export function ConversationPractice({ topic: topicProp = '', onFinish, noFrame,
               className="flex items-center space-x-2 text-gray-400 font-black text-xs uppercase tracking-widest hover:text-gray-600 disabled:opacity-30"
             >
               <Wand2 size={16} />
-              <span>Simular Respuesta</span>
+              <span>{t('simulateResponse')}</span>
             </button>
 
             {conv.messages.length >= MAX_TURNS && !conv.isProcessing && (
@@ -396,7 +398,7 @@ export function ConversationPractice({ topic: topicProp = '', onFinish, noFrame,
                 onClick={handleGoToQuestions}
                 className="bg-green-600 text-white px-4 py-2 rounded-lg font-bold uppercase text-[10px] flex items-center space-x-2 hover:bg-green-700"
               >
-                <span>Evaluar Comprensión</span>
+                <span>{t('evaluateComprehension')}</span>
                 <CheckCircle size={14} />
               </button>
             )}
@@ -414,7 +416,7 @@ export function ConversationPractice({ topic: topicProp = '', onFinish, noFrame,
               className="w-full max-w-[200px] flex items-center justify-center space-x-2 py-4 rounded-full shadow-lg"
             >
               <Mic size={24} />
-              <span className="font-bold">Hablar</span>
+              <span className="font-bold">{t('speak')}</span>
             </Button>
           ) : (
             <Button
@@ -423,7 +425,7 @@ export function ConversationPractice({ topic: topicProp = '', onFinish, noFrame,
               className="w-full max-w-[200px] flex items-center justify-center space-x-2 py-4 rounded-full shadow-lg animate-pulse"
             >
               <Square size={24} fill="currentColor" />
-              <span className="font-bold">Detener</span>
+              <span className="font-bold">{t('stop')}</span>
             </Button>
           )}
         </div>
@@ -443,10 +445,10 @@ export function ConversationPractice({ topic: topicProp = '', onFinish, noFrame,
           >
             <MessageBubble variant="assistant" icon={MessageSquare} accentColor="blue">
               <p>
-                ¡Hola! Vamos a tener una conversación en inglés. ¿Sobre qué tema quieres practicar hoy?
+                {t('topicPrompt')}
                 <br />
                 <span className="text-gray-400 text-xs">
-                  Ej: &quot;En una reunión de trabajo&quot; o &quot;Hablando con un cliente&quot;.
+                  {t('topicPromptExample')}
                 </span>
               </p>
             </MessageBubble>
@@ -462,7 +464,7 @@ export function ConversationPractice({ topic: topicProp = '', onFinish, noFrame,
             className="space-y-3"
           >
             {conv.framing && (
-              <InfoCard title="Escenario" icon={BookOpen}>
+              <InfoCard title={t('scenarioTitle')} icon={BookOpen}>
                 <p className="italic">"{conv.framing}"</p>
               </InfoCard>
             )}
@@ -487,7 +489,7 @@ export function ConversationPractice({ topic: topicProp = '', onFinish, noFrame,
                         ) : (
                           <div className="flex items-center space-x-2 py-1 text-gray-400">
                             <Volume2 size={16} className="animate-pulse" />
-                            <span className="text-sm font-medium italic">Escucha el audio...</span>
+                            <span className="text-sm font-medium italic">{t('listenAudio')}</span>
                           </div>
                         )}
                         <div className="flex items-center justify-between mt-1 pt-2 border-t border-gray-100">
@@ -501,7 +503,7 @@ export function ConversationPractice({ topic: topicProp = '', onFinish, noFrame,
                             ) : (
                               <Volume2 size={12} />
                             )}
-                            <span>{conv.playCounts[i] > 0 ? 'Repetir' : 'Reproducir'}</span>
+                            <span>{conv.playCounts[i] > 0 ? t('repeatAudio') : t('playAudio')}</span>
                           </button>
                           {conv.playCounts[i] >= 2 && (
                             <button
@@ -510,7 +512,7 @@ export function ConversationPractice({ topic: topicProp = '', onFinish, noFrame,
                             >
                               <HelpCircle size={14} />
                               <span className="text-[10px] font-black uppercase tracking-tighter">
-                                {conv.visibleTexts[i] ? 'Ocultar Texto' : 'Ver Pista'}
+                                {conv.visibleTexts[i] ? t('hideText') : t('showHint')}
                               </span>
                             </button>
                           )}
@@ -536,7 +538,7 @@ export function ConversationPractice({ topic: topicProp = '', onFinish, noFrame,
           >
             <div className="text-center space-y-4">
               <div className="inline-block bg-blue-600 text-white px-4 py-1 rounded-full text-xs font-black uppercase tracking-widest">
-                Pregunta {qf.currentQuestionIndex + 1} de {qf.questions.length}
+                {t('questionCounter', { current: qf.currentQuestionIndex + 1, total: qf.questions.length })}
               </div>
               <h3 className="text-2xl font-black text-gray-900 leading-tight">
                 {qf.questions[qf.currentQuestionIndex]?.question}
@@ -546,7 +548,7 @@ export function ConversationPractice({ topic: topicProp = '', onFinish, noFrame,
               <div className="bg-white p-4 border border-green-200 rounded-xl">
                 <div className="flex items-center space-x-2 mb-2">
                   <CheckCircle size={16} className="text-green-500" />
-                  <span className="font-black text-xs uppercase text-green-600">Feedback</span>
+                  <span className="font-black text-xs uppercase text-green-600">{t('feedbackLabel')}</span>
                 </div>
                 <p className="text-gray-700 font-medium italic">
                   "{qf.questionAnswers[qf.currentQuestionIndex].feedback}"
@@ -561,7 +563,7 @@ export function ConversationPractice({ topic: topicProp = '', onFinish, noFrame,
             <div className="bg-white border border-gray-100 p-4 rounded-2xl rounded-tl-sm shadow-sm flex items-center space-x-2">
               <Loader2 size={16} className="animate-spin text-blue-600" />
               <span className="text-sm font-medium text-gray-500">
-                {conv.phase === 'conversation' ? 'Bob está pensando...' : 'Evaluando respuesta...'}
+                {conv.phase === 'conversation' ? t('bobThinking') : t('evaluatingAnswer')}
               </span>
             </div>
           </div>
@@ -586,7 +588,7 @@ export function ConversationPractice({ topic: topicProp = '', onFinish, noFrame,
       headerConfig={{
         icon: headerIcon,
         title: headerTitle,
-        subtitle: 'SIMULACIÓN B1',
+        subtitle: t('subtitleB1'),
         accentColor: 'blue',
         online: true,
       }}

@@ -3,6 +3,7 @@
 import React, { useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
 import type { LucideIcon } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 
 type ChatIcon = LucideIcon | React.FC<{ size?: number; className?: string }>;
 
@@ -112,6 +113,7 @@ function ChatFooter({
   helperText,
   accentColor = 'amber',
 }: ChatFooterConfig & { accentColor?: ChatAccentColor }) {
+  const t = useTranslations('chat');
   const a = ACCENT[accentColor];
   return (
     <div className="flex-none px-4 py-2 bg-white border-t border-gray-100 flex flex-col items-center gap-1">
@@ -123,7 +125,7 @@ function ChatFooter({
         </span>
       </div>
       <p className="text-[10px] text-gray-400">
-        BOB • Basado en {modelName}
+        {t('shell.poweredBy', { modelName })}
       </p>
       {helperText && (
         <p className="text-[10px] text-gray-400 italic">{helperText}</p>

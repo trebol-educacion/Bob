@@ -1,1 +1,93 @@
-{}
+{
+  "shell": {
+    "poweredBy": "BOB • Powered by {modelName}"
+  },
+  "conversation": {
+    "headerTitleChat": "Bob — Chat",
+    "headerTitleConversation": "Bob — Conversation",
+    "modeLabelEvaluation": "COMPREHENSION EVALUATION",
+    "modeLabelConversation": "CONVERSATION",
+    "placeholderTopic": "Type your topic here…",
+    "placeholderAnswer": "Type your answer…",
+    "scenarioTitle": "Scenario",
+    "topicPrompt": "Hi! Let's have a conversation in English. What topic would you like to practise today?",
+    "topicPromptExample": "E.g. \"In a work meeting\" or \"Talking to a client\".",
+    "listenAudio": "Listening to audio…",
+    "playAudio": "Play",
+    "repeatAudio": "Repeat",
+    "hideText": "Hide Text",
+    "showHint": "Show Hint",
+    "skipToQuestions": "Skip to Questions",
+    "simulateResponse": "Simulate Response",
+    "evaluateComprehension": "Evaluate Comprehension",
+    "speak": "Speak",
+    "stop": "Stop",
+    "turn": "Turn {n}",
+    "phaseListening": "Listening & Speaking",
+    "phaseComprehension": "Comprehension",
+    "finished": {
+      "heading": "Excellent Work!",
+      "body": "You have completed the simulation and the comprehension questions.",
+      "backButton": "Back to Home"
+    },
+    "bobThinking": "Bob is thinking…",
+    "evaluatingAnswer": "Evaluating answer…",
+    "questionCounter": "Question {current} of {total}",
+    "feedbackLabel": "Feedback",
+    "subtitleB1": "B1 SIMULATION",
+    "errors": {
+      "microphoneAccess": "Please allow microphone access.",
+      "conversationError": "Conversation error. Please try again.",
+      "sendMessageError": "Error sending the message. Please try again."
+    }
+  },
+  "tipsModal": {
+    "heading": "Expert Tips (B1)",
+    "strategy4Ws": {
+      "title": "The 4 Ws Strategy",
+      "who": "Who? Who are they? (ages, relationships)",
+      "what": "What? What are they doing? (use Present Continuous)",
+      "where": "Where? Where are they located?",
+      "when": "When? What time of day or season is it?"
+    },
+    "strategySpatial": {
+      "title": "Spatial Vocabulary",
+      "tip1": "In the middle/background of the photo…",
+      "tip2": "On the left/right of the picture…",
+      "tip3": "Behind the people, there is a…"
+    },
+    "strategySpeculation": {
+      "title": "Speculation (Bonus points)",
+      "tip1": "Use phrases like 'Perhaps', 'Maybe' or 'It looks like…'",
+      "tip2": "Try modals: 'They might be…', 'I guess…'"
+    },
+    "goalNote": "Goal: Try to speak for 60 seconds straight without long pauses.",
+    "confirmButton": "Got it, let's go!"
+  },
+  "mascotLoader": {
+    "defaultMessage": "Bob is thinking…",
+    "tips": [
+      "Practising 10 minutes a day works better than one hour a week.",
+      "Saying words out loud helps your brain remember them.",
+      "Mistakes are part of learning. Don't worry about getting it wrong!",
+      "Repeating what you hear greatly improves your pronunciation.",
+      "The more you play with the language, the faster you learn it.",
+      "Take a deep breath before speaking. You've got this!",
+      "Listening to songs in English is also practising.",
+      "Bob is here to help you. Have fun with the practice!"
+    ]
+  },
+  "bobPractice": {
+    "backAriaLabel": "Go back",
+    "headerImage": {
+      "title": "Bob — Images",
+      "subtitle": "DESCRIBE WHAT YOU SEE"
+    },
+    "headerSituation": {
+      "title": "Bob — Situations",
+      "subtitle": "PRONUNCIATION IN ENGLISH"
+    },
+    "footerModeImage": "IMAGE MODE ACTIVE",
+    "footerModeSituation": "SITUATIONS MODE ACTIVE"
+  }
+}

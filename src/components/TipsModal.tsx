@@ -2,37 +2,40 @@ import React from 'react';
 import { motion } from 'motion/react';
 import { CheckCircle2, Info, X } from 'lucide-react';
 import { Button } from './Button';
+import { useTranslations } from 'next-intl';
 
 interface TipsModalProps {
   onClose: () => void;
 }
 
 export function TipsModal({ onClose }: TipsModalProps) {
+  const t = useTranslations('chat.tipsModal');
+
   const strategies = [
     {
-      title: "La Estrategia de las 4 Ws",
+      title: t('strategy4Ws.title'),
       tips: [
-        "Who? ¿Quiénes son? (edades, relaciones)",
-        "What? ¿Qué están haciendo? (usa Present Continuous)",
-        "Where? ¿Dónde están ubicados?",
-        "When? ¿Qué momento del día o estación es?"
-      ]
+        t('strategy4Ws.who'),
+        t('strategy4Ws.what'),
+        t('strategy4Ws.where'),
+        t('strategy4Ws.when'),
+      ],
     },
     {
-      title: "Vocabulario Espacial",
+      title: t('strategySpatial.title'),
       tips: [
-        "In the middle/background of the photo...",
-        "On the left/right of the picture...",
-        "Behind the people, there is a..."
-      ]
+        t('strategySpatial.tip1'),
+        t('strategySpatial.tip2'),
+        t('strategySpatial.tip3'),
+      ],
     },
     {
-      title: "Especulación (Puntos extra)",
+      title: t('strategySpeculation.title'),
       tips: [
-        "Usa frases como 'Perhaps', 'Maybe' o 'It looks like...'",
-        "Prueba con modales: 'They might be...', 'I guess...'"
-      ]
-    }
+        t('strategySpeculation.tip1'),
+        t('strategySpeculation.tip2'),
+      ],
+    },
   ];
 
   return (
@@ -50,7 +53,7 @@ export function TipsModal({ onClose }: TipsModalProps) {
         <div className="p-6 bg-trebol-primary text-white flex justify-between items-center shrink-0">
           <div className="flex items-center space-x-2">
             <Info size={24} />
-            <h2 className="text-xl font-black">Consejos de Experto (B1)</h2>
+            <h2 className="text-xl font-black">{t('heading')}</h2>
           </div>
           <button onClick={onClose} className="hover:bg-white/20 p-1 rounded-sm transition-colors">
             <X size={24} />
@@ -74,10 +77,10 @@ export function TipsModal({ onClose }: TipsModalProps) {
               </ul>
             </div>
           ))}
-          
+
           <div className="bg-trebol-secondary/10 p-4 border-l-4 border-trebol-secondary rounded-r-sm">
             <p className="text-sm font-bold text-trebol-text">
-              💡 Objetivo: Intenta hablar durante 60 segundos seguidos sin pausas largas.
+              💡 {t('goalNote')}
             </p>
           </div>
         </div>
@@ -88,7 +91,7 @@ export function TipsModal({ onClose }: TipsModalProps) {
             className="w-full py-4 text-lg"
             onClick={onClose}
           >
-            ¡Entendido, vamos!
+            {t('confirmButton')}
           </Button>
         </div>
       </motion.div>
