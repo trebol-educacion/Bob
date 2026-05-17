@@ -22,7 +22,7 @@ import { useOrganization } from '@/contexts/OrganizationContext';
 import type { AvailableMode } from '@/contexts/OrganizationContext';
 import { getModeIcon, getModeBadge, getModeSection, getModeTitle, getModeDescription, getModeSortWeight, getModeOfficialName, getYLCardTheme, type YLCardTheme } from '@/lib/mode-ui';
 import { ListenAndPointIcon } from '@/components/icons/ModeIcons';
-import { LookAndAnswerIcon, TellTheStoryIcon, PersonalQuestionsIcon } from '@/components/icons/StartersIcons';
+import { LookAndAnswerIcon, TellTheStoryIcon, WhatsThisIcon, PersonalQuestionsIcon } from '@/components/icons/StartersIcons';
 import { FindTheDifferencesIcon, InformationExchangeIcon, PictureStoryMoversIcon, PersonalQuestionsMoversIcon, MoreAboutYouIcon } from '@/components/icons/MoversIcons';
 import { FlyersFindDifferencesIcon } from '@/components/icons/FlyersIcons';
 import { KETListeningIcon, KETReadingIcon, KETWritingIcon, KETSpeakingIcon } from '@/components/icons/KETIcons';
@@ -49,6 +49,7 @@ const ICON_MAP: Record<string, React.FC<{ size?: number; className?: string }>> 
   ListenAndPoint: ListenAndPointIcon,
   LookAndAnswer: LookAndAnswerIcon,
   TellTheStory: TellTheStoryIcon,
+  WhatsThis: WhatsThisIcon,
   PersonalQuestions: PersonalQuestionsIcon,
   FindTheDifferences: FindTheDifferencesIcon,
   InformationExchange: InformationExchangeIcon,

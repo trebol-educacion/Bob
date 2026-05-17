@@ -264,12 +264,16 @@ export async function generateYLContentAction(
   const avoidList = options?.avoidList ?? '(none)';
 
   const isPointingMode = exam === 'starters' && part === 1;
-  const preselectedWords = isPointingMode
+  const isWhatsThisMode = exam === 'starters' && part === 3;
+  const needsPreselectedWords = isPointingMode || isWhatsThisMode;
+
+  const preselectedWords = needsPreselectedWords
     ? await pickVocabularyForActivity({
         framework: 'cambridge',
         cefr_level: 'pre_a1',
         count: 4,
         distinctCategories: true,
+        objectCardFriendlyOnly: isWhatsThisMode,
       })
     : [];
 
@@ -324,15 +328,23 @@ export async function generateYLContentAction(
         p.cues.length > 0 &&
         typeof (p.cues as unknown[])[0] === 'object';
 
+      const isWhatsThis = Array.isArray(p.object_cards) && (p.object_cards as unknown[]).length > 0;
+
       const normalized: Record<string, unknown> = {
         cues: isPointing
           ? (p.cues as Array<{ text: string }>).map((c) => c.text)
+          : isWhatsThis
+          ? (p.object_cards as Array<{ questions: Array<{ text: string }> }>).flatMap((card) =>
+              card.questions.map((q) => q.text)
+            )
           : (p.cues as unknown[]) ??
             (p.examiner_cues as unknown[]) ??
             (p.target_questions as unknown[]) ??
             (typeof p.scene_description === 'string' ? [p.scene_description] : []),
         image_prompts: isPointing
           ? (p.option_image_prompts as unknown[])
+          : isWhatsThis
+          ? (p.object_cards as Array<{ image_prompt: string }>).map((c) => c.image_prompt)
           : (p.image_prompts as unknown[]) ??
             (typeof p.image_prompt === 'string' ? [p.image_prompt] : undefined),
         character_description: p.character_description ?? p.character ?? undefined,
@@ -344,6 +356,7 @@ export async function generateYLContentAction(
         options: isPointing ? (p.options as unknown[]) : undefined,
         option_image_prompts: isPointing ? (p.option_image_prompts as unknown[]) : undefined,
         pointing_cues: isPointing ? (p.cues as unknown[]) : undefined,
+        object_cards: isWhatsThis ? (p.object_cards as unknown[]) : undefined,
       };
 
       return safeParseFallback(YLPlanSchema, normalized, YLPlanFallback);
@@ -360,6 +373,12 @@ export async function generateYLContentAction(
     const shuffled = [...cached.pointing_cues].sort(() => Math.random() - 0.5);
     const cuesAsText = shuffled.map((c) => c.text);
     return { ...cached, pointing_cues: shuffled, cues: cuesAsText };
+  }
+
+  if (isWhatsThisMode && cached.object_cards && cached.object_cards.length > 1) {
+    const shuffled = [...cached.object_cards].sort(() => Math.random() - 0.5);
+    const cuesAsText = shuffled.flatMap((card) => card.questions.map((q) => q.text));
+    return { ...cached, object_cards: shuffled, cues: cuesAsText };
   }
 
   return cached;
@@ -441,7 +460,8 @@ export async function generateYLImagesParallelAction(
   part: number,
   imagePrompts: string[] | Array<{ word: string; scenePrompt: string }>,
   sessionId: string,
-  characterDescription?: string
+  characterDescription?: string,
+  imageType: YLImageType = 'scene'
 ): Promise<string[]> {
   const supabase = await createSupabaseServer();
   const { data: { user } } = await supabase.auth.getUser();
@@ -457,18 +477,20 @@ export async function generateYLImagesParallelAction(
           framework: 'cambridge',
           cefr_level: 'pre_a1',
           word: item.word,
+          image_type: imageType,
         });
         if (fromPool) return fromPool;
       }
 
-      const cacheInputs: Record<string, unknown> = { exam, part, imagePrompt: item.scenePrompt };
-      if (characterDescription) cacheInputs.characterDescription = characterDescription;
+      const effectiveCharacter = imageType === 'object_card' ? undefined : characterDescription;
+      const cacheInputs: Record<string, unknown> = { exam, part, imagePrompt: item.scenePrompt, imageType };
+      if (effectiveCharacter) cacheInputs.characterDescription = effectiveCharacter;
 
       const cached = await getOrCreateCachedContent<string>(
         { kind: 'image', promptKey: `yl-image-${exam}-part${part}`, inputs: cacheInputs },
         async () => {
           const key = imageGenKey(exam, part);
-          const imagenPrompt = buildDirectImagenPrompt(item.scenePrompt, characterDescription);
+          const imagenPrompt = buildDirectImagenPrompt(item.scenePrompt, effectiveCharacter);
           const pixels = await generateImageWithFallback(key, imagenPrompt);
           if (!pixels) throw new Error('empty image after all attempts');
 
@@ -501,6 +523,7 @@ export async function generateYLImagesParallelAction(
           word: item.word,
           image_url: url,
           scene_prompt: item.scenePrompt,
+          image_type: imageType,
         });
       }
       return url;
@@ -804,15 +827,20 @@ async function pickVocabularyForActivity(opts: {
   cefr_level: string;
   count: number;
   distinctCategories?: boolean;
+  objectCardFriendlyOnly?: boolean;
 }): Promise<VocabPick[]> {
-  const { framework, cefr_level, count, distinctCategories = true } = opts;
+  const { framework, cefr_level, count, distinctCategories = true, objectCardFriendlyOnly = false } = opts;
   const supabase = await createSupabaseServer();
-  const { data, error } = await supabase
+  let query = supabase
     .from('bob_vocabulary')
     .select('word, category')
     .eq('framework', framework)
     .eq('cefr_level', cefr_level)
     .eq('pointable', true);
+  if (objectCardFriendlyOnly) {
+    query = query.eq('object_card_friendly', true);
+  }
+  const { data, error } = await query;
 
   if (error || !data || data.length === 0) {
     console.warn('[pickVocabularyForActivity] empty vocab pool', { framework, cefr_level, error });
@@ -842,10 +870,13 @@ async function pickVocabularyForActivity(opts: {
   return picked;
 }
 
+export type YLImageType = 'scene' | 'object_card';
+
 async function tryPickFromImagePool(opts: {
   framework: string;
   cefr_level: string;
   word: string;
+  image_type: YLImageType;
 }): Promise<string | null> {
   if (Math.random() >= POOL_REUSE_PROBABILITY) return null;
   const supabase = await createSupabaseServer();
@@ -855,6 +886,7 @@ async function tryPickFromImagePool(opts: {
     .eq('framework', opts.framework)
     .eq('cefr_level', opts.cefr_level)
     .eq('word', opts.word)
+    .eq('image_type', opts.image_type)
     .limit(50);
   const rows = (data ?? []) as Array<{ id: number; image_url: string }>;
   if (rows.length === 0) return null;
@@ -873,6 +905,7 @@ async function addImageToPool(opts: {
   word: string;
   image_url: string;
   scene_prompt: string;
+  image_type: YLImageType;
 }): Promise<void> {
   const supabase = await createSupabaseServer();
   await supabase
@@ -883,6 +916,145 @@ async function addImageToPool(opts: {
       word: opts.word,
       image_url: opts.image_url,
       scene_prompt: opts.scene_prompt,
+      image_type: opts.image_type,
     })
     .then(() => undefined, (err) => console.warn('[addImageToPool] insert failed', err));
+}
+
+const WhatsThisEvalResultSchema = z.object({
+  score: z.number().int().min(0).max(1),
+  score_max: z.number().int().default(1),
+  cefr_band: z.string().default('a1'),
+  correct: z.boolean(),
+  reaction: z.string(),
+  feedback: z.string().optional(),
+  transcript_used: z.string().optional(),
+});
+
+export type WhatsThisEvalResult = z.infer<typeof WhatsThisEvalResultSchema> & {
+  transcript: string;
+};
+
+const WhatsThisEvalFallback: WhatsThisEvalResult = {
+  score: 0,
+  score_max: 1,
+  cefr_band: 'a1',
+  correct: false,
+  reaction: "Good try! Let's keep going!",
+  feedback: undefined,
+  transcript_used: undefined,
+  transcript: '',
+};
+
+/**
+ * Evaluates a single spoken answer for the Starters Part 3 "What's This?" activity.
+ * Transcribes the audio, evaluates against the expected answer, generates a warm
+ * reaction, and persists the turn via saveYLTurnAction.
+ */
+export async function evaluateWhatsThisAnswerAction(input: {
+  sessionId: string;
+  cardIndex: number;
+  questionIndex: number;
+  question: string;
+  questionType: 'what_is_this' | 'have_you_got';
+  expected: string;
+  audioBase64: string;
+  mimeType: string;
+  audioDuration: number;
+}): Promise<WhatsThisEvalResult> {
+  const cueIndex = input.cardIndex * 2 + input.questionIndex;
+
+  if (input.audioDuration <= 0.15) {
+    const silenceResult: WhatsThisEvalResult = {
+      score: 0,
+      score_max: 1,
+      cefr_band: 'a1',
+      correct: false,
+      reaction: "I didn't hear you — try again!",
+      feedback: undefined,
+      transcript_used: '',
+      transcript: '',
+    };
+    try {
+      await saveYLTurnAction(input.sessionId, {
+        cue: input.question,
+        cueIndex,
+        transcript: '',
+        reaction: silenceResult.reaction,
+      });
+    } catch (err) {
+      console.warn('[evaluateWhatsThisAnswerAction] saveYLTurnAction failed (silence):', err);
+    }
+    return silenceResult;
+  }
+
+  const transcribeResult = await callGemini(
+    { promptKey: 'whats_this_transcribe', model: MODELS.FLASH_LITE_PREVIEW },
+    (ai) => ai.models.generateContent({
+      model: MODELS.FLASH_LITE_PREVIEW,
+      contents: [
+        {
+          role: 'user',
+          parts: [
+            { text: 'Transcribe exactly what the child says in English. Output only the transcription, nothing else. If nothing was said, output "(silence)".' },
+            { inlineData: { mimeType: input.mimeType, data: input.audioBase64 } },
+          ],
+        },
+      ],
+    })
+  );
+  const transcribed = transcribeResult.ok
+    ? (transcribeResult.data.text ?? '(silence)').trim()
+    : '(silence)';
+
+  const evalPromptText = await getPrompt('cambridge_starters_part3_a1_evaluation', {
+    QUESTION: input.question,
+    QUESTION_TYPE: input.questionType,
+    EXPECTED: input.expected,
+    USER_TRANSCRIPT: transcribed,
+    AUDIO_DURATION_SECONDS: input.audioDuration,
+  });
+
+  const evalResult = await callGemini(
+    { promptKey: 'cambridge_starters_part3_a1_evaluation', model: MODELS.FLASH_LITE_PREVIEW },
+    (ai) => ai.models.generateContent({
+      model: MODELS.FLASH_LITE_PREVIEW,
+      contents: [{ role: 'user', parts: [{ text: evalPromptText }] }],
+      config: { responseMimeType: 'application/json' },
+    })
+  );
+
+  if (!evalResult.ok || !evalResult.data.text) {
+    console.error(JSON.stringify({ event: 'evaluateWhatsThisAnswerAction', error: 'eval failed' }));
+    return { ...WhatsThisEvalFallback, transcript: transcribed };
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(evalResult.data.text);
+  } catch {
+    console.error(JSON.stringify({ event: 'evaluateWhatsThisAnswerAction', error: 'invalid JSON' }));
+    return { ...WhatsThisEvalFallback, transcript: transcribed };
+  }
+
+  const validated = WhatsThisEvalResultSchema.safeParse(parsed);
+  if (!validated.success) {
+    console.error('[evaluateWhatsThisAnswerAction] schema mismatch:', validated.error.message);
+    return { ...WhatsThisEvalFallback, transcript: transcribed };
+  }
+
+  const result: WhatsThisEvalResult = { ...validated.data, transcript: transcribed };
+
+  try {
+    await saveYLTurnAction(input.sessionId, {
+      cue: input.question,
+      cueIndex,
+      transcript: transcribed,
+      reaction: result.reaction,
+    });
+  } catch (err) {
+    console.warn('[evaluateWhatsThisAnswerAction] saveYLTurnAction failed:', err);
+  }
+
+  return result;
 }

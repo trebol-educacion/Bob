@@ -5,7 +5,7 @@ export function getModeIcon(card: DynamicCard): string {
   const PART_ICON: Record<string, string> = {
     starters_part1: 'ListenAndPoint',
     starters_part2: 'LookAndAnswer',
-    starters_part3: 'TellTheStory',
+    starters_part3: 'WhatsThis',
     starters_part4: 'PersonalQuestions',
     movers_part1: 'FindTheDifferences',
     movers_part2: 'InformationExchange',

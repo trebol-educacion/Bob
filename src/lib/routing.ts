@@ -7,6 +7,7 @@ import {
   YLPart3Practice,
   YLPart4Practice,
   YLPointingPractice,
+  YLWhatsThisPractice,
 } from '@/components/practice/yl';
 import { B1CollaborativePractice } from '@/components/B1CollaborativePractice';
 import { A2Part1Practice } from '@/components/A2Part1Practice';
@@ -77,7 +78,7 @@ export const EXAM_PART_COMPONENT_MAP: Record<ModeKey, RouteEntry> = {
   cambridge_starters_part3: {
     appState: 'exam-practicing',
     kind: 'yl',
-    render: (p) => React.createElement(YLPart3Practice, { key: ylInstanceKey(p as YLRenderProps), exam: 'starters', part: 3, ...(p as YLRenderProps) }),
+    render: (p) => React.createElement(YLWhatsThisPractice, { key: ylInstanceKey(p as YLRenderProps), exam: 'starters', part: 3, ...(p as YLRenderProps) }),
   },
   cambridge_starters_part4: {
     appState: 'exam-practicing',

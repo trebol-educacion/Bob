@@ -15,7 +15,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { ListenAndPointIcon } from '@/components/icons/ModeIcons';
-import { LookAndAnswerIcon, TellTheStoryIcon, PersonalQuestionsIcon } from '@/components/icons/StartersIcons';
+import { LookAndAnswerIcon, TellTheStoryIcon, WhatsThisIcon, PersonalQuestionsIcon } from '@/components/icons/StartersIcons';
 import { FindTheDifferencesIcon, InformationExchangeIcon, PictureStoryMoversIcon, PersonalQuestionsMoversIcon, MoreAboutYouIcon } from '@/components/icons/MoversIcons';
 import { FlyersFindDifferencesIcon } from '@/components/icons/FlyersIcons';
 import { KETListeningIcon, KETReadingIcon, KETWritingIcon, KETSpeakingIcon } from '@/components/icons/KETIcons';
@@ -48,7 +48,7 @@ const MODE_ICON: Record<NonNullable<SessionMode>, React.ElementType> = {
   generic_conversation: MessagesSquare,
   cambridge_starters_part1: ListenAndPointIcon,
   cambridge_starters_part2: LookAndAnswerIcon,
-  cambridge_starters_part3: TellTheStoryIcon,
+  cambridge_starters_part3: WhatsThisIcon,
   cambridge_starters_part4: PersonalQuestionsIcon,
   cambridge_movers_part1: FindTheDifferencesIcon,
   cambridge_movers_part2: InformationExchangeIcon,

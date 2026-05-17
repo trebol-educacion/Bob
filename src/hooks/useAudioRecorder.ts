@@ -4,7 +4,7 @@ import { useRef, useState, useEffect } from 'react';
 
 const AUDIO_CONSTRAINTS: MediaTrackConstraints = {
   echoCancellation: true,
-  noiseSuppression: true,
+  noiseSuppression: false,
   autoGainControl: true,
   sampleRate: 48000,
 };
@@ -29,7 +29,7 @@ interface UseAudioRecorderReturn {
 export function useAudioRecorder({
   onRecorded,
   onError,
-  minSizeBytes = 1024,
+  minSizeBytes = 512,
 }: UseAudioRecorderOptions): UseAudioRecorderReturn {
   const [isRecording, setIsRecording] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);

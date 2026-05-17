@@ -9,20 +9,36 @@ export const PointingCueSchema = z.object({
   text: z.string(),
 });
 
+/** One question within a What's This? object card. */
+export const WhatsThisQuestionSchema = z.object({
+  id: z.string(),
+  text: z.string(),
+  expected: z.string().optional(),
+  expected_kind: z.string().optional(),
+});
+
+/** One object card in the What's This? activity (Starters Part 3). */
+export const WhatsThisCardSchema = z.object({
+  word: z.string(),
+  image_prompt: z.string(),
+  questions: z.array(WhatsThisQuestionSchema),
+});
+
+export type WhatsThisCard = z.infer<typeof WhatsThisCardSchema>;
+
 export const YLPlanSchema = z.object({
-  cues: z.array(z.string()).min(1),
+  cues: z.array(z.string()).default([]),
   image_prompts: z.array(z.string()).optional(),
   character_description: z.string().optional(),
   story_title: z.string().optional(),
   story_beats: z.array(z.string()).optional(),
-  // Info-exchange (Movers P2)
   student_card: z.record(z.string(), z.string()).optional(),
   examiner_card: z.record(z.string(), z.string()).optional(),
   target_questions: z.array(z.string()).optional(),
-  // Pointing (Starters P1)
   options: z.array(z.string()).optional(),
   option_image_prompts: z.array(z.string()).optional(),
   pointing_cues: z.array(PointingCueSchema).optional(),
+  object_cards: z.array(WhatsThisCardSchema).optional(),
 });
 
 export type YLPlan = z.infer<typeof YLPlanSchema>;

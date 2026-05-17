@@ -64,6 +64,33 @@ export function TellTheStoryIcon({ size = 28, className }: IconProps) {
 }
 
 /**
+ * "What's This?" — Cambridge YL Starters Part 3.
+ * A hand holding an object card with a floating question mark.
+ */
+export function WhatsThisIcon({ size = 28, className }: IconProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 32 32"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden="true"
+    >
+      <rect x="4" y="8" width="18" height="14" rx="2" />
+      <circle cx="13" cy="13.5" r="2.5" />
+      <path d="M7.5 19.5c.7-1.8 2.5-3 5.5-3s4.8 1.2 5.5 3" />
+      <path d="M24.5 6a2.5 2.5 0 1 1 0 .01" />
+      <path d="M24.5 10.5v.4" />
+    </svg>
+  );
+}
+
+/**
  * "Personal Questions" — Cambridge YL Starters Part 4.
  * A chat bubble with a small child silhouette inside, suggesting "tell me about you".
  */
