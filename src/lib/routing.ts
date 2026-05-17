@@ -17,6 +17,7 @@ import { ListenChooseResponsePractice } from '@/components/practice/ListenChoose
 import { BuildSentencePractice } from '@/components/practice/BuildSentencePractice';
 import { EmailWritingPractice } from '@/components/practice/EmailWritingPractice';
 import { AcademicWritingPractice } from '@/components/practice/AcademicWritingPractice';
+import { KETShortMessagePractice } from '@/components/practice/ket';
 
 export type AppState =
   | 'mode-selection'
@@ -159,6 +160,11 @@ export const EXAM_PART_COMPONENT_MAP: Record<ModeKey, RouteEntry> = {
     appState: 'exam-practicing',
     kind: 'exam',
     render: (p) => React.createElement(AcademicWritingPractice, { mode: 'cambridge_fce_writing_part1', onBack: (p as ExamRenderProps).onBack }),
+  },
+  cambridge_ket_writing_part6: {
+    appState: 'exam-practicing',
+    kind: 'yl',
+    render: (p) => React.createElement(KETShortMessagePractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
   },
 };
 
