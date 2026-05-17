@@ -22,7 +22,11 @@ import {
   KETSignsAndNoticesPractice,
   KETListenAndChoosePractice,
 } from '@/components/practice/ket';
-import { PETPictureDescriptionPractice } from '@/components/practice/pet';
+import {
+  PETPictureDescriptionPractice,
+  PETShortTextsPractice,
+  PETEmailWritingPractice,
+} from '@/components/practice/pet';
 
 export type AppState =
   | 'mode-selection'
@@ -158,8 +162,8 @@ export const EXAM_PART_COMPONENT_MAP: Record<ModeKey, RouteEntry> = {
   },
   cambridge_pet_writing_part1: {
     appState: 'exam-practicing',
-    kind: 'exam',
-    render: (p) => React.createElement(EmailWritingPractice, { mode: 'cambridge_pet_writing_part1', onBack: (p as ExamRenderProps).onBack }),
+    kind: 'yl',
+    render: (p) => React.createElement(PETEmailWritingPractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
   },
   toefl_writing_academic_discussion: {
     appState: 'exam-practicing',
@@ -175,6 +179,11 @@ export const EXAM_PART_COMPONENT_MAP: Record<ModeKey, RouteEntry> = {
     appState: 'exam-practicing',
     kind: 'yl',
     render: (p) => React.createElement(KETShortMessagePractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
+  },
+  cambridge_pet_reading_part1: {
+    appState: 'exam-practicing',
+    kind: 'yl',
+    render: (p) => React.createElement(PETShortTextsPractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
   },
   cambridge_ket_reading_part1: {
     appState: 'exam-practicing',

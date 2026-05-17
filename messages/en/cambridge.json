@@ -114,6 +114,23 @@
     }
   },
   "pet": {
+    "shortTexts": {
+      "headerTitle": "Short Texts",
+      "headerSubtitle": "PET · Reading Part 1",
+      "partBadge": "PART 1",
+      "preparingExercise": "Preparing your reading exercise…",
+      "checkingAnswers": "Checking your answers…",
+      "back": "Back",
+      "itemLabel": "Text {number}",
+      "submitAnswers": "Submit answers",
+      "answeredCount": "{answered} / {total} answered",
+      "correctBadge": "Correct",
+      "incorrectBadge": "Incorrect",
+      "correctAnswerLabel": "Correct answer:",
+      "explanationLabel": "Why:",
+      "celebrationFeedback": "Well done reading those texts! Keep practising your comprehension skills.",
+      "celebrationAction": "See my activities"
+    },
     "pictureDescription": {
       "back": "Back",
       "headerTitle": "Picture Description",
@@ -167,6 +184,29 @@
       "celebrationFeedback": "Nice work describing the picture! Keep practising to cover all 8 points fluently.",
       "celebrationAction": "See my progress",
       "finishedTitle": "Description complete"
+    },
+    "emailWriting": {
+      "back": "Back",
+      "headerTitle": "Email Writing",
+      "headerSubtitle": "PET · Writing Part 1",
+      "partBadge": "PART 1",
+      "preparingExercise": "Preparing your email exercise…",
+      "reviewingMessage": "Reviewing your email…",
+      "scenarioTitle": "Email received",
+      "replyPointsTitle": "What to include in your reply:",
+      "placeholder": "Write your email here…",
+      "words": "Words:",
+      "target": "/ target ~100",
+      "moreToSend": "{remaining} more to send",
+      "yourMessage": "Your message",
+      "youDidIt": "Great email!",
+      "reviewYourMessage": "Review your email",
+      "whatYouDidWell": "What you did well",
+      "toImprove": "To improve",
+      "viewModelAnswer": "View model answer",
+      "hideModelAnswer": "Hide model answer",
+      "celebrationFeedback": "Well done writing your email! Keep practising to cover all 4 points perfectly.",
+      "celebrationAction": "See my activities"
     }
   }
 }
