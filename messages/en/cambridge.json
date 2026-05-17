@@ -112,5 +112,61 @@
       "moreToSend": "{remaining} more to send",
       "sendMessage": "Send message"
     }
+  },
+  "pet": {
+    "pictureDescription": {
+      "back": "Back",
+      "headerTitle": "Picture Description",
+      "headerSubtitle": "PET · Speaking Part 2",
+      "partBadge": "PART 2",
+      "preparingExercise": "Bob is preparing your picture…",
+      "processingDescription": "Bob is listening to your description…",
+      "startTimer": "Start — 1-minute timer",
+      "showInstructionsButton": "Instructions",
+      "showInstructionsAria": "Show instructions",
+      "instructionsTitle": "How to do this exercise",
+      "closeInstructions": "Close",
+      "recordingTimer": "Time left",
+      "mic": {
+        "tap": "Tap the mic to start describing",
+        "recording": "Recording… keep talking!",
+        "stop": "Stop recording"
+      },
+      "audioRequired": "I didn't hear you. Tap the mic and try again.",
+      "coverageTitle": "8-Point Coverage",
+      "dimensions": {
+        "place": "Place",
+        "people": "People",
+        "activity": "Activity",
+        "objects": "Objects",
+        "emotions": "Emotions",
+        "weather_setting": "Weather",
+        "clothes": "Clothes",
+        "background": "Background"
+      },
+      "highlightsTitle": "What you did well",
+      "suggestionsTitle": "To improve",
+      "fluencyTitle": "Fluency",
+      "fluencyBand": {
+        "OK": "OK",
+        "Good": "Good",
+        "Excellent": "Excellent"
+      },
+      "referenceVocabularyTitle": "Scene vocabulary",
+      "referenceDimensions": {
+        "place": "Place",
+        "people": "People",
+        "activity": "Activity",
+        "objects": "Objects",
+        "emotions": "Emotions",
+        "weather_setting": "Weather / Setting"
+      },
+      "showModelAnswer": "See a model answer",
+      "hideModelAnswer": "Hide model answer",
+      "modelAnswerTitle": "Model answer (B1 level)",
+      "celebrationFeedback": "Nice work describing the picture! Keep practising to cover all 8 points fluently.",
+      "celebrationAction": "See my progress",
+      "finishedTitle": "Description complete"
+    }
   }
 }

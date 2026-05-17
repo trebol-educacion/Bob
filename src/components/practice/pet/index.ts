@@ -1,0 +1,1 @@
+export { PETPictureDescriptionPractice } from './PETPictureDescriptionPractice';

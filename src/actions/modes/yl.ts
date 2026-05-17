@@ -528,7 +528,7 @@ export async function generateYLImagesParallelAction(
         { kind: 'image', promptKey: `yl-image-${exam}-part${part}`, inputs: cacheInputs },
         async () => {
           const key = imageGenKey(exam, part);
-          const imagenPrompt = buildDirectImagenPrompt(item.scenePrompt, effectiveCharacter);
+          const imagenPrompt = buildDirectImagenPrompt(item.scenePrompt, effectiveCharacter, imageType);
           const pixels = await generateImageWithFallback(key, imagenPrompt);
           if (!pixels) throw new Error('empty image after all attempts');
 
@@ -909,7 +909,7 @@ async function pickVocabularyForActivity(opts: {
   return picked;
 }
 
-export type YLImageType = 'scene' | 'object_card';
+export type YLImageType = 'scene' | 'object_card' | 'photo_realistic';
 
 async function tryPickFromImagePool(opts: {
   framework: string;

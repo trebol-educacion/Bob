@@ -22,6 +22,7 @@ import {
   KETSignsAndNoticesPractice,
   KETListenAndChoosePractice,
 } from '@/components/practice/ket';
+import { PETPictureDescriptionPractice } from '@/components/practice/pet';
 
 export type AppState =
   | 'mode-selection'
@@ -114,6 +115,11 @@ export const EXAM_PART_COMPONENT_MAP: Record<ModeKey, RouteEntry> = {
     appState: 'exam-practicing',
     kind: 'yl',
     render: (p) => React.createElement(YLPart4Practice, { key: ylInstanceKey(p as YLRenderProps), exam: 'movers', part: 5, ...(p as YLRenderProps) }),
+  },
+  cambridge_pet_p2: {
+    appState: 'exam-practicing',
+    kind: 'yl',
+    render: (p) => React.createElement(PETPictureDescriptionPractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
   },
   cambridge_pet_p3: {
     appState: 'exam-practicing',
