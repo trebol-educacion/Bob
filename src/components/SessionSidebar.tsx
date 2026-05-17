@@ -2,6 +2,7 @@
 
 import React from 'react';
 import Image from 'next/image';
+import { useTranslations } from 'next-intl';
 import { motion } from 'motion/react';
 import {
   MessageSquare,
@@ -58,6 +59,18 @@ const MODE_ICON: Record<NonNullable<SessionMode>, React.ElementType> = {
   cambridge_flyers_part1: FlyersFindDifferencesIcon,
   cambridge_ket_part1: KETSpeakingIcon,
   cambridge_ket_part2: KETSpeakingIcon,
+  cambridge_ket_reading_part1: KETReadingIcon,
+  cambridge_ket_reading_part2: KETReadingIcon,
+  cambridge_ket_reading_part3: KETReadingIcon,
+  cambridge_ket_reading_part4: KETReadingIcon,
+  cambridge_ket_reading_part5: KETReadingIcon,
+  cambridge_ket_writing_part6: KETWritingIcon,
+  cambridge_ket_writing_part7: KETWritingIcon,
+  cambridge_ket_listening_part1: KETListeningIcon,
+  cambridge_ket_listening_part2: KETListeningIcon,
+  cambridge_ket_listening_part3: KETListeningIcon,
+  cambridge_ket_listening_part4: KETListeningIcon,
+  cambridge_ket_listening_part5: KETListeningIcon,
   cambridge_pet_p1: PETSpeakingIcon,
   cambridge_pet_p2: PETSpeakingIcon,
   cambridge_pet_p3: PETSpeakingIcon,
@@ -100,18 +113,20 @@ function modeAccent(mode: SessionMode | null | undefined): FrameworkAccent {
   return { color: '#469E7B', soft: '#dcebe3', glow: 'rgba(70,158,123,0.22)' };
 }
 
-function relativeDate(dateStr: string): string {
+type RelativeDateT = (key: string, values?: Record<string, string | number>) => string;
+
+function relativeDate(dateStr: string, t: RelativeDateT): string {
   const date = new Date(dateStr);
   const now = new Date();
   const diffMs = now.getTime() - date.getTime();
   const diffMins = Math.floor(diffMs / 60000);
-  if (diffMins < 1) return 'Ahora mismo';
-  if (diffMins < 60) return `Hace ${diffMins}m`;
+  if (diffMins < 1) return t('justNow');
+  if (diffMins < 60) return t('minutesAgo', { count: diffMins });
   const diffHours = Math.floor(diffMins / 60);
-  if (diffHours < 24) return `Hace ${diffHours}h`;
+  if (diffHours < 24) return t('hoursAgo', { count: diffHours });
   const diffDays = Math.floor(diffHours / 24);
-  if (diffDays < 7) return `Hace ${diffDays}d`;
-  return date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+  if (diffDays < 7) return t('daysAgo', { count: diffDays });
+  return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
 }
 
 export function SessionSidebar({
@@ -124,6 +139,7 @@ export function SessionSidebar({
   collapsed = false,
   onToggleCollapsed,
 }: SessionSidebarProps) {
+  const t = useTranslations('shell.sidebar');
   const handleToggle = () => onToggleCollapsed?.();
   const closeOnMobile = () => {
     if (isMobileViewport()) onToggleCollapsed?.();
@@ -166,7 +182,7 @@ export function SessionSidebar({
         {!collapsed && (
           <div className="flex-1 flex items-center gap-2">
             <span className="text-[11px] font-bold uppercase tracking-[0.18em] text-trebol-text/55">
-              Sesiones
+              {t('sessions')}
             </span>
             {sessions.length > 0 && (
               <span className="ml-auto text-[10px] font-semibold tabular-nums text-trebol-text/40">
@@ -178,7 +194,7 @@ export function SessionSidebar({
         <button
           type="button"
           onClick={handleToggle}
-          aria-label={collapsed ? 'Expandir' : 'Colapsar'}
+          aria-label={collapsed ? t('expand') : t('collapse')}
           className="p-1.5 rounded-lg hover:bg-[#1E1E1C]/[0.05] transition-colors text-trebol-text/60 cursor-pointer"
         >
           {collapsed ? <ChevronRight size={16} strokeWidth={2} /> : <ChevronLeft size={16} strokeWidth={2} />}
@@ -189,8 +205,8 @@ export function SessionSidebar({
         <motion.button
           type="button"
           onClick={handleNewSession}
-          aria-label="Nueva sesión"
-          title="Nueva sesión"
+          aria-label={t('newSession')}
+          title={t('newSession')}
           whileTap={{ scale: 0.98 }}
           transition={{ type: 'spring', stiffness: 400, damping: 22 }}
           className={cn(
@@ -203,16 +219,16 @@ export function SessionSidebar({
           }}
         >
           <Plus size={16} strokeWidth={2.5} className="shrink-0" />
-          {!collapsed && <span className="tracking-tight">Nueva sesión</span>}
+          {!collapsed && <span className="tracking-tight">{t('newSession')}</span>}
         </motion.button>
       </div>
 
       <nav
-        aria-label="Sesiones"
+        aria-label={t('sessions')}
         className="relative z-10 flex-1 overflow-y-auto px-2 pb-3 space-y-1"
       >
         {loading && !collapsed && (
-          <div className="text-xs font-bold text-trebol-text/40 px-3 py-3">Cargando…</div>
+          <div className="text-xs font-bold text-trebol-text/40 px-3 py-3">{t('loading')}</div>
         )}
         {!loading && sessions.length === 0 && !collapsed && (
           <motion.div
@@ -235,10 +251,10 @@ export function SessionSidebar({
               />
             </motion.div>
             <p className="text-[11px] font-black text-trebol-text/70 leading-snug">
-              Aún no tienes sesiones
+              {t('emptyTitle')}
             </p>
             <p className="text-[10px] font-semibold text-trebol-text/40 mt-1 leading-relaxed">
-              Empieza una práctica para crear tu primera.
+              {t('emptyBody')}
             </p>
           </motion.div>
         )}
@@ -295,7 +311,7 @@ export function SessionSidebar({
                       {s.title}
                     </div>
                     <div className="text-[10px] font-medium text-trebol-text/45 flex items-center gap-1.5 mt-0.5">
-                      <span>{relativeDate(s.created_at)}</span>
+                      <span>{relativeDate(s.created_at, t)}</span>
                       {completed && (
                         <>
                           <span className="text-trebol-text/25">·</span>
@@ -312,7 +328,7 @@ export function SessionSidebar({
                       e.stopPropagation();
                       onDeleteSession(s.id);
                     }}
-                    aria-label="Eliminar sesión"
+                    aria-label={t('deleteSession')}
                     className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-red-50 text-trebol-text/30 hover:text-red-500 transition-all shrink-0"
                   >
                     <Trash2 size={12} strokeWidth={2.2} />

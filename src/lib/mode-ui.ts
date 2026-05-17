@@ -124,7 +124,7 @@ export function getModeSection(card: DynamicCard): string {
   }
 
   if (framework === 'toefl') return 'TOEFL iBT';
-  if (framework === 'generic') return 'Práctica libre';
+  if (framework === 'generic') return 'Free practice';
 
   return 'Other';
 }

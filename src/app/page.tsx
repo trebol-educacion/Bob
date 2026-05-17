@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useTranslations } from 'next-intl';
 import { motion, AnimatePresence } from 'motion/react';
 import { ModeSelection } from '@/components/ModeSelection';
 import { ConversationPractice } from '@/components/ConversationPractice';
@@ -27,6 +28,7 @@ import type { PracticeMode } from '@/lib/types/practice';
 import type { StoredMessage } from '@/actions/messages';
 
 export default function App() {
+  const t = useTranslations('home.bobUnavailable');
   const [appState, setAppState] = useState<AppState>('mode-selection');
   const [userEmail, setUserEmail] = useState<string | undefined>();
   const { organization, enabledModes, availableModes, cefrActiveLevel, cefrLevelLocked, setCefrActiveLevel, loading: orgLoading, accessDenialReason } = useOrganization();
@@ -183,9 +185,9 @@ export default function App() {
                 {organization && organization.is_bob_enabled === false ? (
                   <div className="w-full flex-1 flex flex-col items-center justify-center py-24 px-4 text-center">
                     <div className="bg-white shadow-md rounded-2xl p-10 max-w-md w-full space-y-3">
-                      <p className="text-2xl font-black text-trebol-text">Bob no está disponible en tu colegio</p>
+                      <p className="text-2xl font-black text-trebol-text">{t('title')}</p>
                       <p className="text-trebol-text opacity-60 font-medium text-sm">
-                        Contacta con el administrador de tu colegio si crees que es un error.
+                        {t('body')}
                       </p>
                     </div>
                   </div>

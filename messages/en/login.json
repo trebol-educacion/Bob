@@ -1,1 +1,15 @@
-{}
+{
+  "welcome": "Welcome",
+  "subtitle": "Sign in or create an account to continue",
+  "emailLabel": "Email or Username",
+  "emailPlaceholder": "Enter your email or username",
+  "passwordLabel": "Password",
+  "forgotPassword": "Forgot your password?",
+  "submitIdle": "Sign in",
+  "submitLoading": "Signing in…",
+  "errorEmpty": "Please fill in all fields.",
+  "errorCredentials": "Incorrect credentials. Please try again.",
+  "comingSoon": "Coming soon:",
+  "trustCenter": "Trust Center",
+  "studentProtection": "Student Protection"
+}

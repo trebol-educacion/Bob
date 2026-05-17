@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'motion/react';
 import { LogOut, User, BarChart3, Menu } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import { createSupabaseBrowser } from '@/lib/supabase/browser-client';
 import { useOrganization } from '@/hooks/useOrganization';
 import { NavProgressChip } from '@/components/NavProgressChip';
@@ -18,6 +19,7 @@ export function Navbar({ userEmail, onOpenDashboard, onToggleSidebar }: NavbarPr
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const { organization } = useOrganization();
+  const t = useTranslations('shell.navbar');
 
   const handleLogout = async () => {
     const supabase = createSupabaseBrowser();
@@ -40,7 +42,7 @@ export function Navbar({ userEmail, onOpenDashboard, onToggleSidebar }: NavbarPr
             <button
               type="button"
               onClick={onToggleSidebar}
-              aria-label="Abrir sesiones"
+              aria-label={t('openSessions')}
               className="md:hidden p-2 -ml-1 rounded-lg text-white/85 hover:bg-white/10 transition-colors cursor-pointer"
             >
               <Menu size={20} strokeWidth={2.4} />
@@ -98,7 +100,7 @@ export function Navbar({ userEmail, onOpenDashboard, onToggleSidebar }: NavbarPr
                         className="w-full flex items-center gap-3 px-4 py-3 text-sm font-semibold text-trebol-text hover:bg-trebol-secondary/20 transition-colors"
                       >
                         <BarChart3 size={16} className="text-trebol-primary" />
-                        Mi progreso
+                        {t('myProgress')}
                       </button>
                       <div className="h-px bg-gray-100" />
                     </>
@@ -108,7 +110,7 @@ export function Navbar({ userEmail, onOpenDashboard, onToggleSidebar }: NavbarPr
                     className="w-full flex items-center gap-3 px-4 py-3 text-sm font-semibold text-red-600 hover:bg-red-50 transition-colors"
                   >
                     <LogOut size={16} />
-                    Cerrar sesión
+                    {t('logOut')}
                   </button>
                 </motion.div>
               </>

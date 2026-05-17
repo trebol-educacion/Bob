@@ -1,1 +1,6 @@
-{}
+{
+  "sections": {
+    "freePractice": "Free practice",
+    "other": "Other"
+  }
+}

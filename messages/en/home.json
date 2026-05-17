@@ -1,1 +1,15 @@
-{}
+{
+  "bobUnavailable": {
+    "title": "Bob is not available at your school",
+    "body": "Contact your school administrator if you think this is an error."
+  },
+  "modeSelection": {
+    "tagline": "Bob's space{org}",
+    "heading": "Choose your training",
+    "subtitle": "How do you want to improve your English today?",
+    "comingSoon": "Coming soon"
+  },
+  "cefrBanner": {
+    "message": "Select your CEFR level to access more activities"
+  }
+}

@@ -1,12 +1,15 @@
 'use client';
 
 import React from 'react';
+import { useTranslations } from 'next-intl';
 
 interface CefrCtaBannerProps {
   onScroll: () => void;
 }
 
 export function CefrCtaBanner({ onScroll }: CefrCtaBannerProps) {
+  const t = useTranslations('home.cefrBanner');
+
   return (
     <div
       role="banner"
@@ -21,7 +24,7 @@ export function CefrCtaBanner({ onScroll }: CefrCtaBannerProps) {
         text-sm font-semibold text-yellow-800
       "
     >
-      <span>Selecciona tu nivel CEFR para acceder a más actividades</span>
+      <span>{t('message')}</span>
       <span aria-hidden="true">→</span>
     </div>
   );

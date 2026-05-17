@@ -1,6 +1,7 @@
 import React, { forwardRef } from 'react';
 import Image from 'next/image';
 import { motion } from 'motion/react';
+import { useTranslations } from 'next-intl';
 import {
   MessageSquare,
   Image as ImageIcon,
@@ -232,6 +233,8 @@ export const ModeSelection = forwardRef<HTMLDivElement, ModeSelectionProps>(func
   selectorRef
 ) {
   const { allDynamicCards, enabledModes } = useOrganization();
+  const t = useTranslations('home.modeSelection');
+  const tModeUi = useTranslations('mode_ui.sections');
   const iconClass = 'text-trebol-primary group-hover:text-white transition-colors';
 
   const HIDDEN_MODES = new Set<string>(['cambridge_flyers_part1']);
@@ -270,7 +273,7 @@ export const ModeSelection = forwardRef<HTMLDivElement, ModeSelectionProps>(func
         icon={resolveIcon(getModeIcon(card), 28, iconColorClass)}
         title={getModeTitle(card)}
         description={getModeDescription(card)}
-        badge={isComingSoon ? 'Próximamente' : getModeBadge(card)}
+        badge={isComingSoon ? t('comingSoon') : getModeBadge(card)}
         officialName={getModeOfficialName(card)}
         theme={ylTheme}
         disabled={isComingSoon}
@@ -340,13 +343,13 @@ export const ModeSelection = forwardRef<HTMLDivElement, ModeSelectionProps>(func
           </motion.div>
 
           <p className="text-[10px] font-black uppercase tracking-[0.3em] text-trebol-text/45 mb-2">
-            El espacio de Bob{organizationName ? ` · ${organizationName}` : ''}
+            {t('tagline', { org: organizationName ? ` · ${organizationName}` : '' })}
           </p>
           <h2 className="text-4xl sm:text-5xl font-black text-trebol-text tracking-tight leading-[1.05]">
-            Elige tu entrenamiento
+            {t('heading')}
           </h2>
           <p className="text-trebol-text/65 font-bold mt-3 text-base">
-            ¿Cómo quieres mejorar tu inglés hoy?
+            {t('subtitle')}
           </p>
         </motion.div>
 
@@ -371,7 +374,7 @@ export const ModeSelection = forwardRef<HTMLDivElement, ModeSelectionProps>(func
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3, duration: 0.4 }}
           >
-            <SectionTitle>Free Practice</SectionTitle>
+            <SectionTitle>{tModeUi('freePractice')}</SectionTitle>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 sm:gap-5">
               {genericCards.map(renderCard)}
             </div>

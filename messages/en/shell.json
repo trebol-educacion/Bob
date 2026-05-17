@@ -1,1 +1,46 @@
-{}
+{
+  "navbar": {
+    "openSessions": "Open sessions",
+    "myProgress": "My progress",
+    "logOut": "Log out"
+  },
+  "sidebar": {
+    "sessions": "Sessions",
+    "newSession": "New session",
+    "expand": "Expand",
+    "collapse": "Collapse",
+    "loading": "Loading…",
+    "emptyTitle": "You don't have any sessions yet",
+    "emptyBody": "Start a practice to create your first one.",
+    "deleteSession": "Delete session",
+    "justNow": "Just now",
+    "minutesAgo": "{count}m ago",
+    "hoursAgo": "{count}h ago",
+    "daysAgo": "{count}d ago"
+  },
+  "accessDenied": {
+    "backToLogin": "Back to login",
+    "reasons": {
+      "not_authenticated": {
+        "title": "Sign in to continue",
+        "body": "You need to be authenticated to access Bob."
+      },
+      "no_profile": {
+        "title": "Account without associated profile",
+        "body": "Your user does not have a profile configured. Contact your school administrator."
+      },
+      "not_student": {
+        "title": "Bob is for students",
+        "body": "This pronunciation practice tool is available to students only. If you think this is an error, contact your school administrator."
+      },
+      "no_organization": {
+        "title": "No school assigned",
+        "body": "Your account is not linked to any school. Ask the administrator to associate you with your institution before using Bob."
+      },
+      "bob_not_enabled": {
+        "title": "Bob is not available at your school",
+        "body": "Your school has not activated Bob yet. Talk to your institution's administrator to request access."
+      }
+    }
+  }
+}

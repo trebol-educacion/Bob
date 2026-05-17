@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { motion } from 'motion/react';
 import { Mail, Lock, Loader2 } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import ParticlesCanvas from '@/components/ParticlesCanvas';
 import { createSupabaseBrowser } from '@/lib/supabase/browser-client';
 
@@ -10,6 +11,7 @@ const BG = 'var(--color-bob-brand)';
 const GREEN = '#F8AC37';
 
 export default function LoginPage() {
+  const t = useTranslations('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -19,7 +21,7 @@ export default function LoginPage() {
     e.preventDefault();
     setError('');
     if (!email || !password) {
-      setError('Por favor, completa todos los campos.');
+      setError(t('errorEmpty'));
       return;
     }
     setLoading(true);
@@ -29,7 +31,7 @@ export default function LoginPage() {
       password,
     });
     if (authError) {
-      setError('Credenciales incorrectas. Por favor, inténtalo de nuevo.');
+      setError(t('errorCredentials'));
       setLoading(false);
       return;
     }
@@ -77,9 +79,9 @@ export default function LoginPage() {
 
         <div className="bg-white rounded-xl shadow-2xl">
           <div className="p-6 pb-0">
-            <h2 className="text-2xl font-extrabold text-gray-900">Bienvenido</h2>
+            <h2 className="text-2xl font-extrabold text-gray-900">{t('welcome')}</h2>
             <p className="text-sm text-gray-500 mt-1">
-              Inicia sesión o crea una cuenta para continuar
+              {t('subtitle')}
             </p>
           </div>
 
@@ -87,7 +89,7 @@ export default function LoginPage() {
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
                 <label htmlFor="email" className="text-sm font-semibold text-gray-700 block">
-                  Email o Usuario
+                  {t('emailLabel')}
                 </label>
                 <div className="relative">
                   <Mail
@@ -100,7 +102,7 @@ export default function LoginPage() {
                     type="text"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="Ingresa tu correo o usuario"
+                    placeholder={t('emailPlaceholder')}
                     autoComplete="email"
                     className="w-full h-10 pl-10 pr-3 rounded-md border border-gray-200 text-sm outline-none transition-colors focus:border-blue-400 focus:ring-1 focus:ring-blue-400"
                     style={{ backgroundColor: '#E7EFFE' }}
@@ -111,14 +113,14 @@ export default function LoginPage() {
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <label htmlFor="password" className="text-sm font-semibold text-gray-700">
-                    Contraseña
+                    {t('passwordLabel')}
                   </label>
                   <button
                     type="button"
                     className="text-xs font-medium hover:underline"
                     style={{ color: BG }}
                   >
-                    ¿Olvidaste tu contraseña?
+                    {t('forgotPassword')}
                   </button>
                 </div>
                 <div className="relative">
@@ -155,10 +157,10 @@ export default function LoginPage() {
                 {loading ? (
                   <span className="flex items-center justify-center gap-2">
                     <Loader2 size={16} className="animate-spin" />
-                    Iniciando sesión...
+                    {t('submitLoading')}
                   </span>
                 ) : (
-                  'Iniciar sesión'
+                  t('submitIdle')
                 )}
               </button>
             </form>
@@ -166,7 +168,7 @@ export default function LoginPage() {
 
           <div className="px-6 pb-6 flex flex-col space-y-4">
             <div className="text-center text-sm text-gray-500">
-              <p>Próximamente:</p>
+              <p>{t('comingSoon')}</p>
               <div className="flex justify-center space-x-4 mt-2">
                 <span className="opacity-50 text-sm">Microsoft</span>
                 <span className="opacity-50 text-sm">Google</span>
@@ -174,11 +176,11 @@ export default function LoginPage() {
             </div>
             <div className="pt-4 border-t border-gray-100 w-full flex justify-center space-x-4 text-xs font-medium text-gray-400">
               <button type="button" className="hover:text-gray-600 transition-colors">
-                Centro de Confianza
+                {t('trustCenter')}
               </button>
               <span className="text-gray-200">|</span>
               <button type="button" className="hover:text-gray-600 transition-colors">
-                Protección del Estudiante
+                {t('studentProtection')}
               </button>
             </div>
           </div>
