@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { CheckCircle, XCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { KETWritingIcon } from '@/components/icons/KETIcons';
@@ -212,8 +212,11 @@ export function KETShortMessagePractice({
   const [restoredUserText, setRestoredUserText] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isNewSession, setIsNewSession] = useState(false);
+  const initStartedRef = useRef(false);
 
   useEffect(() => {
+    if (initStartedRef.current) return;
+    initStartedRef.current = true;
     async function init() {
       if (initialMessages && initialMessages.length > 0) {
         const restored = tryRestoreFromMessages(initialMessages);
