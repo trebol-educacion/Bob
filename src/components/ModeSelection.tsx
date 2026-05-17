@@ -1,4 +1,5 @@
 import React, { forwardRef } from 'react';
+import Image from 'next/image';
 import { motion } from 'motion/react';
 import {
   MessageSquare,
@@ -175,11 +176,43 @@ function ModeCard({ mode, icon, title, description, badge, officialName, theme, 
   );
 }
 
+const SECTION_ACCENT: { match: (s: string) => boolean; color: string; soft: string }[] = [
+  { match: (s) => /young learners|starters|movers|flyers/i.test(s), color: '#469E7B', soft: '#dcebe3' },
+  { match: (s) => /ket|a2/i.test(s), color: '#3660AB', soft: '#dde4f2' },
+  { match: (s) => /pet|b1/i.test(s), color: '#F8AC37', soft: '#fde9c8' },
+  { match: (s) => /fce|b2/i.test(s), color: '#E62D2B', soft: '#fad6d5' },
+  { match: (s) => /cae|c1/i.test(s), color: '#1E1E1C', soft: '#e5e5e2' },
+  { match: (s) => /cpe|c2/i.test(s), color: '#1E1E1C', soft: '#e5e5e2' },
+  { match: (s) => /toefl/i.test(s), color: '#3660AB', soft: '#dde4f2' },
+  { match: (s) => /free/i.test(s), color: '#469E7B', soft: '#dcebe3' },
+];
+
+function getSectionAccent(name: string) {
+  return SECTION_ACCENT.find((a) => a.match(name)) ?? { color: '#1E1E1C', soft: '#e5e5e2' };
+}
+
 function SectionTitle({ children }: { children: React.ReactNode }) {
+  const text = typeof children === 'string' ? children : '';
+  const accent = getSectionAccent(text);
   return (
-    <h3 className="text-xs font-bold text-trebol-text/50 uppercase tracking-widest mb-3">
-      {children}
-    </h3>
+    <div className="flex items-center gap-3 mb-4">
+      <span
+        aria-hidden
+        className="inline-block w-2 h-2 rounded-full shrink-0"
+        style={{ background: accent.color, boxShadow: `0 0 0 4px ${accent.soft}` }}
+      />
+      <h3
+        className="text-xs font-black uppercase tracking-[0.22em] shrink-0"
+        style={{ color: accent.color }}
+      >
+        {children}
+      </h3>
+      <span
+        aria-hidden
+        className="flex-1 h-px"
+        style={{ background: `linear-gradient(to right, ${accent.soft}, transparent)` }}
+      />
+    </div>
   );
 }
 
@@ -190,10 +223,11 @@ interface ModeSelectionProps {
   cefrActiveLevel?: CefrLevel | null;
   cefrLevelLocked?: boolean;
   onCefrChange?: (level: CefrLevel) => void;
+  organizationName?: string;
 }
 
 export const ModeSelection = forwardRef<HTMLDivElement, ModeSelectionProps>(function ModeSelection(
-  { onSelect, cefrActiveLevel = null, cefrLevelLocked = false, onCefrChange },
+  { onSelect, cefrActiveLevel = null, cefrLevelLocked = false, onCefrChange, organizationName },
   selectorRef
 ) {
   const { allDynamicCards, enabledModes } = useOrganization();
@@ -241,42 +275,130 @@ export const ModeSelection = forwardRef<HTMLDivElement, ModeSelectionProps>(func
   }
 
   return (
-    <div className="w-full max-w-4xl mx-auto p-4 pb-12 space-y-8 overflow-y-auto">
-      <div className="text-center space-y-2">
-        <h2 className="text-3xl font-black text-trebol-text tracking-tight">
-          Elige tu entrenamiento
-        </h2>
-        <p className="text-trebol-text font-semibold opacity-60">
-          ¿Cómo quieres mejorar tu inglés hoy?
-        </p>
+    <div className="relative w-full flex-1 overflow-y-auto bg-[#fffbf2]">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 opacity-[0.35]"
+        style={{
+          backgroundImage:
+            'radial-gradient(circle at 12% 14%, #fde9c8 0, transparent 38%), radial-gradient(circle at 88% 10%, #dde4f2 0, transparent 32%), radial-gradient(circle at 75% 88%, #dcebe3 0, transparent 36%)',
+        }}
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 opacity-[0.05]"
+        style={{
+          backgroundImage: 'radial-gradient(circle, #1e293b 1px, transparent 1px)',
+          backgroundSize: '22px 22px',
+        }}
+      />
+
+      <div className="relative z-10 w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-10 pt-4 pb-16 space-y-10">
+        <motion.div
+          initial={{ opacity: 0, y: 14 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="relative text-center pt-2"
+        >
+          <motion.div
+            initial={{ scale: 0, rotate: -20 }}
+            animate={{ scale: 1, rotate: 0 }}
+            transition={{ delay: 0.1, type: 'spring', stiffness: 200, damping: 14 }}
+            className="relative w-20 h-20 mx-auto mb-3"
+          >
+            <div
+              aria-hidden
+              className="absolute -inset-2 rounded-full"
+              style={{
+                background: 'conic-gradient(from 0deg, #F8AC37, #469E7B, #3660AB, #E62D2B, #F8AC37)',
+                filter: 'blur(10px)',
+                opacity: 0.55,
+              }}
+            />
+            <div className="relative w-full h-full rounded-full bg-white shadow-xl ring-4 ring-white overflow-hidden">
+              <motion.div
+                animate={{ rotate: [0, -6, 6, -4, 0] }}
+                transition={{ delay: 0.7, duration: 1.4, ease: 'easeInOut' }}
+                className="w-full h-full relative"
+                style={{ transformOrigin: '50% 80%' }}
+              >
+                <Image
+                  src="/bob_avatar.png"
+                  alt="Bob"
+                  fill
+                  sizes="80px"
+                  className="object-cover"
+                  priority
+                />
+              </motion.div>
+            </div>
+          </motion.div>
+
+          <p className="text-[10px] font-black uppercase tracking-[0.3em] text-trebol-text/45 mb-2">
+            Bob&apos;s Training Lab{organizationName ? ` · ${organizationName}` : ''}
+          </p>
+          <h2 className="text-4xl sm:text-5xl font-black text-trebol-text tracking-tight leading-[1.05]">
+            Elige tu{' '}
+            <span className="relative inline-block">
+              <span className="relative z-10">entrenamiento</span>
+              <span
+                aria-hidden
+                className="absolute left-0 right-0 bottom-1 h-3 -z-0 rounded-full"
+                style={{
+                  background:
+                    'linear-gradient(90deg, #F8AC37 0%, #E62D2B 50%, #469E7B 100%)',
+                  opacity: 0.35,
+                }}
+              />
+            </span>
+          </h2>
+          <p className="text-trebol-text/65 font-bold mt-3 text-base">
+            ¿Cómo quieres mejorar tu inglés hoy?
+          </p>
+        </motion.div>
+
+        <motion.div
+          ref={selectorRef}
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2, duration: 0.4 }}
+          className="flex justify-center"
+        >
+          <CefrLevelSelector
+            value={cefrActiveLevel}
+            onChange={onCefrChange ?? (() => {})}
+            disabled={!onCefrChange}
+            locked={cefrLevelLocked}
+          />
+        </motion.div>
+
+        {showFreePractice && genericCards.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3, duration: 0.4 }}
+          >
+            <SectionTitle>Free Practice</SectionTitle>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 sm:gap-5">
+              {genericCards.map(renderCard)}
+            </div>
+          </motion.div>
+        )}
+
+        {Array.from(sectionMap.entries()).map(([sectionName, cards], i) => (
+          <motion.div
+            key={sectionName}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 + i * 0.08, duration: 0.45 }}
+          >
+            <SectionTitle>{sectionName}</SectionTitle>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 sm:gap-5">
+              {cards.map(renderCard)}
+            </div>
+          </motion.div>
+        ))}
       </div>
-
-      <div ref={selectorRef} className="flex justify-center">
-        <CefrLevelSelector
-          value={cefrActiveLevel}
-          onChange={onCefrChange ?? (() => {})}
-          disabled={!onCefrChange}
-          locked={cefrLevelLocked}
-        />
-      </div>
-
-      {showFreePractice && genericCards.length > 0 && (
-        <div>
-          <SectionTitle>Free Practice</SectionTitle>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {genericCards.map(renderCard)}
-          </div>
-        </div>
-      )}
-
-      {Array.from(sectionMap.entries()).map(([sectionName, cards]) => (
-        <div key={sectionName}>
-          <SectionTitle>{sectionName}</SectionTitle>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {cards.map(renderCard)}
-          </div>
-        </div>
-      ))}
     </div>
   );
 });

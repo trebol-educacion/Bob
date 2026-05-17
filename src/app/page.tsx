@@ -177,20 +177,16 @@ export default function App() {
                 ) : (
                   <>
                     {showBanner && <CefrCtaBanner onScroll={handleBannerScroll} />}
-                    <div className="w-full max-w-4xl mx-auto flex flex-col items-center py-8 px-4 pb-12">
-                      {organization && (
-                        <p className="text-sm text-trebol-text/50 mb-4 text-center">{organization.name}</p>
-                      )}
-                      <ModeSelection
-                        ref={cefrSelectorRef}
-                        onSelect={handleModeSelect}
-                        enabledModes={enabledModes}
-                        availableModes={availableModes}
-                        cefrActiveLevel={cefrActiveLevel}
-                        cefrLevelLocked={cefrLevelLocked}
-                        onCefrChange={setCefrActiveLevel}
-                      />
-                    </div>
+                    <ModeSelection
+                      ref={cefrSelectorRef}
+                      onSelect={handleModeSelect}
+                      enabledModes={enabledModes}
+                      availableModes={availableModes}
+                      cefrActiveLevel={cefrActiveLevel}
+                      cefrLevelLocked={cefrLevelLocked}
+                      onCefrChange={setCefrActiveLevel}
+                      organizationName={organization?.name}
+                    />
                   </>
                 )}
               </motion.div>
