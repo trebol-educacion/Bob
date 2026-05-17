@@ -19,7 +19,16 @@ const nextConfig: NextConfig = {
   // Stable Turbopack configuration for Next.js 16
   turbopack: {
     root: path.join(process.cwd()),
-  }
+  },
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: '*.supabase.co',
+        pathname: '/storage/v1/object/public/**',
+      },
+    ],
+  },
 };
 
 const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts');

@@ -71,6 +71,26 @@
       "celebrationFeedback": "Great work reading those signs! Keep practising to get even faster.",
       "celebrationAction": "See my activities"
     },
+    "listenAndChoose": {
+      "headerTitle": "Listen and Choose",
+      "headerSubtitle": "KET · Listening Part 1",
+      "partBadge": "PART 1",
+      "back": "Back",
+      "preparingExercise": "Preparing your listening exercise…",
+      "generatingAudio": "Bob is preparing the audio and pictures…",
+      "reviewingAnswers": "Checking your answers…",
+      "answeredCount": "{answered} / {total} answered",
+      "submitAnswers": "Submit answers",
+      "questionLabel": "",
+      "listen": "Listen",
+      "playing": "Playing…",
+      "listenAgain": "Listen again",
+      "showTranscript": "See conversation transcript",
+      "hideTranscript": "Hide transcript",
+      "celebrationFeedback": "Great listening! Keep practising to catch every word.",
+      "celebrationAction": "See my activities",
+      "framingFallback": "You will hear 5 short conversations. After each one, choose the picture that matches what you heard — A, B or C."
+    },
     "shortMessage": {
       "headerTitle": "Short Message",
       "headerSubtitle": "KET · Writing Part 6",
