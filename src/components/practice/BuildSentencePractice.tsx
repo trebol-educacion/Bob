@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { CheckCircle, XCircle } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import { InfoCard } from '@/components/chat';
 import { persistMessage } from '@/lib/persist-activity';
 import { getBuildSentenceItemsAction } from '@/actions/modes/writing-build-sentence';
@@ -37,6 +38,9 @@ function evaluate(ordered: string[], target: string): boolean {
 
 /** TOEFL Writing — Build a Sentence: drag tokens into order, deterministic scoring. */
 export function BuildSentencePractice({ onBack }: BuildSentencePracticeProps) {
+  const t = useTranslations('resultcard');
+  const tErrors = useTranslations('errors');
+  const tLoading = useTranslations('loading');
   const [sessionId, setSessionId] = useState('');
   const [userId, setUserId] = useState('');
   const [items, setItems] = useState<BuildSentenceItem[]>([]);
@@ -128,13 +132,13 @@ export function BuildSentencePractice({ onBack }: BuildSentencePracticeProps) {
   }
 
   if (loading) {
-    return <BobMascotLoader message="Loading activity…" />;
+    return <BobMascotLoader message={tLoading('loadingActivity')} />;
   }
 
   if (loadError) {
     return (
       <div className="flex flex-col items-center gap-4 py-10">
-        <p className="text-sm text-red-500">Could not load items. Please try again.</p>
+        <p className="text-sm text-red-500">{tErrors('couldNotLoadItems')}</p>
         <button onClick={onBack} className="text-sm text-blue-600 underline">Go back</button>
       </div>
     );
@@ -145,19 +149,19 @@ export function BuildSentencePractice({ onBack }: BuildSentencePracticeProps) {
     return (
       <div className="flex flex-col items-center gap-6 py-10 max-w-xl mx-auto">
         <div className="text-4xl font-bold text-blue-600">{correct}/{allResults.length}</div>
-        <p className="text-sm text-gray-500">sentences built correctly</p>
+        <p className="text-sm text-gray-500">{t('sentencesCorrect')}</p>
         {allResults.map((r, i) => (
           <div key={i} className="flex items-start gap-2 text-sm w-full">
             {r.correct
               ? <CheckCircle size={16} className="text-green-500 shrink-0 mt-0.5" />
               : <XCircle size={16} className="text-red-400 shrink-0 mt-0.5" />}
             <span className="text-gray-700">
-              Your answer: <em>{r.ordered_tokens.join(' ')}</em>
-              {!r.correct && <> — expected: <em>{r.expected}</em></>}
+              {t('yourAnswer')} <em>{r.ordered_tokens.join(' ')}</em>
+              {!r.correct && <> — {t('expected')} <em>{r.expected}</em></>}
             </span>
           </div>
         ))}
-        <button onClick={onBack} className="mt-2 text-sm text-blue-600 underline">Done</button>
+        <button onClick={onBack} className="mt-2 text-sm text-blue-600 underline">{t('done')}</button>
       </div>
     );
   }
@@ -184,7 +188,7 @@ export function BuildSentencePractice({ onBack }: BuildSentencePracticeProps) {
 
         <div className="min-h-12 flex flex-wrap gap-2 bg-blue-50 border border-blue-100 rounded-xl px-3 py-3">
           {ordered.length === 0 && (
-            <span className="text-xs text-blue-300 self-center">Tap tokens below to build the sentence…</span>
+            <span className="text-xs text-blue-300 self-center">{t('tapToBuild')}</span>
           )}
           {ordered.map((token, i) => (
             <button
@@ -217,7 +221,7 @@ export function BuildSentencePractice({ onBack }: BuildSentencePracticeProps) {
             disabled={ordered.length === 0}
             className="py-3 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 disabled:opacity-40 transition-colors"
           >
-            Check
+            {t('check')}
           </button>
         )}
 
@@ -227,16 +231,16 @@ export function BuildSentencePractice({ onBack }: BuildSentencePracticeProps) {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.18 }}
           >
-            <InfoCard title={result.correct ? 'Correct!' : 'Not quite'}>
+            <InfoCard title={result.correct ? t('correct') : t('notQuite')}>
               {result.correct
-                ? <>Great sentence: <em>{ordered.join(' ')}</em></>
-                : <>Correct sentence: <em>{result.expected}</em></>}
+                ? <>{t('greatSentence')} <em>{ordered.join(' ')}</em></>
+                : <>{t('correctSentence')} <em>{result.expected}</em></>}
             </InfoCard>
             <button
               onClick={handleNext}
               className="mt-4 w-full py-3 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition-colors"
             >
-              {index + 1 < items.length ? 'Next' : 'See results'}
+              {index + 1 < items.length ? t('next') : t('seeResults')}
             </button>
           </motion.div>
         )}

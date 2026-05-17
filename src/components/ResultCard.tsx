@@ -2,6 +2,7 @@ import React from 'react';
 import { motion } from 'motion/react';
 import { Button } from './Button';
 import { CheckCircle2, ArrowRight, MessageCircle, Clock, Lightbulb, Zap } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import { EvaluationResult } from '@/actions/gemini';
 import { getScoreColor } from '@/lib/score';
 
@@ -11,6 +12,7 @@ interface ResultCardProps {
 }
 
 export function ResultCard({ result, onNext }: ResultCardProps) {
+  const t = useTranslations('resultcard');
   const { score, feedback, transcribed_text, details } = result;
 
   return (
@@ -26,7 +28,7 @@ export function ResultCard({ result, onNext }: ResultCardProps) {
               {score}
             </div>
             <div className="text-sm font-bold text-trebol-text uppercase tracking-widest mt-2">
-              Puntuación Total
+              {t('totalScore')}
             </div>
           </div>
           <p className="mt-6 text-xl font-bold text-trebol-text">
@@ -38,7 +40,7 @@ export function ResultCard({ result, onNext }: ResultCardProps) {
           <div className="space-y-3">
             <h3 className="text-sm font-black text-trebol-text uppercase tracking-widest flex items-center space-x-2">
               <MessageCircle size={18} className="text-trebol-secondary" />
-              <span>Lo que dijiste</span>
+              <span>{t('whatYouSaid')}</span>
             </h3>
             <div className="bg-trebol-bg p-4 rounded-sm border-2 border-trebol-border italic text-trebol-text font-medium leading-relaxed">
               "{transcribed_text}"
@@ -67,7 +69,7 @@ export function ResultCard({ result, onNext }: ResultCardProps) {
               <div className="bg-trebol-secondary/5 p-6 rounded-sm border-2 border-trebol-secondary/20 space-y-4">
                 <h3 className="font-black text-trebol-text flex items-center space-x-2">
                   <Lightbulb size={20} className="text-trebol-secondary" />
-                  <span>Consejos Pro</span>
+                  <span>{t('proTips')}</span>
                 </h3>
                 <ul className="space-y-3">
                   {(details.improvement_tips ?? []).map((tip, idx) => (
@@ -89,7 +91,7 @@ export function ResultCard({ result, onNext }: ResultCardProps) {
             className="flex-1 py-4 text-xl"
             onClick={onNext}
           >
-            <span>Siguiente</span>
+            <span>{t('next')}</span>
             <ArrowRight size={20} className="ml-2" />
           </Button>
         </div>

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { Button } from './Button';
+import { useTranslations } from 'next-intl';
 import { Zap, Coffee, ShoppingBag, Palmtree, Utensils, Plane, Briefcase, Dumbbell, GraduationCap, Users } from 'lucide-react';
 
 export type Difficulty = 'basic' | 'intermediate' | 'advanced';
@@ -15,6 +16,7 @@ interface ImageConfigSelectionProps {
 }
 
 export function ImageConfigSelection({ onConfirm }: ImageConfigSelectionProps) {
+  const t = useTranslations('dashboard');
   const [selectedTopic, setSelectedTopic] = useState<string>('Daily Life');
   const [selectedDifficulty, setSelectedDifficulty] = useState<Difficulty>('intermediate');
 
@@ -32,26 +34,26 @@ export function ImageConfigSelection({ onConfirm }: ImageConfigSelectionProps) {
   ];
 
   const difficulties: { label: Difficulty; description: string }[] = [
-    { label: 'basic', description: 'Escenas simples con pocos objetos.' },
-    { label: 'intermediate', description: 'Escenas dinámicas con varias acciones.' },
-    { label: 'advanced', description: 'Escenas complejas con muchos detalles y matices.' },
+    { label: 'basic', description: t('difficultyBasic') },
+    { label: 'intermediate', description: t('difficultyIntermediate') },
+    { label: 'advanced', description: t('difficultyAdvanced') },
   ];
 
   return (
     <div className="w-full max-w-2xl mx-auto p-4 space-y-8">
       <div className="text-center space-y-2">
         <h2 className="text-3xl font-black text-trebol-text tracking-tight">
-          Configura tu Escena
+          {t('configureScene')}
         </h2>
         <p className="text-trebol-text font-semibold opacity-60">
-          Personaliza el desafío antes de empezar.
+          {t('customizeChallenge')}
         </p>
       </div>
 
       <div className="space-y-6">
         <div className="space-y-3">
           <h3 className="text-sm font-black text-trebol-text uppercase tracking-widest opacity-40">
-            1. Elige una Temática
+            {t('chooseTopic')}
           </h3>
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
             {topics.map((t) => (
@@ -73,7 +75,7 @@ export function ImageConfigSelection({ onConfirm }: ImageConfigSelectionProps) {
 
         <div className="space-y-3">
           <h3 className="text-sm font-black text-trebol-text uppercase tracking-widest opacity-40">
-            2. Elige la Dificultad
+            {t('chooseDifficulty')}
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {difficulties.map((d) => (
@@ -101,7 +103,7 @@ export function ImageConfigSelection({ onConfirm }: ImageConfigSelectionProps) {
           className="w-full py-4 text-xl"
           onClick={() => onConfirm({ topic: selectedTopic, difficulty: selectedDifficulty })}
         >
-          Generar Escena
+          {t('generateScene')}
         </Button>
       </div>
     </div>

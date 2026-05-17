@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import { Flame, Sparkles } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import { getStudentStatsAction } from '@/actions/stats';
 
 function calcStreak(dates: string[]): number {
@@ -28,6 +29,7 @@ interface Props {
 }
 
 export function NavProgressChip({ onClick }: Props) {
+  const t = useTranslations('dashboard');
   const [streak, setStreak] = useState<number | null>(null);
   const [xp, setXp] = useState<number | null>(null);
 
@@ -63,23 +65,23 @@ export function NavProgressChip({ onClick }: Props) {
   const hasData = streak !== null && xp !== null;
 
   const streakTooltip = !hasData
-    ? 'Tu racha de días practicando'
+    ? t('streakTooltipEmpty')
     : streak === 0
-      ? 'Racha: aún sin empezar. ¡Practica hoy para arrancar!'
+      ? t('streakTooltipZero')
       : streak === 1
-        ? 'Racha: 1 día practicando. ¡Vuelve mañana para mantenerla!'
-        : `Racha: ${streak} días seguidos practicando 🔥`;
+        ? t('streakTooltipOne')
+        : t('streakTooltip', { n: streak });
 
   const xpTooltip = !hasData
-    ? 'Tus puntos de experiencia'
-    : `XP: ${xp.toLocaleString()} puntos · suma de tus puntuaciones por sesión`;
+    ? t('xpTooltipEmpty')
+    : t('xpTooltip', { xp: xp.toLocaleString() });
 
   return (
     <motion.button
       type="button"
       onClick={onClick}
-      aria-label="Ver mi progreso"
-      title="Ver mi progreso completo"
+      aria-label={t('viewProgress')}
+      title={t('viewProgressFull')}
       whileTap={{ scale: 0.96 }}
       transition={{ type: 'spring', stiffness: 400, damping: 22 }}
       className="group relative flex items-center gap-2 px-2.5 sm:px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 border border-white/15 hover:border-white/25 transition-colors cursor-pointer"

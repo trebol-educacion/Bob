@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { CheckCircle } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import { InfoCard } from '@/components/chat';
 import { persistMessage } from '@/lib/persist-activity';
 import type { WritingResponse, WritingFormativeFeedback } from '@/lib/types/practice';
@@ -33,6 +34,8 @@ export function WritingPractice({
   onComplete,
   evaluateAction,
 }: WritingPracticeProps) {
+  const t = useTranslations('resultcard');
+  const tErrors = useTranslations('errors');
   const [text, setText] = useState('');
   const [startTime] = useState(() => Date.now());
   const [submitting, setSubmitting] = useState(false);
@@ -125,12 +128,12 @@ export function WritingPractice({
         <div className="flex items-center gap-2">
           <CheckCircle size={20} className="text-green-500 shrink-0" />
           <span className="text-sm font-semibold text-gray-700">
-            {feedback.understood ? 'Well done!' : 'Submitted — see feedback below'}
+            {feedback.understood ? t('wellDone') : t('submitted')}
           </span>
         </div>
 
         {feedback.highlights.length > 0 && (
-          <InfoCard title="Highlights">
+          <InfoCard title={t('highlights')}>
             <ul className="list-disc list-inside space-y-1 text-sm text-gray-700">
               {feedback.highlights.map((h, i) => <li key={i}>{h}</li>)}
             </ul>
@@ -138,7 +141,7 @@ export function WritingPractice({
         )}
 
         {feedback.suggestions.length > 0 && (
-          <InfoCard title="To improve">
+          <InfoCard title={t('toImprove')}>
             <ul className="list-disc list-inside space-y-1 text-sm text-gray-700">
               {feedback.suggestions.map((s, i) => <li key={i}>{s}</li>)}
             </ul>
@@ -146,24 +149,24 @@ export function WritingPractice({
         )}
 
         {feedback.model_answer && (
-          <InfoCard title="Model answer">
+          <InfoCard title={t('modelAnswer')}>
             <p className="text-sm text-gray-700 whitespace-pre-line">{feedback.model_answer}</p>
           </InfoCard>
         )}
 
         <div className="flex gap-4 text-sm text-gray-500">
-          <span>Words: <strong>{feedback.indicators.word_count}</strong></span>
-          <span>Target: <strong>{feedback.indicators.target_word_count_range[0]}–{feedback.indicators.target_word_count_range[1]}</strong></span>
+          <span>{t('words')} <strong>{feedback.indicators.word_count}</strong></span>
+          <span>{t('target')} <strong>{feedback.indicators.target_word_count_range[0]}–{feedback.indicators.target_word_count_range[1]}</strong></span>
         </div>
 
         {(feedback.indicators.covered_bullets?.length ?? 0) > 0 && (
           <div className="text-sm text-green-700">
-            Covered: {feedback.indicators.covered_bullets!.join(', ')}
+            {t('covered')} {feedback.indicators.covered_bullets!.join(', ')}
           </div>
         )}
         {(feedback.indicators.missing_bullets?.length ?? 0) > 0 && (
           <div className="text-sm text-amber-700">
-            Missing: {feedback.indicators.missing_bullets!.join(', ')}
+            {t('missing')} {feedback.indicators.missing_bullets!.join(', ')}
           </div>
         )}
       </motion.div>
@@ -185,14 +188,14 @@ export function WritingPractice({
       <textarea
         value={text}
         onChange={(e) => setText(e.target.value)}
-        placeholder="Write your answer here…"
+        placeholder={t('writeAnswerPlaceholder')}
         rows={10}
         className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-800 leading-relaxed resize-none focus:outline-none focus:ring-2 focus:ring-blue-300"
       />
 
       <div className="flex items-center justify-between text-xs text-gray-400">
         <span>
-          Words: <strong className={wordCount < minWords ? 'text-amber-500' : wordCount > maxWords ? 'text-red-400' : 'text-green-600'}>{wordCount}</strong> / {minWords}–{maxWords}
+          {t('words')} <strong className={wordCount < minWords ? 'text-amber-500' : wordCount > maxWords ? 'text-red-400' : 'text-green-600'}>{wordCount}</strong> / {minWords}–{maxWords}
         </span>
         <span>{minutes}:{String(seconds).padStart(2, '0')}</span>
       </div>
@@ -205,7 +208,7 @@ export function WritingPractice({
             exit={{ opacity: 0 }}
             className="text-sm text-red-500"
           >
-            {submitError} — please try again.
+            {tErrors('tryAgain', { message: submitError })}
           </motion.p>
         )}
       </AnimatePresence>
@@ -215,12 +218,12 @@ export function WritingPractice({
         disabled={submitting || wordCount < minWords}
         className="py-3 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 disabled:opacity-40 transition-colors"
       >
-        {submitting ? 'Evaluating…' : 'Submit'}
+        {submitting ? t('evaluating') : t('submit')}
       </button>
 
       {wordCount < minWords && (
         <p className="text-xs text-gray-400 text-center">
-          {minWords - wordCount} more word{minWords - wordCount !== 1 ? 's' : ''} needed to submit.
+          {t('moreWordsNeeded', { n: minWords - wordCount })}
         </p>
       )}
     </div>

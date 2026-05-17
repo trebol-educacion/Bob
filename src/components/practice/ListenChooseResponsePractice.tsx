@@ -5,6 +5,7 @@ import { getClosedItemsAction } from '@/actions/modes/listen-choose-response';
 import { ClosedComprehension } from '@/components/practice/ClosedComprehension';
 import { BobMascotLoader } from '@/components/chat/BobMascotLoader';
 import { createSessionAction } from '@/actions/sessions';
+import { useTranslations } from 'next-intl';
 import type { ClosedItem } from '@/lib/types/practice';
 
 interface ListenChooseResponsePracticeProps {
@@ -13,10 +14,15 @@ interface ListenChooseResponsePracticeProps {
 
 /** Wrapper that loads TOEFL Listen-Choose-a-Response items and renders ClosedComprehension. */
 export function ListenChooseResponsePractice({ onBack }: ListenChooseResponsePracticeProps) {
+  const tErrors = useTranslations('errors');
+  const tLoading = useTranslations('loading');
   const [items, setItems] = useState<ClosedItem[] | null>(null);
   const [sessionId, setSessionId] = useState('');
   const [userId, setUserId] = useState('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  const msgFailedSession = tErrors('failedCreateSession');
+  const msgNoItems = tErrors('noItemsAvailable');
 
   useEffect(() => {
     async function init() {
@@ -26,7 +32,7 @@ export function ListenChooseResponsePractice({ onBack }: ListenChooseResponsePra
       });
 
       if (!sessionResult.data) {
-        setErrorMsg(sessionResult.error ?? 'Failed to create session');
+        setErrorMsg(sessionResult.error ?? msgFailedSession);
         return;
       }
 
@@ -45,7 +51,7 @@ export function ListenChooseResponsePractice({ onBack }: ListenChooseResponsePra
       }
 
       if (result.items.length === 0) {
-        setErrorMsg('No items available yet. Please check back soon.');
+        setErrorMsg(msgNoItems);
         return;
       }
 
@@ -53,7 +59,7 @@ export function ListenChooseResponsePractice({ onBack }: ListenChooseResponsePra
     }
 
     void init();
-  }, []);
+  }, [msgFailedSession, msgNoItems]);
 
   if (errorMsg) {
     return (
@@ -70,7 +76,7 @@ export function ListenChooseResponsePractice({ onBack }: ListenChooseResponsePra
   }
 
   if (!items) {
-    return <BobMascotLoader message="Loading listening activity…" />;
+    return <BobMascotLoader message={tLoading('loadingListening')} />;
   }
 
   return (

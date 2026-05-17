@@ -14,6 +14,7 @@ import {
   Trash2,
   Trophy,
 } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import {
   getStudentStatsAction,
   resetStudentHistoryAction,
@@ -48,11 +49,11 @@ const MODE_LABEL: Record<string, string> = {
   generic_image: 'Free Practice · Picture',
 };
 
-const SKILL_META: Record<Skill, { label: string; color: string; soft: string; ring: string }> = {
-  speaking: { label: 'Hablar', color: '#3660AB', soft: '#dde4f2', ring: 'shadow-blue-200' },
-  reading: { label: 'Leer', color: '#469E7B', soft: '#dcebe3', ring: 'shadow-emerald-200' },
-  listening: { label: 'Escuchar', color: '#F8AC37', soft: '#fde9c8', ring: 'shadow-amber-200' },
-  writing: { label: 'Escribir', color: '#E62D2B', soft: '#fad6d5', ring: 'shadow-rose-200' },
+const SKILL_META: Record<Skill, { color: string; soft: string; ring: string }> = {
+  speaking: { color: '#3660AB', soft: '#dde4f2', ring: 'shadow-blue-200' },
+  reading: { color: '#469E7B', soft: '#dcebe3', ring: 'shadow-emerald-200' },
+  listening: { color: '#F8AC37', soft: '#fde9c8', ring: 'shadow-amber-200' },
+  writing: { color: '#E62D2B', soft: '#fad6d5', ring: 'shadow-rose-200' },
 };
 
 const MODE_SKILL_OVERRIDE: Record<string, Skill> = {
@@ -106,12 +107,12 @@ function starsFor(pct: number): 0 | 1 | 2 | 3 {
 function formatRelative(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
   const mins = Math.floor(diff / 60_000);
-  if (mins < 1) return 'ahora';
-  if (mins < 60) return `hace ${mins}m`;
+  if (mins < 1) return 'now';
+  if (mins < 60) return `${mins}m ago`;
   const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `hace ${hrs}h`;
+  if (hrs < 24) return `${hrs}h ago`;
   const days = Math.floor(hrs / 24);
-  return `hace ${days}d`;
+  return `${days}d ago`;
 }
 
 function calcStreak(dates: string[]): number {
@@ -165,11 +166,18 @@ function SkillRing({
   sessions: number;
   index: number;
 }) {
+  const t = useTranslations('dashboard');
   const meta = SKILL_META[skill];
   const radius = 34;
   const circumference = 2 * Math.PI * radius;
   const offset = circumference * (1 - pct / 100);
   const active = sessions > 0;
+
+  const skillLabelKey = `skill${skill.charAt(0).toUpperCase()}${skill.slice(1)}` as
+    | 'skillSpeaking'
+    | 'skillReading'
+    | 'skillListening'
+    | 'skillWriting';
 
   return (
     <motion.div
@@ -211,7 +219,7 @@ function SkillRing({
           </span>
           {active && (
             <span className="text-[8px] font-bold uppercase tracking-widest text-trebol-text/40">
-              prom
+              {t('avg')}
             </span>
           )}
         </div>
@@ -220,10 +228,10 @@ function SkillRing({
         className="text-[11px] font-black uppercase tracking-wider"
         style={{ color: active ? meta.color : '#94a3b8' }}
       >
-        {meta.label}
+        {t(skillLabelKey)}
       </span>
       <span className="text-[10px] font-semibold text-trebol-text/40">
-        {sessions} {sessions === 1 ? 'sesión' : 'sesiones'}
+        {t('sessionCount', { n: sessions })}
       </span>
     </motion.div>
   );
@@ -243,10 +251,16 @@ interface PathNode {
 }
 
 function PathNodeCard({ node, index }: { node: PathNode; index: number }) {
+  const t = useTranslations('dashboard');
   const meta = SKILL_META[node.skill];
   const completed = node.pct >= 80;
   const inProgress = node.sessions > 0 && !completed;
   const side = index % 2 === 0 ? 'left' : 'right';
+  const skillLabelKey = `skill${node.skill.charAt(0).toUpperCase()}${node.skill.slice(1)}` as
+    | 'skillSpeaking'
+    | 'skillReading'
+    | 'skillListening'
+    | 'skillWriting';
 
   return (
     <motion.div
@@ -305,7 +319,7 @@ function PathNodeCard({ node, index }: { node: PathNode; index: number }) {
             className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest"
             style={{ background: meta.soft, color: meta.color }}
           >
-            {meta.label}
+            {t(skillLabelKey)}
           </span>
           {node.sessions > 0 && (
             <span className="text-[10px] font-semibold text-trebol-text/40">
@@ -319,10 +333,10 @@ function PathNodeCard({ node, index }: { node: PathNode; index: number }) {
             <span className="tabular-nums" style={{ color: meta.color }}>
               {Math.round(node.pct)}%
             </span>{' '}
-            · {node.sessions} {node.sessions === 1 ? 'intento' : 'intentos'}
+            · {t('attemptCount', { n: node.sessions })}
           </p>
         ) : (
-          <p className="text-xs font-semibold text-trebol-text/30 mt-1 italic">Aún sin empezar</p>
+          <p className="text-xs font-semibold text-trebol-text/30 mt-1 italic">{t('notStarted')}</p>
         )}
       </div>
     </motion.div>
@@ -399,7 +413,6 @@ interface Derived {
   totalStars: number;
   bySkill: Record<Skill, { pct: number; sessions: number }>;
   groups: Array<{ key: string; title: string; framework: string; level: string; nodes: PathNode[] }>;
-  greeting: string;
 }
 
 function deriveStats(stats: StudentStatsResult): Derived {
@@ -470,21 +483,11 @@ function deriveStats(stats: StudentStatsResult): Derived {
     nodes: g.nodes.slice().sort((a, b) => a.order - b.order),
   }));
 
-  const greeting =
-    streak >= 7
-      ? `¡${streak} días seguidos! Eres una leyenda 🔥`
-      : streak >= 3
-        ? `¡${streak} días seguidos! ¡Sigue así! 💪`
-        : streak === 1
-          ? '¡Buen comienzo! Vuelve mañana.'
-          : stats.total_sessions > 0
-            ? '¡Bienvenido otra vez! ¿List@ para practicar?'
-            : '¡Bienvenido! Vamos a empezar tu aventura.';
-
-  return { streak, totalXp, goldBadges, totalStars, bySkill, groups, greeting };
+  return { streak, totalXp, goldBadges, totalStars, bySkill, groups };
 }
 
 export function StudentStatsPanel({ onBack, onAfterReset }: Props) {
+  const t = useTranslations('dashboard');
   const [stats, setStats] = useState<StudentStatsResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [resetting, setResetting] = useState(false);
@@ -505,6 +508,15 @@ export function StudentStatsPanel({ onBack, onAfterReset }: Props) {
   }, [load]);
 
   const derived = useMemo(() => (stats ? deriveStats(stats) : null), [stats]);
+
+  const greeting = useMemo(() => {
+    if (!derived || !stats) return '';
+    if (derived.streak >= 7) return t('greetingLegend', { n: derived.streak });
+    if (derived.streak >= 3) return t('greetingStreak', { n: derived.streak });
+    if (derived.streak === 1) return t('greetingDay1');
+    if (stats.total_sessions > 0) return t('greetingWelcomeBack');
+    return t('greetingFirst');
+  }, [derived, stats, t]);
 
   const handleReset = async () => {
     setResetting(true);
@@ -555,15 +567,15 @@ export function StudentStatsPanel({ onBack, onAfterReset }: Props) {
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1.5">
               <h1 className="text-base font-black text-trebol-text tracking-tight leading-none">
-                Mi progreso
+                {t('myProgress')}
               </h1>
               <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-[#F8AC37]/20 text-[#d98e1d] text-[9px] font-black uppercase tracking-widest">
                 <Sparkles size={8} fill="#d98e1d" strokeWidth={0} />
-                En vivo
+                {t('live')}
               </span>
             </div>
             <p className="text-[11px] text-trebol-text/55 font-bold mt-0.5 leading-none truncate">
-              Tu aventura con Bob
+              {t('yourJourney')}
             </p>
           </div>
 
@@ -590,7 +602,7 @@ export function StudentStatsPanel({ onBack, onAfterReset }: Props) {
         <div className="px-4 sm:px-6 py-6 max-w-3xl mx-auto w-full">
         {loading && !stats && (
           <div className="text-center text-sm text-trebol-text/50 py-20 font-semibold">
-            Cargando tu aventura…
+            {t('loadingAdventure')}
           </div>
         )}
 
@@ -616,10 +628,10 @@ export function StudentStatsPanel({ onBack, onAfterReset }: Props) {
               />
             </motion.div>
             <h2 className="text-2xl font-black text-trebol-text mb-2 tracking-tight">
-              ¡Aquí empieza tu aventura!
+              {t('emptyTitle')}
             </h2>
             <p className="text-sm text-trebol-text/60 font-semibold max-w-xs mx-auto">
-              Elige una actividad y empieza a practicar. Aquí verás tus rachas, trofeos y todos los retos que vayas conquistando.
+              {t('emptyBody')}
             </p>
           </motion.div>
         )}
@@ -687,7 +699,7 @@ export function StudentStatsPanel({ onBack, onAfterReset }: Props) {
                     transition={{ delay: 0.2 }}
                     className="text-[11px] font-black uppercase tracking-[0.25em] text-white/70 mb-1"
                   >
-                    Bob dice
+                    {t('bobSays')}
                   </motion.p>
                   <motion.h2
                     initial={{ opacity: 0, x: -10 }}
@@ -695,7 +707,7 @@ export function StudentStatsPanel({ onBack, onAfterReset }: Props) {
                     transition={{ delay: 0.25 }}
                     className="text-xl sm:text-2xl font-black tracking-tight leading-tight"
                   >
-                    {derived.greeting}
+                    {greeting}
                   </motion.h2>
                   <motion.div
                     initial={{ opacity: 0 }}
@@ -705,7 +717,7 @@ export function StudentStatsPanel({ onBack, onAfterReset }: Props) {
                   >
                     <HeroChip
                       icon={<Flame size={18} fill="#fff" strokeWidth={0} />}
-                      label="Racha"
+                      label={t('streak')}
                       value={<CountUp value={derived.streak} />}
                       bg="linear-gradient(135deg, #E62D2B, #b8201f)"
                       fg="#fff"
@@ -721,7 +733,7 @@ export function StudentStatsPanel({ onBack, onAfterReset }: Props) {
                     />
                     <HeroChip
                       icon={<Trophy size={18} strokeWidth={2.2} />}
-                      label="Trofeos"
+                      label={t('trophies')}
                       value={<CountUp value={derived.goldBadges} />}
                       bg="linear-gradient(135deg, #1E1E1C, #3a3a36)"
                       fg="#fff"
@@ -739,7 +751,7 @@ export function StudentStatsPanel({ onBack, onAfterReset }: Props) {
               className="relative bg-white/80 backdrop-blur-sm border border-white shadow-lg rounded-[28px] p-5 mb-6"
             >
               <div className="flex items-baseline justify-between mb-4">
-                <h3 className="text-base font-black text-trebol-text tracking-tight">Habilidades</h3>
+                <h3 className="text-base font-black text-trebol-text tracking-tight">{t('skills')}</h3>
                 <div className="flex items-center gap-1 text-[#F8AC37]">
                   {Array.from({ length: Math.min(5, derived.totalStars) }).map((_, i) => (
                     <Star key={i} size={12} className="fill-[#F8AC37] stroke-[#d98e1d]" />
@@ -781,7 +793,7 @@ export function StudentStatsPanel({ onBack, onAfterReset }: Props) {
                 className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded-full text-trebol-text/40 hover:text-red-500 hover:bg-red-50 transition-colors"
               >
                 <Trash2 size={11} />
-                Borrar historial
+                {t('deleteHistory')}
               </button>
             </div>
           </>
@@ -797,9 +809,9 @@ export function StudentStatsPanel({ onBack, onAfterReset }: Props) {
             transition={{ type: 'spring', stiffness: 280, damping: 22 }}
             className="bg-white rounded-3xl p-6 max-w-sm w-full space-y-4 shadow-2xl border border-white"
           >
-            <h3 className="text-lg font-black text-trebol-text tracking-tight">¿Borrar progreso?</h3>
+            <h3 className="text-lg font-black text-trebol-text tracking-tight">{t('confirmDeleteTitle')}</h3>
             <p className="text-sm text-trebol-text/70 font-semibold leading-relaxed">
-              Esto eliminará permanentemente todas tus sesiones y sus evaluaciones. No se puede deshacer.
+              {t('confirmDeleteBody')}
             </p>
             <div className="flex gap-2 justify-end">
               <button
@@ -807,7 +819,7 @@ export function StudentStatsPanel({ onBack, onAfterReset }: Props) {
                 disabled={resetting}
                 className="px-4 py-2 rounded-xl text-sm font-black text-trebol-text/70 hover:bg-trebol-secondary/30 transition-colors disabled:opacity-50"
               >
-                Cancelar
+                {t('cancel')}
               </button>
               <button
                 onClick={handleReset}
@@ -815,7 +827,7 @@ export function StudentStatsPanel({ onBack, onAfterReset }: Props) {
                 className="px-4 py-2 rounded-xl text-sm font-black bg-red-500 text-white hover:bg-red-600 transition-colors disabled:opacity-60 flex items-center gap-2 shadow-md"
               >
                 {resetting && <RefreshCw size={14} className="animate-spin" />}
-                Sí, borrar
+                {t('confirmDelete')}
               </button>
             </div>
           </motion.div>

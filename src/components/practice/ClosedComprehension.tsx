@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import Image from 'next/image';
 import { motion, AnimatePresence } from 'motion/react';
 import { CheckCircle, XCircle } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import { InfoCard } from '@/components/chat';
 import { persistMessage } from '@/lib/persist-activity';
 import type { ClosedItem, ClosedEvaluation } from '@/lib/types/practice';
@@ -18,6 +19,7 @@ export interface ClosedComprehensionProps {
 
 /** Generic closed-comprehension activity — listening, reading, or image-based. Deterministic scoring; no LLM involved. */
 export function ClosedComprehension({ items, sessionId, userId, onComplete }: ClosedComprehensionProps) {
+  const t = useTranslations('resultcard');
   const [index, setIndex] = useState(0);
   const [answered, setAnswered] = useState<ClosedEvaluation | null>(null);
   const [results, setResults] = useState<ClosedEvaluation[]>([]);
@@ -30,15 +32,15 @@ export function ClosedComprehension({ items, sessionId, userId, onComplete }: Cl
     return (
       <div className="flex flex-col items-center gap-6 py-10">
         <div className="text-5xl font-bold text-blue-600">{correct}/{results.length}</div>
-        <p className="text-gray-600 text-sm">correct answers</p>
+        <p className="text-gray-600 text-sm">{t('correctAnswers')}</p>
         {results.map((r, i) => (
           <div key={i} className="flex items-center gap-2 text-sm">
             {r.correct
               ? <CheckCircle size={16} className="text-green-500 shrink-0" />
               : <XCircle size={16} className="text-red-400 shrink-0" />}
             <span className="text-gray-700">
-              You chose <strong>{r.selected}</strong>
-              {!r.correct && <> — correct: <strong>{r.expected}</strong></>}
+              {t('youChose')} <strong>{r.selected}</strong>
+              {!r.correct && <> — {t('expected')} <strong>{r.expected}</strong></>}
             </span>
           </div>
         ))}
@@ -187,17 +189,17 @@ export function ClosedComprehension({ items, sessionId, userId, onComplete }: Cl
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.18 }}
           >
-            <InfoCard title={answered.correct ? 'Correct!' : `The answer is ${answered.expected.toUpperCase()}`}>
+            <InfoCard title={answered.correct ? t('correct') : t('theAnswerIs', { key: answered.expected.toUpperCase() })}>
               {answered.correct
-                ? <>Well done — you chose <strong>{selectedLabel}</strong>.</>
-                : <>You chose <strong>{selectedLabel}</strong>. {answered.explanation ?? ''}</>}
+                ? <>{t('wellDoneChose', { label: selectedLabel ?? answered.selected })}</>
+                : <>{t('choseWrong', { label: selectedLabel ?? answered.selected })} {answered.explanation ?? ''}</>}
             </InfoCard>
 
             <button
               onClick={handleNext}
               className="mt-4 w-full py-3 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition-colors"
             >
-              {index + 1 < items.length ? 'Next' : 'See results'}
+              {index + 1 < items.length ? t('next') : t('seeResults')}
             </button>
           </motion.div>
         )}
