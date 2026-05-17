@@ -305,6 +305,12 @@ export function getModeOfficialName(card: DynamicCard): string {
       const family = ylMatch[1].charAt(0).toUpperCase() + ylMatch[1].slice(1);
       return `Cambridge ${family} · Part ${ylMatch[2]}`;
     }
+    const skillMatch = exam_part.match(/^([a-z]+)_(reading|writing|listening|speaking)_part(\d+)$/);
+    if (skillMatch) {
+      const exam = skillMatch[1].toUpperCase();
+      const skill = skillMatch[2].charAt(0).toUpperCase() + skillMatch[2].slice(1);
+      return `Cambridge ${exam} · ${skill} Part ${skillMatch[3]}`;
+    }
     const partMatch = exam_part.match(/^([a-z]+)_p?(\d+)([a-z]?)$/);
     if (partMatch) {
       const exam = partMatch[1].toUpperCase();
