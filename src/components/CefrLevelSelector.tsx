@@ -6,6 +6,7 @@ import { motion } from 'motion/react';
 import type { CefrLevel } from '@/lib/types/practice';
 
 const CEFR_OPTIONS: { value: CefrLevel; label: string; color: string; soft: string }[] = [
+  { value: 'pre_a1', label: 'Pre-A1', color: '#8B5CF6', soft: '#ede9fe' },
   { value: 'a1', label: 'A1', color: '#469E7B', soft: '#dcebe3' },
   { value: 'a2', label: 'A2', color: '#3660AB', soft: '#dde4f2' },
   { value: 'b1', label: 'B1', color: '#F8AC37', soft: '#fde9c8' },

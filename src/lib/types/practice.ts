@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 /** CEFR proficiency level. */
-export type CefrLevel = 'a1' | 'a2' | 'b1' | 'b2' | 'c1' | 'c2';
+export type CefrLevel = 'pre_a1' | 'a1' | 'a2' | 'b1' | 'b2' | 'c1' | 'c2';
 
 /** Formative (non-graded) feedback for open speaking and writing tasks. */
 export interface FormativeFeedback {
@@ -156,7 +156,7 @@ export const ClosedItemSchema = z.object({
   id: z.string(),
   framework: z.string(),
   exam_part: z.string(),
-  cefr_level: z.enum(['a1', 'a2', 'b1', 'b2', 'c1', 'c2']).nullable(),
+  cefr_level: z.enum(['pre_a1', 'a1', 'a2', 'b1', 'b2', 'c1', 'c2']).nullable(),
   variant_id: z.string(),
   stimulus_audio_url: z.string().nullable(),
   stimulus_text: z.string().nullable(),

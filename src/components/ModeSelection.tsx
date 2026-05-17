@@ -276,7 +276,7 @@ export const ModeSelection = forwardRef<HTMLDivElement, ModeSelectionProps>(func
   }
 
   return (
-    <div className="relative w-full flex-1 overflow-y-auto bg-[#fffbf2]">
+    <div className="relative w-full min-h-full overflow-y-auto bg-[#fffbf2]">
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0 opacity-[0.35]"

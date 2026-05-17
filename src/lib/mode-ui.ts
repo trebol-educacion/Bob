@@ -82,8 +82,8 @@ export function getModeIcon(card: DynamicCard): string {
 }
 
 function cefrLabel(card: DynamicCard): string {
-  if (card.framework === 'cambridge' && card.exam_part.startsWith('starters_')) return 'Pre-A1';
   if (!card.cefr_level) return '';
+  if (card.cefr_level === 'pre_a1') return 'Pre-A1';
   return card.cefr_level.toUpperCase();
 }
 
