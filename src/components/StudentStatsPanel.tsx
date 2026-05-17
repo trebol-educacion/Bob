@@ -49,10 +49,10 @@ const MODE_LABEL: Record<string, string> = {
 };
 
 const SKILL_META: Record<Skill, { label: string; color: string; soft: string; ring: string }> = {
-  speaking: { label: 'Speaking', color: '#3660AB', soft: '#dde4f2', ring: 'shadow-blue-200' },
-  reading: { label: 'Reading', color: '#469E7B', soft: '#dcebe3', ring: 'shadow-emerald-200' },
-  listening: { label: 'Listening', color: '#F8AC37', soft: '#fde9c8', ring: 'shadow-amber-200' },
-  writing: { label: 'Writing', color: '#E62D2B', soft: '#fad6d5', ring: 'shadow-rose-200' },
+  speaking: { label: 'Hablar', color: '#3660AB', soft: '#dde4f2', ring: 'shadow-blue-200' },
+  reading: { label: 'Leer', color: '#469E7B', soft: '#dcebe3', ring: 'shadow-emerald-200' },
+  listening: { label: 'Escuchar', color: '#F8AC37', soft: '#fde9c8', ring: 'shadow-amber-200' },
+  writing: { label: 'Escribir', color: '#E62D2B', soft: '#fad6d5', ring: 'shadow-rose-200' },
 };
 
 function inferSkill(mode: string): Skill {
@@ -99,12 +99,12 @@ function starsFor(pct: number): 0 | 1 | 2 | 3 {
 function formatRelative(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
   const mins = Math.floor(diff / 60_000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m ago`;
+  if (mins < 1) return 'ahora';
+  if (mins < 60) return `hace ${mins}m`;
   const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
+  if (hrs < 24) return `hace ${hrs}h`;
   const days = Math.floor(hrs / 24);
-  return `${days}d ago`;
+  return `hace ${days}d`;
 }
 
 function calcStreak(dates: string[]): number {
@@ -204,7 +204,7 @@ function SkillRing({
           </span>
           {active && (
             <span className="text-[8px] font-bold uppercase tracking-widest text-trebol-text/40">
-              avg
+              prom
             </span>
           )}
         </div>
@@ -216,7 +216,7 @@ function SkillRing({
         {meta.label}
       </span>
       <span className="text-[10px] font-semibold text-trebol-text/40">
-        {sessions} {sessions === 1 ? 'session' : 'sessions'}
+        {sessions} {sessions === 1 ? 'sesión' : 'sesiones'}
       </span>
     </motion.div>
   );
@@ -312,10 +312,10 @@ function PathNodeCard({ node, index }: { node: PathNode; index: number }) {
             <span className="tabular-nums" style={{ color: meta.color }}>
               {Math.round(node.pct)}%
             </span>{' '}
-            · {node.sessions} {node.sessions === 1 ? 'try' : 'tries'}
+            · {node.sessions} {node.sessions === 1 ? 'intento' : 'intentos'}
           </p>
         ) : (
-          <p className="text-xs font-semibold text-trebol-text/30 mt-1 italic">Not started yet</p>
+          <p className="text-xs font-semibold text-trebol-text/30 mt-1 italic">Aún sin empezar</p>
         )}
       </div>
     </motion.div>
@@ -465,14 +465,14 @@ function deriveStats(stats: StudentStatsResult): Derived {
 
   const greeting =
     streak >= 7
-      ? `${streak} days in a row! You're a legend 🔥`
+      ? `¡${streak} días seguidos! Eres una leyenda 🔥`
       : streak >= 3
-        ? `${streak} days in a row! Keep it up 💪`
+        ? `¡${streak} días seguidos! ¡Sigue así! 💪`
         : streak === 1
-          ? 'Great start! Come back tomorrow.'
+          ? '¡Buen comienzo! Vuelve mañana.'
           : stats.total_sessions > 0
-            ? 'Welcome back! Ready to practice?'
-            : "Welcome! Let's start your adventure.";
+            ? '¡Bienvenido otra vez! ¿List@ para practicar?'
+            : '¡Bienvenido! Vamos a empezar tu aventura.';
 
   return { streak, totalXp, goldBadges, totalStars, bySkill, groups, greeting };
 }
@@ -545,29 +545,18 @@ export function StudentStatsPanel({ onBack, onAfterReset }: Props) {
             <ArrowLeft size={18} className="text-trebol-text group-hover:text-[#3660AB] group-hover:-translate-x-0.5 transition-transform" strokeWidth={2.5} />
           </button>
 
-          <div className="relative shrink-0 w-10 h-10 rounded-full bg-white shadow-md ring-2 ring-white overflow-hidden">
-            <Image
-              src="/bob_avatar.png"
-              alt="Bob"
-              fill
-              sizes="40px"
-              className="object-cover"
-              priority
-            />
-          </div>
-
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1.5">
               <h1 className="text-base font-black text-trebol-text tracking-tight leading-none">
-                My progress
+                Mi progreso
               </h1>
               <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-[#F8AC37]/20 text-[#d98e1d] text-[9px] font-black uppercase tracking-widest">
                 <Sparkles size={8} fill="#d98e1d" strokeWidth={0} />
-                Live
+                En vivo
               </span>
             </div>
             <p className="text-[11px] text-trebol-text/55 font-bold mt-0.5 leading-none truncate">
-              Your adventure with Bob
+              Tu aventura con Bob
             </p>
           </div>
 
@@ -593,7 +582,7 @@ export function StudentStatsPanel({ onBack, onAfterReset }: Props) {
       <div className="relative z-10 flex-1 overflow-y-auto px-4 sm:px-6 py-6 max-w-3xl mx-auto w-full">
         {loading && !stats && (
           <div className="text-center text-sm text-trebol-text/50 py-20 font-semibold">
-            Loading your adventure…
+            Cargando tu aventura…
           </div>
         )}
 
@@ -619,10 +608,10 @@ export function StudentStatsPanel({ onBack, onAfterReset }: Props) {
               />
             </motion.div>
             <h2 className="text-2xl font-black text-trebol-text mb-2 tracking-tight">
-              Your adventure starts here!
+              ¡Aquí empieza tu aventura!
             </h2>
             <p className="text-sm text-trebol-text/60 font-semibold max-w-xs mx-auto">
-              Pick an activity and start practicing. You&apos;ll see your streaks, badges and every challenge you conquer right here.
+              Elige una actividad y empieza a practicar. Aquí verás tus rachas, trofeos y todos los retos que vayas conquistando.
             </p>
           </motion.div>
         )}
@@ -690,7 +679,7 @@ export function StudentStatsPanel({ onBack, onAfterReset }: Props) {
                     transition={{ delay: 0.2 }}
                     className="text-[11px] font-black uppercase tracking-[0.25em] text-white/70 mb-1"
                   >
-                    Bob says
+                    Bob dice
                   </motion.p>
                   <motion.h2
                     initial={{ opacity: 0, x: -10 }}
@@ -708,7 +697,7 @@ export function StudentStatsPanel({ onBack, onAfterReset }: Props) {
                   >
                     <HeroChip
                       icon={<Flame size={18} fill="#fff" strokeWidth={0} />}
-                      label="Streak"
+                      label="Racha"
                       value={<CountUp value={derived.streak} />}
                       bg="linear-gradient(135deg, #E62D2B, #b8201f)"
                       fg="#fff"
@@ -724,7 +713,7 @@ export function StudentStatsPanel({ onBack, onAfterReset }: Props) {
                     />
                     <HeroChip
                       icon={<Trophy size={18} strokeWidth={2.2} />}
-                      label="Trophies"
+                      label="Trofeos"
                       value={<CountUp value={derived.goldBadges} />}
                       bg="linear-gradient(135deg, #1E1E1C, #3a3a36)"
                       fg="#fff"
@@ -742,7 +731,7 @@ export function StudentStatsPanel({ onBack, onAfterReset }: Props) {
               className="relative bg-white/80 backdrop-blur-sm border border-white shadow-lg rounded-[28px] p-5 mb-6"
             >
               <div className="flex items-baseline justify-between mb-4">
-                <h3 className="text-base font-black text-trebol-text tracking-tight">Skills</h3>
+                <h3 className="text-base font-black text-trebol-text tracking-tight">Habilidades</h3>
                 <div className="flex items-center gap-1 text-[#F8AC37]">
                   {Array.from({ length: Math.min(5, derived.totalStars) }).map((_, i) => (
                     <Star key={i} size={12} className="fill-[#F8AC37] stroke-[#d98e1d]" />
@@ -784,7 +773,7 @@ export function StudentStatsPanel({ onBack, onAfterReset }: Props) {
                 className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded-full text-trebol-text/40 hover:text-red-500 hover:bg-red-50 transition-colors"
               >
                 <Trash2 size={11} />
-                Reset history
+                Borrar historial
               </button>
             </div>
           </>
@@ -799,9 +788,9 @@ export function StudentStatsPanel({ onBack, onAfterReset }: Props) {
             transition={{ type: 'spring', stiffness: 280, damping: 22 }}
             className="bg-white rounded-3xl p-6 max-w-sm w-full space-y-4 shadow-2xl border border-white"
           >
-            <h3 className="text-lg font-black text-trebol-text tracking-tight">Reset progress?</h3>
+            <h3 className="text-lg font-black text-trebol-text tracking-tight">¿Borrar progreso?</h3>
             <p className="text-sm text-trebol-text/70 font-semibold leading-relaxed">
-              This will permanently delete all your sessions and their evaluations. You can&apos;t undo this.
+              Esto eliminará permanentemente todas tus sesiones y sus evaluaciones. No se puede deshacer.
             </p>
             <div className="flex gap-2 justify-end">
               <button
@@ -809,7 +798,7 @@ export function StudentStatsPanel({ onBack, onAfterReset }: Props) {
                 disabled={resetting}
                 className="px-4 py-2 rounded-xl text-sm font-black text-trebol-text/70 hover:bg-trebol-secondary/30 transition-colors disabled:opacity-50"
               >
-                Cancel
+                Cancelar
               </button>
               <button
                 onClick={handleReset}
@@ -817,7 +806,7 @@ export function StudentStatsPanel({ onBack, onAfterReset }: Props) {
                 className="px-4 py-2 rounded-xl text-sm font-black bg-red-500 text-white hover:bg-red-600 transition-colors disabled:opacity-60 flex items-center gap-2 shadow-md"
               >
                 {resetting && <RefreshCw size={14} className="animate-spin" />}
-                Yes, reset
+                Sí, borrar
               </button>
             </div>
           </motion.div>

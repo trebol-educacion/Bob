@@ -335,22 +335,10 @@ export const ModeSelection = forwardRef<HTMLDivElement, ModeSelectionProps>(func
           </motion.div>
 
           <p className="text-[10px] font-black uppercase tracking-[0.3em] text-trebol-text/45 mb-2">
-            Bob&apos;s Training Lab{organizationName ? ` · ${organizationName}` : ''}
+            El espacio de Bob{organizationName ? ` · ${organizationName}` : ''}
           </p>
           <h2 className="text-4xl sm:text-5xl font-black text-trebol-text tracking-tight leading-[1.05]">
-            Elige tu{' '}
-            <span className="relative inline-block">
-              <span className="relative z-10">entrenamiento</span>
-              <span
-                aria-hidden
-                className="absolute left-0 right-0 bottom-1 h-3 -z-0 rounded-full"
-                style={{
-                  background:
-                    'linear-gradient(90deg, #F8AC37 0%, #E62D2B 50%, #469E7B 100%)',
-                  opacity: 0.35,
-                }}
-              />
-            </span>
+            Elige tu entrenamiento
           </h2>
           <p className="text-trebol-text/65 font-bold mt-3 text-base">
             ¿Cómo quieres mejorar tu inglés hoy?
