@@ -2,12 +2,12 @@ import React from 'react';
 import type { ModeKey } from '@/lib/types/practice';
 import type { StoredMessage } from '@/actions/messages';
 import {
-  YLPart1Practice,
   YLPart2Practice,
   YLPart3Practice,
   YLPart4Practice,
   YLPointingPractice,
   YLWhatsThisPractice,
+  YLFindDifferencesPractice,
 } from '@/components/practice/yl';
 import { B1CollaborativePractice } from '@/components/B1CollaborativePractice';
 import { A2Part1Practice } from '@/components/A2Part1Practice';
@@ -88,7 +88,7 @@ export const EXAM_PART_COMPONENT_MAP: Record<ModeKey, RouteEntry> = {
   cambridge_movers_part1: {
     appState: 'exam-practicing',
     kind: 'yl',
-    render: (p) => React.createElement(YLPart1Practice, { key: ylInstanceKey(p as YLRenderProps), exam: 'movers', part: 1, ...(p as YLRenderProps) }),
+    render: (p) => React.createElement(YLFindDifferencesPractice, { key: ylInstanceKey(p as YLRenderProps), exam: 'movers', part: 1, ...(p as YLRenderProps) }),
   },
   cambridge_movers_part2: {
     appState: 'exam-practicing',

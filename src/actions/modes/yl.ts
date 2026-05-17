@@ -265,12 +265,13 @@ export async function generateYLContentAction(
 
   const isPointingMode = exam === 'starters' && part === 1;
   const isWhatsThisMode = exam === 'starters' && part === 3;
-  const needsPreselectedWords = isPointingMode || isWhatsThisMode;
+  const isFindDifferencesMode = exam === 'movers' && part === 1;
+  const needsPreselectedWords = isPointingMode || isWhatsThisMode || isFindDifferencesMode;
 
   const preselectedWords = needsPreselectedWords
     ? await pickVocabularyForActivity({
         framework: 'cambridge',
-        cefr_level: 'pre_a1',
+        cefr_level: isPointingMode || isWhatsThisMode ? 'pre_a1' : 'a1',
         count: 4,
         distinctCategories: true,
         objectCardFriendlyOnly: isWhatsThisMode,
@@ -330,6 +331,12 @@ export async function generateYLContentAction(
 
       const isWhatsThis = Array.isArray(p.object_cards) && (p.object_cards as unknown[]).length > 0;
 
+      const isFindDiffs =
+        Array.isArray(p.differences) &&
+        (p.differences as unknown[]).length > 0 &&
+        typeof p.image_prompt_a === 'string' &&
+        typeof p.image_prompt_b === 'string';
+
       const normalized: Record<string, unknown> = {
         cues: isPointing
           ? (p.cues as Array<{ text: string }>).map((c) => c.text)
@@ -337,6 +344,8 @@ export async function generateYLContentAction(
           ? (p.object_cards as Array<{ questions: Array<{ text: string }> }>).flatMap((card) =>
               card.questions.map((q) => q.text)
             )
+          : isFindDiffs
+          ? (p.differences as Array<{ examiner_cue: string }>).map((d) => d.examiner_cue)
           : (p.cues as unknown[]) ??
             (p.examiner_cues as unknown[]) ??
             (p.target_questions as unknown[]) ??
@@ -345,6 +354,8 @@ export async function generateYLContentAction(
           ? (p.option_image_prompts as unknown[])
           : isWhatsThis
           ? (p.object_cards as Array<{ image_prompt: string }>).map((c) => c.image_prompt)
+          : isFindDiffs
+          ? [p.image_prompt_a, p.image_prompt_b]
           : (p.image_prompts as unknown[]) ??
             (typeof p.image_prompt === 'string' ? [p.image_prompt] : undefined),
         character_description: p.character_description ?? p.character ?? undefined,
@@ -357,6 +368,7 @@ export async function generateYLContentAction(
         option_image_prompts: isPointing ? (p.option_image_prompts as unknown[]) : undefined,
         pointing_cues: isPointing ? (p.cues as unknown[]) : undefined,
         object_cards: isWhatsThis ? (p.object_cards as unknown[]) : undefined,
+        differences: isFindDiffs ? (p.differences as unknown[]) : undefined,
       };
 
       return safeParseFallback(YLPlanSchema, normalized, YLPlanFallback);
@@ -379,6 +391,12 @@ export async function generateYLContentAction(
     const shuffled = [...cached.object_cards].sort(() => Math.random() - 0.5);
     const cuesAsText = shuffled.flatMap((card) => card.questions.map((q) => q.text));
     return { ...cached, object_cards: shuffled, cues: cuesAsText };
+  }
+
+  if (isFindDifferencesMode && cached.differences && cached.differences.length > 1) {
+    const shuffled = [...cached.differences].sort(() => Math.random() - 0.5);
+    const cuesAsText = shuffled.map((d) => d.examiner_cue);
+    return { ...cached, differences: shuffled, cues: cuesAsText };
   }
 
   return cached;
@@ -802,6 +820,7 @@ export async function evaluateYLFinalAction(input: {
 }
 
 import { getMessagesAction } from '@/actions/messages';
+import type { FindDifference } from '@/lib/types/yl';
 
 export async function getSessionMessagesAction(sessionId: string) {
   return getMessagesAction(sessionId);
@@ -1054,6 +1073,114 @@ export async function evaluateWhatsThisAnswerAction(input: {
     });
   } catch (err) {
     console.warn('[evaluateWhatsThisAnswerAction] saveYLTurnAction failed:', err);
+  }
+
+  return result;
+}
+
+/**
+ * Evaluates a single spoken answer for the Movers Part 1 "Find the Differences" activity.
+ * Transcribes the audio, evaluates binary correctness, generates a warm reaction,
+ * and persists the turn via saveYLTurnAction.
+ */
+export async function evaluateFindDifferencesAnswerAction(input: {
+  sessionId: string;
+  turnIndex: number;
+  examinerCue: string;
+  expectedAnswer: string;
+  audioBase64: string;
+  mimeType: string;
+  audioDuration: number;
+}): Promise<WhatsThisEvalResult> {
+  if (input.audioDuration <= 0.15) {
+    const silenceResult: WhatsThisEvalResult = {
+      score: 0,
+      score_max: 1,
+      cefr_band: 'a1',
+      correct: false,
+      reaction: "I didn't hear you — try again!",
+      feedback: undefined,
+      transcript_used: '',
+      transcript: '',
+    };
+    try {
+      await saveYLTurnAction(input.sessionId, {
+        cue: input.examinerCue,
+        cueIndex: input.turnIndex,
+        transcript: '',
+        reaction: silenceResult.reaction,
+      });
+    } catch (err) {
+      console.warn('[evaluateFindDifferencesAnswerAction] saveYLTurnAction failed (silence):', err);
+    }
+    return silenceResult;
+  }
+
+  const transcribeResult = await callGemini(
+    { promptKey: 'find_differences_transcribe', model: MODELS.FLASH_LITE_PREVIEW },
+    (ai) => ai.models.generateContent({
+      model: MODELS.FLASH_LITE_PREVIEW,
+      contents: [
+        {
+          role: 'user',
+          parts: [
+            { text: 'Transcribe exactly what the child says in English. Output only the transcription, nothing else. If nothing was said, output "(silence)".' },
+            { inlineData: { mimeType: input.mimeType, data: input.audioBase64 } },
+          ],
+        },
+      ],
+    })
+  );
+  const transcribed = transcribeResult.ok
+    ? (transcribeResult.data.text ?? '(silence)').trim()
+    : '(silence)';
+
+  const evalPromptText = await getPrompt('cambridge_movers_part1_a1_evaluation', {
+    EXAMINER_CUE: input.examinerCue,
+    EXPECTED_ANSWER: input.expectedAnswer,
+    USER_TRANSCRIPT: transcribed,
+    AUDIO_DURATION_SECONDS: input.audioDuration,
+  });
+
+  const evalResult = await callGemini(
+    { promptKey: 'cambridge_movers_part1_a1_evaluation', model: MODELS.FLASH_LITE_PREVIEW },
+    (ai) => ai.models.generateContent({
+      model: MODELS.FLASH_LITE_PREVIEW,
+      contents: [{ role: 'user', parts: [{ text: evalPromptText }] }],
+      config: { responseMimeType: 'application/json' },
+    })
+  );
+
+  if (!evalResult.ok || !evalResult.data.text) {
+    console.error(JSON.stringify({ event: 'evaluateFindDifferencesAnswerAction', error: 'eval failed' }));
+    return { ...WhatsThisEvalFallback, transcript: transcribed };
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(evalResult.data.text);
+  } catch {
+    console.error(JSON.stringify({ event: 'evaluateFindDifferencesAnswerAction', error: 'invalid JSON' }));
+    return { ...WhatsThisEvalFallback, transcript: transcribed };
+  }
+
+  const validated = WhatsThisEvalResultSchema.safeParse(parsed);
+  if (!validated.success) {
+    console.error('[evaluateFindDifferencesAnswerAction] schema mismatch:', validated.error.message);
+    return { ...WhatsThisEvalFallback, transcript: transcribed };
+  }
+
+  const result: WhatsThisEvalResult = { ...validated.data, transcript: transcribed };
+
+  try {
+    await saveYLTurnAction(input.sessionId, {
+      cue: input.examinerCue,
+      cueIndex: input.turnIndex,
+      transcript: transcribed,
+      reaction: result.reaction,
+    });
+  } catch (err) {
+    console.warn('[evaluateFindDifferencesAnswerAction] saveYLTurnAction failed:', err);
   }
 
   return result;

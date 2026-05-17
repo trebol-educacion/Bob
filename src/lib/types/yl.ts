@@ -26,6 +26,19 @@ export const WhatsThisCardSchema = z.object({
 
 export type WhatsThisCard = z.infer<typeof WhatsThisCardSchema>;
 
+/** One difference entry for Movers Part 1 "Find the Differences". */
+export const FindDifferenceSchema = z.object({
+  id: z.string(),
+  object_word: z.string(),
+  property: z.string(),
+  value_a: z.string(),
+  value_b: z.string(),
+  examiner_cue: z.string(),
+  expected_answer: z.string(),
+});
+
+export type FindDifference = z.infer<typeof FindDifferenceSchema>;
+
 export const YLPlanSchema = z.object({
   cues: z.array(z.string()).default([]),
   image_prompts: z.array(z.string()).optional(),
@@ -39,6 +52,7 @@ export const YLPlanSchema = z.object({
   option_image_prompts: z.array(z.string()).optional(),
   pointing_cues: z.array(PointingCueSchema).optional(),
   object_cards: z.array(WhatsThisCardSchema).optional(),
+  differences: z.array(FindDifferenceSchema).optional(),
 });
 
 export type YLPlan = z.infer<typeof YLPlanSchema>;
