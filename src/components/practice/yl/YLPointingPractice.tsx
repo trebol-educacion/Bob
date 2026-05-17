@@ -12,6 +12,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'motion/react';
 import { ArrowLeft } from 'lucide-react';
 import { ListenAndPointIcon } from '@/components/icons/ModeIcons';
+import { CelebrationCard } from './CelebrationCard';
 import { ACTIVE_MODEL_LABEL } from '@/lib/models';
 import {
   startYLSessionAction,
@@ -55,6 +56,7 @@ export interface YLPointingPracticeProps {
   initialMessages?: BobMessageShape[];
   onSessionCreated?: (sessionId: string) => void;
   onSessionFinished?: () => void;
+  onOpenDashboard?: () => void;
 }
 
 type Phase = 'loading' | 'ready' | 'answered' | 'evaluating' | 'finished';
@@ -67,6 +69,7 @@ export function YLPointingPractice({
   initialMessages,
   onSessionCreated,
   onSessionFinished,
+  onOpenDashboard,
 }: YLPointingPracticeProps) {
   const mode: ModeKey = `cambridge_${exam}_part${part}` as ModeKey;
   const isReadOnly = !!initialMessages && initialMessages.length > 0;
@@ -296,35 +299,29 @@ export function YLPointingPractice({
 
   useEffect(() => {
     if (phase !== 'evaluating' || !sessionId || !plan) return;
-    (async () => {
-      try {
-        const total = plan.pointing_cues?.length ?? 1;
-        const pct = Math.round((score / total) * 100);
-        const result: EvalResponse = {
-          score: pct,
-          score_max: 100,
-          cefr_band: 'a1',
-          feedback:
-            pct === 100
-              ? 'Perfect! You identified all the objects.'
-              : pct >= 50
-              ? 'Good job! Next time try to get them all right.'
-              : "Let's practice the vocabulary a little more.",
-        };
-        setFinalEval(result);
-        // Persist final eval (click-based) directly — Gemini-based eval
-        // doesn't make sense for a pointing activity.
-        try {
-          await saveYLFinalEvalAction(sessionId, result);
-        } catch (err) {
-          console.warn('[YLPointing] saveYLFinalEvalAction failed:', err);
-        }
-        setPhase('finished');
-        onSessionFinished?.();
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Error finalizing the session');
-      }
-    })();
+    try {
+      const total = plan.pointing_cues?.length ?? 1;
+      const pct = Math.round((score / total) * 100);
+      const result: EvalResponse = {
+        score: pct,
+        score_max: 100,
+        cefr_band: 'a1',
+        feedback:
+          pct === 100
+            ? 'Perfect! You identified all the objects.'
+            : pct >= 50
+            ? 'Good job! Next time try to get them all right.'
+            : "Let's practice the vocabulary a little more.",
+      };
+      setFinalEval(result);
+      setPhase('finished');
+
+      void saveYLFinalEvalAction(sessionId, result)
+        .then(() => onSessionFinished?.())
+        .catch((err) => console.warn('[YLPointing] saveYLFinalEvalAction failed:', err));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error finalizing the session');
+    }
   }, [phase, sessionId, plan, score, mode, onSessionFinished]);
 
   if (error) return <YLErrorScreen error={error} onBack={onBack} />;
@@ -370,15 +367,18 @@ export function YLPointingPractice({
   );
 
   if (phase === 'finished' && isReadOnly) {
-    // Find the saved final evaluation (if any) so we can render the
-    // score / feedback cards inline below the conversation.
-    const finalMsg = messages.find(
+    // Render evaluation card preferring (1) live finalEval set by the
+    // current session run, (2) the persisted 'evaluation' message in the
+    // history payload. If both are missing, the card simply hides.
+    const sourceMessages = initialMessages ?? messages;
+    const finalMsg = sourceMessages.find(
       (m) =>
         m.msg_type === 'evaluation' &&
         m.role === 'bob' &&
         (m.content_json as { is_final?: boolean } | null)?.is_final === true
     );
-    const savedEval = (finalMsg?.content_json as EvalResponse | undefined) ?? null;
+    const savedEval: EvalResponse | null =
+      finalEval ?? ((finalMsg?.content_json as EvalResponse | undefined) ?? null);
 
     return (
       <ChatShell
@@ -404,7 +404,7 @@ export function YLPointingPractice({
             </div>
           </div>
         )}
-        {messages
+        {sourceMessages
           // Exclude rows that are pure audio cache (yl_tts) or scene
           // images saved separately — they would duplicate the conversation.
           .filter((m) => m.msg_type !== 'evaluation' && m.msg_type !== 'yl_tts' && m.msg_type !== 'image_scene')
@@ -441,15 +441,16 @@ export function YLPointingPractice({
             ];
           })}
         {savedEval && (
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="space-y-3 max-w-md pt-2"
-          >
-            <YLResultsHeader title="Practice complete!" subtitle={partLabel} />
-            <YLScoreDisplay evalResult={savedEval} />
-            <YLFeedbackCard feedback={savedEval.feedback} />
-          </motion.div>
+          <div className="pt-2 flex justify-center">
+            <CelebrationCard
+              score={savedEval.score}
+              scoreMax={savedEval.score_max ?? 100}
+              feedback={savedEval.feedback}
+              onAction={onOpenDashboard}
+              actionLabel="Ver mi progreso"
+              animate={false}
+            />
+          </div>
         )}
       </ChatShell>
     );
@@ -557,15 +558,15 @@ export function YLPointingPractice({
       )}
 
       {phase === 'finished' && finalEval && !isReadOnly && (
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="space-y-3 max-w-md"
-        >
-          <YLResultsHeader title="Practice complete!" subtitle={partLabel} />
-          <YLScoreDisplay evalResult={finalEval} />
-          <YLFeedbackCard feedback={finalEval.feedback} />
-        </motion.div>
+        <div className="flex justify-center">
+          <CelebrationCard
+            score={finalEval.score}
+            scoreMax={finalEval.score_max ?? 100}
+            feedback={finalEval.feedback}
+            onAction={onOpenDashboard ?? onBack}
+            actionLabel={onOpenDashboard ? 'Ver mi progreso' : 'Back to activities'}
+          />
+        </div>
       )}
 
     </ChatShell>

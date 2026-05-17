@@ -365,15 +365,15 @@ export function YLVoiceNote({
   };
 
   const isBob = side === 'bob';
-  const bubbleColor = isBob ? 'bg-white border border-gray-100' : 'bg-blue-600';
-  const iconColor = isBob ? 'bg-blue-600 text-white' : 'bg-white/20 text-white';
+  const bubbleColor = isBob ? 'bg-white ring-1 ring-violet-100' : 'bg-gradient-to-br from-violet-600 to-violet-700';
+  const iconColor = isBob ? 'bg-violet-600 text-white' : 'bg-white/20 text-white';
 
   return (
-    <div className={`flex ${isBob ? 'justify-start' : 'justify-end'} gap-2`}>
+    <div className={`flex ${isBob ? 'justify-start' : 'justify-end'} gap-2 font-nunito`}>
       {isBob && (
         <BobAvatar />
       )}
-      <div className={`flex items-center gap-3 rounded-2xl px-3 py-2 max-w-sm ${bubbleColor} ${playing ? 'ring-2 ring-blue-600/30 shadow-md' : ''}`}>
+      <div className={`flex items-center gap-3 rounded-2xl px-3 py-2 max-w-sm ${bubbleColor} ${playing ? 'ring-2 ring-violet-400/40 shadow-md' : ''}`}>
         <button
           type="button"
           onClick={handlePlay}
@@ -399,7 +399,7 @@ export function YLVoiceNote({
         <div className="flex-1 min-w-32">
           <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
             <div
-              className={`h-full bg-blue-600 transition-all ${playing ? 'animate-pulse' : ''}`}
+              className={`h-full ${isBob ? 'bg-violet-600' : 'bg-white'} transition-all ${playing ? 'animate-pulse' : ''}`}
               style={{ width: `${Math.round(progress * 100)}%` }}
             />
           </div>
@@ -415,9 +415,9 @@ export function YLVoiceNote({
 
 export function YLBobTextMessage({ text }: { text: string }) {
   return (
-    <div className="flex justify-start gap-2">
+    <div className="flex justify-start gap-2 font-nunito">
       <BobAvatar />
-      <div className="rounded-2xl rounded-tl-sm px-4 py-2 bg-white border border-gray-100 shadow-sm text-gray-800 text-sm max-w-sm font-semibold">
+      <div className="rounded-2xl rounded-tl-sm px-4 py-2.5 bg-white ring-1 ring-violet-100 shadow-[0_1px_2px_rgba(0,0,0,0.04)] text-slate-800 text-sm max-w-sm font-bold">
         {text}
       </div>
     </div>
@@ -439,8 +439,8 @@ export function YLImageMessage({ src }: { src: string }) {
 
 export function YLUserTextMessage({ text }: { text: string }) {
   return (
-    <div className="flex justify-end gap-2">
-      <div className="rounded-2xl rounded-tr-sm px-4 py-2 bg-blue-600 text-white text-sm max-w-sm">
+    <div className="flex justify-end gap-2 font-nunito">
+      <div className="rounded-2xl rounded-tr-sm px-4 py-2.5 bg-gradient-to-br from-violet-600 to-violet-700 text-white text-sm max-w-sm font-bold shadow-sm">
         {text || <span className="text-white/60 italic">(no audio)</span>}
       </div>
     </div>

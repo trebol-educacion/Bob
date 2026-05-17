@@ -355,6 +355,13 @@ export async function generateYLContentAction(
     console.error(JSON.stringify({ event: 'generateYLContentAction_cache', error: cached.error }));
     return YLPlanFallback;
   }
+
+  if (isPointingMode && cached.pointing_cues && cached.pointing_cues.length > 1) {
+    const shuffled = [...cached.pointing_cues].sort(() => Math.random() - 0.5);
+    const cuesAsText = shuffled.map((c) => c.text);
+    return { ...cached, pointing_cues: shuffled, cues: cuesAsText };
+  }
+
   return cached;
 }
 

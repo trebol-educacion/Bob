@@ -30,6 +30,7 @@ export interface YLRenderProps {
   initialMessages?: StoredMessage[];
   onSessionCreated?: (sessionId: string) => void;
   onSessionFinished?: () => void;
+  onOpenDashboard?: () => void;
 }
 
 export interface ExamRenderProps {

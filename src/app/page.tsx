@@ -144,6 +144,7 @@ export default function App() {
     initialMessages: selectedMessages.length > 0 ? selectedMessages : undefined,
     onSessionCreated: handleYLSessionCreated,
     onSessionFinished: refreshSessions,
+    onOpenDashboard: () => setAppState('dashboard'),
   };
 
   const examProps: ExamRenderProps = {
