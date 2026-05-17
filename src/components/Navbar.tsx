@@ -3,16 +3,17 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'motion/react';
-import { LogOut, User, BarChart3 } from 'lucide-react';
+import { LogOut, User, BarChart3, Menu } from 'lucide-react';
 import { createSupabaseBrowser } from '@/lib/supabase/browser-client';
 import { useOrganization } from '@/hooks/useOrganization';
 
 interface NavbarProps {
   userEmail?: string;
   onOpenDashboard?: () => void;
+  onToggleSidebar?: () => void;
 }
 
-export function Navbar({ userEmail, onOpenDashboard }: NavbarProps) {
+export function Navbar({ userEmail, onOpenDashboard, onToggleSidebar }: NavbarProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const { organization } = useOrganization();
@@ -32,20 +33,32 @@ export function Navbar({ userEmail, onOpenDashboard }: NavbarProps) {
       transition={{ duration: 0.4, ease: 'easeOut' }}
       className="w-full px-6 py-3 shadow-md bg-bob-brand"
     >
-      <div className="flex items-center justify-between">
-        {organization?.logo_url ? (
-          <img
-            src={organization.logo_url}
-            alt={organization.name}
-            className="h-8 w-auto object-contain"
-          />
-        ) : (
-          <img
-            src="/bob_logo.png"
-            alt="BOB"
-            className="h-8 w-auto object-contain"
-          />
-        )}
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          {onToggleSidebar && (
+            <button
+              type="button"
+              onClick={onToggleSidebar}
+              aria-label="Abrir sesiones"
+              className="md:hidden p-2 -ml-1 rounded-lg text-white/85 hover:bg-white/10 transition-colors cursor-pointer"
+            >
+              <Menu size={20} strokeWidth={2.4} />
+            </button>
+          )}
+          {organization?.logo_url ? (
+            <img
+              src={organization.logo_url}
+              alt={organization.name}
+              className="h-8 w-auto object-contain"
+            />
+          ) : (
+            <img
+              src="/bob_logo.png"
+              alt="BOB"
+              className="h-8 w-auto object-contain"
+            />
+          )}
+        </div>
 
         <div className="relative">
           <button

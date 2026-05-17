@@ -42,6 +42,17 @@ export default function App() {
 
   const [mode, setMode] = useState<PracticeMode>(null);
   const [topic, setTopic] = useState('');
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 767px)');
+    setSidebarCollapsed(mq.matches);
+    const handler = (e: MediaQueryListEvent) => {
+      if (e.matches) setSidebarCollapsed(true);
+    };
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
 
   const resetToModeSelection = useCallback(() => {
     setAppState('mode-selection');
@@ -144,8 +155,9 @@ export default function App() {
       <Navbar
         userEmail={userEmail}
         onOpenDashboard={() => setAppState('dashboard')}
+        onToggleSidebar={() => setSidebarCollapsed((v) => !v)}
       />
-      <div className="flex-1 flex min-h-0">
+      <div className="flex-1 flex min-h-0 relative">
         <SessionSidebar
           sessions={sessions}
           activeSessionId={activeSessionId}
@@ -153,6 +165,8 @@ export default function App() {
           onNewSession={onNewSession}
           onDeleteSession={onDeleteSession}
           loading={sessionsLoading}
+          collapsed={sidebarCollapsed}
+          onToggleCollapsed={() => setSidebarCollapsed((v) => !v)}
         />
         <main className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden">
 

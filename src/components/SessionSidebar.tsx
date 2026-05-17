@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React from 'react';
 import Image from 'next/image';
 import { motion } from 'motion/react';
 import {
@@ -33,6 +33,13 @@ interface SessionSidebarProps {
   onNewSession: () => void;
   onDeleteSession: (id: string) => void;
   loading?: boolean;
+  collapsed?: boolean;
+  onToggleCollapsed?: () => void;
+}
+
+function isMobileViewport(): boolean {
+  if (typeof window === 'undefined') return false;
+  return window.matchMedia('(max-width: 767px)').matches;
 }
 
 const MODE_ICON: Record<NonNullable<SessionMode>, React.ElementType> = {
@@ -114,14 +121,37 @@ export function SessionSidebar({
   onNewSession,
   onDeleteSession,
   loading,
+  collapsed = false,
+  onToggleCollapsed,
 }: SessionSidebarProps) {
-  const [collapsed, setCollapsed] = useState(false);
+  const handleToggle = () => onToggleCollapsed?.();
+  const closeOnMobile = () => {
+    if (isMobileViewport()) onToggleCollapsed?.();
+  };
+  const handleSelectSession = (id: string) => {
+    onSelectSession(id);
+    closeOnMobile();
+  };
+  const handleNewSession = () => {
+    onNewSession();
+    closeOnMobile();
+  };
 
   return (
+    <>
+      {!collapsed && (
+        <div
+          aria-hidden
+          onClick={handleToggle}
+          className="md:hidden fixed inset-0 top-[60px] z-30 bg-black/30 backdrop-blur-sm"
+        />
+      )}
     <aside
       className={cn(
-        'shrink-0 h-full flex flex-col transition-[width] duration-200 ease-out overflow-hidden relative',
-        collapsed ? 'w-16' : 'w-72'
+        'h-full flex flex-col overflow-hidden relative shrink-0',
+        collapsed
+          ? 'hidden md:flex md:w-16 transition-[width] duration-200 ease-out'
+          : 'absolute inset-0 z-40 w-full md:relative md:inset-auto md:w-72 transition-[width] duration-200 ease-out'
       )}
       style={{
         background: '#fdfcf8',
@@ -147,7 +177,7 @@ export function SessionSidebar({
         )}
         <button
           type="button"
-          onClick={() => setCollapsed((v) => !v)}
+          onClick={handleToggle}
           aria-label={collapsed ? 'Expandir' : 'Colapsar'}
           className="p-1.5 rounded-lg hover:bg-[#1E1E1C]/[0.05] transition-colors text-trebol-text/60 cursor-pointer"
         >
@@ -158,7 +188,7 @@ export function SessionSidebar({
       <div className="relative z-10 px-3 pb-3 shrink-0">
         <motion.button
           type="button"
-          onClick={onNewSession}
+          onClick={handleNewSession}
           aria-label="Nueva sesión"
           title="Nueva sesión"
           whileTap={{ scale: 0.98 }}
@@ -233,7 +263,7 @@ export function SessionSidebar({
                   ? `inset 2px 0 0 0 ${accent.color}, 0 1px 2px rgba(0,0,0,0.04)`
                   : 'none',
               }}
-              onClick={() => onSelectSession(s.id)}
+              onClick={() => handleSelectSession(s.id)}
               title={s.title}
             >
               <div className="relative shrink-0">
@@ -294,5 +324,6 @@ export function SessionSidebar({
         })}
       </nav>
     </aside>
+    </>
   );
 }
