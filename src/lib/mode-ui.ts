@@ -135,6 +135,13 @@ const YL_FAMILY_WEIGHT: Record<string, number> = {
   flyers: 3,
 };
 
+const SKILL_ORDER: Record<string, number> = {
+  reading: 1,
+  writing: 2,
+  listening: 3,
+};
+const SPEAKING_BASE = 4000;
+
 export function getModeSortWeight(card: DynamicCard): number {
   const { framework, exam_part } = card;
 
@@ -145,11 +152,17 @@ export function getModeSortWeight(card: DynamicCard): number {
       const part = parseInt(ylMatch[2], 10);
       return family * 100 + part;
     }
-    const partMatch = exam_part.match(/_p?(\d+)([a-z]?)$/);
-    if (partMatch) {
-      const part = parseInt(partMatch[1], 10);
-      const suffix = partMatch[2] ? partMatch[2].charCodeAt(0) - 96 : 0;
-      return part * 10 + suffix;
+    const skillMatch = exam_part.match(/^[a-z]+_(reading|writing|listening)_part(\d+)$/);
+    if (skillMatch) {
+      const skill = SKILL_ORDER[skillMatch[1]];
+      const part = parseInt(skillMatch[2], 10);
+      return skill * 1000 + part * 10;
+    }
+    const speakingMatch = exam_part.match(/_p(?:art)?(\d+)([a-z]?)$/);
+    if (speakingMatch) {
+      const part = parseInt(speakingMatch[1], 10);
+      const suffix = speakingMatch[2] ? speakingMatch[2].charCodeAt(0) - 96 : 0;
+      return SPEAKING_BASE + part * 10 + suffix;
     }
   }
 

@@ -234,8 +234,12 @@ export const ModeSelection = forwardRef<HTMLDivElement, ModeSelectionProps>(func
   const { allDynamicCards, enabledModes } = useOrganization();
   const iconClass = 'text-trebol-primary group-hover:text-white transition-colors';
 
+  const HIDDEN_MODES = new Set<string>(['cambridge_flyers_part1']);
+  const COMING_SOON_MODES = new Set<string>(['cambridge_ket_writing_part7']);
   const enabledSet = new Set(enabledModes);
-  const visibleCards = allDynamicCards.filter(card => enabledSet.has(card.mode_key));
+  const visibleCards = allDynamicCards.filter(
+    card => enabledSet.has(card.mode_key) && !HIDDEN_MODES.has(card.mode_key),
+  );
 
   const genericCards = visibleCards.filter(card => card.framework === 'generic');
   const frameworkCards = visibleCards.filter(card => card.framework !== 'generic');
@@ -255,7 +259,7 @@ export const ModeSelection = forwardRef<HTMLDivElement, ModeSelectionProps>(func
 
   function renderCard(card: DynamicCard) {
     const ylTheme = getYLCardTheme(card);
-    const isComingSoon = card.status === 'coming_soon';
+    const isComingSoon = card.status === 'coming_soon' || COMING_SOON_MODES.has(card.mode_key);
     const iconColorClass = ylTheme
       ? `${ylTheme.iconText} transition-colors duration-200`
       : iconClass;
