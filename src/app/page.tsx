@@ -44,10 +44,11 @@ export default function App() {
 
   const [mode, setMode] = useState<PracticeMode>(null);
   const [topic, setTopic] = useState('');
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 767px)');
+    if (mq.matches) setSidebarCollapsed(true);
     const handler = (e: MediaQueryListEvent) => {
       if (e.matches) setSidebarCollapsed(true);
     };

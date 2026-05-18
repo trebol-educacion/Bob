@@ -167,7 +167,7 @@ export function ChatShell({
 
       <div
         ref={bodyRef}
-        className="flex-1 overflow-y-auto bg-slate-50/30 px-4 py-4 space-y-3"
+        className="flex-1 overflow-y-auto bg-white px-4 py-4 space-y-3"
       >
         {children}
         <div ref={endRef} />

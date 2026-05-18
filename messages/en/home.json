@@ -8,7 +8,8 @@
     "heading": "Choose your training",
     "subtitle": "How do you want to improve your English today?",
     "comingSoon": "Coming soon",
-    "pickLevelHint": "Pick your level above to see the activities available for you."
+    "pickLevelHint": "Pick your level above to see the activities available for you.",
+    "explore": "Explore"
   },
   "cefrBanner": {
     "message": "Select your CEFR level to access more activities"
