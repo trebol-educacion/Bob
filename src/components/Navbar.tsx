@@ -13,9 +13,10 @@ interface NavbarProps {
   userEmail?: string;
   onOpenDashboard?: () => void;
   onToggleSidebar?: () => void;
+  onGoHome?: () => void;
 }
 
-export function Navbar({ userEmail, onOpenDashboard, onToggleSidebar }: NavbarProps) {
+export function Navbar({ userEmail, onOpenDashboard, onToggleSidebar, onGoHome }: NavbarProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const { organization } = useOrganization();
@@ -48,19 +49,27 @@ export function Navbar({ userEmail, onOpenDashboard, onToggleSidebar }: NavbarPr
               <Menu size={20} strokeWidth={2.4} />
             </button>
           )}
-          {organization?.logo_url ? (
-            <img
-              src={organization.logo_url}
-              alt={organization.name}
-              className="h-8 w-auto object-contain"
-            />
-          ) : (
-            <img
-              src="/bob_logo.png"
-              alt="BOB"
-              className="h-8 w-auto object-contain"
-            />
-          )}
+          <button
+            type="button"
+            onClick={onGoHome}
+            disabled={!onGoHome}
+            aria-label={t('goHome')}
+            className="flex items-center rounded-lg p-1 -m-1 hover:bg-white/10 transition-colors disabled:cursor-default disabled:hover:bg-transparent cursor-pointer"
+          >
+            {organization?.logo_url ? (
+              <img
+                src={organization.logo_url}
+                alt={organization.name}
+                className="h-8 w-auto object-contain"
+              />
+            ) : (
+              <img
+                src="/bob_logo.png"
+                alt="BOB"
+                className="h-8 w-auto object-contain"
+              />
+            )}
+          </button>
         </div>
 
         <div className="flex items-center gap-2">

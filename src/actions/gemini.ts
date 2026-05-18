@@ -16,6 +16,7 @@ import {
   SimulatedConversationResponse,
   QuestionsResponse,
 } from '@/lib/types/gemini';
+import { pickVocabulary, wordsToPromptVars, type CefrLevel } from '@/lib/vocabulary';
 
 export interface EvaluationResult {
   score: number;
@@ -99,13 +100,26 @@ export async function generateSpeechAction(text: string): Promise<{ data: string
 }
 
 /**
- * Generates 10 progressive phrases based on a user-provided topic.
+ * Generates 10 progressive phrases based on a user-provided topic and CEFR level.
+ * For B1/B2, 10 official Cambridge words are pre-picked from `bob_vocabulary`
+ * and injected as `{WORD_1..10}` to kill few-shot anchoring and guarantee
+ * variety across sessions (see .sdd/sessions/2026-05-17-starters-pointing-rework.md §3).
  */
-export async function generateTopicPhrasesAction(topic: string): Promise<string[]> {
-  const prompt = await getPrompt('generic_situation_a2_generation', { TOPIC: topic });
+export async function generateTopicPhrasesAction(
+  topic: string,
+  level: CefrLevel = 'a2',
+): Promise<string[]> {
+  const promptKey = `generic_situation_${level}_generation`;
+
+  const promptVars: Record<string, string> = { TOPIC: topic };
+  if (level === 'b1' || level === 'b2') {
+    const picked = await pickVocabulary({ cefr_level: level, count: 10 });
+    Object.assign(promptVars, wordsToPromptVars(picked.map((p) => p.word)));
+  }
+  const prompt = await getPrompt(promptKey, promptVars);
 
   const result = await callGemini(
-    { promptKey: 'generic_situation_a2_generation', model: MODELS.FLASH_LITE_PREVIEW },
+    { promptKey, model: MODELS.FLASH_LITE_PREVIEW },
     (ai) => ai.models.generateContent({
       model: MODELS.FLASH_LITE_PREVIEW,
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
@@ -117,7 +131,9 @@ export async function generateTopicPhrasesAction(topic: string): Promise<string[
             phrases: {
               type: Type.ARRAY,
               items: { type: Type.STRING },
-              description: 'Lista de 10 frases en inglés',
+              minItems: 10,
+              maxItems: 10,
+              description: 'Exactly 10 English phrases ordered easier → harder. Each phrase MUST contain the assigned WORD_N.',
             },
           },
           required: ['phrases'],
@@ -139,7 +155,13 @@ export async function generateTopicPhrasesAction(topic: string): Promise<string[
     return [];
   }
   const outcome = PhraseGenerationSchema.safeParse(parsed);
-  if (!outcome.success) return [];
+  if (!outcome.success) {
+    console.error(JSON.stringify({ event: 'generateTopicPhrasesAction', error: 'schema validation failed', issues: outcome.error.issues }));
+    return [];
+  }
+  if (outcome.data.phrases.length < 10) {
+    console.error(JSON.stringify({ event: 'generateTopicPhrasesAction', error: 'fewer than 10 phrases', count: outcome.data.phrases.length }));
+  }
   return outcome.data.phrases.slice(0, 10);
 }
 
@@ -310,7 +332,8 @@ export async function evaluateImageDescriptionAction(
 export async function evaluatePronunciationAction(
   audioBase64: string,
   mimeType: string,
-  targetPhrase: string
+  targetPhrase: string,
+  level: CefrLevel = 'a2',
 ): Promise<EvaluationResult> {
   const fallback: EvaluationResult = {
     score: 0,
@@ -318,10 +341,11 @@ export async function evaluatePronunciationAction(
     transcribed_text: '',
   };
 
-  const prompt = await getPrompt('generic_situation_a2_evaluation', { TARGET_PHRASE: targetPhrase, AUDIO_DURATION_SECONDS: 0 });
+  const promptKey = `generic_situation_${level}_evaluation`;
+  const prompt = await getPrompt(promptKey, { TARGET_PHRASE: targetPhrase, AUDIO_DURATION_SECONDS: 0 });
 
   const result = await callGemini(
-    { promptKey: 'generic_situation_a2_evaluation', model: MODELS.FLASH_LITE_PREVIEW },
+    { promptKey, model: MODELS.FLASH_LITE_PREVIEW },
     (ai) => ai.models.generateContent({
       model: MODELS.FLASH_LITE_PREVIEW,
       contents: {

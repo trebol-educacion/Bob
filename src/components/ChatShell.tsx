@@ -7,7 +7,7 @@ import { useTranslations } from 'next-intl';
 
 type ChatIcon = LucideIcon | React.FC<{ size?: number; className?: string }>;
 
-export type ChatAccentColor = 'amber' | 'blue' | 'purple' | 'green' | 'violet';
+export type ChatAccentColor = 'amber' | 'blue' | 'purple' | 'green' | 'violet' | 'emerald' | 'sky';
 
 export type ChatHeaderConfig = {
   /** Lucide icon rendered inside the avatar circle */
@@ -57,6 +57,8 @@ const ACCENT: Record<
   purple: { avatarBg: 'bg-purple-50', avatarBorder: 'border-purple-100', avatarIcon: 'text-purple-600', badgeBg: 'bg-purple-50', badgeText: 'text-purple-600' },
   green:  { avatarBg: 'bg-green-50',  avatarBorder: 'border-green-100',  avatarIcon: 'text-green-600',  badgeBg: 'bg-green-50',  badgeText: 'text-green-600' },
   violet: { avatarBg: 'bg-violet-50', avatarBorder: 'border-violet-100', avatarIcon: 'text-violet-700', badgeBg: 'bg-white ring-1 ring-violet-200', badgeText: 'text-violet-700' },
+  emerald: { avatarBg: 'bg-emerald-50', avatarBorder: 'border-emerald-100', avatarIcon: 'text-emerald-700', badgeBg: 'bg-white ring-1 ring-emerald-200', badgeText: 'text-emerald-700' },
+  sky: { avatarBg: 'bg-sky-50', avatarBorder: 'border-sky-100', avatarIcon: 'text-sky-700', badgeBg: 'bg-white ring-1 ring-sky-200', badgeText: 'text-sky-700' },
 };
 
 function AssistantAvatar({

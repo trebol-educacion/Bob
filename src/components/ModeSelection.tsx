@@ -21,7 +21,7 @@ import type { ModeKey, PracticeMode, CefrLevel, DynamicCard } from '@/lib/types/
 import { CefrLevelSelector } from '@/components/CefrLevelSelector';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import type { AvailableMode } from '@/contexts/OrganizationContext';
-import { getModeIcon, getModeBadge, getModeSection, getModeTitle, getModeDescription, getModeSortWeight, getModeOfficialName, getYLCardTheme, type YLCardTheme } from '@/lib/mode-ui';
+import { getModeIcon, getModeBadge, getModeSection, getModeTitle, getModeDescription, getModeSortWeight, getModeOfficialName, getYLCardTheme, isGenericGroupedWithCambridge, type YLCardTheme } from '@/lib/mode-ui';
 import { ListenAndPointIcon } from '@/components/icons/ModeIcons';
 import { LookAndAnswerIcon, TellTheStoryIcon, WhatsThisIcon, PersonalQuestionsIcon } from '@/components/icons/StartersIcons';
 import { FindTheDifferencesIcon, InformationExchangeIcon, PictureStoryMoversIcon, PersonalQuestionsMoversIcon, MoreAboutYouIcon } from '@/components/icons/MoversIcons';
@@ -281,12 +281,21 @@ export const ModeSelection = forwardRef<HTMLDivElement, ModeSelectionProps>(func
   const HIDDEN_MODES = new Set<string>(['cambridge_flyers_part1']);
   const COMING_SOON_MODES = new Set<string>(['cambridge_ket_writing_part7']);
   const enabledSet = new Set(enabledModes);
-  const visibleCards = allDynamicCards.filter(
-    card => enabledSet.has(card.mode_key) && !HIDDEN_MODES.has(card.mode_key),
-  );
+  const visibleCards = allDynamicCards.filter(card => {
+    if (!enabledSet.has(card.mode_key)) return false;
+    if (HIDDEN_MODES.has(card.mode_key)) return false;
+    if (card.framework === 'generic' && card.cefr_level !== null) {
+      if (card.cefr_level !== cefrActiveLevel) return false;
+    }
+    return true;
+  });
 
-  const genericCards = visibleCards.filter(card => card.framework === 'generic');
-  const frameworkCards = visibleCards.filter(card => card.framework !== 'generic');
+  const genericCards = visibleCards.filter(
+    card => card.framework === 'generic' && !isGenericGroupedWithCambridge(card),
+  );
+  const frameworkCards = visibleCards.filter(
+    card => card.framework !== 'generic' || isGenericGroupedWithCambridge(card),
+  );
 
   const showFreePractice = frameworkCards.length === 0;
 
