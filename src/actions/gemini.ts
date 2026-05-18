@@ -348,12 +348,15 @@ export async function evaluatePronunciationAction(
     { promptKey, model: MODELS.FLASH_LITE_PREVIEW },
     (ai) => ai.models.generateContent({
       model: MODELS.FLASH_LITE_PREVIEW,
-      contents: {
-        parts: [
-          { inlineData: { data: audioBase64, mimeType: mimeType } },
-          { text: prompt },
-        ],
-      },
+      contents: [
+        {
+          role: 'user',
+          parts: [
+            { text: prompt },
+            { inlineData: { mimeType, data: audioBase64 } },
+          ],
+        },
+      ],
       config: {
         responseMimeType: 'application/json',
         responseSchema: {
