@@ -6,15 +6,17 @@ import { motion } from 'motion/react';
 import { useTranslations } from 'next-intl';
 import type { CefrLevel } from '@/lib/types/practice';
 
-const CEFR_OPTIONS: { value: CefrLevel; label: string; color: string; soft: string; comingSoon?: boolean }[] = [
-  { value: 'pre_a1', label: 'Pre-A1', color: '#8B5CF6', soft: '#ede9fe' },
-  { value: 'a1', label: 'A1', color: '#469E7B', soft: '#dcebe3' },
-  { value: 'a2', label: 'A2', color: '#3660AB', soft: '#dde4f2' },
-  { value: 'b1', label: 'B1', color: '#F8AC37', soft: '#fde9c8' },
-  { value: 'b2', label: 'B2', color: '#E62D2B', soft: '#fad6d5' },
-  { value: 'c1', label: 'C1', color: '#1E1E1C', soft: '#e5e5e2', comingSoon: true },
-  { value: 'c2', label: 'C2', color: '#1E1E1C', soft: '#e5e5e2', comingSoon: true },
+const CEFR_OPTIONS: { value: CefrLevel; label: string; comingSoon?: boolean }[] = [
+  { value: 'pre_a1', label: 'Pre-A1' },
+  { value: 'a1', label: 'A1' },
+  { value: 'a2', label: 'A2' },
+  { value: 'b1', label: 'B1' },
+  { value: 'b2', label: 'B2' },
+  { value: 'c1', label: 'C1', comingSoon: true },
+  { value: 'c2', label: 'C2', comingSoon: true },
 ];
+
+const BRAND_COLOR = 'var(--color-bob-brand)';
 
 interface CefrLevelSelectorProps {
   value: CefrLevel | null;
@@ -58,7 +60,7 @@ export function CefrLevelSelector({ value, onChange, onClear, disabled, locked }
         className="relative inline-flex items-center gap-0 sm:gap-0.5 rounded-full bg-white p-0.5 sm:p-1 border border-[#ece8de]"
         style={{ boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.04)' }}
       >
-        {CEFR_OPTIONS.map(({ value: v, label, color, comingSoon }) => {
+        {CEFR_OPTIONS.map(({ value: v, label, comingSoon }) => {
           const isActive = value === v;
           const itemDisabled = (isDisabled && !isActive) || Boolean(comingSoon);
           return (
@@ -76,7 +78,7 @@ export function CefrLevelSelector({ value, onChange, onClear, disabled, locked }
                   ? '#fff'
                   : itemDisabled
                     ? 'rgba(45,55,72,0.25)'
-                    : color,
+                    : BRAND_COLOR,
                 opacity: !isActive && !itemDisabled ? 0.75 : 1,
               }}
               onMouseEnter={(e) => {
@@ -95,8 +97,8 @@ export function CefrLevelSelector({ value, onChange, onClear, disabled, locked }
                   layoutId="cefr-active"
                   className="absolute inset-0 rounded-full"
                   style={{
-                    background: color,
-                    boxShadow: `0 2px 8px -2px ${color}80`,
+                    background: BRAND_COLOR,
+                    boxShadow: `0 2px 8px -2px color-mix(in oklab, ${BRAND_COLOR} 50%, transparent)`,
                   }}
                   transition={{ type: 'spring', stiffness: 380, damping: 32 }}
                 />

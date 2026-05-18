@@ -106,19 +106,21 @@ function ModeCard({ mode, icon, title, description, badge, officialName, disable
       transition={{ duration: 0.2, ease: 'easeOut' }}
       onClick={() => !disabled && onSelect(mode)}
       disabled={disabled}
-      className={`bg-white border border-blue-100 hover:border-blue-200 hover:shadow-md rounded-2xl p-6 text-center transition-all duration-200 group relative flex flex-col items-center h-full w-full
+      className={`bg-white border hover:shadow-md rounded-2xl p-6 text-center transition-all duration-200 group relative flex flex-col items-center h-full w-full
+        border-[color-mix(in_oklab,var(--color-bob-brand)_15%,white)]
+        hover:border-[color-mix(in_oklab,var(--color-bob-brand)_28%,white)]
         ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
     >
       {badge && (
         <span className={`absolute top-3 right-3 text-[11px] font-bold px-2.5 py-1 rounded-full tracking-wide ${
           disabled
             ? 'bg-slate-100 text-slate-500 ring-1 ring-slate-200'
-            : 'bg-blue-50 text-bob-brand'
+            : 'text-bob-brand bg-[color-mix(in_oklab,var(--color-bob-brand)_10%,white)]'
         }`}>
           {badge}
         </span>
       )}
-      <div className="bg-blue-50 text-bob-brand p-3.5 rounded-xl mb-4">
+      <div className="text-bob-brand p-3.5 rounded-xl mb-4 bg-[color-mix(in_oklab,var(--color-bob-brand)_10%,white)]">
         {icon}
       </div>
       <h3 className="text-lg font-extrabold text-bob-brand leading-tight tracking-tight">{title}</h3>
@@ -130,7 +132,9 @@ function ModeCard({ mode, icon, title, description, badge, officialName, disable
       )}
       {!disabled && (
         <div className="mt-auto pt-4">
-          <span className="inline-flex items-center justify-center text-sm font-bold text-bob-brand bg-blue-50 group-hover:bg-blue-100 px-4 py-1.5 rounded-full transition-colors">
+          <span className="inline-flex items-center justify-center text-sm font-bold text-bob-brand px-4 py-1.5 rounded-full transition-colors
+            bg-[color-mix(in_oklab,var(--color-bob-brand)_10%,white)]
+            group-hover:bg-[color-mix(in_oklab,var(--color-bob-brand)_18%,white)]">
             {exploreLabel}
           </span>
         </div>
@@ -198,7 +202,7 @@ export const ModeSelection = forwardRef<HTMLDivElement, ModeSelectionProps>(func
   const t = useTranslations('home.modeSelection');
 
   const HIDDEN_MODES = new Set<string>(['cambridge_flyers_part1']);
-  const COMING_SOON_MODES = new Set<string>(['cambridge_ket_writing_part7']);
+  const COMING_SOON_MODES = new Set<string>();
   const enabledSet = new Set(enabledModes);
   const visibleCards = allDynamicCards.filter(card => {
     if (!enabledSet.has(card.mode_key)) return false;
