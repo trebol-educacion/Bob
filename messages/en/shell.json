@@ -2,7 +2,8 @@
   "navbar": {
     "openSessions": "Open sessions",
     "myProgress": "My progress",
-    "logOut": "Log out"
+    "logOut": "Log out",
+    "goHome": "Go to home"
   },
   "sidebar": {
     "sessions": "Sessions",

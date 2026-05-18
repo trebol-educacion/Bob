@@ -13,6 +13,7 @@ import {
   EvaluationResult,
   ImageScene,
 } from '@/actions/gemini';
+import { pregenerateYLCueAudiosAction } from '@/actions/modes/yl';
 import { saveMessageAction, StoredMessage } from '@/actions/messages';
 import { blobToBase64, pcmToWavBase64 } from '@/lib/audio';
 import { createSupabaseBrowser } from '@/lib/supabase/browser-client';
@@ -66,7 +67,9 @@ export function renderEvaluationContent(
 }
 
 export function restoreMessages(stored: StoredMessage[]): ChatMsg[] {
-  return stored.map((m) => {
+  return stored
+    .filter((m) => m.msg_type !== 'phrase_plan' && m.msg_type !== 'yl_tts')
+    .map((m) => {
     let content: React.ReactNode;
 
     if (m.msg_type === 'phrase') {
@@ -106,7 +109,10 @@ export function restoreMessages(stored: StoredMessage[]): ChatMsg[] {
         ? renderEvaluationContent(j.score, j.feedback, j.transcribed_text, j?.model_answer)
         : <span>{m.content_text}</span>;
     } else if (m.msg_type === 'user_audio') {
-      content = (
+      const text = m.content_text && m.content_text !== 'Audio recorded' ? m.content_text : null;
+      content = text ? (
+        <span>{text}</span>
+      ) : (
         <span className="flex items-center gap-2 text-sm">
           <Mic size={14} /> Audio recorded
         </span>
@@ -125,7 +131,8 @@ export interface UsePracticeChatProps {
   onSessionStart: (title: string) => Promise<string | undefined>;
   sessionId?: string | null;
   initialMessages?: StoredMessage[];
-  level?: 'b1' | 'b2';
+  level?: 'a1' | 'a2' | 'b1' | 'b2';
+  onSessionFinished?: () => void;
 }
 
 export interface UsePracticeChatReturn {
@@ -137,6 +144,8 @@ export interface UsePracticeChatReturn {
   currentIndex: number;
   currentScene: (ImageScene & { image_data?: string }) | null;
   currentResult: EvaluationResult | null;
+  phraseScores: number[];
+  averageScore: number;
   isRecording: boolean;
   saveError: string | null;
   setInputText: (v: string) => void;
@@ -160,11 +169,22 @@ export function usePracticeChat({
   sessionId,
   initialMessages,
   level = 'b1',
+  onSessionFinished,
 }: UsePracticeChatProps): UsePracticeChatReturn {
   const isHistory = !!initialMessages && initialMessages.length > 0;
 
   const inferPhaseFromHistory = (msgs: StoredMessage[]): ChatPhase => {
     if (!msgs.length) return mode === 'image' ? 'image-config' : 'topic-input';
+    if (mode === 'situation') {
+      const plan = msgs.find(m => m.msg_type === 'phrase_plan');
+      const planLen = (plan?.content_json as { phrases?: string[] } | null)?.phrases?.length ?? 0;
+      const evals = msgs.filter(m => m.role === 'bob' && m.msg_type === 'evaluation').length;
+      const total = planLen > 0 ? planLen : 10;
+      if (evals >= total) return 'finished';
+      const last = msgs[msgs.length - 1];
+      if (last.role === 'bob' && last.msg_type === 'evaluation') return 'result';
+      return 'phrase-ready';
+    }
     const last = msgs[msgs.length - 1];
     if (last.role === 'bob') {
       if (last.msg_type === 'image_scene') return 'phrase-ready';
@@ -190,12 +210,24 @@ export function usePracticeChat({
   const [inputText, setInputText] = useState('');
   const [dynamicPhrases, setDynamicPhrases] = useState<string[]>(() => {
     if (!isHistory || !initialMessages) return [];
-    const lastPhrase = [...initialMessages].reverse().find(m => m.msg_type === 'phrase');
-    if (!lastPhrase) return [];
-    const j = lastPhrase.content_json as { phrase: string } | null;
-    return j?.phrase ? [j.phrase] : [];
+    const plan = initialMessages.find(m => m.msg_type === 'phrase_plan');
+    if (plan) {
+      const j = plan.content_json as { phrases?: string[] } | null;
+      if (j?.phrases && j.phrases.length > 0) return j.phrases;
+    }
+    const phraseMsgs = initialMessages
+      .filter(m => m.msg_type === 'phrase')
+      .map(m => m.content_json as { phrase: string; index: number } | null)
+      .filter((j): j is { phrase: string; index: number } => !!j?.phrase)
+      .sort((a, b) => a.index - b.index)
+      .map(j => j.phrase);
+    return phraseMsgs;
   });
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const [currentIndex, setCurrentIndex] = useState<number>(() => {
+    if (!isHistory || !initialMessages) return 0;
+    const evals = initialMessages.filter(m => m.role === 'bob' && m.msg_type === 'evaluation').length;
+    return Math.max(0, evals - 1);
+  });
   const [currentScene, setCurrentScene] = useState<(ImageScene & { image_data?: string }) | null>(() => {
     if (!isHistory || !initialMessages) return null;
     const lastImg = [...initialMessages].reverse().find(m => m.msg_type === 'image_scene');
@@ -213,6 +245,15 @@ export function usePracticeChat({
     return { topic: j.topic, difficulty: j.difficulty as Difficulty };
   });
   const [currentResult, setCurrentResult] = useState<EvaluationResult | null>(null);
+  const [phraseScores, setPhraseScores] = useState<number[]>(() => {
+    if (!isHistory || !initialMessages) return [];
+    return initialMessages
+      .filter((m) => m.role === 'bob' && m.msg_type === 'evaluation')
+      .map((m) => {
+        const j = m.content_json as { score?: number } | null;
+        return typeof j?.score === 'number' ? j.score : 0;
+      });
+  });
   const [saveError, setSaveError] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
@@ -364,12 +405,17 @@ export function usePracticeChat({
       if (id) sessionIdRef.current = id;
     }
     try {
-      const generated = await generateTopicPhrasesAction(t);
+      const generated = await generateTopicPhrasesAction(t, level);
       setDynamicPhrases(generated);
       setCurrentIndex(0);
       setMessages(prev => prev.slice(0, -1));
+      saveMsg({ role: 'bob', msg_type: 'phrase_plan', content_json: { phrases: generated, topic: t } });
       addBobMessage(renderPhrase(generated[0], 0, generated.length));
       saveMsg({ role: 'bob', msg_type: 'phrase', content_json: { phrase: generated[0], index: 0, total: generated.length } });
+      const sidForPregen = sessionIdRef.current;
+      if (sidForPregen && generated.length > 0) {
+        void pregenerateYLCueAudiosAction(sidForPregen, generated);
+      }
       setPhase('phrase-ready');
     } catch {
       setMessages(prev => prev.slice(0, -1));
@@ -412,7 +458,8 @@ export function usePracticeChat({
       </span>
     );
     try {
-      const scene = await generateImageSceneAction(cfg.topic, cfg.difficulty, level);
+      const imageLevel: 'b1' | 'b2' = level === 'b2' ? 'b2' : 'b1';
+      const scene = await generateImageSceneAction(cfg.topic, cfg.difficulty, imageLevel);
       const imageData = await generateImageAction(scene.image_prompt);
       const fullScene = { ...scene, image_data: imageData };
       setCurrentScene(fullScene);
@@ -447,32 +494,38 @@ export function usePracticeChat({
       setPhase(mode === 'image' ? 'phrase-ready' : 'phrase-ready');
       return;
     }
-    addUserMessage(
-      <span className="flex items-center gap-2 text-sm">
-        <Mic size={14} /> Audio recorded
-      </span>
-    );
-    saveMsg({ role: 'user', msg_type: 'user_audio', content_text: 'Audio recorded' });
     setPhase('evaluating');
-    addBobMessage(
-      <span className="flex items-center gap-2 text-trebol-text/70">
-        <Loader2 size={16} className="animate-spin" /> Analyzing your pronunciation...
-      </span>
-    );
     try {
       const base64Audio = await blobToBase64(audioBlob);
       const mimeType = (audioBlob.type || 'audio/webm').split(';')[0];
       const result =
         mode === 'situation'
-          ? await evaluatePronunciationAction(base64Audio, mimeType, dynamicPhrases[currentIndex])
+          ? await evaluatePronunciationAction(base64Audio, mimeType, dynamicPhrases[currentIndex], level)
           : await evaluateImageDescriptionAction(
               base64Audio,
               mimeType,
               currentScene?.description || '',
-              level
+              level === 'b2' ? 'b2' : 'b1',
             );
       setCurrentResult(result);
-      setMessages(prev => prev.slice(0, -1));
+      if (mode === 'situation') {
+        setPhraseScores((prev) => {
+          const next = [...prev];
+          next[currentIndex] = result.score;
+          return next;
+        });
+      }
+      const transcriptText = result.transcribed_text || 'Audio recorded';
+      addUserMessage(
+        result.transcribed_text ? (
+          <span>{result.transcribed_text}</span>
+        ) : (
+          <span className="flex items-center gap-2 text-sm">
+            <Mic size={14} /> Audio recorded
+          </span>
+        )
+      );
+      saveMsg({ role: 'user', msg_type: 'user_audio', content_text: transcriptText });
       const modelAnswer = mode === 'image' ? result.model_answer : undefined;
       addBobMessage(renderEvaluationContent(result.score, result.feedback, result.transcribed_text, modelAnswer));
       saveMsg({
@@ -487,7 +540,6 @@ export function usePracticeChat({
       });
       setPhase('result');
     } catch {
-      setMessages(prev => prev.slice(0, -1));
       addBobMessage(
         <span className="text-red-500">Evaluation error. Want to try again?</span>
       );
@@ -531,11 +583,17 @@ export function usePracticeChat({
         );
         saveMsg({ role: 'bob', msg_type: 'text', content_text: completionText });
         setPhase('finished');
+        onSessionFinished?.();
       }
     } else {
       handleNextImage();
     }
   };
+
+  const averageScore =
+    phraseScores.length > 0
+      ? Math.round(phraseScores.reduce((a, b) => a + b, 0) / phraseScores.length)
+      : 0;
 
   return {
     phase,
@@ -546,6 +604,8 @@ export function usePracticeChat({
     currentIndex,
     currentScene,
     currentResult,
+    phraseScores,
+    averageScore,
     isRecording,
     saveError,
     setInputText,

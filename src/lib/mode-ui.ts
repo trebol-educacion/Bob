@@ -107,9 +107,32 @@ export function getModeBadge(card: DynamicCard): string {
   return label ? `${label} · ${mins} min` : `${mins} min`;
 }
 
+/**
+ * Generic cards that should render as part of a Cambridge section instead of
+ * "Free practice" (e.g. Phrase Practice surfaces inside PET/FCE so the
+ * student sees it next to the official parts). Keyed by `mode_key|cefr_level`
+ * because the catalog reuses `mode_key='generic_situation'` across A1/A2/B1/B2.
+ */
+const GENERIC_AS_CAMBRIDGE: Record<string, { section: string; weight: number }> = {
+  'generic_situation|b1': { section: 'Cambridge PET (B1 Preliminary)', weight: 9000 },
+  'generic_situation|b2': { section: 'Cambridge FCE (B2 First)', weight: 9000 },
+};
+
+function genericOverrideKey(card: DynamicCard): string {
+  return `${card.mode_key}|${card.cefr_level ?? ''}`;
+}
+
+/** True when this card, although `framework='generic'`, should be grouped with a Cambridge framework. */
+export function isGenericGroupedWithCambridge(card: DynamicCard): boolean {
+  return genericOverrideKey(card) in GENERIC_AS_CAMBRIDGE;
+}
+
 /** Returns the section heading under which this card is grouped in ModeSelection. */
 export function getModeSection(card: DynamicCard): string {
   const { framework, exam_part } = card;
+
+  const override = GENERIC_AS_CAMBRIDGE[genericOverrideKey(card)];
+  if (override) return override.section;
 
   if (framework === 'cambridge') {
     if (exam_part.startsWith('starters_') || exam_part.startsWith('movers_') || exam_part.startsWith('flyers_')) {
@@ -144,6 +167,9 @@ const SPEAKING_BASE = 4000;
 
 export function getModeSortWeight(card: DynamicCard): number {
   const { framework, exam_part } = card;
+
+  const override = GENERIC_AS_CAMBRIDGE[genericOverrideKey(card)];
+  if (override) return override.weight;
 
   if (framework === 'cambridge') {
     const ylMatch = exam_part.match(/^(starters|movers|flyers)_part(\d+)$/);
@@ -188,6 +214,12 @@ export function getYLFamily(card: DynamicCard): YLFamily | null {
 }
 
 export function getCambridgeFamily(card: DynamicCard): CambridgeFamily | null {
+  if (card.framework === 'generic') {
+    const key = `${card.mode_key}|${card.cefr_level ?? ''}`;
+    if (key === 'generic_situation|b1') return 'pet';
+    if (key === 'generic_situation|b2') return 'fce';
+    return null;
+  }
   if (card.framework !== 'cambridge') return null;
   const m = card.exam_part.match(/^(starters|movers|flyers|ket|pet|fce|cae|cpe)(_|$)/);
   return m ? (m[1] as CambridgeFamily) : null;
@@ -299,6 +331,12 @@ export function getYLCardTheme(card: DynamicCard): YLCardTheme | null {
  */
 export function getModeOfficialName(card: DynamicCard): string {
   const { framework, exam_part } = card;
+  if (framework === 'generic') {
+    const key = `${card.mode_key}|${card.cefr_level ?? ''}`;
+    if (key === 'generic_situation|b1') return 'Cambridge PET · Phrase Practice';
+    if (key === 'generic_situation|b2') return 'Cambridge FCE · Phrase Practice';
+    return '';
+  }
   if (framework === 'cambridge') {
     const ylMatch = exam_part.match(/^(starters|movers|flyers)_part(\d+)$/);
     if (ylMatch) {

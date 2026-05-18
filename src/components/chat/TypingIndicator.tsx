@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { motion } from 'motion/react';
+import { BobAvatar } from '@/components/practice/yl/_shared';
 
 /**
  * TypingIndicator — renders an assistant-style bubble with 3 animated dots.
@@ -9,10 +10,8 @@ import { motion } from 'motion/react';
  */
 export function TypingIndicator() {
   return (
-    <div className="flex items-end gap-2 justify-start">
-      <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 mb-0.5 bg-amber-50 text-amber-600 border border-amber-100 text-xs font-bold">
-        B
-      </div>
+    <div className="flex items-start gap-2.5 justify-start">
+      <BobAvatar />
       <div className="bg-white border border-gray-100 shadow-sm rounded-2xl rounded-tl-sm px-4 py-3 flex items-center gap-1.5">
         {[0, 1, 2].map((i) => (
           <motion.span
