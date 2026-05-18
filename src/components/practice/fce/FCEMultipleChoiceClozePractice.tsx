@@ -32,7 +32,7 @@ interface RestoredState {
   text_with_gaps: string;
   gaps: ClozeGap[];
   framingText: string;
-  results: ClozeGapResult[];
+  results: ClozeGapResult[] | null;
   correctCount: number;
 }
 
@@ -60,7 +60,7 @@ function tryRestore(messages: StoredMessage[]): RestoredState | null {
     }
   }
 
-  if (gaps && results) return { title, text_with_gaps, gaps, framingText, results, correctCount };
+  if (gaps) return { title, text_with_gaps, gaps, framingText, results, correctCount };
   return null;
 }
 
@@ -336,9 +336,17 @@ export function FCEMultipleChoiceClozePractice({
           setTextWithGaps(restored.text_with_gaps);
           setGaps(restored.gaps);
           setFramingText(restored.framingText);
-          setResults(restored.results);
-          setCorrectCount(restored.correctCount);
-          setPhase('finished');
+          if (restored.results) {
+            setResults(restored.results);
+            setCorrectCount(restored.correctCount);
+            setPhase('finished');
+          } else {
+            const { createSupabaseBrowser } = await import('@/lib/supabase/browser-client');
+            const supabase = createSupabaseBrowser();
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) setUserId(user.id);
+            setPhase('ready');
+          }
           return;
         }
       }
