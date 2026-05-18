@@ -197,7 +197,7 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
             .order('exam_part'),
           supabase
             .from('bob_prompts')
-            .select('framework, exam_part, cefr_level, label, description, status')
+            .select('framework, exam_part, cefr_level, label, description, status, skill')
             .eq('activity_type', 'generation')
             .neq('status', 'hidden')
             .order('framework')
@@ -316,6 +316,7 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
           label: string;
           description: string | null;
           status: string;
+          skill: string;
         }>;
         const seenAll = new Set<string>();
         const dedupedAll: DynamicCard[] = [];
@@ -334,6 +335,7 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
               description: row.description,
               mode_key: `${row.framework}_${row.exam_part}`,
               status,
+              skill: row.skill,
             });
           }
         }

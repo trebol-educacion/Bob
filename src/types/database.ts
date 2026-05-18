@@ -53,12 +53,16 @@ export type Database = {
           explanation: string | null
           framework: string
           id: string
+          metadata: Json | null
           options: Json
           question: string
+          skill: string | null
           source: string
+          status: string
           stimulus_audio_url: string | null
           stimulus_image_url: string | null
           stimulus_text: string | null
+          transcript: string | null
           variant_id: string
         }
         Insert: {
@@ -69,12 +73,16 @@ export type Database = {
           explanation?: string | null
           framework: string
           id?: string
+          metadata?: Json | null
           options: Json
           question: string
+          skill?: string | null
           source?: string
+          status?: string
           stimulus_audio_url?: string | null
           stimulus_image_url?: string | null
           stimulus_text?: string | null
+          transcript?: string | null
           variant_id: string
         }
         Update: {
@@ -85,12 +93,16 @@ export type Database = {
           explanation?: string | null
           framework?: string
           id?: string
+          metadata?: Json | null
           options?: Json
           question?: string
+          skill?: string | null
           source?: string
+          status?: string
           stimulus_audio_url?: string | null
           stimulus_image_url?: string | null
           stimulus_text?: string | null
+          transcript?: string | null
           variant_id?: string
         }
         Relationships: []
@@ -188,6 +200,7 @@ export type Database = {
           prompt_current: string
           prompt_default: string
           prompt_key: string
+          skill: string
           status: string
           updated_at: string
           updated_by: string | null
@@ -205,6 +218,7 @@ export type Database = {
           prompt_current: string
           prompt_default: string
           prompt_key: string
+          skill: string
           status?: string
           updated_at?: string
           updated_by?: string | null
@@ -222,6 +236,7 @@ export type Database = {
           prompt_current?: string
           prompt_default?: string
           prompt_key?: string
+          skill?: string
           status?: string
           updated_at?: string
           updated_by?: string | null

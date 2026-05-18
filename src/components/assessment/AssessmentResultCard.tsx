@@ -45,13 +45,17 @@ export function AssessmentResultCard({ result, onPracticeNow }: Props) {
   const skillLabel = SKILL_LABELS[result.skill] ?? result.skill;
 
   const feedback = result.feedback;
-  const highlights = 'highlights' in feedback ? feedback.highlights : [];
-  const suggestions = 'suggestions' in feedback ? feedback.suggestions : [];
-  const overallMessage = 'overall_message' in feedback ? feedback.overall_message : null;
+  const highlights = 'highlights' in feedback ? feedback.highlights : ('strengths' in feedback ? (feedback as { strengths: string[] }).strengths : []);
+  const suggestions = 'suggestions' in feedback ? feedback.suggestions : ('improvements' in feedback ? (feedback as { improvements: string[] }).improvements : []);
+  const overallMessage = 'overall_message' in feedback ? feedback.overall_message : ('next_step' in feedback ? (feedback as { next_step: string }).next_step : null);
 
-  const isListening = result.skill === 'listening';
-  const score = isListening ? result.score : null;
-  const scoreMax = isListening ? result.score_max : null;
+  const isScored = result.skill === 'listening' || result.skill === 'reading';
+  const score = isScored ? (result as { score: number }).score : null;
+  const scoreMax = isScored ? (result as { score_max: number }).score_max : null;
+
+  const isWriting = result.skill === 'writing';
+  const bulletsCovered = isWriting ? (result as { bullets_covered: number }).bullets_covered : null;
+  const totalBullets = isWriting ? 4 : null;
 
   return (
     <div className="flex flex-col items-center justify-center flex-1 p-6 max-w-lg mx-auto w-full gap-6">
@@ -68,6 +72,11 @@ export function AssessmentResultCard({ result, onPracticeNow }: Props) {
           {score !== null && scoreMax !== null && (
             <span className="text-sm font-semibold text-gray-600 mt-1">
               {score} / {scoreMax} correct
+            </span>
+          )}
+          {bulletsCovered !== null && totalBullets !== null && (
+            <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-bold mt-1">
+              {bulletsCovered}/{totalBullets} task points covered
             </span>
           )}
         </div>

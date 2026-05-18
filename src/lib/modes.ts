@@ -40,6 +40,7 @@ export function resolveEnabledModes({
   const resolved: ResolvedCard[] = [];
 
   for (const card of allDynamicCards) {
+    if (card.skill !== selectedSkill) continue;
     if (card.status === 'hidden') continue;
 
     if (card.framework === 'generic') {

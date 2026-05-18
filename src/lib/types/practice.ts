@@ -67,6 +67,8 @@ export interface DynamicCard {
   description: string | null;
   mode_key: ModeKey;
   status: ActivityStatus;
+  /** Skill bucket from bob_prompts.skill. Used to filter catalog by selected skill. */
+  skill: string;
 }
 
 export type ExamLevel = 'a2' | 'b1' | 'b2' | 'toefl';

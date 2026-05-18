@@ -7,7 +7,7 @@ import { callGemini } from '@/lib/gemini-client';
 import { MODELS } from '@/lib/models';
 import { mapListeningScoreToCefr } from '@/lib/assessment/cefr-mapping';
 import type { Skill } from '@/lib/types/skills';
-import type { AssessmentCefrBand, AssessmentConfidence, AssessmentResultSpeaking, AssessmentResultListening } from '@/lib/types/skills';
+import type { AssessmentCefrBand, AssessmentConfidence, AssessmentResultSpeaking, AssessmentResultListening, AssessmentResultReading, AssessmentResultWriting, AssessmentWritingFeedback } from '@/lib/types/skills';
 
 export interface AssessmentPrompt {
   turn_number: number;
@@ -22,11 +22,24 @@ export interface AssessmentListeningItem {
   options: Array<{ key: string; label: string }>;
 }
 
+export interface AssessmentReadingItem {
+  id: string;
+  stimulus_text: string;
+  question: string;
+  options: Array<{ key: string; label: string }>;
+}
+
+export interface AssessmentWritingTask {
+  prompt_text: string;
+  bullet_count: number;
+}
+
 export type StartAssessmentResult =
   | { status: 'ok'; skill: 'speaking'; assessment_id: string; prompts: AssessmentPrompt[]; is_yl: boolean }
   | { status: 'ok'; skill: 'listening'; assessment_id: string; items: AssessmentListeningItem[] }
+  | { status: 'ok'; skill: 'reading'; assessment_id: string; items: AssessmentReadingItem[] }
+  | { status: 'ok'; skill: 'writing'; assessment_id: string; task: AssessmentWritingTask }
   | { status: 'cooldown'; days_remaining: number; available_at: string }
-  | { status: 'not_available'; reason: 'reading' | 'writing' }
   | { status: 'error'; code: 'unauthenticated' | 'db_error' | 'no_prompts' | 'no_items' };
 
 export interface SubmitSpeakingTurn {
@@ -48,10 +61,6 @@ export type SubmitSpeakingResult =
  * For listening: returns a random selection of items from bob_closed_items.
  */
 export async function startAssessmentAction(skill: Skill): Promise<StartAssessmentResult> {
-  if (skill === 'reading' || skill === 'writing') {
-    return { status: 'not_available', reason: skill };
-  }
-
   const supabase = await createSupabaseServer();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { status: 'error', code: 'unauthenticated' };
@@ -127,6 +136,51 @@ export async function startAssessmentAction(skill: Skill): Promise<StartAssessme
     }));
 
     return { status: 'ok', skill: 'listening', assessment_id, items };
+  }
+
+  if (skill === 'reading') {
+    const { data: rawItems, error: itemsError } = await supabase
+      .from('bob_closed_items')
+      .select('id, stimulus_text, question, options')
+      .eq('skill', 'reading')
+      .eq('status', 'enabled')
+      .in('cefr_level', ['a1', 'a2', 'b1', 'b2']);
+
+    if (itemsError || !rawItems || rawItems.length === 0) {
+      return { status: 'error', code: 'no_items' };
+    }
+
+    const shuffled = [...rawItems].sort(() => Math.random() - 0.5);
+    const selected = shuffled.slice(0, Math.min(10, shuffled.length));
+
+    const items: AssessmentReadingItem[] = selected.map(row => ({
+      id: row.id as string,
+      stimulus_text: (row.stimulus_text as string) ?? '',
+      question: row.question as string,
+      options: row.options as Array<{ key: string; label: string }>,
+    }));
+
+    return { status: 'ok', skill: 'reading', assessment_id, items };
+  }
+
+  if (skill === 'writing') {
+    const currentLevel = skillLevel?.cefr_level ?? profile.cefr_active_level ?? 'a1';
+    const isHigherRange = currentLevel === 'b1' || currentLevel === 'b2';
+    const promptKey = isHigherRange
+      ? 'cefr_assessment_writing_b1_b2_generation'
+      : 'cefr_assessment_writing_a1_a2_generation';
+
+    const promptText = await getPrompt(promptKey);
+    if (!promptText) return { status: 'error', code: 'no_prompts' };
+
+    const bullets = (promptText.match(/^•/gm) ?? []).length || 4;
+
+    return {
+      status: 'ok',
+      skill: 'writing',
+      assessment_id,
+      task: { prompt_text: promptText, bullet_count: bullets },
+    };
   }
 
   const currentLevel = skillLevel?.cefr_level ?? profile.cefr_active_level ?? 'a2';
@@ -633,6 +687,383 @@ export async function pollAssessmentSpeakingResultAction(
         feedback: content.feedback as AssessmentResultSpeaking['feedback'],
         cooldown_until: cooldownUntil,
         pending_evaluation: false,
+      },
+    };
+  }
+
+  return { status: 'pending' };
+}
+
+export interface SubmitReadingAnswer {
+  item_id: string;
+  selected_key: string;
+}
+
+export type SubmitReadingResult =
+  | { status: 'ok'; result: AssessmentResultReading }
+  | { status: 'error'; code: 'unauthenticated' | 'invalid_items' | 'db_error' };
+
+/**
+ * Scores a completed Reading Assessment deterministically.
+ * No LLM call — pure comparison against bob_closed_items.correct_key.
+ * D-D1 compliance: zero Gemini calls on this path.
+ */
+export async function submitAssessmentReadingAction(
+  assessment_id: string,
+  answers: SubmitReadingAnswer[]
+): Promise<SubmitReadingResult> {
+  const supabase = await createSupabaseServer();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { status: 'error', code: 'unauthenticated' };
+
+  if (!answers || answers.length === 0) {
+    return { status: 'error', code: 'invalid_items' };
+  }
+
+  const itemIds = answers.map(a => a.item_id);
+  const { data: items, error: itemsError } = await supabase
+    .from('bob_closed_items')
+    .select('id, correct_key, explanation')
+    .in('id', itemIds);
+
+  if (itemsError || !items) return { status: 'error', code: 'db_error' };
+
+  const correctMap = new Map<string, string>(
+    items.map(row => [row.id as string, row.correct_key as string])
+  );
+
+  let correct = 0;
+  const failedItemIds: string[] = [];
+
+  for (const answer of answers) {
+    const expectedKey = correctMap.get(answer.item_id);
+    if (expectedKey !== undefined && answer.selected_key === expectedKey) {
+      correct++;
+    } else {
+      failedItemIds.push(answer.item_id);
+    }
+  }
+
+  const total = answers.length;
+  const { band, confidence } = mapListeningScoreToCefr(correct, total);
+
+  const confidenceNumeric = confidence === 'low' ? 0.3
+    : confidence === 'medium' ? 0.65
+    : 0.9;
+
+  try {
+    await supabase.rpc('set_config', { setting: 'bob.assessment_id', value: assessment_id, is_local: true });
+  } catch { /* non-critical */ }
+
+  const { error: upsertError } = await supabase
+    .from('bob_skill_levels')
+    .upsert({
+      user_id: user.id,
+      skill: 'reading',
+      cefr_level: band,
+      origin: 'assessment',
+      confidence: confidenceNumeric,
+      last_assessment_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'user_id,skill' });
+
+  if (upsertError) return { status: 'error', code: 'db_error' };
+
+  const { data: sessionData, error: sessionError } = await supabase
+    .from('bob_sessions')
+    .insert({
+      user_id: user.id,
+      mode: 'assessment_reading',
+      topic: assessment_id,
+      title: 'Reading Assessment',
+    })
+    .select('id')
+    .single();
+
+  if (!sessionError && sessionData) {
+    await supabase.from('bob_messages').insert({
+      session_id: sessionData.id,
+      user_id: user.id,
+      role: 'bob',
+      msg_type: 'evaluation',
+      content_text: null,
+      content_json: {
+        assessment_id,
+        status: 'done',
+        score: correct,
+        score_max: total,
+        cefr_band: band,
+        confidence,
+        failed_item_ids: failedItemIds,
+      },
+    });
+  }
+
+  const cooldownUntil = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+
+  const result: AssessmentResultReading = {
+    assessment_id,
+    skill: 'reading',
+    cefr_band: band,
+    confidence,
+    score: correct,
+    score_max: total,
+    failed_item_ids: failedItemIds,
+    cooldown_until: cooldownUntil,
+    feedback: {
+      kind: 'formative',
+      understood: correct >= Math.ceil(total / 2),
+      highlights: correct === total
+        ? ['You answered all questions correctly — excellent reading comprehension!']
+        : [`You got ${correct} out of ${total} correct.`],
+      suggestions: failedItemIds.length > 0
+        ? ['Re-read the texts for the questions you missed and look for the key information.']
+        : [],
+    },
+  };
+
+  return { status: 'ok', result };
+}
+
+export type SubmitWritingResult =
+  | { status: 'queued'; assessment_id: string }
+  | { status: 'error'; code: 'unauthenticated' | 'db_error' | 'text_too_short' };
+
+/**
+ * Persists the student's written text and fires background evaluation.
+ * D-A1 compliance: returns 'queued' immediately; Gemini runs in background.
+ */
+export async function submitAssessmentWritingAction(
+  assessment_id: string,
+  written_text: string
+): Promise<SubmitWritingResult> {
+  const supabase = await createSupabaseServer();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { status: 'error', code: 'unauthenticated' };
+
+  const wordCount = written_text.trim().split(/\s+/).filter(Boolean).length;
+  if (wordCount < 10) return { status: 'error', code: 'text_too_short' };
+
+  const [profileResult, skillLevelResult] = await Promise.all([
+    supabase.from('profiles').select('cefr_active_level').eq('id', user.id).single(),
+    supabase.from('bob_skill_levels').select('cefr_level').eq('user_id', user.id).eq('skill', 'writing').maybeSingle(),
+  ]);
+
+  const profile = profileResult.data;
+  const writingLevel = skillLevelResult.data?.cefr_level ?? profile?.cefr_active_level ?? 'a1';
+
+  const { data: session, error: sessionError } = await supabase
+    .from('bob_sessions')
+    .insert({
+      user_id: user.id,
+      mode: 'assessment_writing',
+      topic: assessment_id,
+      title: 'Writing Assessment',
+    })
+    .select('id')
+    .single();
+
+  if (sessionError || !session) return { status: 'error', code: 'db_error' };
+  const sessionId = session.id;
+
+  await supabase.from('bob_messages').insert({
+    session_id: sessionId,
+    user_id: user.id,
+    role: 'user',
+    msg_type: 'text',
+    content_text: written_text,
+    content_json: { assessment_id, word_count: wordCount },
+  });
+
+  await supabase.from('bob_messages').insert({
+    session_id: sessionId,
+    user_id: user.id,
+    role: 'bob',
+    msg_type: 'evaluation',
+    content_text: null,
+    content_json: { assessment_id, status: 'pending' },
+  });
+
+  const userId = user.id;
+  void runWritingEvaluationBackground(userId, sessionId, assessment_id, written_text, writingLevel);
+
+  return { status: 'queued', assessment_id };
+}
+
+interface GeminiWritingResult {
+  cefr_band: AssessmentCefrBand;
+  confidence: AssessmentConfidence;
+  bullets_covered: number;
+  feedback: AssessmentWritingFeedback;
+}
+
+async function runWritingEvaluationBackground(
+  userId: string,
+  sessionId: string,
+  assessment_id: string,
+  written_text: string,
+  currentLevel: string
+): Promise<void> {
+  const supabase = await createSupabaseServer();
+
+  const isHigherRange = currentLevel === 'b1' || currentLevel === 'b2';
+  const evalKey = isHigherRange
+    ? 'cefr_assessment_writing_b1_b2_evaluation'
+    : 'cefr_assessment_writing_a1_a2_evaluation';
+
+  const promptText = await getPrompt(evalKey, { WRITTEN_TEXT: written_text });
+
+  const result = await callGemini(
+    { promptKey: evalKey, model: MODELS.FLASH_LITE_PREVIEW, userId },
+    (ai) => ai.models.generateContent({
+      model: MODELS.FLASH_LITE_PREVIEW,
+      contents: [{ role: 'user', parts: [{ text: promptText }] }],
+      config: {
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            cefr_band: { type: Type.STRING },
+            confidence: { type: Type.STRING },
+            bullets_covered: { type: Type.INTEGER },
+            feedback: {
+              type: Type.OBJECT,
+              properties: {
+                strengths: { type: Type.ARRAY, items: { type: Type.STRING } },
+                improvements: { type: Type.ARRAY, items: { type: Type.STRING } },
+                next_step: { type: Type.STRING },
+              },
+              required: ['strengths', 'improvements', 'next_step'],
+            },
+          },
+          required: ['cefr_band', 'confidence', 'bullets_covered', 'feedback'],
+        },
+      },
+    })
+  );
+
+  const failUpdate = async (error: string) => {
+    await supabase
+      .from('bob_messages')
+      .update({ content_json: { assessment_id, status: 'failed', error } })
+      .eq('session_id', sessionId)
+      .eq('content_json->>assessment_id', assessment_id)
+      .eq('content_json->>status', 'pending');
+  };
+
+  if (!result.ok || !result.data.text) {
+    await failUpdate(result.ok ? 'empty response' : result.error);
+    return;
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(result.data.text);
+  } catch {
+    await failUpdate('invalid JSON from Gemini');
+    return;
+  }
+
+  const geminiResult = parsed as GeminiWritingResult;
+  const validBands: AssessmentCefrBand[] = ['pre_a1', 'a1', 'a2', 'b1', 'b2'];
+  const validConfidence: AssessmentConfidence[] = ['low', 'medium', 'high'];
+
+  if (!validBands.includes(geminiResult.cefr_band) || !validConfidence.includes(geminiResult.confidence)) {
+    await failUpdate('invalid band or confidence from Gemini');
+    return;
+  }
+
+  const confidenceNumeric = geminiResult.confidence === 'low' ? 0.3
+    : geminiResult.confidence === 'medium' ? 0.65
+    : 0.9;
+
+  try {
+    await supabase.rpc('set_config', { setting: 'bob.assessment_id', value: assessment_id, is_local: true });
+  } catch { /* non-critical */ }
+
+  await supabase
+    .from('bob_skill_levels')
+    .upsert({
+      user_id: userId,
+      skill: 'writing',
+      cefr_level: geminiResult.cefr_band,
+      origin: 'assessment',
+      confidence: confidenceNumeric,
+      last_assessment_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'user_id,skill' });
+
+  const cooldownUntil = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+
+  await supabase
+    .from('bob_messages')
+    .update({
+      content_json: {
+        assessment_id,
+        status: 'done',
+        cefr_band: geminiResult.cefr_band,
+        confidence: geminiResult.confidence,
+        bullets_covered: geminiResult.bullets_covered,
+        feedback: geminiResult.feedback,
+        cooldown_until: cooldownUntil,
+      },
+    })
+    .eq('session_id', sessionId)
+    .eq('content_json->>assessment_id', assessment_id)
+    .eq('content_json->>status', 'pending');
+}
+
+/**
+ * Polls for the Writing Assessment result.
+ * Returns 'done' with result, 'pending' if still evaluating, or 'failed' on error.
+ */
+export async function pollAssessmentWritingResultAction(
+  assessment_id: string
+): Promise<
+  | { status: 'done'; result: AssessmentResultWriting }
+  | { status: 'pending' }
+  | { status: 'failed'; error: string }
+  | { status: 'error'; code: string }
+> {
+  const supabase = await createSupabaseServer();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { status: 'error', code: 'unauthenticated' };
+
+  const { data: messages } = await supabase
+    .from('bob_messages')
+    .select('content_json')
+    .eq('user_id', user.id)
+    .eq('role', 'bob')
+    .eq('msg_type', 'evaluation')
+    .filter('content_json->>assessment_id', 'eq', assessment_id)
+    .order('created_at', { ascending: false })
+    .limit(1);
+
+  if (!messages || messages.length === 0) return { status: 'pending' };
+
+  const content = messages[0].content_json as Record<string, unknown>;
+  if (!content) return { status: 'pending' };
+
+  const msgStatus = content.status as string;
+
+  if (msgStatus === 'pending') return { status: 'pending' };
+
+  if (msgStatus === 'failed') {
+    return { status: 'failed', error: (content.error as string) ?? 'Evaluation failed' };
+  }
+
+  if (msgStatus === 'done') {
+    const cooldownUntil = (content.cooldown_until as string) ?? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    return {
+      status: 'done',
+      result: {
+        assessment_id,
+        skill: 'writing',
+        cefr_band: content.cefr_band as AssessmentCefrBand,
+        confidence: content.confidence as AssessmentConfidence,
+        bullets_covered: (content.bullets_covered as number) ?? 0,
+        feedback: content.feedback as AssessmentWritingFeedback,
+        cooldown_until: cooldownUntil,
       },
     };
   }

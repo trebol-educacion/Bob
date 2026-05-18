@@ -13,29 +13,21 @@ interface SkillCardProps {
   color: string;
   softColor: string;
   cefrLevel: string | null;
-  disabled: boolean;
   onClick: () => void;
 }
 
-function SkillCard({ skill: _skill, label, icon, color, softColor, cefrLevel, disabled, onClick }: SkillCardProps) {
+function SkillCard({ skill: _skill, label, icon, color, softColor, cefrLevel, onClick }: SkillCardProps) {
   return (
     <motion.button
-      onClick={disabled ? undefined : onClick}
-      whileHover={disabled ? {} : { scale: 1.03 }}
-      whileTap={disabled ? {} : { scale: 0.97 }}
-      aria-disabled={disabled}
-      title={disabled ? 'Aún no disponible' : undefined}
-      className={[
-        'relative flex flex-col items-center justify-center gap-3 rounded-2xl p-6 text-center transition-shadow',
-        disabled
-          ? 'opacity-50 cursor-not-allowed bg-gray-50 border-2 border-dashed border-gray-200'
-          : 'cursor-pointer border-2 border-transparent shadow-md hover:shadow-lg',
-      ].join(' ')}
-      style={disabled ? {} : { backgroundColor: softColor, borderColor: color }}
+      onClick={onClick}
+      whileHover={{ scale: 1.03 }}
+      whileTap={{ scale: 0.97 }}
+      className="relative flex flex-col items-center justify-center gap-3 rounded-2xl p-6 text-center transition-shadow cursor-pointer border-2 shadow-md hover:shadow-lg"
+      style={{ backgroundColor: softColor, borderColor: color }}
     >
       <div
         className="w-14 h-14 rounded-full flex items-center justify-center text-white shadow-sm"
-        style={{ backgroundColor: disabled ? '#9ca3af' : color }}
+        style={{ backgroundColor: color }}
       >
         {icon}
       </div>
@@ -45,18 +37,12 @@ function SkillCard({ skill: _skill, label, icon, color, softColor, cefrLevel, di
       {cefrLevel ? (
         <span
           className="text-xs font-bold px-2 py-0.5 rounded-full text-white"
-          style={{ backgroundColor: disabled ? '#9ca3af' : color }}
+          style={{ backgroundColor: color }}
         >
           {cefrLevel.toUpperCase()}
         </span>
       ) : (
         <span className="text-xs text-gray-400 font-medium">Sin nivel</span>
-      )}
-
-      {disabled && (
-        <span className="absolute top-2 right-2 text-[10px] bg-gray-200 text-gray-500 rounded px-1.5 py-0.5 font-medium">
-          Aún no disponible
-        </span>
       )}
     </motion.button>
   );
@@ -68,7 +54,6 @@ const SKILL_CONFIG: {
   icon: React.ReactNode;
   color: string;
   softColor: string;
-  disabled: boolean;
 }[] = [
   {
     skill: 'listening',
@@ -76,7 +61,6 @@ const SKILL_CONFIG: {
     icon: <Headphones size={24} />,
     color: '#F8AC37',
     softColor: '#fef3e0',
-    disabled: false,
   },
   {
     skill: 'speaking',
@@ -84,7 +68,6 @@ const SKILL_CONFIG: {
     icon: <Mic2 size={24} />,
     color: '#3660AB',
     softColor: '#dde4f2',
-    disabled: false,
   },
   {
     skill: 'reading',
@@ -92,7 +75,6 @@ const SKILL_CONFIG: {
     icon: <BookOpen size={24} />,
     color: '#469E7B',
     softColor: '#dcebe3',
-    disabled: true,
   },
   {
     skill: 'writing',
@@ -100,7 +82,6 @@ const SKILL_CONFIG: {
     icon: <PenLine size={24} />,
     color: '#E62D2B',
     softColor: '#fad6d5',
-    disabled: true,
   },
 ];
 
@@ -121,7 +102,7 @@ export function SkillSelector({ onSelect }: Props) {
         </div>
 
         <div className="grid grid-cols-2 gap-4">
-          {SKILL_CONFIG.map(({ skill, label, icon, color, softColor, disabled }) => {
+          {SKILL_CONFIG.map(({ skill, label, icon, color, softColor }) => {
             const levelEntry = skillLevels?.[skill];
             const cefrLevel = levelEntry?.cefr_level ?? null;
 
@@ -134,7 +115,6 @@ export function SkillSelector({ onSelect }: Props) {
                 color={color}
                 softColor={softColor}
                 cefrLevel={cefrLevel}
-                disabled={disabled}
                 onClick={() => onSelect(skill)}
               />
             );

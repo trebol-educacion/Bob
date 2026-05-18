@@ -14,6 +14,8 @@ import { SkillSelector } from '@/components/assessment/SkillSelector';
 import { AssessmentInvite } from '@/components/assessment/AssessmentInvite';
 import { AssessmentSpeakingRunner } from '@/components/assessment/AssessmentSpeakingRunner';
 import { AssessmentListeningRunner } from '@/components/assessment/AssessmentListeningRunner';
+import { AssessmentReadingRunner } from '@/components/assessment/AssessmentReadingRunner';
+import { AssessmentWritingRunner } from '@/components/assessment/AssessmentWritingRunner';
 import { AssessmentResultCard } from '@/components/assessment/AssessmentResultCard';
 import { startAssessmentAction } from '@/actions/assessment';
 import { createSessionAction } from '@/actions/sessions';
@@ -33,8 +35,8 @@ import {
 import type { PracticeMode } from '@/lib/types/practice';
 import type { StoredMessage } from '@/actions/messages';
 import type { Skill } from '@/lib/types/skills';
-import type { AssessmentResultSpeaking, AssessmentResultListening } from '@/lib/types/skills';
-import type { AssessmentPrompt, AssessmentListeningItem } from '@/actions/assessment';
+import type { AssessmentResultSpeaking, AssessmentResultListening, AssessmentResultReading, AssessmentResultWriting } from '@/lib/types/skills';
+import type { AssessmentPrompt, AssessmentListeningItem, AssessmentReadingItem, AssessmentWritingTask } from '@/actions/assessment';
 
 export default function App() {
   const t = useTranslations('home.bobUnavailable');
@@ -61,7 +63,9 @@ export default function App() {
   const [assessmentPrompts, setAssessmentPrompts] = useState<AssessmentPrompt[]>([]);
   const [assessmentIsYl, setAssessmentIsYl] = useState(false);
   const [assessmentListeningItems, setAssessmentListeningItems] = useState<AssessmentListeningItem[]>([]);
-  const [assessmentResult, setAssessmentResult] = useState<AssessmentResultSpeaking | AssessmentResultListening | null>(null);
+  const [assessmentReadingItems, setAssessmentReadingItems] = useState<AssessmentReadingItem[]>([]);
+  const [assessmentWritingTask, setAssessmentWritingTask] = useState<AssessmentWritingTask | null>(null);
+  const [assessmentResult, setAssessmentResult] = useState<AssessmentResultSpeaking | AssessmentResultListening | AssessmentResultReading | AssessmentResultWriting | null>(null);
 
   const cefrSelectorRef = useRef<HTMLDivElement>(null);
 
@@ -195,11 +199,25 @@ export default function App() {
       setAssessmentResult(null);
       if (result.skill === 'listening') {
         setAssessmentListeningItems(result.items);
+        setAssessmentReadingItems([]);
+        setAssessmentWritingTask(null);
+        setAssessmentPrompts([]);
+      } else if (result.skill === 'reading') {
+        setAssessmentReadingItems(result.items);
+        setAssessmentListeningItems([]);
+        setAssessmentWritingTask(null);
+        setAssessmentPrompts([]);
+      } else if (result.skill === 'writing') {
+        setAssessmentWritingTask(result.task);
+        setAssessmentListeningItems([]);
+        setAssessmentReadingItems([]);
         setAssessmentPrompts([]);
       } else {
         setAssessmentPrompts(result.prompts);
         setAssessmentIsYl(result.is_yl);
         setAssessmentListeningItems([]);
+        setAssessmentReadingItems([]);
+        setAssessmentWritingTask(null);
       }
       setAppState('assessment-running');
     } else if (result.status === 'cooldown') {
@@ -328,6 +346,48 @@ export default function App() {
                 <AssessmentListeningRunner
                   assessment_id={assessmentId}
                   items={assessmentListeningItems}
+                  onResult={async (result) => {
+                    setAssessmentResult(result);
+                    await refreshSkillLevels();
+                    setAppState('assessment-result');
+                  }}
+                  onCancel={() => setAppState('assessment-invite')}
+                />
+              </motion.div>
+            )}
+
+            {appState === 'assessment-running' && assessmentId && assessmentReadingItems.length > 0 && (
+              <motion.div
+                key="assessment-running-reading"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="w-full flex-1 flex flex-col"
+              >
+                <AssessmentReadingRunner
+                  assessment_id={assessmentId}
+                  items={assessmentReadingItems}
+                  onResult={async (result) => {
+                    setAssessmentResult(result);
+                    await refreshSkillLevels();
+                    setAppState('assessment-result');
+                  }}
+                  onCancel={() => setAppState('assessment-invite')}
+                />
+              </motion.div>
+            )}
+
+            {appState === 'assessment-running' && assessmentId && assessmentWritingTask && (
+              <motion.div
+                key="assessment-running-writing"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="w-full flex-1 flex flex-col"
+              >
+                <AssessmentWritingRunner
+                  assessment_id={assessmentId}
+                  task={assessmentWritingTask}
                   onResult={async (result) => {
                     setAssessmentResult(result);
                     await refreshSkillLevels();

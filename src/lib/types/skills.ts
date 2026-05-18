@@ -29,12 +29,18 @@ export interface AssessmentSpeakingFeedback {
 
 export type AssessmentCefrBand = 'pre_a1' | 'a1' | 'a2' | 'b1' | 'b2';
 
+export interface AssessmentWritingFeedback {
+  strengths: string[];
+  improvements: string[];
+  next_step: string;
+}
+
 export interface AssessmentResultBase {
   assessment_id: string;
   skill: Skill;
   cefr_band: AssessmentCefrBand;
   confidence: AssessmentConfidence;
-  feedback: FormativeFeedback | AssessmentSpeakingFeedback;
+  feedback: FormativeFeedback | AssessmentSpeakingFeedback | AssessmentWritingFeedback;
   cooldown_until: string;
 }
 
@@ -51,9 +57,24 @@ export interface AssessmentResultListening extends AssessmentResultBase {
   failed_item_ids: string[];
 }
 
+export interface AssessmentResultReading extends AssessmentResultBase {
+  skill: 'reading';
+  score: number;
+  score_max: number;
+  failed_item_ids: string[];
+}
+
+export interface AssessmentResultWriting extends AssessmentResultBase {
+  skill: 'writing';
+  bullets_covered: number;
+  feedback: AssessmentWritingFeedback;
+}
+
 export type AssessmentResult =
   | AssessmentResultSpeaking
-  | AssessmentResultListening;
+  | AssessmentResultListening
+  | AssessmentResultReading
+  | AssessmentResultWriting;
 
 export interface SkillLevelHistoryEntry {
   id: number;
