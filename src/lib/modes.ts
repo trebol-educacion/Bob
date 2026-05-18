@@ -43,6 +43,11 @@ export function resolveEnabledModes({
   return allDynamicCards
     .filter(card => {
       if (card.framework === 'generic') {
+        const levelKey = `${card.mode_key}|${card.cefr_level ?? ''}`;
+        if (GENERIC_ALWAYS_VISIBLE_WITH_FRAMEWORK.has(levelKey)) {
+          if (studentActiveCefr === null) return false;
+          return card.cefr_level === studentActiveCefr;
+        }
         if (hasAssignedFrameworks) return false;
         if (card.cefr_level === null) return true;
         if (studentActiveCefr === null) return false;
@@ -54,3 +59,15 @@ export function resolveEnabledModes({
     })
     .map(card => card.mode_key);
 }
+
+/**
+ * Generic mode keys that should remain visible even when the student has
+ * Cambridge / TOEFL frameworks assigned. These cards render inside the
+ * framework section via the override in mode-ui.ts (Phrase Practice ends
+ * up inside PET / FCE), so excluding them as "generic fallback only"
+ * leaves the student without the activity.
+ */
+const GENERIC_ALWAYS_VISIBLE_WITH_FRAMEWORK = new Set<string>([
+  'generic_situation|b1',
+  'generic_situation|b2',
+]);

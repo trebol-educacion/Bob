@@ -158,6 +158,7 @@ export default function App() {
         userEmail={userEmail}
         onOpenDashboard={() => setAppState('dashboard')}
         onToggleSidebar={() => setSidebarCollapsed((v) => !v)}
+        onGoHome={onFinish}
       />
       <div className="flex-1 flex min-h-0 relative">
         <SessionSidebar

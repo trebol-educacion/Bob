@@ -131,7 +131,9 @@ export async function generateTopicPhrasesAction(
             phrases: {
               type: Type.ARRAY,
               items: { type: Type.STRING },
-              description: 'Lista de 10 frases en inglés',
+              minItems: 10,
+              maxItems: 10,
+              description: 'Exactly 10 English phrases ordered easier → harder. Each phrase MUST contain the assigned WORD_N.',
             },
           },
           required: ['phrases'],
@@ -153,7 +155,13 @@ export async function generateTopicPhrasesAction(
     return [];
   }
   const outcome = PhraseGenerationSchema.safeParse(parsed);
-  if (!outcome.success) return [];
+  if (!outcome.success) {
+    console.error(JSON.stringify({ event: 'generateTopicPhrasesAction', error: 'schema validation failed', issues: outcome.error.issues }));
+    return [];
+  }
+  if (outcome.data.phrases.length < 10) {
+    console.error(JSON.stringify({ event: 'generateTopicPhrasesAction', error: 'fewer than 10 phrases', count: outcome.data.phrases.length }));
+  }
   return outcome.data.phrases.slice(0, 10);
 }
 
@@ -324,7 +332,8 @@ export async function evaluateImageDescriptionAction(
 export async function evaluatePronunciationAction(
   audioBase64: string,
   mimeType: string,
-  targetPhrase: string
+  targetPhrase: string,
+  level: CefrLevel = 'a2',
 ): Promise<EvaluationResult> {
   const fallback: EvaluationResult = {
     score: 0,
@@ -332,10 +341,11 @@ export async function evaluatePronunciationAction(
     transcribed_text: '',
   };
 
-  const prompt = await getPrompt('generic_situation_a2_evaluation', { TARGET_PHRASE: targetPhrase, AUDIO_DURATION_SECONDS: 0 });
+  const promptKey = `generic_situation_${level}_evaluation`;
+  const prompt = await getPrompt(promptKey, { TARGET_PHRASE: targetPhrase, AUDIO_DURATION_SECONDS: 0 });
 
   const result = await callGemini(
-    { promptKey: 'generic_situation_a2_evaluation', model: MODELS.FLASH_LITE_PREVIEW },
+    { promptKey, model: MODELS.FLASH_LITE_PREVIEW },
     (ai) => ai.models.generateContent({
       model: MODELS.FLASH_LITE_PREVIEW,
       contents: {

@@ -281,9 +281,14 @@ export const ModeSelection = forwardRef<HTMLDivElement, ModeSelectionProps>(func
   const HIDDEN_MODES = new Set<string>(['cambridge_flyers_part1']);
   const COMING_SOON_MODES = new Set<string>(['cambridge_ket_writing_part7']);
   const enabledSet = new Set(enabledModes);
-  const visibleCards = allDynamicCards.filter(
-    card => enabledSet.has(card.mode_key) && !HIDDEN_MODES.has(card.mode_key),
-  );
+  const visibleCards = allDynamicCards.filter(card => {
+    if (!enabledSet.has(card.mode_key)) return false;
+    if (HIDDEN_MODES.has(card.mode_key)) return false;
+    if (card.framework === 'generic' && card.cefr_level !== null) {
+      if (card.cefr_level !== cefrActiveLevel) return false;
+    }
+    return true;
+  });
 
   const genericCards = visibleCards.filter(
     card => card.framework === 'generic' && !isGenericGroupedWithCambridge(card),

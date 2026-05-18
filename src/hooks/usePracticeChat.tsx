@@ -67,7 +67,9 @@ export function renderEvaluationContent(
 }
 
 export function restoreMessages(stored: StoredMessage[]): ChatMsg[] {
-  return stored.map((m) => {
+  return stored
+    .filter((m) => m.msg_type !== 'phrase_plan' && m.msg_type !== 'yl_tts')
+    .map((m) => {
     let content: React.ReactNode;
 
     if (m.msg_type === 'phrase') {
@@ -107,7 +109,10 @@ export function restoreMessages(stored: StoredMessage[]): ChatMsg[] {
         ? renderEvaluationContent(j.score, j.feedback, j.transcribed_text, j?.model_answer)
         : <span>{m.content_text}</span>;
     } else if (m.msg_type === 'user_audio') {
-      content = (
+      const text = m.content_text && m.content_text !== 'Audio recorded' ? m.content_text : null;
+      content = text ? (
+        <span>{text}</span>
+      ) : (
         <span className="flex items-center gap-2 text-sm">
           <Mic size={14} /> Audio recorded
         </span>
@@ -170,8 +175,16 @@ export function usePracticeChat({
 
   const inferPhaseFromHistory = (msgs: StoredMessage[]): ChatPhase => {
     if (!msgs.length) return mode === 'image' ? 'image-config' : 'topic-input';
-    const evals = msgs.filter((m) => m.role === 'bob' && m.msg_type === 'evaluation').length;
-    if (mode === 'situation' && evals >= 10) return 'finished';
+    if (mode === 'situation') {
+      const plan = msgs.find(m => m.msg_type === 'phrase_plan');
+      const planLen = (plan?.content_json as { phrases?: string[] } | null)?.phrases?.length ?? 0;
+      const evals = msgs.filter(m => m.role === 'bob' && m.msg_type === 'evaluation').length;
+      const total = planLen > 0 ? planLen : 10;
+      if (evals >= total) return 'finished';
+      const last = msgs[msgs.length - 1];
+      if (last.role === 'bob' && last.msg_type === 'evaluation') return 'result';
+      return 'phrase-ready';
+    }
     const last = msgs[msgs.length - 1];
     if (last.role === 'bob') {
       if (last.msg_type === 'image_scene') return 'phrase-ready';
@@ -197,12 +210,24 @@ export function usePracticeChat({
   const [inputText, setInputText] = useState('');
   const [dynamicPhrases, setDynamicPhrases] = useState<string[]>(() => {
     if (!isHistory || !initialMessages) return [];
-    const lastPhrase = [...initialMessages].reverse().find(m => m.msg_type === 'phrase');
-    if (!lastPhrase) return [];
-    const j = lastPhrase.content_json as { phrase: string } | null;
-    return j?.phrase ? [j.phrase] : [];
+    const plan = initialMessages.find(m => m.msg_type === 'phrase_plan');
+    if (plan) {
+      const j = plan.content_json as { phrases?: string[] } | null;
+      if (j?.phrases && j.phrases.length > 0) return j.phrases;
+    }
+    const phraseMsgs = initialMessages
+      .filter(m => m.msg_type === 'phrase')
+      .map(m => m.content_json as { phrase: string; index: number } | null)
+      .filter((j): j is { phrase: string; index: number } => !!j?.phrase)
+      .sort((a, b) => a.index - b.index)
+      .map(j => j.phrase);
+    return phraseMsgs;
   });
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const [currentIndex, setCurrentIndex] = useState<number>(() => {
+    if (!isHistory || !initialMessages) return 0;
+    const evals = initialMessages.filter(m => m.role === 'bob' && m.msg_type === 'evaluation').length;
+    return Math.max(0, evals - 1);
+  });
   const [currentScene, setCurrentScene] = useState<(ImageScene & { image_data?: string }) | null>(() => {
     if (!isHistory || !initialMessages) return null;
     const lastImg = [...initialMessages].reverse().find(m => m.msg_type === 'image_scene');
@@ -384,6 +409,7 @@ export function usePracticeChat({
       setDynamicPhrases(generated);
       setCurrentIndex(0);
       setMessages(prev => prev.slice(0, -1));
+      saveMsg({ role: 'bob', msg_type: 'phrase_plan', content_json: { phrases: generated, topic: t } });
       addBobMessage(renderPhrase(generated[0], 0, generated.length));
       saveMsg({ role: 'bob', msg_type: 'phrase', content_json: { phrase: generated[0], index: 0, total: generated.length } });
       const sidForPregen = sessionIdRef.current;
@@ -468,24 +494,13 @@ export function usePracticeChat({
       setPhase(mode === 'image' ? 'phrase-ready' : 'phrase-ready');
       return;
     }
-    addUserMessage(
-      <span className="flex items-center gap-2 text-sm">
-        <Mic size={14} /> Audio recorded
-      </span>
-    );
-    saveMsg({ role: 'user', msg_type: 'user_audio', content_text: 'Audio recorded' });
     setPhase('evaluating');
-    addBobMessage(
-      <span className="flex items-center gap-2 text-trebol-text/70">
-        <Loader2 size={16} className="animate-spin" /> Analyzing your pronunciation...
-      </span>
-    );
     try {
       const base64Audio = await blobToBase64(audioBlob);
       const mimeType = (audioBlob.type || 'audio/webm').split(';')[0];
       const result =
         mode === 'situation'
-          ? await evaluatePronunciationAction(base64Audio, mimeType, dynamicPhrases[currentIndex])
+          ? await evaluatePronunciationAction(base64Audio, mimeType, dynamicPhrases[currentIndex], level)
           : await evaluateImageDescriptionAction(
               base64Audio,
               mimeType,
@@ -494,9 +509,23 @@ export function usePracticeChat({
             );
       setCurrentResult(result);
       if (mode === 'situation') {
-        setPhraseScores((prev) => [...prev, result.score]);
+        setPhraseScores((prev) => {
+          const next = [...prev];
+          next[currentIndex] = result.score;
+          return next;
+        });
       }
-      setMessages(prev => prev.slice(0, -1));
+      const transcriptText = result.transcribed_text || 'Audio recorded';
+      addUserMessage(
+        result.transcribed_text ? (
+          <span>{result.transcribed_text}</span>
+        ) : (
+          <span className="flex items-center gap-2 text-sm">
+            <Mic size={14} /> Audio recorded
+          </span>
+        )
+      );
+      saveMsg({ role: 'user', msg_type: 'user_audio', content_text: transcriptText });
       const modelAnswer = mode === 'image' ? result.model_answer : undefined;
       addBobMessage(renderEvaluationContent(result.score, result.feedback, result.transcribed_text, modelAnswer));
       saveMsg({
@@ -511,7 +540,6 @@ export function usePracticeChat({
       });
       setPhase('result');
     } catch {
-      setMessages(prev => prev.slice(0, -1));
       addBobMessage(
         <span className="text-red-500">Evaluation error. Want to try again?</span>
       );
