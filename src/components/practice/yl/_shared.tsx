@@ -23,13 +23,13 @@ export const REACTION_PAUSE_MS = 1200;
 export function BobAvatar() {
   const speaking = useBobSpeaking();
   return (
-    <div className="w-8 h-8 rounded-xl overflow-hidden shrink-0 bg-amber-50 border border-amber-100 mt-1 relative">
+    <div className="w-8 h-8 rounded-xl overflow-hidden shrink-0 bg-white border border-gray-100 mt-1 relative">
       <Image
         src="/bob_avatar.png"
         alt="Bob"
         fill
         sizes="32px"
-        className="object-cover"
+        className="object-contain"
       />
       {speaking && (
         <video
@@ -339,6 +339,7 @@ export function YLVoiceNote({
       intervalRef.current = null;
     }
     setPlaying(false);
+    setBobSpeaking(false);
   }, []);
 
   React.useEffect(() => () => stop(), [stop]);
@@ -378,6 +379,7 @@ export function YLVoiceNote({
       };
       audio.onerror = () => stop();
       setPlaying(true);
+      if (side === 'bob') setBobSpeaking(true);
       intervalRef.current = setInterval(() => {
         if (audio.duration > 0) setProgress(audio.currentTime / audio.duration);
       }, 100);

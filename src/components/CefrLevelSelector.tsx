@@ -30,7 +30,7 @@ export function CefrLevelSelector({ value, onChange, onClear, disabled, locked }
   const canClear = !isDisabled && value !== null && Boolean(onClear);
 
   return (
-    <div className="inline-flex items-center gap-3">
+    <div className="inline-flex items-center gap-1.5 sm:gap-3 max-w-full">
       {canClear ? (
         <motion.button
           type="button"
@@ -38,7 +38,7 @@ export function CefrLevelSelector({ value, onChange, onClear, disabled, locked }
           title={t('level.clear')}
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
-          className="inline-flex items-center gap-1.5 shrink-0 rounded-full bg-trebol-text/5 hover:bg-trebol-text/10 px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.18em] text-trebol-text/70 hover:text-trebol-text transition-colors cursor-pointer"
+          className="inline-flex items-center gap-1 sm:gap-1.5 shrink-0 rounded-full bg-trebol-text/5 hover:bg-trebol-text/10 px-2 py-1 sm:px-3 sm:py-1.5 text-[9px] sm:text-[11px] font-black uppercase tracking-[0.14em] sm:tracking-[0.18em] text-trebol-text/70 hover:text-trebol-text transition-colors cursor-pointer"
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5">
             <path d="M3 12a9 9 0 1 0 3-6.7" />
@@ -47,7 +47,7 @@ export function CefrLevelSelector({ value, onChange, onClear, disabled, locked }
           {t('level.label')}
         </motion.button>
       ) : (
-        <span className="text-[10px] font-bold uppercase tracking-[0.22em] text-trebol-text/55 shrink-0">
+        <span className="hidden sm:inline text-[10px] font-bold uppercase tracking-[0.22em] text-trebol-text/55 shrink-0">
           {t('level.label')}
         </span>
       )}
@@ -55,7 +55,7 @@ export function CefrLevelSelector({ value, onChange, onClear, disabled, locked }
         role="radiogroup"
         aria-label="Nivel CEFR"
         title={locked ? t('level.lockedByOrg') : undefined}
-        className="relative inline-flex items-center gap-0.5 rounded-full bg-white p-1 border border-[#ece8de]"
+        className="relative inline-flex items-center gap-0 sm:gap-0.5 rounded-full bg-white p-0.5 sm:p-1 border border-[#ece8de]"
         style={{ boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.04)' }}
       >
         {CEFR_OPTIONS.map(({ value: v, label, color, comingSoon }) => {
@@ -70,7 +70,7 @@ export function CefrLevelSelector({ value, onChange, onClear, disabled, locked }
               disabled={itemDisabled}
               title={comingSoon ? t('level.comingSoon') : undefined}
               onClick={() => !isDisabled && !comingSoon && onChange(v)}
-              className="relative px-3 py-1.5 text-xs font-bold rounded-full transition-colors cursor-pointer disabled:cursor-not-allowed"
+              className="relative whitespace-nowrap px-1.5 py-1 sm:px-3 sm:py-1.5 text-[10px] sm:text-xs font-bold rounded-full transition-colors cursor-pointer disabled:cursor-not-allowed"
               style={{
                 color: isActive
                   ? '#fff'
