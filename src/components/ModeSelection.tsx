@@ -1,4 +1,4 @@
-import React, { forwardRef } from 'react';
+import React, { forwardRef, useState } from 'react';
 import Image from 'next/image';
 import { motion } from 'motion/react';
 import { useTranslations } from 'next-intl';
@@ -218,13 +218,54 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
   );
 }
 
+/**
+ * Plays the Bob greeting video once on first load, then swaps to the
+ * static avatar PNG. Avoids continuous CPU drain from looping playback.
+ */
+function BobIntroAvatar() {
+  const [videoEnded, setVideoEnded] = useState(false);
+
+  return (
+    <div className="relative w-full h-full rounded-full bg-white shadow-xl ring-4 ring-white overflow-hidden">
+      <motion.div
+        animate={{ rotate: [0, -6, 6, -4, 0] }}
+        transition={{ delay: 0.7, duration: 1.4, ease: 'easeInOut' }}
+        className="w-full h-full relative"
+        style={{ transformOrigin: '50% 80%' }}
+      >
+        <Image
+          src="/bob_avatar.png"
+          alt="Bob"
+          fill
+          sizes="160px"
+          className="object-cover object-[50%_0%] scale-95 origin-bottom"
+          priority
+        />
+      </motion.div>
+      {!videoEnded && (
+        <video
+          autoPlay
+          muted
+          playsInline
+          preload="auto"
+          onEnded={() => setVideoEnded(true)}
+          onError={() => setVideoEnded(true)}
+          className="absolute inset-0 w-full h-full object-cover object-[50%_35%]"
+        >
+          <source src="/bob_hello.mp4" type="video/mp4" />
+        </video>
+      )}
+    </div>
+  );
+}
+
 interface ModeSelectionProps {
   onSelect: (mode: PracticeMode) => void;
   enabledModes?: ModeKey[];
   availableModes?: AvailableMode[];
   cefrActiveLevel?: CefrLevel | null;
   cefrLevelLocked?: boolean;
-  onCefrChange?: (level: CefrLevel) => void;
+  onCefrChange?: (level: CefrLevel | null) => void;
   organizationName?: string;
 }
 
@@ -301,7 +342,7 @@ export const ModeSelection = forwardRef<HTMLDivElement, ModeSelectionProps>(func
         }}
       />
 
-      <div className="relative z-10 w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-10 pt-4 pb-16 space-y-10">
+      <div className={`relative z-10 w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-10 ${cefrActiveLevel ? 'pt-4 pb-16' : 'min-h-full flex flex-col justify-center py-10'} space-y-10`}>
         <motion.div
           initial={{ opacity: 0, y: 14 }}
           animate={{ opacity: 1, y: 0 }}
@@ -312,9 +353,8 @@ export const ModeSelection = forwardRef<HTMLDivElement, ModeSelectionProps>(func
             initial={{ scale: 0, rotate: -20 }}
             animate={{ scale: 1, rotate: 0 }}
             transition={{ delay: 0.1, type: 'spring', stiffness: 200, damping: 14 }}
-            className="relative w-20 h-20 mx-auto mb-3"
-          >
-            <div
+            className="relative w-40 h-40 sm:w-48 sm:h-48 mx-auto mb-4"
+          >            <div
               aria-hidden
               className="absolute -inset-2 rounded-full"
               style={{
@@ -323,23 +363,7 @@ export const ModeSelection = forwardRef<HTMLDivElement, ModeSelectionProps>(func
                 opacity: 0.55,
               }}
             />
-            <div className="relative w-full h-full rounded-full bg-white shadow-xl ring-4 ring-white overflow-hidden">
-              <motion.div
-                animate={{ rotate: [0, -6, 6, -4, 0] }}
-                transition={{ delay: 0.7, duration: 1.4, ease: 'easeInOut' }}
-                className="w-full h-full relative"
-                style={{ transformOrigin: '50% 80%' }}
-              >
-                <Image
-                  src="/bob_avatar.png"
-                  alt="Bob"
-                  fill
-                  sizes="80px"
-                  className="object-cover"
-                  priority
-                />
-              </motion.div>
-            </div>
+            <BobIntroAvatar />
           </motion.div>
 
           <p className="text-[10px] font-black uppercase tracking-[0.3em] text-trebol-text/45 mb-2">
@@ -363,34 +387,81 @@ export const ModeSelection = forwardRef<HTMLDivElement, ModeSelectionProps>(func
           <CefrLevelSelector
             value={cefrActiveLevel}
             onChange={onCefrChange ?? (() => {})}
+            onClear={onCefrChange ? () => onCefrChange(null) : undefined}
             disabled={!onCefrChange}
             locked={cefrLevelLocked}
           />
         </motion.div>
 
-        {showFreePractice && genericCards.length > 0 && (
+        {!cefrActiveLevel && (
           <motion.div
-            initial={{ opacity: 0, y: 10 }}
+            initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3, duration: 0.4 }}
+            transition={{ delay: 0.35, duration: 0.4 }}
+            className="text-center"
           >
-            <SectionTitle>{tModeUi('freePractice')}</SectionTitle>
+            <p className="text-sm sm:text-base font-bold text-trebol-text/65 max-w-md mx-auto">
+              {t('pickLevelHint')}
+            </p>
+          </motion.div>
+        )}
+
+        {cefrActiveLevel && showFreePractice && genericCards.length > 0 && (
+          <motion.div
+            key={`generic-${cefrActiveLevel}`}
+            initial="hidden"
+            animate="show"
+            variants={{
+              hidden: {},
+              show: { transition: { staggerChildren: 0.06, delayChildren: 0.05 } },
+            }}
+          >
+            <motion.div variants={{ hidden: { opacity: 0, y: 6 }, show: { opacity: 1, y: 0 } }}>
+              <SectionTitle>{tModeUi('freePractice')}</SectionTitle>
+            </motion.div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 sm:gap-5">
-              {genericCards.map(renderCard)}
+              {genericCards.map((card, idx) => (
+                <motion.div
+                  key={card.mode_key}
+                  variants={{
+                    hidden: { opacity: 0, y: 24, scale: 0.94 },
+                    show: { opacity: 1, y: 0, scale: 1 },
+                  }}
+                  transition={{ type: 'spring', stiffness: 220, damping: 22, delay: idx * 0.02 }}
+                >
+                  {renderCard(card)}
+                </motion.div>
+              ))}
             </div>
           </motion.div>
         )}
 
-        {Array.from(sectionMap.entries()).map(([sectionName, cards], i) => (
+        {cefrActiveLevel && Array.from(sectionMap.entries()).map(([sectionName, cards], i) => (
           <motion.div
-            key={sectionName}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 + i * 0.08, duration: 0.45 }}
+            key={`${sectionName}-${cefrActiveLevel}`}
+            initial="hidden"
+            animate="show"
+            variants={{
+              hidden: {},
+              show: { transition: { staggerChildren: 0.05, delayChildren: 0.1 + i * 0.08 } },
+            }}
           >
-            <SectionTitle>{sectionName}</SectionTitle>
+            <motion.div variants={{ hidden: { opacity: 0, y: 6 }, show: { opacity: 1, y: 0 } }}>
+              <SectionTitle>{sectionName}</SectionTitle>
+            </motion.div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 sm:gap-5">
-              {cards.map(renderCard)}
+              {cards.map((card) => (
+                <motion.div
+                  key={card.mode_key}
+                  variants={{
+                    hidden: { opacity: 0, y: 28, scale: 0.92 },
+                    show: { opacity: 1, y: 0, scale: 1 },
+                  }}
+                  transition={{ type: 'spring', stiffness: 220, damping: 22 }}
+                >
+                  {renderCard(card)}
+                </motion.div>
+              ))}
             </div>
           </motion.div>
         ))}
