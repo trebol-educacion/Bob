@@ -9,15 +9,23 @@ export function BrandingProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!organization) return;
     const root = document.documentElement;
-    if (organization.primary_color) {
-      root.style.setProperty('--color-trebol-primary', organization.primary_color);
-      root.style.setProperty('--color-bob-brand', organization.primary_color);
+    const primary = organization.primary_color;
+    const secondary = organization.secondary_color;
+    const accent = organization.accent_color;
+    if (primary) {
+      root.style.setProperty('--color-trebol-primary', primary);
+      root.style.setProperty('--color-bob-brand', primary);
     }
-    if (organization.secondary_color) {
-      root.style.setProperty('--color-trebol-secondary', organization.secondary_color);
+    if (secondary) {
+      root.style.setProperty('--color-trebol-secondary', secondary);
     }
-    if (organization.accent_color) {
-      root.style.setProperty('--color-trebol-accent', organization.accent_color);
+    if (accent) {
+      root.style.setProperty('--color-trebol-accent', accent);
+    }
+    try {
+      localStorage.setItem('bob-brand', JSON.stringify({ primary, secondary, accent }));
+    } catch {
+      // localStorage unavailable (private mode); skip silently
     }
   }, [organization]);
 
