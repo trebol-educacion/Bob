@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'motion/react';
 import confetti from 'canvas-confetti';
 import { Trophy, Star, ChevronRight } from 'lucide-react';
@@ -88,17 +88,55 @@ export function CelebrationCard({
     keep:    { heading: t('celebration.keep.heading'), sub: t('celebration.keep.sub'), accent: 'text-slate-600', ring: 'ring-slate-200', glow: 'from-slate-50 via-white to-white' },
   }[tier];
 
+  const passed = pct >= 50;
+  const [celebrationDone, setCelebrationDone] = useState(!animate || !passed);
+
   const firedRef = useRef(false);
   useEffect(() => {
     if (!animate || firedRef.current) return;
     firedRef.current = true;
-    const intensity: 'mega' | 'normal' | 'mini' = pct === 100 ? 'mega' : pct >= 75 ? 'normal' : pct >= 50 ? 'mini' : 'mini';
-    if (pct >= 50) {
-      setTimeout(() => fireConfetti(intensity), 300);
+    const intensity: 'mega' | 'normal' | 'mini' = pct === 100 ? 'mega' : pct >= 75 ? 'normal' : 'mini';
+    if (passed) {
+      setTimeout(() => fireConfetti(intensity), 100);
+      setTimeout(() => fireConfetti(intensity), 900);
     }
-  }, [animate, pct]);
+  }, [animate, pct, passed]);
 
-  const displayedPct = useCountUp(pct, 900, animate);
+  const displayedPct = useCountUp(pct, 900, animate && celebrationDone);
+
+  if (!celebrationDone) {
+    return (
+      <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-white/95 backdrop-blur-sm">
+        <div className="relative w-64 sm:w-80 aspect-[3/4]">
+          <div
+            aria-hidden
+            className="absolute -inset-3 rounded-3xl"
+            style={{
+              background: 'conic-gradient(from 0deg, #F8AC37, #469E7B, #3660AB, #E62D2B, #F8AC37)',
+              filter: 'blur(14px)',
+              opacity: 0.55,
+            }}
+          />
+          <div className="relative w-full h-full rounded-3xl overflow-hidden shadow-2xl ring-4 ring-white">
+            <video
+              autoPlay
+              muted
+              playsInline
+              preload="auto"
+              onEnded={() => setCelebrationDone(true)}
+              onError={() => setCelebrationDone(true)}
+              className="w-full h-full object-cover"
+            >
+              <source src="/bob_celebrate.mp4" type="video/mp4" />
+            </video>
+          </div>
+        </div>
+        <p className="mt-8 text-3xl sm:text-4xl font-black text-amber-600 font-nunito">
+          {tierConfig.heading}
+        </p>
+      </div>
+    );
+  }
 
   const clickable = !!onAction;
   const Container = clickable ? motion.button : motion.div;
