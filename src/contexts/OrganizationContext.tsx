@@ -45,7 +45,7 @@ interface OrganizationContextValue {
   allDynamicCards: DynamicCard[];
   cefrActiveLevel: CefrLevel | null;
   cefrLevelLocked: boolean;
-  setCefrActiveLevel: (level: CefrLevel) => Promise<void>;
+  setCefrActiveLevel: (level: CefrLevel | null) => Promise<void>;
   userRole: string | null;
   accessGranted: boolean;
   accessDenialReason: BobAccessDenialReason | null;
@@ -280,7 +280,7 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
     })();
   }, []);
 
-  const setCefrActiveLevel = useCallback(async (level: CefrLevel) => {
+  const setCefrActiveLevel = useCallback(async (level: CefrLevel | null) => {
     if (cefrLevelLocked) {
       throw new Error('Tu colegio bloqueó tu nivel CEFR y no puede cambiarse.');
     }

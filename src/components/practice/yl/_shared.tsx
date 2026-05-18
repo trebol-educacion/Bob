@@ -15,11 +15,13 @@ import { getOrCreateCueAudioAction } from '@/actions/modes/yl';
 import { pcmToWavBase64 } from '@/lib/audio';
 import type { EvalResponse } from '@/lib/types/practice';
 import { BobMascotLoader } from '@/components/chat/BobMascotLoader';
+import { setBobSpeaking, useBobSpeaking } from '@/lib/bob-speaking';
 
 export const RECORDING_MAX_SECONDS = 45;
 export const REACTION_PAUSE_MS = 1200;
 
 export function BobAvatar() {
+  const speaking = useBobSpeaking();
   return (
     <div className="w-8 h-8 rounded-xl overflow-hidden shrink-0 bg-amber-50 border border-amber-100 mt-1 relative">
       <Image
@@ -29,6 +31,18 @@ export function BobAvatar() {
         sizes="32px"
         className="object-cover"
       />
+      {speaking && (
+        <video
+          autoPlay
+          muted
+          playsInline
+          loop
+          preload="auto"
+          className="absolute inset-0 w-full h-full object-cover"
+        >
+          <source src="/bob_speaking.mp4" type="video/mp4" />
+        </video>
+      )}
     </div>
   );
 }
@@ -44,10 +58,14 @@ export function stopCurrentAudio(): void {
   }
   _currentText = null;
   _cachedUrl = null;
+  setBobSpeaking(false);
 }
 
 export function pauseCurrentAudio(): void {
-  if (_currentAudio && !_currentAudio.paused) _currentAudio.pause();
+  if (_currentAudio && !_currentAudio.paused) {
+    _currentAudio.pause();
+    setBobSpeaking(false);
+  }
 }
 
 export function isAudioPaused(): boolean {
@@ -56,20 +74,24 @@ export function isAudioPaused(): boolean {
 
 export async function resumeCurrentAudio(): Promise<void> {
   if (_currentAudio && _currentAudio.paused) {
-    try { await _currentAudio.play(); } catch { /* ignore */ }
+    try {
+      await _currentAudio.play();
+      setBobSpeaking(true);
+    } catch { /* ignore */ }
   }
 }
 
 export async function playTTS(text: string): Promise<void> {
-  // Reuse the cached audio when replaying the same text (no extra TTS call).
   if (_currentText === text && _cachedUrl) {
     if (_currentAudio) _currentAudio.pause();
     const audio = new Audio(_cachedUrl);
     _currentAudio = audio;
+    setBobSpeaking(true);
     await new Promise<void>((resolve) => {
-      audio.onended = () => resolve();
-      audio.onerror = () => resolve();
-      audio.play().catch(() => resolve());
+      audio.onended = () => { setBobSpeaking(false); resolve(); };
+      audio.onerror = () => { setBobSpeaking(false); resolve(); };
+      audio.onpause = () => setBobSpeaking(false);
+      audio.play().catch(() => { setBobSpeaking(false); resolve(); });
     });
     return;
   }
@@ -82,13 +104,15 @@ export async function playTTS(text: string): Promise<void> {
     _cachedUrl = url;
     const audio = new Audio(url);
     _currentAudio = audio;
+    setBobSpeaking(true);
     await new Promise<void>((resolve) => {
-      audio.onended = () => resolve();
-      audio.onerror = () => resolve();
-      audio.play().catch(() => resolve());
+      audio.onended = () => { setBobSpeaking(false); resolve(); };
+      audio.onerror = () => { setBobSpeaking(false); resolve(); };
+      audio.onpause = () => setBobSpeaking(false);
+      audio.play().catch(() => { setBobSpeaking(false); resolve(); });
     });
   } catch {
-    // Non-fatal — continue even if TTS fails
+    setBobSpeaking(false);
   }
 }
 

@@ -19,19 +19,38 @@ const CEFR_OPTIONS: { value: CefrLevel; label: string; color: string; soft: stri
 interface CefrLevelSelectorProps {
   value: CefrLevel | null;
   onChange: (level: CefrLevel) => void;
+  onClear?: () => void;
   disabled: boolean;
   locked: boolean;
 }
 
-export function CefrLevelSelector({ value, onChange, disabled, locked }: CefrLevelSelectorProps) {
+export function CefrLevelSelector({ value, onChange, onClear, disabled, locked }: CefrLevelSelectorProps) {
   const t = useTranslations('common');
   const isDisabled = disabled || locked;
+  const canClear = !isDisabled && value !== null && Boolean(onClear);
 
   return (
     <div className="inline-flex items-center gap-3">
-      <span className="text-[10px] font-bold uppercase tracking-[0.22em] text-trebol-text/55 shrink-0">
-        {t('level.label')}
-      </span>
+      {canClear ? (
+        <motion.button
+          type="button"
+          onClick={() => onClear?.()}
+          title={t('level.clear')}
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          className="inline-flex items-center gap-1.5 shrink-0 rounded-full bg-trebol-text/5 hover:bg-trebol-text/10 px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.18em] text-trebol-text/70 hover:text-trebol-text transition-colors cursor-pointer"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5">
+            <path d="M3 12a9 9 0 1 0 3-6.7" />
+            <polyline points="3 4 3 10 9 10" />
+          </svg>
+          {t('level.label')}
+        </motion.button>
+      ) : (
+        <span className="text-[10px] font-bold uppercase tracking-[0.22em] text-trebol-text/55 shrink-0">
+          {t('level.label')}
+        </span>
+      )}
       <div
         role="radiogroup"
         aria-label="Nivel CEFR"
