@@ -454,7 +454,7 @@ export function YLVoiceNote({
 export function YLBobTextMessage({ text }: { text: string }) {
   return (
     <div className="flex justify-start gap-2 font-nunito">
-      <BobAvatar audioKey={text} />
+      <BobAvatar />
       <div className="rounded-2xl rounded-tl-sm px-4 py-2.5 bg-white ring-1 ring-violet-100 shadow-[0_1px_2px_rgba(0,0,0,0.04)] text-slate-800 text-sm max-w-sm font-bold">
         {text}
       </div>
@@ -687,7 +687,7 @@ export function YLReadOnlyMessage({
   return (
     <div className={`flex ${isBob ? 'justify-start' : 'justify-end'} gap-2`}>
       {isBob && (
-        <BobAvatar audioKey={text} />
+        <BobAvatar />
       )}
       <div className="flex flex-col gap-1 max-w-md">
         {!isBob && cue && (

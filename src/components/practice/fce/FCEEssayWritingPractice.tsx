@@ -333,7 +333,11 @@ export function FCEEssayWritingPractice({
         }
       }
 
-      setIsNewSession(!initialSessionId);
+      if (initialSessionId) {
+        return;
+      }
+
+      setIsNewSession(true);
       const result = await generateFCEEssayAction({
         sessionId: initialSessionId,
         userId: undefined,

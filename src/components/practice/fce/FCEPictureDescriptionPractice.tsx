@@ -530,7 +530,11 @@ export function FCEPictureDescriptionPractice({
         }
       }
 
-      setIsNewSession(!initialSessionId);
+      if (initialSessionId) {
+        return;
+      }
+
+      setIsNewSession(true);
       const result = await generateFCEPictureDescriptionAction({ sessionId: initialSessionId });
 
       if ('error' in result) {

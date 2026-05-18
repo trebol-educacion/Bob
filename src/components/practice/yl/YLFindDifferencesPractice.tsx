@@ -643,7 +643,15 @@ export function YLFindDifferencesPractice({
           : null;
         return (
           <React.Fragment key={t.id}>
-            <YLBobTextMessage text={t.examinerCue} />
+            {sessionId && (
+              <YLVoiceNote
+                key={`cue-prev-${t.id}`}
+                text={t.examinerCue}
+                side="bob"
+                sessionId={sessionId}
+                autoPlay={false}
+              />
+            )}
             <YLUserTextMessage text={`${t.transcript} ${t.correct ? '✓' : '✗'}`} />
             {sessionId && (
               <YLVoiceNote
@@ -666,16 +674,13 @@ export function YLFindDifferencesPractice({
       })}
 
       {currentDiff && phase === 'ready' && sessionId && (
-        <>
-          <YLBobTextMessage text={currentDiff.examiner_cue} />
-          <YLVoiceNote
-            key={`cue-${turnIndex}`}
-            text={currentDiff.examiner_cue}
-            side="bob"
-            sessionId={sessionId}
-            autoPlay
-          />
-        </>
+        <YLVoiceNote
+          key={`cue-${turnIndex}`}
+          text={currentDiff.examiner_cue}
+          side="bob"
+          sessionId={sessionId}
+          autoPlay
+        />
       )}
 
       {phase === 'finished' && finalEval && !isReadOnly && (
