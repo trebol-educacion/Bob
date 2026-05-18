@@ -2,26 +2,33 @@
 
 import { useEffect, useState } from 'react';
 
-type Listener = (speaking: boolean) => void;
+type Listener = (key: string | null) => void;
 
 const listeners = new Set<Listener>();
-let currentSpeaking = false;
+let currentKey: string | null = null;
 
-/** Globally toggles Bob's "speaking" state so all avatars can react. */
-export function setBobSpeaking(speaking: boolean): void {
-  if (currentSpeaking === speaking) return;
-  currentSpeaking = speaking;
-  listeners.forEach((l) => l(speaking));
+/**
+ * Sets the key (message id or text) of the currently speaking message.
+ * Only avatars wired to the same key will animate. Pass null to silence.
+ */
+export function setBobSpeaking(key: string | null): void {
+  if (currentKey === key) return;
+  currentKey = key;
+  listeners.forEach((l) => l(key));
 }
 
-/** Subscribes a React component to Bob's speaking state. */
-export function useBobSpeaking(): boolean {
-  const [speaking, setSpeaking] = useState(currentSpeaking);
+/**
+ * Returns true only if `myKey` matches the currently speaking message key.
+ * Avatars without a key (or with a non-matching key) stay static.
+ */
+export function useBobSpeaking(myKey?: string | null): boolean {
+  const [key, setKey] = useState(currentKey);
   useEffect(() => {
-    listeners.add(setSpeaking);
+    listeners.add(setKey);
     return () => {
-      listeners.delete(setSpeaking);
+      listeners.delete(setKey);
     };
   }, []);
-  return speaking;
+  if (!myKey) return false;
+  return key === myKey;
 }
