@@ -288,7 +288,7 @@ export const ModeSelection = forwardRef<HTMLDivElement, ModeSelectionProps>(func
   const genericCards = visibleCards.filter(card => card.framework === 'generic');
   const frameworkCards = visibleCards.filter(card => card.framework !== 'generic');
 
-  const showFreePractice = frameworkCards.length === 0;
+  const showFreePractice = genericCards.length > 0;
 
   const sectionMap = new Map<string, DynamicCard[]>();
   for (const card of frameworkCards) {
