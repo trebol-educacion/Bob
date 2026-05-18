@@ -8,7 +8,22 @@ import { MessageBubble, TypingIndicator, SuggestionChip } from '@/components/cha
 import { ACTIVE_MODEL_LABEL } from '@/lib/models';
 import { PhrasePhase } from './PhrasePhase';
 import { ImagePhase } from './ImagePhase';
+import { CelebrationCard } from '@/components/practice/yl/CelebrationCard';
 import { useTranslations } from 'next-intl';
+
+function PhraseDots({ scores, currentIndex, total, finished }: { scores: number[]; currentIndex: number; total: number; finished: boolean }) {
+  return (
+    <div className="flex items-center gap-1.5">
+      {Array.from({ length: total }).map((_, i) => {
+        const score = scores[i];
+        let cls = 'bg-gray-200';
+        if (typeof score === 'number') cls = score >= 50 ? 'bg-emerald-500' : 'bg-rose-400';
+        else if (!finished && i === currentIndex) cls = 'bg-blue-500 ring-2 ring-blue-200';
+        return <span key={i} className={`w-2 h-2 rounded-full ${cls}`} />;
+      })}
+    </div>
+  );
+}
 
 function SaveErrorBanner({ error }: { error: string | null }) {
   if (!error) return null;
@@ -91,9 +106,23 @@ export function BobPracticeChat(props: UsePracticeChatProps) {
     </button>
   );
 
+  const isSituation = props.mode === 'situation';
+  const phraseTotal = chat.dynamicPhrases.length > 0 ? chat.dynamicPhrases.length : 10;
+  const showCelebration = isSituation && chat.phase === 'finished' && chat.phraseScores.length > 0;
+
+  const rightSlot = isSituation && chat.dynamicPhrases.length > 0 ? (
+    <PhraseDots
+      scores={chat.phraseScores}
+      currentIndex={chat.currentIndex}
+      total={phraseTotal}
+      finished={chat.phase === 'finished'}
+    />
+  ) : undefined;
+
   return (
+    <div className="relative flex flex-col h-full">
     <ChatShell
-      headerConfig={{ ...headerConfig, leftSlot: backButton }}
+      headerConfig={{ ...headerConfig, leftSlot: backButton, rightSlot }}
       footerConfig={{
         modeLabel: isImageMode ? t('footerModeImage') : t('footerModeSituation'),
         modelName: ACTIVE_MODEL_LABEL,
@@ -127,5 +156,15 @@ export function BobPracticeChat(props: UsePracticeChatProps) {
         </div>
       )}
     </ChatShell>
+    {showCelebration && (
+      <CelebrationCard
+        score={chat.averageScore}
+        scoreMax={100}
+        animate={!props.initialMessages || props.initialMessages.length === 0}
+        actionLabel="Done"
+        onAction={props.onBack}
+      />
+    )}
+    </div>
   );
 }

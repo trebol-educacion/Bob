@@ -233,13 +233,14 @@ export default function App() {
                 ) : (
                   <BobPracticeChat
                     mode={mode === 'generic_image' ? 'image' : 'situation'}
-                    level={(cefrActiveLevel as 'b1' | 'b2' | undefined) ?? undefined}
+                    level={(cefrActiveLevel as 'a1' | 'a2' | 'b1' | 'b2' | undefined) ?? undefined}
                     onBack={onFinish}
                     onSessionStart={async (title) => {
                       const { data } = await createSessionAction({ mode, topic: title, title });
                       if (data) { setActiveSessionId(data.id); setSessions(prev => [data, ...prev]); }
                       return data?.id;
                     }}
+                    onSessionFinished={refreshSessions}
                     sessionId={activeSessionId}
                     initialMessages={selectedMessages.length > 0 ? selectedMessages : undefined}
                   />

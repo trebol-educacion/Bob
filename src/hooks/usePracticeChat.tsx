@@ -13,6 +13,7 @@ import {
   EvaluationResult,
   ImageScene,
 } from '@/actions/gemini';
+import { pregenerateYLCueAudiosAction } from '@/actions/modes/yl';
 import { saveMessageAction, StoredMessage } from '@/actions/messages';
 import { blobToBase64, pcmToWavBase64 } from '@/lib/audio';
 import { createSupabaseBrowser } from '@/lib/supabase/browser-client';
@@ -126,6 +127,7 @@ export interface UsePracticeChatProps {
   sessionId?: string | null;
   initialMessages?: StoredMessage[];
   level?: 'a1' | 'a2' | 'b1' | 'b2';
+  onSessionFinished?: () => void;
 }
 
 export interface UsePracticeChatReturn {
@@ -137,6 +139,8 @@ export interface UsePracticeChatReturn {
   currentIndex: number;
   currentScene: (ImageScene & { image_data?: string }) | null;
   currentResult: EvaluationResult | null;
+  phraseScores: number[];
+  averageScore: number;
   isRecording: boolean;
   saveError: string | null;
   setInputText: (v: string) => void;
@@ -160,11 +164,14 @@ export function usePracticeChat({
   sessionId,
   initialMessages,
   level = 'b1',
+  onSessionFinished,
 }: UsePracticeChatProps): UsePracticeChatReturn {
   const isHistory = !!initialMessages && initialMessages.length > 0;
 
   const inferPhaseFromHistory = (msgs: StoredMessage[]): ChatPhase => {
     if (!msgs.length) return mode === 'image' ? 'image-config' : 'topic-input';
+    const evals = msgs.filter((m) => m.role === 'bob' && m.msg_type === 'evaluation').length;
+    if (mode === 'situation' && evals >= 10) return 'finished';
     const last = msgs[msgs.length - 1];
     if (last.role === 'bob') {
       if (last.msg_type === 'image_scene') return 'phrase-ready';
@@ -213,6 +220,15 @@ export function usePracticeChat({
     return { topic: j.topic, difficulty: j.difficulty as Difficulty };
   });
   const [currentResult, setCurrentResult] = useState<EvaluationResult | null>(null);
+  const [phraseScores, setPhraseScores] = useState<number[]>(() => {
+    if (!isHistory || !initialMessages) return [];
+    return initialMessages
+      .filter((m) => m.role === 'bob' && m.msg_type === 'evaluation')
+      .map((m) => {
+        const j = m.content_json as { score?: number } | null;
+        return typeof j?.score === 'number' ? j.score : 0;
+      });
+  });
   const [saveError, setSaveError] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
@@ -370,6 +386,10 @@ export function usePracticeChat({
       setMessages(prev => prev.slice(0, -1));
       addBobMessage(renderPhrase(generated[0], 0, generated.length));
       saveMsg({ role: 'bob', msg_type: 'phrase', content_json: { phrase: generated[0], index: 0, total: generated.length } });
+      const sidForPregen = sessionIdRef.current;
+      if (sidForPregen && generated.length > 0) {
+        void pregenerateYLCueAudiosAction(sidForPregen, generated);
+      }
       setPhase('phrase-ready');
     } catch {
       setMessages(prev => prev.slice(0, -1));
@@ -473,6 +493,9 @@ export function usePracticeChat({
               level === 'b2' ? 'b2' : 'b1',
             );
       setCurrentResult(result);
+      if (mode === 'situation') {
+        setPhraseScores((prev) => [...prev, result.score]);
+      }
       setMessages(prev => prev.slice(0, -1));
       const modelAnswer = mode === 'image' ? result.model_answer : undefined;
       addBobMessage(renderEvaluationContent(result.score, result.feedback, result.transcribed_text, modelAnswer));
@@ -532,11 +555,17 @@ export function usePracticeChat({
         );
         saveMsg({ role: 'bob', msg_type: 'text', content_text: completionText });
         setPhase('finished');
+        onSessionFinished?.();
       }
     } else {
       handleNextImage();
     }
   };
+
+  const averageScore =
+    phraseScores.length > 0
+      ? Math.round(phraseScores.reduce((a, b) => a + b, 0) / phraseScores.length)
+      : 0;
 
   return {
     phase,
@@ -547,6 +576,8 @@ export function usePracticeChat({
     currentIndex,
     currentScene,
     currentResult,
+    phraseScores,
+    averageScore,
     isRecording,
     saveError,
     setInputText,
