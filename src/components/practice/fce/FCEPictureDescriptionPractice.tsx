@@ -8,6 +8,7 @@ import { useTranslations } from 'next-intl';
 import { FCESpeakingIcon } from '@/components/icons/FCEIcons';
 import { CelebrationCard } from '@/components/practice/yl/CelebrationCard';
 import { BobMascotLoader } from '@/components/chat/BobMascotLoader';
+import { ChatInputBar } from '@/components/chat/ChatInputBar';
 import { BobAvatar } from '@/components/practice/yl/_shared';
 import { useCountdownTimer } from '@/hooks/useCountdownTimer';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
@@ -126,7 +127,7 @@ function InstructionsScreen({
             >
               {heading.startsWith('THE ') || heading.startsWith('LANGUAGE') || heading.startsWith('GOLDEN') || heading.startsWith('WHAT ') ? (
                 <div className="px-4 pt-3 pb-1">
-                  <p className="text-[11px] font-black uppercase tracking-widest text-emerald-600">{heading}</p>
+                  <p className="text-[11px] font-black uppercase tracking-widest text-bob-brand">{heading}</p>
                 </div>
               ) : (
                 <div className="px-4 pt-3 pb-1">
@@ -143,7 +144,10 @@ function InstructionsScreen({
                         const [, num, text] = match;
                         return (
                           <li key={j} className="flex items-start gap-2 text-sm text-gray-700">
-                            <span className="shrink-0 w-5 h-5 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-black flex items-center justify-center mt-0.5">
+                            <span
+                              className="shrink-0 w-5 h-5 rounded-full text-bob-brand text-[10px] font-black flex items-center justify-center mt-0.5"
+                              style={{ background: 'color-mix(in oklab, var(--color-bob-brand) 14%, white)' }}
+                            >
                               {num}
                             </span>
                             <span className="leading-snug">{text}</span>
@@ -158,7 +162,10 @@ function InstructionsScreen({
                         if (!text) return null;
                         return (
                           <li key={j} className="flex items-start gap-2 text-sm text-gray-700">
-                            <span className="shrink-0 w-1.5 h-1.5 rounded-full bg-emerald-400 mt-2" />
+                            <span
+                              className="shrink-0 w-1.5 h-1.5 rounded-full mt-2"
+                              style={{ background: 'var(--color-bob-brand)' }}
+                            />
                             <span className="leading-snug">{text}</span>
                           </li>
                         );
@@ -184,7 +191,8 @@ function InstructionsScreen({
             transition={{ delay: 0.3 }}
             type="button"
             onClick={onStart}
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 text-white font-bold text-sm shadow-sm hover:bg-emerald-700 active:scale-98 transition-all cursor-pointer"
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-white font-bold text-sm shadow-sm active:scale-98 transition-all cursor-pointer"
+            style={{ background: 'var(--color-bob-brand)' }}
           >
             {t('fce.pictureDescription.startTimer')}
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
@@ -232,7 +240,7 @@ function DualImageGrid({
           { url: imageUrlB, label: t('fce.pictureDescription.picture2Label') },
         ].map(({ url, label }) => (
           <div key={label} className="flex flex-col gap-1.5">
-            <p className="text-[10px] font-black uppercase tracking-widest text-center text-emerald-700">{label}</p>
+            <p className="text-[10px] font-black uppercase tracking-widest text-center text-bob-brand">{label}</p>
             {url ? (
               <div className="rounded-2xl overflow-hidden shadow-md aspect-[3/2]">
                 <Image
@@ -638,8 +646,11 @@ export function FCEPictureDescriptionPractice({
         >
           ←
         </button>
-        <div className="w-8 h-8 rounded-xl bg-emerald-100 flex items-center justify-center shrink-0">
-          <FCESpeakingIcon size={18} className="text-emerald-700" />
+        <div
+          className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0"
+          style={{ background: 'color-mix(in oklab, var(--color-bob-brand) 12%, white)' }}
+        >
+          <FCESpeakingIcon size={18} className="text-bob-brand" />
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-bold text-gray-800 truncate">
@@ -654,7 +665,8 @@ export function FCEPictureDescriptionPractice({
           <button
             type="button"
             onClick={() => setShowInstructions(true)}
-            className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-[11px] font-bold hover:bg-emerald-100 transition-colors cursor-pointer"
+            className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-bob-brand text-[11px] font-bold transition-colors cursor-pointer"
+            style={{ background: 'color-mix(in oklab, var(--color-bob-brand) 10%, white)' }}
             aria-label={t('fce.pictureDescription.showInstructionsButton')}
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5">
@@ -665,7 +677,10 @@ export function FCEPictureDescriptionPractice({
             {t('fce.pictureDescription.showInstructionsButton')}
           </button>
         )}
-        <span className="shrink-0 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-bold uppercase tracking-widest">
+        <span
+          className="shrink-0 px-2 py-0.5 rounded-full text-bob-brand text-[10px] font-bold uppercase tracking-widest"
+          style={{ background: 'color-mix(in oklab, var(--color-bob-brand) 12%, white)' }}
+        >
           {t('fce.pictureDescription.partBadge')}
         </span>
       </div>
@@ -730,23 +745,13 @@ export function FCEPictureDescriptionPractice({
             <div className="h-24" />
           </div>
 
-          <div className="shrink-0 border-t border-gray-100 bg-white/90 backdrop-blur px-4 py-3 flex items-center justify-between gap-3">
-            <p className="text-xs text-gray-500 font-medium pl-2">
-              {t('fce.pictureDescription.mic.tap')}
-            </p>
-            <button
-              type="button"
-              onClick={handleStartRecording}
-              className="w-14 h-14 rounded-full bg-emerald-600 text-white shadow-lg hover:scale-105 active:scale-95 transition-transform flex items-center justify-center"
-              aria-label={t('fce.pictureDescription.mic.tap')}
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
-                <rect x="9" y="3" width="6" height="12" rx="3" />
-                <path d="M5 11a7 7 0 0 0 14 0" />
-                <line x1="12" y1="18" x2="12" y2="22" />
-              </svg>
-            </button>
-          </div>
+          <ChatInputBar
+            variant="mic"
+            placeholder={t('fce.pictureDescription.mic.tap')}
+            recording={false}
+            onStart={handleStartRecording}
+            onStop={() => {}}
+          />
         </>
       )}
 
@@ -777,18 +782,13 @@ export function FCEPictureDescriptionPractice({
             </div>
           </div>
 
-          <div className="shrink-0 border-t border-gray-100 bg-white/90 backdrop-blur px-4 py-3 flex items-center justify-center">
-            <button
-              type="button"
-              onClick={handleStopRecording}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gray-100 text-gray-700 text-sm font-bold hover:bg-gray-200 transition-colors"
-            >
-              <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
-                <rect x="6" y="6" width="12" height="12" rx="2" />
-              </svg>
-              {t('fce.pictureDescription.mic.stop')}
-            </button>
-          </div>
+          <ChatInputBar
+            variant="mic"
+            placeholder={t('fce.pictureDescription.mic.stop')}
+            recording={true}
+            onStart={() => {}}
+            onStop={handleStopRecording}
+          />
         </>
       )}
 
@@ -804,7 +804,10 @@ export function FCEPictureDescriptionPractice({
 
           {transcript && (
             <div className="flex justify-end gap-2">
-              <div className="rounded-2xl rounded-tr-sm px-4 py-2.5 bg-gradient-to-br from-emerald-600 to-emerald-700 text-white text-sm max-w-xs shadow-sm">
+              <div
+                className="rounded-2xl rounded-tr-sm px-4 py-2.5 text-white text-sm max-w-xs shadow-sm"
+                style={{ background: 'var(--color-bob-brand)' }}
+              >
                 <p className="leading-relaxed">{transcript}</p>
               </div>
             </div>

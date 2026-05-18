@@ -21,6 +21,7 @@ import {
   type StudentStatRow,
   type StudentStatsResult,
 } from '@/actions/stats';
+import { useOrganization } from '@/hooks/useOrganization';
 
 interface Props {
   onBack: () => void;
@@ -159,11 +160,13 @@ function SkillRing({
   skill,
   pct,
   sessions,
+  cefrLevel,
   index,
 }: {
   skill: Skill;
   pct: number;
   sessions: number;
+  cefrLevel: string | null;
   index: number;
 }) {
   const t = useTranslations('dashboard');
@@ -229,6 +232,16 @@ function SkillRing({
         style={{ color: active ? meta.color : '#94a3b8' }}
       >
         {t(skillLabelKey)}
+      </span>
+      <span
+        className="px-1.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider"
+        style={
+          cefrLevel
+            ? { background: meta.soft, color: meta.color }
+            : { background: '#f1f5f9', color: '#94a3b8' }
+        }
+      >
+        {cefrLevel ? cefrLevel.replace('_', ' ') : '—'}
       </span>
       <span className="text-[10px] font-semibold text-trebol-text/40">
         {t('sessionCount', { n: sessions })}
@@ -488,6 +501,7 @@ function deriveStats(stats: StudentStatsResult): Derived {
 
 export function StudentStatsPanel({ onBack, onAfterReset }: Props) {
   const t = useTranslations('dashboard');
+  const { skillLevels } = useOrganization();
   const [stats, setStats] = useState<StudentStatsResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [resetting, setResetting] = useState(false);
@@ -726,6 +740,7 @@ export function StudentStatsPanel({ onBack, onAfterReset }: Props) {
                     skill={skill}
                     pct={derived.bySkill[skill].pct}
                     sessions={derived.bySkill[skill].sessions}
+                    cefrLevel={skillLevels?.[skill]?.cefr_level ?? null}
                     index={i}
                   />
                 ))}

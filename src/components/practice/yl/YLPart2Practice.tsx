@@ -293,7 +293,10 @@ export function YLPart2Practice({
   );
 
   const partBadge = (
-    <span className="text-xs font-bold bg-amber-50 text-amber-700 px-2 py-1 rounded-md">
+    <span
+      className="text-xs font-bold text-bob-brand px-2 py-1 rounded-md"
+      style={{ background: 'color-mix(in oklab, var(--color-bob-brand) 10%, white)' }}
+    >
       {partBadgeLabel}
     </span>
   );
@@ -348,7 +351,8 @@ export function YLPart2Practice({
         <div className="flex gap-3 pb-4">
           <button
             onClick={onBack}
-            className="flex-1 py-3 bg-blue-600 text-white rounded-xl font-bold hover:opacity-90 transition-opacity"
+            className="flex-1 py-3 text-white rounded-xl font-bold hover:opacity-90 transition-opacity"
+            style={{ background: 'var(--color-bob-brand)' }}
           >
             {t('common.backToActivities')}
           </button>
@@ -362,7 +366,8 @@ export function YLPart2Practice({
       <motion.div
         animate={{ width: `${progress}%` }}
         transition={{ duration: 0.4 }}
-        className="h-full bg-blue-600"
+        className="h-full"
+        style={{ background: 'var(--color-bob-brand)' }}
       />
     </div>
   );
@@ -386,8 +391,14 @@ export function YLPart2Practice({
       )}
 
       {exam === 'movers' && plan?.student_card && (
-        <div className="max-w-lg mx-auto w-full bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-1">
-          <p className="text-xs font-bold text-amber-700 uppercase tracking-wide">{t('part2.yourCard')}</p>
+        <div
+          className="max-w-lg mx-auto w-full rounded-xl p-4 space-y-1"
+          style={{
+            background: 'color-mix(in oklab, var(--color-bob-brand) 6%, white)',
+            border: '1px solid color-mix(in oklab, var(--color-bob-brand) 15%, white)',
+          }}
+        >
+          <p className="text-xs font-bold text-bob-brand uppercase tracking-wide">{t('part2.yourCard')}</p>
           {Object.entries(plan.student_card).map(([k, v]) => (
             <p key={k} className="text-sm text-gray-700">
               <span className="font-semibold">{k}:</span> {v}
@@ -430,7 +441,7 @@ export function YLPart2Practice({
                   key={countdown}
                   initial={{ scale: 1.4, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
-                  className="text-5xl font-black text-blue-600 block"
+                  className="text-5xl font-black text-bob-brand block"
                 >
                   {countdown}
                 </motion.span>
@@ -448,7 +459,10 @@ export function YLPart2Practice({
 
             {phase === 'processing' && (
               <div className="flex flex-col items-center gap-3">
-                <div className="w-8 h-8 border-3 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                <div
+                  className="w-8 h-8 border-3 border-t-transparent rounded-full animate-spin"
+                  style={{ borderColor: 'var(--color-bob-brand)', borderTopColor: 'transparent' }}
+                />
                 <p className="text-gray-500 font-semibold text-sm">
                   {t('common.processingAnswer')}
                 </p>

@@ -1,71 +1,105 @@
-import type { CefrLevel, DynamicCard, ModeFramework, ModeKey } from './types/practice';
+import type { CardVisibility, DynamicCard, ModeFramework, ModeKey, ResolvedCard } from './types/practice';
+import type { Skill, SkillLevelMap } from './types/skills';
 
 export interface ResolveModesArgs {
   isBobEnabled: boolean;
-  /** Single active CEFR level. null means the student has not yet selected a level. */
-  studentActiveCefr: CefrLevel | null;
-  /** Frameworks the student's org has granted (e.g. ['cambridge', 'toefl']). */
+  selectedSkill: Skill;
+  skillLevels: SkillLevelMap;
   studentFrameworks: ModeFramework[];
-  /** Frameworks enabled at the org level. */
   orgFrameworks: ModeFramework[];
-  /**
-   * Full catalog from bob_prompts (BD). Source of truth for what activities exist.
-   * Replaces the previous static catalog iteration. See spec.md §2.2.
-   */
   allDynamicCards: DynamicCard[];
 }
 
 /**
- * Returns the list of ModeKeys the student can access.
+ * Returns resolved cards for the selected skill with visibility per card.
  *
- * Inclusion rules (per spec §2.2):
- *   1. Mode M is included iff `isBobEnabled` AND one of:
- *      a. M.framework === 'generic' (fallback, visible only when the student
- *         has NO framework assigned). Cards with `cefr_level === null` are
- *         universal; otherwise must match studentActiveCefr.
- *      b. M.framework ∈ (studentFrameworks ∩ orgFrameworks)
- *         AND M.cefr_level === studentActiveCefr
+ * Visibility rules (spec bob-skill-first-assessment §4, D3):
+ *   - `enabled`                — framework + CEFR level match the student's level for selectedSkill.
+ *   - `disabled-mismatch`      — framework matches but CEFR level differs from the student's level.
+ *   - `disabled-not-available` — card is marked status='coming_soon' or 'hidden', or skill has
+ *                                no level assigned in skillLevels.
  *
- *   2. studentActiveCefr === null → only universal generics (`cefr_level=null`).
+ * Cards whose framework is not in the effective intersection are excluded entirely.
+ * Generic cards follow the same level-match logic unless cefr_level is null (universal).
  */
 export function resolveEnabledModes({
   isBobEnabled,
-  studentActiveCefr,
+  selectedSkill,
+  skillLevels,
   studentFrameworks,
   orgFrameworks,
   allDynamicCards,
-}: ResolveModesArgs): ModeKey[] {
+}: ResolveModesArgs): ResolvedCard[] {
   if (!isBobEnabled) return [];
 
   const effectiveFrameworks = studentFrameworks.filter(f => orgFrameworks.includes(f));
   const hasAssignedFrameworks = effectiveFrameworks.length > 0;
 
-  return allDynamicCards
-    .filter(card => {
-      if (card.framework === 'generic') {
-        const levelKey = `${card.mode_key}|${card.cefr_level ?? ''}`;
-        if (GENERIC_ALWAYS_VISIBLE_WITH_FRAMEWORK.has(levelKey)) {
-          if (studentActiveCefr === null) return false;
-          return card.cefr_level === studentActiveCefr;
-        }
-        if (hasAssignedFrameworks) return false;
-        if (card.cefr_level === null) return true;
-        if (studentActiveCefr === null) return false;
-        return card.cefr_level === studentActiveCefr;
+  const studentLevel = skillLevels[selectedSkill]?.cefr_level ?? null;
+
+  const resolved: ResolvedCard[] = [];
+
+  for (const card of allDynamicCards) {
+    if (card.status === 'hidden') continue;
+
+    if (card.framework === 'generic') {
+      const levelKey = `${card.mode_key}|${card.cefr_level ?? ''}`;
+
+      if (GENERIC_ALWAYS_VISIBLE_WITH_FRAMEWORK.has(levelKey)) {
+        if (studentLevel === null) continue;
+        const vis: CardVisibility = card.cefr_level === studentLevel ? 'enabled' : 'disabled-mismatch';
+        resolved.push({
+          ...card,
+          visibility: vis,
+          reason: vis === 'enabled' ? 'level_match' : 'level_mismatch',
+        });
+        continue;
       }
-      if (studentActiveCefr === null) return false;
-      if (!(effectiveFrameworks as string[]).includes(card.framework)) return false;
-      return card.cefr_level === studentActiveCefr;
-    })
-    .map(card => card.mode_key);
+
+      if (hasAssignedFrameworks) continue;
+
+      if (card.cefr_level === null) {
+        resolved.push({ ...card, visibility: 'enabled', reason: 'level_match' });
+        continue;
+      }
+
+      if (studentLevel === null) continue;
+      const vis: CardVisibility = card.cefr_level === studentLevel ? 'enabled' : 'disabled-mismatch';
+      resolved.push({
+        ...card,
+        visibility: vis,
+        reason: vis === 'enabled' ? 'level_match' : 'level_mismatch',
+      });
+      continue;
+    }
+
+    if (!(effectiveFrameworks as string[]).includes(card.framework)) continue;
+
+    if (card.status === 'coming_soon') {
+      resolved.push({ ...card, visibility: 'disabled-not-available', reason: 'status_not_available' });
+      continue;
+    }
+
+    if (studentLevel === null) {
+      resolved.push({ ...card, visibility: 'disabled-not-available', reason: 'status_not_available' });
+      continue;
+    }
+
+    const vis: CardVisibility = card.cefr_level === studentLevel ? 'enabled' : 'disabled-mismatch';
+    resolved.push({
+      ...card,
+      visibility: vis,
+      reason: vis === 'enabled' ? 'level_match' : 'level_mismatch',
+    });
+  }
+
+  return resolved;
 }
 
 /**
- * Generic mode keys that should remain visible even when the student has
- * Cambridge / TOEFL frameworks assigned. These cards render inside the
- * framework section via the override in mode-ui.ts (Phrase Practice ends
- * up inside PET / FCE), so excluding them as "generic fallback only"
- * leaves the student without the activity.
+ * Generic mode keys that remain visible even when the student has Cambridge / TOEFL
+ * frameworks assigned. These cards render inside the framework section via the
+ * override in mode-ui.ts (Phrase Practice inside PET / FCE).
  */
 const GENERIC_ALWAYS_VISIBLE_WITH_FRAMEWORK = new Set<string>([
   'generic_situation|b1',

@@ -177,6 +177,16 @@ export const ClosedItemSchema = z.object({
 /** Single row from bob_closed_items; shape mirrors the Zod schema above. */
 export type ClosedItem = z.infer<typeof ClosedItemSchema>;
 
+export type CardVisibility =
+  | 'enabled'
+  | 'disabled-mismatch'
+  | 'disabled-not-available';
+
+export interface ResolvedCard extends DynamicCard {
+  visibility: CardVisibility;
+  reason: 'level_match' | 'level_mismatch' | 'status_not_available';
+}
+
 /** User's raw writing submission for an open writing task. */
 export interface WritingResponse {
   text: string;

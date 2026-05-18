@@ -26,6 +26,11 @@ interface CefrLevelSelectorProps {
   locked: boolean;
 }
 
+/**
+ * @deprecated Global CEFR level picker — superseded by the skill-first flow
+ * introduced in `bob-skill-first-assessment`. Will be removed in `bob-cleanup-legacy-cefr`.
+ * The only remaining call site is `ModeSelection.tsx` (legacy mode-selection state).
+ */
 export function CefrLevelSelector({ value, onChange, onClear, disabled, locked }: CefrLevelSelectorProps) {
   const t = useTranslations('common');
   const isDisabled = disabled || locked;

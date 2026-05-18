@@ -17,7 +17,7 @@ import {
   MessageCircle,
   BookImage,
 } from 'lucide-react';
-import type { ModeKey, PracticeMode, CefrLevel, DynamicCard } from '@/lib/types/practice';
+import type { ModeKey, PracticeMode, CefrLevel, DynamicCard, CardVisibility } from '@/lib/types/practice';
 import { CefrLevelSelector } from '@/components/CefrLevelSelector';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import type { AvailableMode } from '@/contexts/OrganizationContext';
@@ -94,29 +94,29 @@ interface ModeCardProps {
   description: string;
   badge?: string;
   officialName?: string;
-  disabled?: boolean;
+  visibility: CardVisibility;
+  tooltip?: string;
   onSelect: (mode: ModeKey) => void;
 }
 
-function ModeCard({ mode, icon, title, description, badge, officialName, disabled, onSelect, exploreLabel }: ModeCardProps & { exploreLabel: string }) {
+function ModeCard({ mode, icon, title, description, badge, officialName, visibility, tooltip, onSelect, exploreLabel }: ModeCardProps & { exploreLabel: string }) {
+  const isDisabled = visibility !== 'enabled';
   return (
     <motion.button
-      whileHover={disabled ? {} : { y: -2 }}
-      whileTap={disabled ? {} : { scale: 0.99 }}
+      whileHover={isDisabled ? {} : { y: -2 }}
+      whileTap={isDisabled ? {} : { scale: 0.99 }}
       transition={{ duration: 0.2, ease: 'easeOut' }}
-      onClick={() => !disabled && onSelect(mode)}
-      disabled={disabled}
+      onClick={() => !isDisabled && onSelect(mode)}
+      disabled={isDisabled}
+      aria-disabled={isDisabled}
+      title={tooltip}
       className={`bg-white border hover:shadow-md rounded-2xl p-6 text-center transition-all duration-200 group relative flex flex-col items-center h-full w-full
         border-[color-mix(in_oklab,var(--color-bob-brand)_15%,white)]
         hover:border-[color-mix(in_oklab,var(--color-bob-brand)_28%,white)]
-        ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+        ${isDisabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
     >
       {badge && (
-        <span className={`absolute top-3 right-3 text-[11px] font-bold px-2.5 py-1 rounded-full tracking-wide ${
-          disabled
-            ? 'bg-slate-100 text-slate-500 ring-1 ring-slate-200'
-            : 'text-bob-brand bg-[color-mix(in_oklab,var(--color-bob-brand)_10%,white)]'
-        }`}>
+        <span className="absolute top-3 right-3 text-[11px] font-bold px-2.5 py-1 rounded-full tracking-wide text-bob-brand bg-[color-mix(in_oklab,var(--color-bob-brand)_10%,white)]">
           {badge}
         </span>
       )}
@@ -130,7 +130,7 @@ function ModeCard({ mode, icon, title, description, badge, officialName, disable
           {officialName}
         </p>
       )}
-      {!disabled && (
+      {!isDisabled && (
         <div className="mt-auto pt-4">
           <span className="inline-flex items-center justify-center text-sm font-bold text-bob-brand px-4 py-1.5 rounded-full transition-colors
             bg-[color-mix(in_oklab,var(--color-bob-brand)_10%,white)]
@@ -198,12 +198,14 @@ export const ModeSelection = forwardRef<HTMLDivElement, ModeSelectionProps>(func
   { onSelect, cefrActiveLevel = null, cefrLevelLocked = false, onCefrChange, organizationName },
   selectorRef
 ) {
-  const { allDynamicCards, enabledModes } = useOrganization();
+  const { allDynamicCards, enabledModes, resolvedCards } = useOrganization();
   const t = useTranslations('home.modeSelection');
 
   const HIDDEN_MODES = new Set<string>(['cambridge_flyers_part1']);
-  const COMING_SOON_MODES = new Set<string>();
   const enabledSet = new Set(enabledModes);
+
+  const resolvedCardMap = new Map(resolvedCards.map(rc => [rc.mode_key, rc]));
+
   const visibleCards = allDynamicCards.filter(card => {
     if (!enabledSet.has(card.mode_key)) return false;
     if (HIDDEN_MODES.has(card.mode_key)) return false;
@@ -235,8 +237,21 @@ export const ModeSelection = forwardRef<HTMLDivElement, ModeSelectionProps>(func
 
   const exploreLabel = t('explore');
 
+  function resolveTooltip(visibility: CardVisibility, card: DynamicCard): string | undefined {
+    if (visibility === 'disabled-mismatch') {
+      const level = card.cefr_level?.toUpperCase() ?? '';
+      return t('availableForLevel', { level });
+    }
+    if (visibility === 'disabled-not-available') {
+      return t('notAvailableYet');
+    }
+    return undefined;
+  }
+
   function renderCard(card: DynamicCard) {
-    const isComingSoon = card.status === 'coming_soon' || COMING_SOON_MODES.has(card.mode_key);
+    const resolved = resolvedCardMap.get(card.mode_key);
+    const visibility: CardVisibility = resolved?.visibility ?? 'enabled';
+    const tooltip = resolveTooltip(visibility, card);
     return (
       <ModeCard
         key={card.mode_key}
@@ -244,9 +259,10 @@ export const ModeSelection = forwardRef<HTMLDivElement, ModeSelectionProps>(func
         icon={resolveIcon(getModeIcon(card), 26, 'text-bob-brand')}
         title={getModeTitle(card)}
         description={getModeDescription(card)}
-        badge={isComingSoon ? t('comingSoon') : getModeBadge(card)}
+        badge={getModeBadge(card)}
         officialName={getModeOfficialName(card)}
-        disabled={isComingSoon}
+        visibility={visibility}
+        tooltip={tooltip}
         onSelect={onSelect}
         exploreLabel={exploreLabel}
       />

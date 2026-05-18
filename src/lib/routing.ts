@@ -34,7 +34,12 @@ import {
 } from '@/components/practice/fce';
 
 export type AppState =
+  | 'skill-selection'
+  | 'assessment-invite'
+  | 'assessment-running'
+  | 'assessment-result'
   | 'mode-selection'
+  | 'catalog-filtered'
   | 'practicing'
   | 'conversation-practicing'
   | 'exam-practicing'

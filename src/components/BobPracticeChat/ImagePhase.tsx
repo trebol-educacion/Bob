@@ -1,9 +1,10 @@
 'use client';
 
 import React, { useEffect } from 'react';
-import { Mic, Square, Loader2, ArrowRight } from 'lucide-react';
+import { Loader2, ArrowRight } from 'lucide-react';
 import { UsePracticeChatReturn } from '@/hooks/usePracticeChat';
 import { useCountdown } from '@/hooks/useCountdown';
+import { ChatInputBar } from '@/components/chat/ChatInputBar';
 
 type ImagePhaseProps = Pick<
   UsePracticeChatReturn,
@@ -37,22 +38,22 @@ export function ImagePhase({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase]);
 
-  return (
-    <div className="shrink-0 border-t border-trebol-border bg-white px-4 py-3">
-      {phase === 'phrase-ready' && (
-        <div className="flex justify-center">
-          <button
-            type="button"
-            onClick={handleAudioStart}
-            className="flex items-center gap-3 px-8 py-3 bg-trebol-primary text-white rounded-full font-bold text-sm hover:opacity-90 transition-opacity shadow-lg"
-          >
-            <Mic size={20} /> Record answer
-          </button>
-        </div>
-      )}
+  if (phase === 'phrase-ready') {
+    return (
+      <ChatInputBar
+        variant="mic"
+        placeholder="Tap to record your answer"
+        recording={false}
+        onStart={handleAudioStart}
+        onStop={() => {}}
+      />
+    );
+  }
 
-      {phase === 'recording' && (
-        <div className="flex flex-col items-center gap-3">
+  if (phase === 'recording') {
+    return (
+      <>
+        <div className="shrink-0 px-4 pt-2 flex justify-center bg-white">
           <div
             className={`text-2xl font-mono font-bold tabular-nums ${
               countdown.remaining <= 10 ? 'text-red-500 animate-pulse' : 'text-trebol-text/60'
@@ -60,16 +61,20 @@ export function ImagePhase({
           >
             {String(countdown.remaining).padStart(2, '0')}s
           </div>
-          <button
-            type="button"
-            onClick={stopRecording}
-            className="flex items-center gap-3 px-8 py-3 bg-red-500 text-white rounded-full font-bold text-sm hover:opacity-90 transition-opacity shadow-lg animate-pulse"
-          >
-            <Square size={18} /> Stop recording
-          </button>
         </div>
-      )}
+        <ChatInputBar
+          variant="mic"
+          placeholder="Tap to stop"
+          recording={true}
+          onStart={() => {}}
+          onStop={stopRecording}
+        />
+      </>
+    );
+  }
 
+  return (
+    <div className="shrink-0 border-t border-trebol-border bg-white px-4 py-3">
       {(phase === 'generating' || phase === 'evaluating') && (
         <div className="flex justify-center py-1">
           <span className="text-sm text-trebol-text/50 flex items-center gap-2">
