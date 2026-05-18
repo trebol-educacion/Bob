@@ -234,7 +234,11 @@ export function KETShortMessagePractice({
         }
       }
 
-      setIsNewSession(!initialSessionId);
+      if (initialSessionId) {
+        return;
+      }
+
+      setIsNewSession(true);
       const result = await generateKETShortMessageAction({
         sessionId: initialSessionId,
         userId: undefined,

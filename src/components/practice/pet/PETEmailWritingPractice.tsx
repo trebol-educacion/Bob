@@ -274,7 +274,11 @@ export function PETEmailWritingPractice({
         }
       }
 
-      setIsNewSession(!initialSessionId);
+      if (initialSessionId) {
+        return;
+      }
+
+      setIsNewSession(true);
       const result = await generatePETEmailAction({ sessionId: initialSessionId, userId: undefined });
 
       if ('error' in result) {

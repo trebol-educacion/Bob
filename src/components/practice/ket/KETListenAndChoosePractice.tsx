@@ -32,7 +32,7 @@ type Phase = 'loading' | 'generating' | 'ready' | 'submitting' | 'finished';
 interface RestoredState {
   items: ListenItem[];
   framingText: string;
-  results: ListenAnswerResult[];
+  results: ListenAnswerResult[] | null;
   correctCount: number;
 }
 
@@ -56,7 +56,7 @@ function tryRestore(messages: StoredMessage[]): RestoredState | null {
     }
   }
 
-  if (items && results) return { items, framingText, results, correctCount };
+  if (items) return { items, framingText, results, correctCount };
   return null;
 }
 
@@ -482,14 +482,26 @@ export function KETListenAndChoosePractice({
         if (restored) {
           setItems(restored.items);
           setFramingText(restored.framingText);
-          setResults(restored.results);
-          setCorrectCount(restored.correctCount);
-          setPhase('finished');
+          if (restored.results) {
+            setResults(restored.results);
+            setCorrectCount(restored.correctCount);
+            setPhase('finished');
+          } else {
+            const { createSupabaseBrowser } = await import('@/lib/supabase/browser-client');
+            const supabase = createSupabaseBrowser();
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) setUserId(user.id);
+            setPhase('ready');
+          }
           return;
         }
       }
 
-      setIsNewSession(!initialSessionId);
+      if (initialSessionId) {
+        return;
+      }
+
+      setIsNewSession(true);
       setPhase('generating');
 
       const result = await generateKETListenAndChooseAction({ sessionId: initialSessionId });

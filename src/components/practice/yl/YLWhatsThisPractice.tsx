@@ -673,7 +673,15 @@ export function YLWhatsThisPractice({
           : `Say: "Yes, I have" or "No, I haven't"`;
         return (
           <React.Fragment key={t.id}>
-            <YLBobTextMessage text={t.question} />
+            {sessionId && (
+              <YLVoiceNote
+                key={`cue-prev-${t.id}`}
+                text={t.question}
+                side="bob"
+                sessionId={sessionId}
+                autoPlay={false}
+              />
+            )}
             <YLUserTextMessage text={`${t.transcript} ${t.correct ? '✓' : '✗'}`} />
             {sessionId && (
               <YLVoiceNote
@@ -696,16 +704,13 @@ export function YLWhatsThisPractice({
       })}
 
       {currentQuestion && phase === 'ready' && sessionId && (
-        <>
-          <YLBobTextMessage text={currentQuestion.text} />
-          <YLVoiceNote
-            key={`cue-${cueIndex}`}
-            text={currentQuestion.text}
-            side="bob"
-            sessionId={sessionId}
-            autoPlay
-          />
-        </>
+        <YLVoiceNote
+          key={`cue-${cueIndex}`}
+          text={currentQuestion.text}
+          side="bob"
+          sessionId={sessionId}
+          autoPlay
+        />
       )}
 
       {phase === 'finished' && finalEval && !isReadOnly && (
