@@ -125,7 +125,7 @@ export interface UsePracticeChatProps {
   onSessionStart: (title: string) => Promise<string | undefined>;
   sessionId?: string | null;
   initialMessages?: StoredMessage[];
-  level?: 'b1' | 'b2';
+  level?: 'a1' | 'a2' | 'b1' | 'b2';
 }
 
 export interface UsePracticeChatReturn {
@@ -364,7 +364,7 @@ export function usePracticeChat({
       if (id) sessionIdRef.current = id;
     }
     try {
-      const generated = await generateTopicPhrasesAction(t);
+      const generated = await generateTopicPhrasesAction(t, level);
       setDynamicPhrases(generated);
       setCurrentIndex(0);
       setMessages(prev => prev.slice(0, -1));
@@ -412,7 +412,8 @@ export function usePracticeChat({
       </span>
     );
     try {
-      const scene = await generateImageSceneAction(cfg.topic, cfg.difficulty, level);
+      const imageLevel: 'b1' | 'b2' = level === 'b2' ? 'b2' : 'b1';
+      const scene = await generateImageSceneAction(cfg.topic, cfg.difficulty, imageLevel);
       const imageData = await generateImageAction(scene.image_prompt);
       const fullScene = { ...scene, image_data: imageData };
       setCurrentScene(fullScene);
@@ -469,7 +470,7 @@ export function usePracticeChat({
               base64Audio,
               mimeType,
               currentScene?.description || '',
-              level
+              level === 'b2' ? 'b2' : 'b1',
             );
       setCurrentResult(result);
       setMessages(prev => prev.slice(0, -1));

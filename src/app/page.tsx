@@ -233,6 +233,7 @@ export default function App() {
                 ) : (
                   <BobPracticeChat
                     mode={mode === 'generic_image' ? 'image' : 'situation'}
+                    level={(cefrActiveLevel as 'b1' | 'b2' | undefined) ?? undefined}
                     onBack={onFinish}
                     onSessionStart={async (title) => {
                       const { data } = await createSessionAction({ mode, topic: title, title });
