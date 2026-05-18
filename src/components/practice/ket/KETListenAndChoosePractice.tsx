@@ -489,7 +489,11 @@ export function KETListenAndChoosePractice({
         }
       }
 
-      setIsNewSession(!initialSessionId);
+      if (initialSessionId) {
+        return;
+      }
+
+      setIsNewSession(true);
       setPhase('generating');
 
       const result = await generateKETListenAndChooseAction({ sessionId: initialSessionId });

@@ -73,15 +73,15 @@ export async function startYLSessionAction(input: {
   }
 
   const partTitles: Record<string, string> = {
-    starters_1: 'Starters Part 1 — Señalar imágenes',
-    starters_2: 'Starters Part 2 — Preguntas sobre escena',
-    starters_3: 'Starters Part 3 — Historia con imágenes',
-    starters_4: 'Starters Part 4 — Preguntas personales',
-    movers_1: 'Movers Part 1 — Encuentra diferencias',
-    movers_2: 'Movers Part 2 — Intercambio de información',
-    movers_3: 'Movers Part 3 — Cuenta la historia',
-    movers_4: 'Movers Part 4 — Preguntas personales',
-    movers_5: 'Movers Part 5 — Describe la imagen',
+    starters_1: 'Starters Part 1 — Listen and Point',
+    starters_2: 'Starters Part 2 — Look and Answer',
+    starters_3: 'Starters Part 3 — What\'s This?',
+    starters_4: 'Starters Part 4 — Personal Questions',
+    movers_1: 'Movers Part 1 — Find the Differences',
+    movers_2: 'Movers Part 2 — Information Exchange',
+    movers_3: 'Movers Part 3 — Tell the Story',
+    movers_4: 'Movers Part 4 — Personal Questions',
+    movers_5: 'Movers Part 5 — More About You',
   };
   const titleKey = `${exam}_${part}`;
   const title = partTitles[titleKey] ?? `Cambridge ${exam} Part ${part}`;

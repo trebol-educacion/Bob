@@ -260,7 +260,11 @@ export function KETSignsAndNoticesPractice({
         }
       }
 
-      setIsNewSession(!initialSessionId);
+      if (initialSessionId) {
+        return;
+      }
+
+      setIsNewSession(true);
       const result = await generateKETSignsAndNoticesAction({ sessionId: initialSessionId });
 
       if ('error' in result) {

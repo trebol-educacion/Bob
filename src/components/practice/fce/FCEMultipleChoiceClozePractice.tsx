@@ -343,7 +343,11 @@ export function FCEMultipleChoiceClozePractice({
         }
       }
 
-      setIsNewSession(!initialSessionId);
+      if (initialSessionId) {
+        return;
+      }
+
+      setIsNewSession(true);
       const result = await generateFCEClozeAction({ sessionId: initialSessionId });
 
       if ('error' in result) {

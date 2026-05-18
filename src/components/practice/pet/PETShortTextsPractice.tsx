@@ -277,7 +277,11 @@ export function PETShortTextsPractice({
         }
       }
 
-      setIsNewSession(!initialSessionId);
+      if (initialSessionId) {
+        return;
+      }
+
+      setIsNewSession(true);
       const result = await generatePETShortTextsAction({ sessionId: initialSessionId });
 
       if ('error' in result) {

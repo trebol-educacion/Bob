@@ -452,7 +452,11 @@ export function PETPictureDescriptionPractice({
         }
       }
 
-      setIsNewSession(!initialSessionId);
+      if (initialSessionId) {
+        return;
+      }
+
+      setIsNewSession(true);
       const result = await generatePETPictureDescriptionAction({ sessionId: initialSessionId });
 
       if ('error' in result) {
