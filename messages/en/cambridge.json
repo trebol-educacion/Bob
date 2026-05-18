@@ -113,6 +113,117 @@
       "sendMessage": "Send message"
     }
   },
+  "fce": {
+    "cloze": {
+      "back": "Back",
+      "headerTitle": "Multiple-Choice Cloze",
+      "headerSubtitle": "FCE · Reading & Use of English Part 1",
+      "partBadge": "PART 1",
+      "preparingExercise": "Preparing your cloze exercise…",
+      "checkingAnswers": "Checking your answers…",
+      "gapLabel": "Gap {number}",
+      "answeredCount": "{answered} / {total} answered",
+      "submitAnswers": "Submit answers",
+      "correctBadge": "Correct",
+      "incorrectBadge": "Incorrect",
+      "correctAnswerLabel": "Correct answer:",
+      "explanationLabel": "Why:",
+      "celebrationFeedback": "Well done! Keep practising collocations and phrasal verbs to master B2 vocabulary.",
+      "celebrationAction": "See my activities"
+    },
+    "essay": {
+      "back": "Back",
+      "headerTitle": "Essay",
+      "headerSubtitle": "FCE · Writing Part 1",
+      "partBadge": "PART 1",
+      "preparingExercise": "Preparing your essay…",
+      "reviewingMessage": "Reviewing your essay…",
+      "words": "Words:",
+      "target": "/ target 140-190",
+      "moreToSend": "{remaining} more to send",
+      "contextLabel": "Context",
+      "titleLabel": "Essay title",
+      "notesLabel": "Notes",
+      "yourOwnIdeaBadge": "your idea",
+      "placeholder": "Write your essay here…",
+      "yourEssay": "Your essay",
+      "youDidIt": "Great essay!",
+      "reviewYourEssay": "Review your essay",
+      "whatYouDidWell": "What you did well",
+      "toImprove": "To improve",
+      "organizationLabel": "Organisation",
+      "registerLabel": "Register",
+      "bandLabel": {
+        "OK": "OK",
+        "Good": "Good",
+        "Excellent": "Excellent"
+      },
+      "viewModelAnswer": "View model answer",
+      "hideModelAnswer": "Hide model answer",
+      "modelAnswerTitle": "Model answer (B2 level)",
+      "celebrationFeedback": "Well done writing your essay! Keep practising to cover all 3 notes with a strong, balanced argument.",
+      "celebrationAction": "See my activities"
+    },
+    "pictureDescription": {
+      "back": "Back",
+      "headerTitle": "Picture Description",
+      "headerSubtitle": "FCE · Speaking Part 2",
+      "partBadge": "PART 2",
+      "preparingExercise": "Bob is preparing your two pictures…",
+      "processingDescription": "Bob is listening to your description…",
+      "startTimer": "Start — 1-minute timer",
+      "showInstructionsButton": "Instructions",
+      "instructionsTitle": "How to do this exercise",
+      "closeInstructions": "Close",
+      "recordingTimer": "Time left",
+      "readyReminder": "Compare both pictures and speculate for 1 minute.",
+      "picture1Label": "Picture 1",
+      "picture2Label": "Picture 2",
+      "mic": {
+        "tap": "Tap the mic to start comparing",
+        "recording": "Recording… keep talking!",
+        "stop": "Stop recording"
+      },
+      "audioRequired": "I didn't hear you. Tap the mic and try again.",
+      "coverageTitle": "Long-Turn Coverage",
+      "dimensions": {
+        "introduction": "Introduction",
+        "comparison": "Comparison",
+        "contrast": "Contrast",
+        "speculation": "Speculation",
+        "addressed_question": "Answered Question",
+        "conclusion": "Conclusion"
+      },
+      "highlightsTitle": "What you did well",
+      "suggestionsTitle": "To improve",
+      "fluencyTitle": "Fluency",
+      "languageTitle": "Language",
+      "fluencyBand": {
+        "OK": "OK",
+        "Good": "Good",
+        "Excellent": "Excellent"
+      },
+      "languageBand": {
+        "OK": "OK",
+        "Good": "Good",
+        "Excellent": "Excellent"
+      },
+      "referenceVocabularyTitle": "Scene vocabulary",
+      "referenceDimensions": {
+        "comparison": "Comparison",
+        "speculation": "Speculation",
+        "activity_verbs": "Activity verbs",
+        "emotions": "Emotions",
+        "settings": "Settings"
+      },
+      "showModelAnswer": "See a model answer",
+      "hideModelAnswer": "Hide model answer",
+      "modelAnswerTitle": "Model answer (B2 level)",
+      "celebrationFeedback": "Nice work comparing the pictures! Keep practising to cover all 6 points fluently.",
+      "celebrationAction": "See my progress",
+      "finishedTitle": "Long Turn complete"
+    }
+  },
   "pet": {
     "shortTexts": {
       "headerTitle": "Short Texts",

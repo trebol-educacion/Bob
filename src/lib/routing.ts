@@ -27,6 +27,11 @@ import {
   PETShortTextsPractice,
   PETEmailWritingPractice,
 } from '@/components/practice/pet';
+import {
+  FCEMultipleChoiceClozePractice,
+  FCEPictureDescriptionPractice,
+  FCEEssayWritingPractice,
+} from '@/components/practice/fce';
 
 export type AppState =
   | 'mode-selection'
@@ -172,8 +177,8 @@ export const EXAM_PART_COMPONENT_MAP: Record<ModeKey, RouteEntry> = {
   },
   cambridge_fce_writing_part1: {
     appState: 'exam-practicing',
-    kind: 'exam',
-    render: (p) => React.createElement(AcademicWritingPractice, { mode: 'cambridge_fce_writing_part1', onBack: (p as ExamRenderProps).onBack }),
+    kind: 'yl',
+    render: (p) => React.createElement(FCEEssayWritingPractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
   },
   cambridge_ket_writing_part6: {
     appState: 'exam-practicing',
@@ -194,6 +199,16 @@ export const EXAM_PART_COMPONENT_MAP: Record<ModeKey, RouteEntry> = {
     appState: 'exam-practicing',
     kind: 'yl',
     render: (p) => React.createElement(KETListenAndChoosePractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
+  },
+  cambridge_fce_reading_part1: {
+    appState: 'exam-practicing',
+    kind: 'yl',
+    render: (p) => React.createElement(FCEMultipleChoiceClozePractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
+  },
+  cambridge_fce_p2: {
+    appState: 'exam-practicing',
+    kind: 'yl',
+    render: (p) => React.createElement(FCEPictureDescriptionPractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
   },
 };
 
