@@ -3,6 +3,7 @@
     "label": "Level",
     "comingSoon": "Coming soon",
     "lockedByOrg": "Your school locked your CEFR level",
-    "lockedAria": "Locked by your school"
+    "lockedAria": "Locked by your school",
+    "clear": "Click to clear your level"
   }
 }

@@ -15,20 +15,34 @@ import { getOrCreateCueAudioAction } from '@/actions/modes/yl';
 import { pcmToWavBase64 } from '@/lib/audio';
 import type { EvalResponse } from '@/lib/types/practice';
 import { BobMascotLoader } from '@/components/chat/BobMascotLoader';
+import { setBobSpeaking, useBobSpeaking } from '@/lib/bob-speaking';
 
 export const RECORDING_MAX_SECONDS = 45;
 export const REACTION_PAUSE_MS = 1200;
 
-export function BobAvatar() {
+export function BobAvatar({ audioKey }: { audioKey?: string }) {
+  const speaking = useBobSpeaking(audioKey);
   return (
-    <div className="w-8 h-8 rounded-xl overflow-hidden shrink-0 bg-amber-50 border border-amber-100 mt-1 relative">
+    <div className="w-11 h-11 rounded-xl overflow-hidden shrink-0 bg-white border border-gray-100 mt-1 relative">
       <Image
         src="/bob_avatar.png"
         alt="Bob"
         fill
-        sizes="32px"
-        className="object-cover"
+        sizes="44px"
+        className="object-contain"
       />
+      {speaking && (
+        <video
+          autoPlay
+          muted
+          playsInline
+          loop
+          preload="auto"
+          className="absolute inset-0 w-full h-full object-cover"
+        >
+          <source src="/bob_speaking.mp4" type="video/mp4" />
+        </video>
+      )}
     </div>
   );
 }
@@ -44,10 +58,14 @@ export function stopCurrentAudio(): void {
   }
   _currentText = null;
   _cachedUrl = null;
+  setBobSpeaking(null);
 }
 
 export function pauseCurrentAudio(): void {
-  if (_currentAudio && !_currentAudio.paused) _currentAudio.pause();
+  if (_currentAudio && !_currentAudio.paused) {
+    _currentAudio.pause();
+    setBobSpeaking(null);
+  }
 }
 
 export function isAudioPaused(): boolean {
@@ -56,20 +74,24 @@ export function isAudioPaused(): boolean {
 
 export async function resumeCurrentAudio(): Promise<void> {
   if (_currentAudio && _currentAudio.paused) {
-    try { await _currentAudio.play(); } catch { /* ignore */ }
+    try {
+      await _currentAudio.play();
+      setBobSpeaking(_currentText);
+    } catch { /* ignore */ }
   }
 }
 
 export async function playTTS(text: string): Promise<void> {
-  // Reuse the cached audio when replaying the same text (no extra TTS call).
   if (_currentText === text && _cachedUrl) {
     if (_currentAudio) _currentAudio.pause();
     const audio = new Audio(_cachedUrl);
     _currentAudio = audio;
+    setBobSpeaking(text);
     await new Promise<void>((resolve) => {
-      audio.onended = () => resolve();
-      audio.onerror = () => resolve();
-      audio.play().catch(() => resolve());
+      audio.onended = () => { setBobSpeaking(null); resolve(); };
+      audio.onerror = () => { setBobSpeaking(null); resolve(); };
+      audio.onpause = () => setBobSpeaking(null);
+      audio.play().catch(() => { setBobSpeaking(null); resolve(); });
     });
     return;
   }
@@ -82,13 +104,15 @@ export async function playTTS(text: string): Promise<void> {
     _cachedUrl = url;
     const audio = new Audio(url);
     _currentAudio = audio;
+    setBobSpeaking(text);
     await new Promise<void>((resolve) => {
-      audio.onended = () => resolve();
-      audio.onerror = () => resolve();
-      audio.play().catch(() => resolve());
+      audio.onended = () => { setBobSpeaking(null); resolve(); };
+      audio.onerror = () => { setBobSpeaking(null); resolve(); };
+      audio.onpause = () => setBobSpeaking(null);
+      audio.play().catch(() => { setBobSpeaking(null); resolve(); });
     });
   } catch {
-    // Non-fatal — continue even if TTS fails
+    setBobSpeaking(null);
   }
 }
 
@@ -315,6 +339,7 @@ export function YLVoiceNote({
       intervalRef.current = null;
     }
     setPlaying(false);
+    setBobSpeaking(null);
   }, []);
 
   React.useEffect(() => () => stop(), [stop]);
@@ -354,6 +379,7 @@ export function YLVoiceNote({
       };
       audio.onerror = () => stop();
       setPlaying(true);
+      if (side === 'bob') setBobSpeaking(text);
       intervalRef.current = setInterval(() => {
         if (audio.duration > 0) setProgress(audio.currentTime / audio.duration);
       }, 100);
@@ -383,7 +409,7 @@ export function YLVoiceNote({
   return (
     <div className={`flex ${isBob ? 'justify-start' : 'justify-end'} gap-2 font-nunito`}>
       {isBob && (
-        <BobAvatar />
+        <BobAvatar audioKey={text} />
       )}
       <div className={`flex items-center gap-3 rounded-2xl px-3 py-2 max-w-sm ${bubbleColor} ${playing ? 'ring-2 ring-violet-400/40 shadow-md' : ''}`}>
         <button
@@ -428,7 +454,7 @@ export function YLVoiceNote({
 export function YLBobTextMessage({ text }: { text: string }) {
   return (
     <div className="flex justify-start gap-2 font-nunito">
-      <BobAvatar />
+      <BobAvatar audioKey={text} />
       <div className="rounded-2xl rounded-tl-sm px-4 py-2.5 bg-white ring-1 ring-violet-100 shadow-[0_1px_2px_rgba(0,0,0,0.04)] text-slate-800 text-sm max-w-sm font-bold">
         {text}
       </div>
@@ -661,7 +687,7 @@ export function YLReadOnlyMessage({
   return (
     <div className={`flex ${isBob ? 'justify-start' : 'justify-end'} gap-2`}>
       {isBob && (
-        <BobAvatar />
+        <BobAvatar audioKey={text} />
       )}
       <div className="flex flex-col gap-1 max-w-md">
         {!isBob && cue && (

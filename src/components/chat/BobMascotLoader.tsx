@@ -83,7 +83,7 @@ export function BobMascotLoader({
               width={avatar}
               height={avatar}
               priority
-              className="w-full h-full object-cover"
+              className="w-full h-full object-cover object-[50%_0%] scale-95 origin-bottom"
             />
           </motion.div>
         </motion.div>
