@@ -126,10 +126,12 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
             .from('student_english_frameworks')
             .select('framework_id, pedagogical_frameworks(name, type)')
             .eq('user_id', userId),
-          supabase
-            .from('organization_frameworks')
-            .select('framework_id, pedagogical_frameworks(name, type)')
-            .eq('organization_id', org?.id ?? ''),
+          org?.id
+            ? supabase
+                .from('organization_frameworks')
+                .select('framework_id, pedagogical_frameworks(name, type)')
+                .eq('organization_id', org.id)
+            : Promise.resolve({ data: [], error: null } as { data: never[]; error: null }),
           supabase
             .from('bob_prompts')
             .select('framework, exam_part, cefr_level, label, description')

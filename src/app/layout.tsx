@@ -34,7 +34,14 @@ export default async function RootLayout({
   const messages = await getMessages();
 
   return (
-    <html lang={locale} className={`${poppins.variable} ${nunito.variable} h-full`}>
+    <html lang={locale} className={`${poppins.variable} ${nunito.variable} h-full`} suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var s=localStorage.getItem('bob-brand');if(!s)return;var b=JSON.parse(s);var r=document.documentElement.style;if(b.primary){r.setProperty('--color-trebol-primary',b.primary);r.setProperty('--color-bob-brand',b.primary);}if(b.secondary)r.setProperty('--color-trebol-secondary',b.secondary);if(b.accent)r.setProperty('--color-trebol-accent',b.accent);}catch(e){}})();`,
+          }}
+        />
+      </head>
       <body className="font-sans antialiased h-full">
         <NextIntlClientProvider messages={messages}>
           <OrganizationProvider>
