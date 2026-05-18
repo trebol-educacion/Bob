@@ -107,9 +107,27 @@ export function getModeBadge(card: DynamicCard): string {
   return label ? `${label} · ${mins} min` : `${mins} min`;
 }
 
+/**
+ * Generic cards that should render as part of a Cambridge section instead of
+ * "Free practice" (e.g. Phrase Practice surfaces inside PET/FCE so the
+ * student sees it next to the official parts).
+ */
+const GENERIC_AS_CAMBRIDGE: Record<string, { section: string; weight: number }> = {
+  generic_situation_b1: { section: 'Cambridge PET (B1 Preliminary)', weight: 9000 },
+  generic_situation_b2: { section: 'Cambridge FCE (B2 First)', weight: 9000 },
+};
+
+/** True when this card, although `framework='generic'`, should be grouped with a Cambridge framework. */
+export function isGenericGroupedWithCambridge(card: DynamicCard): boolean {
+  return card.mode_key in GENERIC_AS_CAMBRIDGE;
+}
+
 /** Returns the section heading under which this card is grouped in ModeSelection. */
 export function getModeSection(card: DynamicCard): string {
   const { framework, exam_part } = card;
+
+  const override = GENERIC_AS_CAMBRIDGE[card.mode_key];
+  if (override) return override.section;
 
   if (framework === 'cambridge') {
     if (exam_part.startsWith('starters_') || exam_part.startsWith('movers_') || exam_part.startsWith('flyers_')) {
@@ -144,6 +162,9 @@ const SPEAKING_BASE = 4000;
 
 export function getModeSortWeight(card: DynamicCard): number {
   const { framework, exam_part } = card;
+
+  const override = GENERIC_AS_CAMBRIDGE[card.mode_key];
+  if (override) return override.weight;
 
   if (framework === 'cambridge') {
     const ylMatch = exam_part.match(/^(starters|movers|flyers)_part(\d+)$/);

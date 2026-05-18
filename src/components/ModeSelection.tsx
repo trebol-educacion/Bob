@@ -21,7 +21,7 @@ import type { ModeKey, PracticeMode, CefrLevel, DynamicCard } from '@/lib/types/
 import { CefrLevelSelector } from '@/components/CefrLevelSelector';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import type { AvailableMode } from '@/contexts/OrganizationContext';
-import { getModeIcon, getModeBadge, getModeSection, getModeTitle, getModeDescription, getModeSortWeight, getModeOfficialName, getYLCardTheme, type YLCardTheme } from '@/lib/mode-ui';
+import { getModeIcon, getModeBadge, getModeSection, getModeTitle, getModeDescription, getModeSortWeight, getModeOfficialName, getYLCardTheme, isGenericGroupedWithCambridge, type YLCardTheme } from '@/lib/mode-ui';
 import { ListenAndPointIcon } from '@/components/icons/ModeIcons';
 import { LookAndAnswerIcon, TellTheStoryIcon, WhatsThisIcon, PersonalQuestionsIcon } from '@/components/icons/StartersIcons';
 import { FindTheDifferencesIcon, InformationExchangeIcon, PictureStoryMoversIcon, PersonalQuestionsMoversIcon, MoreAboutYouIcon } from '@/components/icons/MoversIcons';
@@ -285,10 +285,14 @@ export const ModeSelection = forwardRef<HTMLDivElement, ModeSelectionProps>(func
     card => enabledSet.has(card.mode_key) && !HIDDEN_MODES.has(card.mode_key),
   );
 
-  const genericCards = visibleCards.filter(card => card.framework === 'generic');
-  const frameworkCards = visibleCards.filter(card => card.framework !== 'generic');
+  const genericCards = visibleCards.filter(
+    card => card.framework === 'generic' && !isGenericGroupedWithCambridge(card),
+  );
+  const frameworkCards = visibleCards.filter(
+    card => card.framework !== 'generic' || isGenericGroupedWithCambridge(card),
+  );
 
-  const showFreePractice = genericCards.length > 0;
+  const showFreePractice = frameworkCards.length === 0;
 
   const sectionMap = new Map<string, DynamicCard[]>();
   for (const card of frameworkCards) {
