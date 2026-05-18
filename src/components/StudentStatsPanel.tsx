@@ -351,7 +351,7 @@ function PathGroup({ title, level, framework, nodes }: { title: string; level: s
       transition={{ delay: 0.45, duration: 0.5 }}
       className="relative"
     >
-      <div className="sticky top-0 z-10 bg-gradient-to-b from-[#fffbf2] via-[#fffbf2] to-transparent pt-2 pb-3 mb-2">
+      <div className="sticky top-0 z-10 bg-gradient-to-b from-white via-white to-transparent pt-2 pb-3 mb-2">
         <div className="flex items-baseline gap-2">
           <h3 className="text-lg font-black text-trebol-text tracking-tight">{title}</h3>
           <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-trebol-text/5 text-trebol-text/60">
@@ -535,25 +535,7 @@ export function StudentStatsPanel({ onBack, onAfterReset }: Props) {
   const hasData = !!stats && stats.total_sessions > 0 && !!derived;
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 relative overflow-hidden bg-[#fffbf2]">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 opacity-[0.35]"
-        style={{
-          backgroundImage:
-            'radial-gradient(circle at 12% 14%, #fde9c8 0, transparent 38%), radial-gradient(circle at 88% 10%, #dde4f2 0, transparent 32%), radial-gradient(circle at 75% 88%, #dcebe3 0, transparent 36%)',
-        }}
-      />
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 opacity-[0.05]"
-        style={{
-          backgroundImage:
-            'radial-gradient(circle, #1e293b 1px, transparent 1px)',
-          backgroundSize: '22px 22px',
-        }}
-      />
-
+    <div className="flex-1 flex flex-col min-h-0 relative overflow-hidden bg-white">
       <div className="relative z-10 shrink-0">
         <div className="flex items-center gap-3 px-4 py-3 bg-white/75 backdrop-blur-md">
           <button
@@ -591,10 +573,7 @@ export function StudentStatsPanel({ onBack, onAfterReset }: Props) {
         <div
           aria-hidden
           className="h-[3px] w-full"
-          style={{
-            background:
-              'linear-gradient(90deg, #3660AB 0%, #469E7B 30%, #F8AC37 60%, #E62D2B 100%)',
-          }}
+          style={{ background: 'var(--color-bob-brand)' }}
         />
       </div>
 
@@ -642,20 +621,9 @@ export function StudentStatsPanel({ onBack, onAfterReset }: Props) {
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5 }}
-              className="relative overflow-hidden rounded-[28px] border-2 border-white shadow-xl mb-6"
-              style={{
-                background:
-                  'linear-gradient(135deg, #3660AB 0%, #3f7a96 55%, #469E7B 100%)',
-              }}
+              className="relative overflow-hidden rounded-[28px] shadow-xl mb-6"
+              style={{ background: 'var(--color-bob-brand)' }}
             >
-              <div
-                aria-hidden
-                className="absolute inset-0 opacity-30"
-                style={{
-                  backgroundImage:
-                    'radial-gradient(circle at 80% 20%, #fff 0, transparent 30%), radial-gradient(circle at 20% 90%, #fff 0, transparent 25%)',
-                }}
-              />
               <div className="relative p-5 sm:p-6 flex flex-col sm:flex-row items-center gap-5">
                 <motion.div
                   initial={{ scale: 0, rotate: -20 }}
@@ -663,16 +631,6 @@ export function StudentStatsPanel({ onBack, onAfterReset }: Props) {
                   transition={{ delay: 0.1, type: 'spring', stiffness: 200, damping: 14 }}
                   className="relative shrink-0"
                 >
-                  <div
-                    aria-hidden
-                    className="absolute -inset-3 rounded-full"
-                    style={{
-                      background:
-                        'conic-gradient(from 0deg, #fde68a, #fbcfe8, #c7d2fe, #fde68a)',
-                      filter: 'blur(8px)',
-                      opacity: 0.6,
-                    }}
-                  />
                   <div className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-full bg-white shadow-2xl ring-4 ring-white overflow-hidden">
                     <motion.div
                       animate={{ rotate: [0, -6, 6, -4, 0] }}
