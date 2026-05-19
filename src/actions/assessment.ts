@@ -124,13 +124,20 @@ export async function startAssessmentAction(skill: Skill): Promise<StartAssessme
     const shuffled = [...rawItems].sort(() => Math.random() - 0.5);
     const selected = shuffled.slice(0, Math.min(10, shuffled.length));
 
-    const items: AssessmentListeningItem[] = selected.map(row => ({
-      id: row.id as string,
-      audio_url: (row.stimulus_audio_url as string) ?? '',
-      transcript: (row.transcript as string | null) ?? null,
-      question: row.question as string,
-      options: row.options as Array<{ key: string; label: string }>,
-    }));
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? '';
+    const items: AssessmentListeningItem[] = selected.map(row => {
+      const rawPath = (row.stimulus_audio_url as string) ?? '';
+      const fullUrl = rawPath.startsWith('http')
+        ? rawPath
+        : `${supabaseUrl}/storage/v1/object/public/bob-listening${rawPath}`;
+      return {
+        id: row.id as string,
+        audio_url: fullUrl,
+        transcript: (row.transcript as string | null) ?? null,
+        question: row.question as string,
+        options: row.options as Array<{ key: string; label: string }>,
+      };
+    });
 
     return { status: 'ok', skill: 'listening', assessment_id, items };
   }
