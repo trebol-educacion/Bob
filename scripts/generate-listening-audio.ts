@@ -39,15 +39,36 @@ const GEMINI_API_KEY = process.env.GEMINI_API_KEY!;
 const TTS_MODEL = 'gemini-2.5-flash-preview-tts';
 const BUCKET = 'bob-listening';
 
-const VOICE_MAP: Record<string, string> = {
-  child_male:     'Zephyr',
-  child_female:   'Zephyr',
-  teenager_male:  'Charon',
-  teenager_female:'Kore',
-  adult_male:     'Orus',
-  adult_female:   'Aoede',
-  adult_mixed:    'Orus',
-};
+const BOB_VOICE = 'Sadaltager';
+
+const FORCE_REGEN = process.argv.includes('--force');
+
+function extractSampleRate(mimeType?: string): number | null {
+  if (!mimeType) return null;
+  const m = mimeType.match(/rate=(\d+)/);
+  return m ? Number(m[1]) : null;
+}
+
+function pcmToWav(pcm: Buffer, sampleRate: number, channels: number, bitDepth: number): Buffer {
+  const dataSize = pcm.length;
+  const byteRate = sampleRate * channels * (bitDepth / 8);
+  const blockAlign = channels * (bitDepth / 8);
+  const header = Buffer.alloc(44);
+  header.write('RIFF', 0);
+  header.writeUInt32LE(36 + dataSize, 4);
+  header.write('WAVE', 8);
+  header.write('fmt ', 12);
+  header.writeUInt32LE(16, 16);
+  header.writeUInt16LE(1, 20);
+  header.writeUInt16LE(channels, 22);
+  header.writeUInt32LE(sampleRate, 24);
+  header.writeUInt32LE(byteRate, 28);
+  header.writeUInt16LE(blockAlign, 32);
+  header.writeUInt16LE(bitDepth, 34);
+  header.write('data', 36);
+  header.writeUInt32LE(dataSize, 40);
+  return Buffer.concat([header, pcm]);
+}
 
 async function main() {
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
@@ -58,7 +79,8 @@ async function main() {
     .select('id, variant_id, cefr_level, stimulus_audio_url, transcript, metadata')
     .eq('skill', 'listening')
     .eq('status', 'enabled')
-    .not('transcript', 'is', null);
+    .not('transcript', 'is', null)
+    .in('exam_part', ['assessment_listening', 'pet_listening_part2', 'fce_listening_part1']);
 
   if (error || !items) {
     console.error('Failed to fetch items:', error);
@@ -81,20 +103,28 @@ async function main() {
 
     const storagePath = audioPath.startsWith('/') ? audioPath.slice(1) : audioPath;
 
-    const { data: existing } = await supabase.storage
-      .from(BUCKET)
-      .list(path.dirname(storagePath), { search: path.basename(storagePath) });
+    if (!FORCE_REGEN) {
+      const { data: existing } = await supabase.storage
+        .from(BUCKET)
+        .list(path.dirname(storagePath), { search: path.basename(storagePath) });
 
-    if (existing && existing.length > 0) {
-      console.log(`[${item.variant_id}] Already exists — skipping.`);
-      skipped++;
-      continue;
+      if (existing && existing.length > 0) {
+        const head = await fetch(
+          `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${storagePath}`,
+          { method: 'HEAD' },
+        );
+        const ct = head.headers.get('content-type') ?? '';
+        if (ct.includes('wav') || ct.includes('mpeg')) {
+          console.log(`[${item.variant_id}] Already exists with valid audio — skipping.`);
+          skipped++;
+          continue;
+        }
+        console.log(`[${item.variant_id}] Exists but content-type is ${ct} — regenerating with WAV wrapper.`);
+      }
     }
 
     const transcript = item.transcript as string;
-    const meta = (item.metadata as Record<string, string>) ?? {};
-    const voiceKey = meta.voice ?? 'adult_female';
-    const voiceName = VOICE_MAP[voiceKey] ?? 'Aoede';
+    const voiceName = BOB_VOICE;
 
     console.log(`[${item.variant_id}] Generating TTS with voice ${voiceName}…`);
 
@@ -120,13 +150,15 @@ async function main() {
         continue;
       }
 
-      const audioBuffer = Buffer.from(audioPart.inlineData.data, 'base64');
+      const pcmBuffer = Buffer.from(audioPart.inlineData.data, 'base64');
+      const sampleRate = extractSampleRate(audioPart.inlineData.mimeType) ?? 24000;
+      const wavBuffer = pcmToWav(pcmBuffer, sampleRate, 1, 16);
 
       const { error: uploadError } = await supabase.storage
         .from(BUCKET)
-        .upload(storagePath, audioBuffer, {
-          contentType: audioPart.inlineData.mimeType ?? 'audio/L16;codec=pcm;rate=24000',
-          upsert: false,
+        .upload(storagePath, wavBuffer, {
+          contentType: 'audio/wav',
+          upsert: true,
         });
 
       if (uploadError) {

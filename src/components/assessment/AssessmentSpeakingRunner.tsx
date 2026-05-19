@@ -2,23 +2,20 @@
 
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Mic, StopCircle, ChevronRight, RotateCcw } from 'lucide-react';
-import {
-  submitAssessmentSpeakingAction,
-  pollAssessmentSpeakingResultAction,
-} from '@/actions/assessment';
+import { BobMascotLoader } from '@/components/chat/BobMascotLoader';
+import { submitAssessmentSpeakingAction } from '@/actions/assessment';
 import type { AssessmentPrompt } from '@/actions/assessment';
-import type { AssessmentResultSpeaking } from '@/lib/types/skills';
 
 interface Props {
   assessment_id: string;
   prompts: AssessmentPrompt[];
   is_yl?: boolean;
-  onResult: (result: AssessmentResultSpeaking) => void;
+  onQueued: () => void;
   onCancel: () => void;
 }
 
 type TurnState = 'idle' | 'recording' | 'done';
-type RunnerPhase = 'turns' | 'submitting' | 'evaluating' | 'failed';
+type RunnerPhase = 'turns' | 'submitting' | 'sent' | 'failed';
 
 interface RecordedTurn {
   audio_base64: string;
@@ -29,10 +26,8 @@ interface RecordedTurn {
 
 const MAX_TURN_MS_DEFAULT = 20_000;
 const MAX_TURN_MS_YL = 10_000;
-const POLL_INTERVAL_MS = 2_000;
-const POLL_TIMEOUT_MS = 90_000;
 
-export function AssessmentSpeakingRunner({ assessment_id, prompts, is_yl = false, onResult, onCancel }: Props) {
+export function AssessmentSpeakingRunner({ assessment_id, prompts, is_yl = false, onQueued, onCancel }: Props) {
   const MAX_TURN_MS = is_yl ? MAX_TURN_MS_YL : MAX_TURN_MS_DEFAULT;
   const [currentTurnIdx, setCurrentTurnIdx] = useState(0);
   const [turnState, setTurnState] = useState<TurnState>('idle');
@@ -46,8 +41,6 @@ export function AssessmentSpeakingRunner({ assessment_id, prompts, is_yl = false
   const chunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startTimeRef = useRef<number>(0);
-  const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const pollStartRef = useRef<number>(0);
 
   const clearTimer = useCallback(() => {
     if (timerRef.current) {
@@ -56,22 +49,14 @@ export function AssessmentSpeakingRunner({ assessment_id, prompts, is_yl = false
     }
   }, []);
 
-  const clearPollTimer = useCallback(() => {
-    if (pollTimerRef.current) {
-      clearInterval(pollTimerRef.current);
-      pollTimerRef.current = null;
-    }
-  }, []);
-
   useEffect(() => {
     return () => {
       clearTimer();
-      clearPollTimer();
       if (mediaRecorderRef.current?.state === 'recording') {
         mediaRecorderRef.current.stop();
       }
     };
-  }, [clearTimer, clearPollTimer]);
+  }, [clearTimer]);
 
   const stopRecording = useCallback(() => {
     clearTimer();
@@ -146,9 +131,7 @@ export function AssessmentSpeakingRunner({ assessment_id, prompts, is_yl = false
 
     const turns = recordedTurns.map((rt, idx) => ({
       turn_number: idx + 1,
-      prompt_key: idx < prompts.length
-        ? `turn_${idx + 1}`
-        : 'unknown',
+      prompt_key: idx < prompts.length ? `turn_${idx + 1}` : 'unknown',
       audio_base64: rt.audio_base64,
       mime_type: rt.mime_type,
       duration_ms: rt.duration_ms,
@@ -162,29 +145,9 @@ export function AssessmentSpeakingRunner({ assessment_id, prompts, is_yl = false
       return;
     }
 
-    setPhase('evaluating');
-    pollStartRef.current = Date.now();
-
-    pollTimerRef.current = setInterval(async () => {
-      if (Date.now() - pollStartRef.current > POLL_TIMEOUT_MS) {
-        clearPollTimer();
-        setPhase('failed');
-        setFailureMessage('Evaluation is taking longer than expected. Your level has not changed. Please try again.');
-        return;
-      }
-
-      const poll = await pollAssessmentSpeakingResultAction(assessment_id);
-
-      if (poll.status === 'done') {
-        clearPollTimer();
-        onResult(poll.result);
-      } else if (poll.status === 'failed') {
-        clearPollTimer();
-        setPhase('failed');
-        setFailureMessage('We could not evaluate your speaking. Your level has not changed.');
-      }
-    }, POLL_INTERVAL_MS);
-  }, [assessment_id, recordedTurns, prompts.length, clearPollTimer, onResult]);
+    setPhase('sent');
+    setTimeout(() => onQueued(), 2_000);
+  }, [assessment_id, recordedTurns, prompts.length, onQueued]);
 
   const handleRetry = useCallback(() => {
     setPhase('turns');
@@ -205,7 +168,7 @@ export function AssessmentSpeakingRunner({ assessment_id, prompts, is_yl = false
         </p>
         <button
           onClick={handleRetry}
-          className="flex items-center gap-2 px-5 py-2.5 bg-trebol-green text-white rounded-xl font-semibold text-sm hover:opacity-90 transition"
+          className="flex items-center gap-2 px-5 py-2.5 bg-trebol-primary text-white rounded-xl font-semibold text-sm hover:opacity-90 transition"
         >
           <RotateCcw size={16} /> Try again
         </button>
@@ -216,18 +179,12 @@ export function AssessmentSpeakingRunner({ assessment_id, prompts, is_yl = false
     );
   }
 
-  if (phase === 'evaluating' || phase === 'submitting') {
-    return (
-      <div className="flex flex-col items-center justify-center flex-1 p-8 gap-6 text-center">
-        <div className="text-5xl animate-pulse">🤔</div>
-        <p className="text-xl font-black text-gray-800">
-          {phase === 'submitting' ? 'Sending your recording…' : 'Bob is evaluating your speaking…'}
-        </p>
-        <p className="text-sm text-gray-500 max-w-xs">
-          This usually takes about 10–20 seconds. Hang tight!
-        </p>
-      </div>
-    );
+  if (phase === 'sent') {
+    return <BobMascotLoader size="lg" message="Recording sent! Bob will evaluate it in the background — check your dashboard in a moment." />;
+  }
+
+  if (phase === 'submitting') {
+    return <BobMascotLoader size="lg" message="Sending your recording…" />;
   }
 
   if (phase === 'failed') {
@@ -238,7 +195,7 @@ export function AssessmentSpeakingRunner({ assessment_id, prompts, is_yl = false
         <p className="text-sm text-gray-500 max-w-xs">{failureMessage}</p>
         <button
           onClick={handleRetry}
-          className="flex items-center gap-2 px-5 py-2.5 bg-trebol-green text-white rounded-xl font-semibold text-sm hover:opacity-90 transition"
+          className="flex items-center gap-2 px-5 py-2.5 bg-trebol-primary text-white rounded-xl font-semibold text-sm hover:opacity-90 transition"
         >
           <RotateCcw size={16} /> Try the assessment again
         </button>
@@ -261,9 +218,9 @@ export function AssessmentSpeakingRunner({ assessment_id, prompts, is_yl = false
             key={i}
             className={`flex-1 h-1.5 rounded-full transition-colors ${
               i < currentTurnIdx
-                ? 'bg-trebol-green'
+                ? 'bg-trebol-primary'
                 : i === currentTurnIdx
-                ? 'bg-trebol-green/40'
+                ? 'bg-trebol-primary/40'
                 : 'bg-gray-200'
             }`}
           />
@@ -283,7 +240,7 @@ export function AssessmentSpeakingRunner({ assessment_id, prompts, is_yl = false
       {turnState === 'idle' && (
         <button
           onClick={startRecording}
-          className="flex items-center gap-2 px-6 py-3 bg-trebol-green text-white rounded-xl font-semibold text-sm hover:opacity-90 transition shadow-sm"
+          className="flex items-center gap-2 px-6 py-3 bg-trebol-primary text-white rounded-xl font-semibold text-sm hover:opacity-90 transition shadow-sm"
         >
           <Mic size={18} /> Start recording
         </button>
@@ -324,7 +281,7 @@ export function AssessmentSpeakingRunner({ assessment_id, prompts, is_yl = false
             </button>
             <button
               onClick={handleNext}
-              className="flex items-center gap-1.5 px-5 py-2 bg-trebol-green text-white rounded-xl text-sm font-semibold hover:opacity-90 transition"
+              className="flex items-center gap-1.5 px-5 py-2 bg-trebol-primary text-white rounded-xl text-sm font-semibold hover:opacity-90 transition"
             >
               {isLastTurn ? 'Submit' : 'Next question'}
               <ChevronRight size={16} />

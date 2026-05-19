@@ -80,9 +80,9 @@ export interface SkillLevelHistoryEntry {
   id: number;
   user_id: string;
   skill: Skill;
-  level_before: string | null;
-  level_after: string;
+  previous_level: string | null;
+  new_level: string;
   origin: SkillLevelOrigin;
   occurred_at: string;
-  source_assessment_id?: string | null;
+  assessment_id?: string | null;
 }

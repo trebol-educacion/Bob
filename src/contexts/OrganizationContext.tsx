@@ -5,6 +5,7 @@ import { Organization, getOrganizationForUser } from '@/lib/organization';
 import { createSupabaseBrowser } from '@/lib/supabase/browser-client';
 import { resolveEnabledModes } from '@/lib/modes';
 import { detectSustainedImprovementAction } from '@/actions/skills';
+import { getPendingAssessmentsAction, type PendingAssessmentsMap } from '@/actions/assessment';
 import type { ModeKey, ModeFramework, CefrLevel, DynamicCard, ResolvedCard } from '@/lib/types/practice';
 import type { Skill, SkillLevelMap } from '@/lib/types/skills';
 
@@ -49,6 +50,7 @@ interface OrganizationContextValue {
   skillLevels: SkillLevelMap | null;
   /** Refreshes `skillLevels` from the DB — call after a completed Assessment. */
   refreshSkillLevels: () => Promise<void>;
+  refreshPendingAssessments: () => Promise<void>;
   /** Skill selected by the student in the skill-first flow; null when on home. */
   selectedSkill: Skill | null;
   /** Sets the currently selected skill; stored in sessionStorage for navigation resilience. */
@@ -60,6 +62,8 @@ interface OrganizationContextValue {
   resolvedCards: ResolvedCard[];
   /** Cooldown period in days read from `organizations.assessment_cooldown_days`. */
   assessmentCooldownDays: number;
+  /** Per-skill pending evaluations currently in the queue (pending or processing). */
+  pendingAssessments: PendingAssessmentsMap;
   /**
    * True when the student has shown sustained improvement (≥85% accuracy over last 5 sessions)
    * and cooldown has expired. Loaded once when entering catalog-filtered; null while not yet checked.
@@ -84,10 +88,12 @@ const OrganizationContext = createContext<OrganizationContextValue>({
   allDynamicCards: [],
   skillLevels: null,
   refreshSkillLevels: async () => {},
+  refreshPendingAssessments: async () => {},
   selectedSkill: null,
   setSelectedSkill: () => {},
   resolvedCards: [],
   assessmentCooldownDays: 7,
+  pendingAssessments: { speaking: null, listening: null, reading: null, writing: null },
   sustainedImprovementDetected: null,
   checkSustainedImprovement: () => {},
   cefrActiveLevel: null,
@@ -114,6 +120,9 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
   const [accessDenialReason, setAccessDenialReason] = useState<BobAccessDenialReason | null>(null);
   const [skillLevels, setSkillLevels] = useState<SkillLevelMap | null>(null);
   const [assessmentCooldownDays, setAssessmentCooldownDays] = useState<number>(7);
+  const [pendingAssessments, setPendingAssessments] = useState<PendingAssessmentsMap>({
+    speaking: null, listening: null, reading: null, writing: null,
+  });
   const [selectedSkill, setSelectedSkillState] = useState<Skill | null>(() => {
     if (typeof window !== 'undefined') {
       return (sessionStorage.getItem('bob_selected_skill') as Skill | null) ?? null;
@@ -389,12 +398,73 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
           }
         }
         setAvailableModes(deduped);
+        void getPendingAssessmentsAction().then(setPendingAssessments);
       } catch (err) {
         console.error('[OrganizationContext] Unexpected error loading org data:', err);
       } finally {
         setLoading(false);
       }
     })();
+  }, []);
+
+  useEffect(() => {
+    const supabase = createSupabaseBrowser();
+    let userId: string | null = null;
+
+    supabase.auth.getUser().then(({ data }) => {
+      userId = data.user?.id ?? null;
+      if (!userId) return;
+
+      const refreshAll = () => {
+        void getPendingAssessmentsAction().then(setPendingAssessments);
+        void (async () => {
+          const { data: rows } = await supabase
+            .from('bob_skill_levels')
+            .select('skill, cefr_level, origin, confidence, last_assessment_at, updated_at')
+            .eq('user_id', userId!);
+          const ALL_SKILLS: Skill[] = ['reading', 'listening', 'writing', 'speaking'];
+          const map: SkillLevelMap = {};
+          for (const row of (rows ?? []) as Array<{
+            skill: string;
+            cefr_level: string;
+            origin: string;
+            confidence: number | null;
+            last_assessment_at: string | null;
+            updated_at: string;
+          }>) {
+            const skill = row.skill as Skill;
+            if (ALL_SKILLS.includes(skill)) {
+              map[skill] = {
+                cefr_level: row.cefr_level as CefrLevel,
+                origin: row.origin as import('@/lib/types/skills').SkillLevelOrigin,
+                confidence: row.confidence,
+                last_assessment_at: row.last_assessment_at,
+                updated_at: row.updated_at,
+              };
+            }
+          }
+          setSkillLevels(map);
+        })();
+      };
+
+      const channel = supabase
+        .channel('bob_assessment_changes')
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'bob_skill_levels', filter: `user_id=eq.${userId}` },
+          refreshAll
+        )
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'bob_assessment_queue', filter: `user_id=eq.${userId}` },
+          refreshAll
+        )
+        .subscribe();
+
+      return () => {
+        void supabase.removeChannel(channel);
+      };
+    });
   }, []);
 
   const setCefrActiveLevel = useCallback(async (level: CefrLevel | null) => {
@@ -478,6 +548,11 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
     setSkillLevels(map);
   }, [cachedUserId]);
 
+  const refreshPendingAssessments = useCallback(async () => {
+    const data = await getPendingAssessmentsAction();
+    setPendingAssessments(data);
+  }, []);
+
   const checkSustainedImprovement = useCallback(() => {
     if (!selectedSkill) return;
     const cacheKey = selectedSkill;
@@ -512,10 +587,12 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
       allDynamicCards,
       skillLevels,
       refreshSkillLevels,
+      refreshPendingAssessments,
       selectedSkill,
       setSelectedSkill,
       resolvedCards,
       assessmentCooldownDays,
+      pendingAssessments,
       sustainedImprovementDetected,
       checkSustainedImprovement,
       cefrActiveLevel,

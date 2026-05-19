@@ -192,6 +192,7 @@ function SkillRing({
   cefrLevel,
   lastAssessment,
   index,
+  isPending,
   onTakeAssessment,
   onChangeLevel,
 }: {
@@ -201,6 +202,7 @@ function SkillRing({
   cefrLevel: string | null;
   lastAssessment: LastAssessment | null;
   index: number;
+  isPending?: boolean;
   onTakeAssessment?: (skill: Skill) => void;
   onChangeLevel?: (skill: Skill, level: string) => Promise<void> | void;
 }) {
@@ -283,6 +285,22 @@ function SkillRing({
       <span className="text-[10px] font-semibold text-trebol-text/40">
         {t('sessionCount', { n: sessions })}
       </span>
+      {isPending && (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="mt-1 flex items-center gap-1 px-2 py-1 rounded-full"
+          style={{ background: meta.soft, border: `1px solid ${meta.color}50` }}
+        >
+          <span
+            className="inline-block w-2 h-2 rounded-full animate-pulse"
+            style={{ background: meta.color }}
+          />
+          <span className="text-[9px] font-black uppercase tracking-wider" style={{ color: meta.color }}>
+            Evaluating
+          </span>
+        </motion.div>
+      )}
       {lastAssessment ? (
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
@@ -630,7 +648,7 @@ function deriveStats(stats: StudentStatsResult): Derived {
 
 export function StudentStatsPanel({ onBack, onAfterReset, onTakeAssessment, onChangeLevel }: Props) {
   const t = useTranslations('dashboard');
-  const { skillLevels } = useOrganization();
+  const { skillLevels, pendingAssessments } = useOrganization();
   const [stats, setStats] = useState<StudentStatsResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [resetting, setResetting] = useState(false);
@@ -660,7 +678,7 @@ export function StudentStatsPanel({ onBack, onAfterReset, onTakeAssessment, onCh
       if (!user) return;
       const { data } = await supabase
         .from('bob_skill_level_history')
-        .select('skill, level_after, occurred_at')
+        .select('skill, new_level, occurred_at')
         .eq('user_id', user.id)
         .eq('origin', 'assessment')
         .order('occurred_at', { ascending: false });
@@ -671,7 +689,7 @@ export function StudentStatsPanel({ onBack, onAfterReset, onTakeAssessment, onCh
       for (const row of data) {
         const s = row.skill as Skill;
         if (!byMostRecent[s]) {
-          byMostRecent[s] = { cefr_band: row.level_after, occurred_at: row.occurred_at };
+          byMostRecent[s] = { cefr_band: row.new_level, occurred_at: row.occurred_at };
         }
       }
       setLastAssessments(byMostRecent);
@@ -757,33 +775,62 @@ export function StudentStatsPanel({ onBack, onAfterReset, onTakeAssessment, onCh
         )}
 
         {!loading && stats && stats.total_sessions === 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-            className="text-center py-16 px-6"
-          >
+          <>
             <motion.div
-              animate={{ y: [0, -8, 0] }}
-              transition={{ repeat: Infinity, duration: 2.4, ease: 'easeInOut' }}
-              className="relative w-32 h-32 mx-auto mb-6"
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5 }}
+              className="text-center py-10 px-6"
             >
-              <Image
-                src="/bob_avatar.png"
-                alt="Bob"
-                fill
-                sizes="128px"
-                className="object-contain drop-shadow-xl"
-                priority
-              />
+              <motion.div
+                animate={{ y: [0, -8, 0] }}
+                transition={{ repeat: Infinity, duration: 2.4, ease: 'easeInOut' }}
+                className="relative w-28 h-28 mx-auto mb-5"
+              >
+                <Image
+                  src="/bob_avatar.png"
+                  alt="Bob"
+                  fill
+                  sizes="112px"
+                  className="object-contain drop-shadow-xl"
+                  priority
+                />
+              </motion.div>
+              <h2 className="text-2xl font-black text-trebol-text mb-2 tracking-tight">
+                {t('emptyTitle')}
+              </h2>
+              <p className="text-sm text-trebol-text/60 font-semibold max-w-xs mx-auto">
+                {t('emptyBody')}
+              </p>
             </motion.div>
-            <h2 className="text-2xl font-black text-trebol-text mb-2 tracking-tight">
-              {t('emptyTitle')}
-            </h2>
-            <p className="text-sm text-trebol-text/60 font-semibold max-w-xs mx-auto">
-              {t('emptyBody')}
-            </p>
-          </motion.div>
+
+            <motion.section
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.15, duration: 0.5 }}
+              className="relative bg-white/80 backdrop-blur-sm border border-white shadow-lg rounded-[28px] p-5 mb-6"
+            >
+              <div className="flex items-baseline justify-between mb-4">
+                <h3 className="text-base font-black text-trebol-text tracking-tight">{t('skills')}</h3>
+              </div>
+              <div className="grid grid-cols-4 gap-2">
+                {(['speaking', 'reading', 'listening', 'writing'] as Skill[]).map((skill, i) => (
+                  <SkillRing
+                    key={skill}
+                    skill={skill}
+                    pct={0}
+                    sessions={0}
+                    cefrLevel={skillLevels?.[skill]?.cefr_level ?? null}
+                    lastAssessment={lastAssessments[skill]}
+                    index={i}
+                    isPending={!!pendingAssessments[skill]}
+                    onTakeAssessment={onTakeAssessment}
+                    onChangeLevel={onChangeLevel}
+                  />
+                ))}
+              </div>
+            </motion.section>
+          </>
         )}
 
         {hasData && derived && (
@@ -900,6 +947,7 @@ export function StudentStatsPanel({ onBack, onAfterReset, onTakeAssessment, onCh
                     cefrLevel={skillLevels?.[skill]?.cefr_level ?? null}
                     lastAssessment={lastAssessments[skill]}
                     index={i}
+                    isPending={!!pendingAssessments[skill]}
                     onTakeAssessment={onTakeAssessment}
                     onChangeLevel={onChangeLevel}
                   />

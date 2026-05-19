@@ -3,6 +3,7 @@
 import React, { useState, useCallback } from 'react';
 import { ChevronRight, RotateCcw } from 'lucide-react';
 import { submitAssessmentReadingAction } from '@/actions/assessment';
+import { BobMascotLoader } from '@/components/chat/BobMascotLoader';
 import type { AssessmentReadingItem } from '@/actions/assessment';
 import type { AssessmentResultReading } from '@/lib/types/skills';
 
@@ -72,13 +73,7 @@ export function AssessmentReadingRunner({ assessment_id, items, onResult, onCanc
   }, []);
 
   if (submitting) {
-    return (
-      <div className="flex flex-col items-center justify-center flex-1 p-8 gap-6 text-center">
-        <div className="text-5xl animate-pulse">📊</div>
-        <p className="text-xl font-black text-gray-800">Calculating your result…</p>
-        <p className="text-sm text-gray-500">Just a moment!</p>
-      </div>
-    );
+    return <BobMascotLoader size="lg" message="Calculating your result…" />;
   }
 
   if (failed) {
@@ -89,7 +84,7 @@ export function AssessmentReadingRunner({ assessment_id, items, onResult, onCanc
         <p className="text-sm text-gray-500 max-w-xs">{failMessage}</p>
         <button
           onClick={handleRetry}
-          className="flex items-center gap-2 px-5 py-2.5 bg-trebol-green text-white rounded-xl font-semibold text-sm hover:opacity-90 transition"
+          className="flex items-center gap-2 px-5 py-2.5 bg-trebol-primary text-white rounded-xl font-semibold text-sm hover:opacity-90 transition"
         >
           <RotateCcw size={16} /> Try again
         </button>
@@ -108,9 +103,9 @@ export function AssessmentReadingRunner({ assessment_id, items, onResult, onCanc
             key={i}
             className={`flex-1 h-1.5 rounded-full transition-colors ${
               i < currentIdx
-                ? 'bg-trebol-green'
+                ? 'bg-trebol-primary'
                 : i === currentIdx
-                ? 'bg-trebol-green/40'
+                ? 'bg-trebol-primary/40'
                 : 'bg-gray-200'
             }`}
           />
@@ -139,7 +134,7 @@ export function AssessmentReadingRunner({ assessment_id, items, onResult, onCanc
               onClick={() => handleSelectOption(opt.key)}
               className={`w-full text-left px-4 py-3 rounded-xl border text-sm font-medium transition ${
                 selectedKey === opt.key
-                  ? 'border-trebol-green bg-trebol-green/5 text-trebol-green'
+                  ? 'border-trebol-green bg-trebol-primary/5 text-trebol-primary'
                   : 'border-gray-200 text-gray-700 hover:border-gray-300 hover:bg-gray-50'
               }`}
             >
@@ -155,7 +150,7 @@ export function AssessmentReadingRunner({ assessment_id, items, onResult, onCanc
         disabled={!selectedKey}
         className={`flex items-center gap-2 px-6 py-3 rounded-xl font-semibold text-sm transition w-full justify-center ${
           selectedKey
-            ? 'bg-trebol-green text-white hover:opacity-90 shadow-sm'
+            ? 'bg-trebol-primary text-white hover:opacity-90 shadow-sm'
             : 'bg-gray-100 text-gray-400 cursor-not-allowed'
         }`}
       >

@@ -56,6 +56,7 @@ export default function App() {
     selectedSkill,
     setSelectedSkill,
     refreshSkillLevels,
+    refreshPendingAssessments,
     sustainedImprovementDetected,
     checkSustainedImprovement,
   } = useOrganization();
@@ -343,11 +344,7 @@ export default function App() {
                   assessment_id={assessmentId}
                   prompts={assessmentPrompts}
                   is_yl={assessmentIsYl}
-                  onResult={async (result) => {
-                    setAssessmentResult(result);
-                    await refreshSkillLevels();
-                    setAppState('assessment-result');
-                  }}
+                  onQueued={() => setAppState('dashboard')}
                   onCancel={() => setAppState('assessment-invite')}
                 />
               </motion.div>
@@ -406,11 +403,7 @@ export default function App() {
                 <AssessmentWritingRunner
                   assessment_id={assessmentId}
                   task={assessmentWritingTask}
-                  onResult={async (result) => {
-                    setAssessmentResult(result);
-                    await refreshSkillLevels();
-                    setAppState('assessment-result');
-                  }}
+                  onQueued={() => setAppState('dashboard')}
                   onCancel={() => setAppState('assessment-invite')}
                 />
               </motion.div>

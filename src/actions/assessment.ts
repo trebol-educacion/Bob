@@ -1,10 +1,7 @@
 'use server';
 
-import { Type } from '@google/genai';
 import { createSupabaseServer } from '@/lib/supabase/server';
 import { getPrompt } from '@/lib/prompts/db-prompts';
-import { callGemini } from '@/lib/gemini-client';
-import { MODELS } from '@/lib/models';
 import { mapListeningScoreToCefr } from '@/lib/assessment/cefr-mapping';
 import type { Skill } from '@/lib/types/skills';
 import type { AssessmentCefrBand, AssessmentConfidence, AssessmentResultSpeaking, AssessmentResultListening, AssessmentResultReading, AssessmentResultWriting, AssessmentWritingFeedback } from '@/lib/types/skills';
@@ -335,174 +332,25 @@ export async function submitAssessmentSpeakingAction(
       content_json: { assessment_id, status: 'pending' },
     });
 
-  const userId = user.id;
+  const { error: queueError } = await supabase
+    .from('bob_assessment_queue')
+    .insert({
+      user_id: user.id,
+      assessment_id,
+      skill: 'speaking',
+      session_id: sessionId,
+      status: 'pending',
+      payload: {
+        current_level: speakingLevel,
+        is_yl: isYl,
+      },
+    });
 
-  void runSpeakingEvaluationBackground(
-    userId,
-    sessionId,
-    assessment_id,
-    turns,
-    speakingLevel,
-    isYl
-  );
+  if (queueError) {
+    return { status: 'error', code: 'db_error' };
+  }
 
   return { status: 'queued', assessment_id };
-}
-
-interface GeminiSpeakingResult {
-  cefr_band: AssessmentCefrBand;
-  confidence: AssessmentConfidence;
-  feedback: {
-    kind: string;
-    highlights: string[];
-    suggestions: string[];
-    overall_message: string;
-  };
-}
-
-async function runSpeakingEvaluationBackground(
-  userId: string,
-  sessionId: string,
-  assessment_id: string,
-  turns: SubmitSpeakingTurn[],
-  currentLevel: string,
-  isYl: boolean
-): Promise<void> {
-  const supabase = await createSupabaseServer();
-
-  let evalKey: string;
-  if (isYl) {
-    evalKey = currentLevel === 'pre_a1'
-      ? 'cefr_assessment_speaking_yl_pre_a1_evaluation'
-      : 'cefr_assessment_speaking_yl_a1_evaluation';
-  } else {
-    const isHigherRange = currentLevel === 'b1' || currentLevel === 'b2';
-    evalKey = isHigherRange
-      ? 'cefr_assessment_speaking_b1_b2_evaluation'
-      : 'cefr_assessment_speaking_a1_a2_evaluation';
-  }
-
-  const transcripts = turns
-    .map((t, i) => `Turn ${i + 1}: ${t.transcript ?? '[no transcript]'}`)
-    .join('\n');
-
-  const promptText = await getPrompt(evalKey, { TRANSCRIPTS: transcripts });
-
-  const audioParts = turns
-    .filter(t => t.audio_base64 && t.mime_type)
-    .map(t => ({ inlineData: { data: t.audio_base64, mimeType: t.mime_type } }));
-
-  const result = await callGemini(
-    { promptKey: evalKey, model: MODELS.FLASH_LITE_PREVIEW, userId },
-    (ai) => ai.models.generateContent({
-      model: MODELS.FLASH_LITE_PREVIEW,
-      contents: [
-        {
-          role: 'user',
-          parts: [
-            ...audioParts,
-            { text: promptText },
-          ],
-        },
-      ],
-      config: {
-        responseMimeType: 'application/json',
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            cefr_band: { type: Type.STRING },
-            confidence: { type: Type.STRING },
-            feedback: {
-              type: Type.OBJECT,
-              properties: {
-                kind: { type: Type.STRING },
-                highlights: { type: Type.ARRAY, items: { type: Type.STRING } },
-                suggestions: { type: Type.ARRAY, items: { type: Type.STRING } },
-                overall_message: { type: Type.STRING },
-              },
-              required: ['kind', 'highlights', 'suggestions', 'overall_message'],
-            },
-          },
-          required: ['cefr_band', 'confidence', 'feedback'],
-        },
-      },
-    })
-  );
-
-  if (!result.ok || !result.data.text) {
-    await supabase
-      .from('bob_messages')
-      .update({ content_json: { assessment_id, status: 'failed', error: result.ok ? 'empty response' : result.error } })
-      .eq('session_id', sessionId)
-      .eq('content_json->>assessment_id', assessment_id)
-      .eq('content_json->>status', 'pending');
-    return;
-  }
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(result.data.text);
-  } catch {
-    await supabase
-      .from('bob_messages')
-      .update({ content_json: { assessment_id, status: 'failed', error: 'invalid JSON from Gemini' } })
-      .eq('session_id', sessionId)
-      .eq('content_json->>assessment_id', assessment_id)
-      .eq('content_json->>status', 'pending');
-    return;
-  }
-
-  const geminiResult = parsed as GeminiSpeakingResult;
-  const validBands: AssessmentCefrBand[] = ['pre_a1', 'a1', 'a2', 'b1', 'b2'];
-  const validConfidence: AssessmentConfidence[] = ['low', 'medium', 'high'];
-
-  if (!validBands.includes(geminiResult.cefr_band) || !validConfidence.includes(geminiResult.confidence)) {
-    await supabase
-      .from('bob_messages')
-      .update({ content_json: { assessment_id, status: 'failed', error: 'invalid band or confidence from Gemini' } })
-      .eq('session_id', sessionId)
-      .eq('content_json->>assessment_id', assessment_id)
-      .eq('content_json->>status', 'pending');
-    return;
-  }
-
-  const confidenceNumeric = geminiResult.confidence === 'low' ? 0.3
-    : geminiResult.confidence === 'medium' ? 0.65
-    : 0.9;
-
-  try {
-    await supabase.rpc('set_config', { setting: 'bob.assessment_id', value: assessment_id, is_local: true });
-  } catch { /* non-critical: trigger will use NULL assessment_id */ }
-
-  await supabase
-    .from('bob_skill_levels')
-    .upsert({
-      user_id: userId,
-      skill: 'speaking',
-      cefr_level: geminiResult.cefr_band,
-      origin: 'assessment',
-      confidence: confidenceNumeric,
-      last_assessment_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    }, { onConflict: 'user_id,skill' });
-
-  const cooldownUntil = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-
-  await supabase
-    .from('bob_messages')
-    .update({
-      content_json: {
-        assessment_id,
-        status: 'done',
-        cefr_band: geminiResult.cefr_band,
-        confidence: geminiResult.confidence,
-        feedback: geminiResult.feedback,
-        cooldown_until: cooldownUntil,
-      },
-    })
-    .eq('session_id', sessionId)
-    .eq('content_json->>assessment_id', assessment_id)
-    .eq('content_json->>status', 'pending');
 }
 
 export interface SubmitListeningAnswer {
@@ -884,133 +732,25 @@ export async function submitAssessmentWritingAction(
     content_json: { assessment_id, status: 'pending' },
   });
 
-  const userId = user.id;
-  void runWritingEvaluationBackground(userId, sessionId, assessment_id, written_text, writingLevel);
+  const { error: queueError } = await supabase
+    .from('bob_assessment_queue')
+    .insert({
+      user_id: user.id,
+      assessment_id,
+      skill: 'writing',
+      session_id: sessionId,
+      status: 'pending',
+      payload: {
+        current_level: writingLevel,
+        written_text,
+      },
+    });
+
+  if (queueError) {
+    return { status: 'error', code: 'db_error' };
+  }
 
   return { status: 'queued', assessment_id };
-}
-
-interface GeminiWritingResult {
-  cefr_band: AssessmentCefrBand;
-  confidence: AssessmentConfidence;
-  bullets_covered: number;
-  feedback: AssessmentWritingFeedback;
-}
-
-async function runWritingEvaluationBackground(
-  userId: string,
-  sessionId: string,
-  assessment_id: string,
-  written_text: string,
-  currentLevel: string
-): Promise<void> {
-  const supabase = await createSupabaseServer();
-
-  const isHigherRange = currentLevel === 'b1' || currentLevel === 'b2';
-  const evalKey = isHigherRange
-    ? 'cefr_assessment_writing_b1_b2_evaluation'
-    : 'cefr_assessment_writing_a1_a2_evaluation';
-
-  const promptText = await getPrompt(evalKey, { WRITTEN_TEXT: written_text });
-
-  const result = await callGemini(
-    { promptKey: evalKey, model: MODELS.FLASH_LITE_PREVIEW, userId },
-    (ai) => ai.models.generateContent({
-      model: MODELS.FLASH_LITE_PREVIEW,
-      contents: [{ role: 'user', parts: [{ text: promptText }] }],
-      config: {
-        responseMimeType: 'application/json',
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            cefr_band: { type: Type.STRING },
-            confidence: { type: Type.STRING },
-            bullets_covered: { type: Type.INTEGER },
-            feedback: {
-              type: Type.OBJECT,
-              properties: {
-                strengths: { type: Type.ARRAY, items: { type: Type.STRING } },
-                improvements: { type: Type.ARRAY, items: { type: Type.STRING } },
-                next_step: { type: Type.STRING },
-              },
-              required: ['strengths', 'improvements', 'next_step'],
-            },
-          },
-          required: ['cefr_band', 'confidence', 'bullets_covered', 'feedback'],
-        },
-      },
-    })
-  );
-
-  const failUpdate = async (error: string) => {
-    await supabase
-      .from('bob_messages')
-      .update({ content_json: { assessment_id, status: 'failed', error } })
-      .eq('session_id', sessionId)
-      .eq('content_json->>assessment_id', assessment_id)
-      .eq('content_json->>status', 'pending');
-  };
-
-  if (!result.ok || !result.data.text) {
-    await failUpdate(result.ok ? 'empty response' : result.error);
-    return;
-  }
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(result.data.text);
-  } catch {
-    await failUpdate('invalid JSON from Gemini');
-    return;
-  }
-
-  const geminiResult = parsed as GeminiWritingResult;
-  const validBands: AssessmentCefrBand[] = ['pre_a1', 'a1', 'a2', 'b1', 'b2'];
-  const validConfidence: AssessmentConfidence[] = ['low', 'medium', 'high'];
-
-  if (!validBands.includes(geminiResult.cefr_band) || !validConfidence.includes(geminiResult.confidence)) {
-    await failUpdate('invalid band or confidence from Gemini');
-    return;
-  }
-
-  const confidenceNumeric = geminiResult.confidence === 'low' ? 0.3
-    : geminiResult.confidence === 'medium' ? 0.65
-    : 0.9;
-
-  try {
-    await supabase.rpc('set_config', { setting: 'bob.assessment_id', value: assessment_id, is_local: true });
-  } catch { /* non-critical */ }
-
-  await supabase
-    .from('bob_skill_levels')
-    .upsert({
-      user_id: userId,
-      skill: 'writing',
-      cefr_level: geminiResult.cefr_band,
-      origin: 'assessment',
-      confidence: confidenceNumeric,
-      last_assessment_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    }, { onConflict: 'user_id,skill' });
-
-  const cooldownUntil = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-
-  await supabase
-    .from('bob_messages')
-    .update({
-      content_json: {
-        assessment_id,
-        status: 'done',
-        cefr_band: geminiResult.cefr_band,
-        confidence: geminiResult.confidence,
-        bullets_covered: geminiResult.bullets_covered,
-        feedback: geminiResult.feedback,
-        cooldown_until: cooldownUntil,
-      },
-    })
-    .eq('session_id', sessionId)
-    .eq('content_json->>assessment_id', assessment_id)
-    .eq('content_json->>status', 'pending');
 }
 
 /**
@@ -1069,4 +809,37 @@ export async function pollAssessmentWritingResultAction(
   }
 
   return { status: 'pending' };
+}
+
+export type PendingAssessmentEntry = { assessment_id: string; started_at: string | null } | null;
+export type PendingAssessmentsMap = Record<Skill, PendingAssessmentEntry>;
+
+/**
+ * Returns the most recent pending or processing queue row per skill for the current user.
+ * Used by the dashboard to show "Evaluating…" overlay on SkillRing while the Edge Function works.
+ */
+export async function getPendingAssessmentsAction(): Promise<PendingAssessmentsMap> {
+  const empty: PendingAssessmentsMap = { speaking: null, listening: null, reading: null, writing: null };
+
+  const supabase = await createSupabaseServer();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return empty;
+
+  const { data } = await supabase
+    .from('bob_assessment_queue')
+    .select('skill, assessment_id, started_at')
+    .eq('user_id', user.id)
+    .in('status', ['pending', 'processing'])
+    .order('created_at', { ascending: false });
+
+  const result: PendingAssessmentsMap = { speaking: null, listening: null, reading: null, writing: null };
+
+  for (const row of (data ?? []) as Array<{ skill: string; assessment_id: string; started_at: string | null }>) {
+    const skill = row.skill as Skill;
+    if (result[skill] === null) {
+      result[skill] = { assessment_id: row.assessment_id, started_at: row.started_at };
+    }
+  }
+
+  return result;
 }

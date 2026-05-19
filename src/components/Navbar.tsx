@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'motion/react';
 import { LogOut, User, BarChart3, Menu, Headphones, Mic2, BookOpen, PenLine } from 'lucide-react';
@@ -35,6 +35,8 @@ export function Navbar({ userEmail, onOpenDashboard, onToggleSidebar, onGoHome }
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const { organization, selectedSkill, skillLevels } = useOrganization();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
   const currentLevel = selectedSkill ? skillLevels?.[selectedSkill]?.cefr_level ?? null : null;
   const SkillIcon = selectedSkill ? SKILL_ICON[selectedSkill] : null;
   const t = useTranslations('shell.navbar');
@@ -90,7 +92,7 @@ export function Navbar({ userEmail, onOpenDashboard, onToggleSidebar, onGoHome }
         </div>
 
         <div className="flex items-center gap-2">
-          {selectedSkill && SkillIcon && (
+          {mounted && selectedSkill && SkillIcon && (
             <div
               aria-label={`${SKILL_LABEL[selectedSkill]} level`}
               className="flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1.5"

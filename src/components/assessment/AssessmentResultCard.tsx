@@ -122,7 +122,7 @@ export function AssessmentResultCard({ result, onPracticeNow }: Props) {
 
       <button
         onClick={onPracticeNow}
-        className="flex items-center gap-2 px-6 py-3 bg-trebol-green text-white rounded-xl font-semibold text-sm hover:opacity-90 transition shadow-sm w-full justify-center"
+        className="flex items-center gap-2 px-6 py-3 bg-trebol-primary text-white rounded-xl font-semibold text-sm hover:opacity-90 transition shadow-sm w-full justify-center"
       >
         Practice now <ChevronRight size={16} />
       </button>

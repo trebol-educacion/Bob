@@ -244,11 +244,11 @@ export async function getSkillLevelHistoryAction(
       id: row.id,
       user_id: row.user_id,
       skill: row.skill as Skill,
-      level_before: row.previous_level,
-      level_after: row.new_level,
+      previous_level: row.previous_level,
+      new_level: row.new_level,
       origin: row.origin as SkillLevelHistoryEntry['origin'],
       occurred_at: row.occurred_at,
-      source_assessment_id: row.assessment_id,
+      assessment_id: row.assessment_id,
     }));
   } catch {
     return [];
