@@ -3,11 +3,26 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'motion/react';
-import { LogOut, User, BarChart3, Menu } from 'lucide-react';
+import { LogOut, User, BarChart3, Menu, Headphones, Mic2, BookOpen, PenLine } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { createSupabaseBrowser } from '@/lib/supabase/browser-client';
 import { useOrganization } from '@/hooks/useOrganization';
 import { NavProgressChip } from '@/components/NavProgressChip';
+import type { Skill } from '@/lib/types/skills';
+
+const SKILL_ICON: Record<Skill, React.ComponentType<{ className?: string }>> = {
+  listening: Headphones,
+  speaking: Mic2,
+  reading: BookOpen,
+  writing: PenLine,
+};
+
+const SKILL_LABEL: Record<Skill, string> = {
+  listening: 'Listening',
+  speaking: 'Speaking',
+  reading: 'Reading',
+  writing: 'Writing',
+};
 
 interface NavbarProps {
   userEmail?: string;
@@ -19,7 +34,9 @@ interface NavbarProps {
 export function Navbar({ userEmail, onOpenDashboard, onToggleSidebar, onGoHome }: NavbarProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const { organization } = useOrganization();
+  const { organization, selectedSkill, skillLevels } = useOrganization();
+  const currentLevel = selectedSkill ? skillLevels?.[selectedSkill]?.cefr_level ?? null : null;
+  const SkillIcon = selectedSkill ? SKILL_ICON[selectedSkill] : null;
   const t = useTranslations('shell.navbar');
 
   const handleLogout = async () => {
@@ -73,6 +90,20 @@ export function Navbar({ userEmail, onOpenDashboard, onToggleSidebar, onGoHome }
         </div>
 
         <div className="flex items-center gap-2">
+          {selectedSkill && SkillIcon && (
+            <div
+              aria-label={`${SKILL_LABEL[selectedSkill]} level`}
+              className="flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1.5"
+            >
+              <SkillIcon className="w-4 h-4 text-white" />
+              <span className="hidden sm:inline text-xs font-bold text-white/85">
+                {SKILL_LABEL[selectedSkill]}
+              </span>
+              <span className="text-xs font-black uppercase tracking-wide text-white px-1.5 py-0.5 rounded-md bg-white/20">
+                {currentLevel ?? '—'}
+              </span>
+            </div>
+          )}
           {onOpenDashboard && <NavProgressChip onClick={onOpenDashboard} />}
         <div className="relative">
           <button

@@ -6,6 +6,7 @@ import { motion, useReducedMotion } from 'motion/react';
 import {
   ArrowLeft,
   BarChart3,
+  ClipboardList,
   Flame,
   Lock,
   RefreshCw,
@@ -14,6 +15,7 @@ import {
   Trash2,
   Trophy,
 } from 'lucide-react';
+import { createSupabaseBrowser } from '@/lib/supabase/browser-client';
 import { useTranslations } from 'next-intl';
 import {
   getStudentStatsAction,
@@ -26,7 +28,18 @@ import { useOrganization } from '@/hooks/useOrganization';
 interface Props {
   onBack: () => void;
   onAfterReset: () => void;
+  onTakeAssessment?: (skill: Skill) => void;
+  onChangeLevel?: (skill: Skill, level: string) => Promise<void> | void;
 }
+
+const PICKABLE_LEVELS = ['pre_a1', 'a1', 'a2', 'b1', 'b2'] as const;
+const LEVEL_LABEL: Record<string, string> = {
+  pre_a1: 'Pre-A1',
+  a1: 'A1',
+  a2: 'A2',
+  b1: 'B1',
+  b2: 'B2',
+};
 
 type Skill = 'speaking' | 'reading' | 'listening' | 'writing';
 
@@ -156,19 +169,43 @@ function CountUp({ value, duration = 900 }: { value: number; duration?: number }
   return <>{n.toLocaleString()}</>;
 }
 
+function relativeTime(iso: string): string {
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diffMs / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  if (days < 30) return `${days}d ago`;
+  const months = Math.floor(days / 30);
+  if (months < 12) return `${months}mo ago`;
+  return `${Math.floor(months / 12)}y ago`;
+}
+
+type LastAssessment = { cefr_band: string; occurred_at: string };
+
 function SkillRing({
   skill,
   pct,
   sessions,
   cefrLevel,
+  lastAssessment,
   index,
+  onTakeAssessment,
+  onChangeLevel,
 }: {
   skill: Skill;
   pct: number;
   sessions: number;
   cefrLevel: string | null;
+  lastAssessment: LastAssessment | null;
   index: number;
+  onTakeAssessment?: (skill: Skill) => void;
+  onChangeLevel?: (skill: Skill, level: string) => Promise<void> | void;
 }) {
+  const [showPicker, setShowPicker] = useState(false);
+  const [savingLevel, setSavingLevel] = useState(false);
   const t = useTranslations('dashboard');
   const meta = SKILL_META[skill];
   const radius = 34;
@@ -246,6 +283,98 @@ function SkillRing({
       <span className="text-[10px] font-semibold text-trebol-text/40">
         {t('sessionCount', { n: sessions })}
       </span>
+      {lastAssessment ? (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 0.5 + index * 0.07, duration: 0.3 }}
+          className="mt-1 flex items-center gap-1 px-2 py-1 rounded-full shadow-sm"
+          style={{ background: meta.soft, border: `1px solid ${meta.color}30` }}
+        >
+          <ClipboardList size={9} style={{ color: meta.color }} />
+          <span className="text-[9px] font-black uppercase tracking-wider" style={{ color: meta.color }}>
+            {lastAssessment.cefr_band.replace('_', ' ')}
+          </span>
+          <span className="text-[8px] font-semibold text-trebol-text/40 ml-0.5">
+            {relativeTime(lastAssessment.occurred_at)}
+          </span>
+        </motion.div>
+      ) : (
+        <span className="mt-1 text-[8px] font-semibold uppercase tracking-wider text-trebol-text/30">
+          No test yet
+        </span>
+      )}
+
+      {(onTakeAssessment || onChangeLevel) && (
+        <div className="mt-2 flex flex-col items-center gap-1.5 w-full">
+          <div className="flex items-center justify-center gap-3 text-[10px] font-bold">
+            {onChangeLevel && (
+              <button
+                type="button"
+                onClick={() => setShowPicker((v) => !v)}
+                disabled={savingLevel}
+                title="Change level"
+                aria-label="Change level"
+                className="flex items-center gap-1 text-trebol-text/50 hover:text-trebol-text transition-colors cursor-pointer disabled:opacity-50"
+              >
+                <RefreshCw size={11} />
+                <span>Change</span>
+              </button>
+            )}
+            {onTakeAssessment && (
+              <button
+                type="button"
+                onClick={() => onTakeAssessment(skill)}
+                title="Take assessment"
+                aria-label="Take assessment"
+                className="flex items-center gap-1 transition-colors cursor-pointer"
+                style={{ color: meta.color }}
+              >
+                <ClipboardList size={11} />
+                <span>Take test</span>
+              </button>
+            )}
+          </div>
+          {showPicker && onChangeLevel && (
+            <motion.div
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex items-center gap-0.5"
+            >
+              {PICKABLE_LEVELS.map((lvl) => {
+                const isCurrent = cefrLevel === lvl;
+                return (
+                  <button
+                    key={lvl}
+                    type="button"
+                    disabled={savingLevel || isCurrent}
+                    onClick={async () => {
+                      setSavingLevel(true);
+                      try {
+                        await onChangeLevel(skill, lvl);
+                        setShowPicker(false);
+                      } finally {
+                        setSavingLevel(false);
+                      }
+                    }}
+                    className="rounded font-black uppercase tracking-tight whitespace-nowrap border transition-all cursor-pointer disabled:cursor-default hover:scale-110"
+                    style={{
+                      fontSize: '8px',
+                      lineHeight: 1,
+                      padding: '3px 4px',
+                      ...(isCurrent
+                        ? { background: meta.color, color: 'white', borderColor: meta.color }
+                        : { background: 'white', color: meta.color, borderColor: `${meta.color}33` }),
+                    }}
+                  >
+                    {LEVEL_LABEL[lvl]}
+                  </button>
+                );
+              })}
+            </motion.div>
+          )}
+        </div>
+      )}
     </motion.div>
   );
 }
@@ -499,13 +628,16 @@ function deriveStats(stats: StudentStatsResult): Derived {
   return { streak, totalXp, goldBadges, totalStars, bySkill, groups };
 }
 
-export function StudentStatsPanel({ onBack, onAfterReset }: Props) {
+export function StudentStatsPanel({ onBack, onAfterReset, onTakeAssessment, onChangeLevel }: Props) {
   const t = useTranslations('dashboard');
   const { skillLevels } = useOrganization();
   const [stats, setStats] = useState<StudentStatsResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [resetting, setResetting] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [lastAssessments, setLastAssessments] = useState<Record<Skill, LastAssessment | null>>({
+    speaking: null, reading: null, listening: null, writing: null,
+  });
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -520,6 +652,31 @@ export function StudentStatsPanel({ onBack, onAfterReset }: Props) {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    void (async () => {
+      const supabase = createSupabaseBrowser();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data } = await supabase
+        .from('bob_skill_level_history')
+        .select('skill, level_after, occurred_at')
+        .eq('user_id', user.id)
+        .eq('origin', 'assessment')
+        .order('occurred_at', { ascending: false });
+      if (!data) return;
+      const byMostRecent: Record<Skill, LastAssessment | null> = {
+        speaking: null, reading: null, listening: null, writing: null,
+      };
+      for (const row of data) {
+        const s = row.skill as Skill;
+        if (!byMostRecent[s]) {
+          byMostRecent[s] = { cefr_band: row.level_after, occurred_at: row.occurred_at };
+        }
+      }
+      setLastAssessments(byMostRecent);
+    })();
+  }, []);
 
   const derived = useMemo(() => (stats ? deriveStats(stats) : null), [stats]);
 
@@ -741,7 +898,10 @@ export function StudentStatsPanel({ onBack, onAfterReset }: Props) {
                     pct={derived.bySkill[skill].pct}
                     sessions={derived.bySkill[skill].sessions}
                     cefrLevel={skillLevels?.[skill]?.cefr_level ?? null}
+                    lastAssessment={lastAssessments[skill]}
                     index={i}
+                    onTakeAssessment={onTakeAssessment}
+                    onChangeLevel={onChangeLevel}
                   />
                 ))}
               </div>

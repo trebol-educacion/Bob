@@ -18,6 +18,7 @@ import { AssessmentReadingRunner } from '@/components/assessment/AssessmentReadi
 import { AssessmentWritingRunner } from '@/components/assessment/AssessmentWritingRunner';
 import { AssessmentResultCard } from '@/components/assessment/AssessmentResultCard';
 import { startAssessmentAction } from '@/actions/assessment';
+import { applyDefaultSkillLevelAction, resetOwnSkillLevelAction } from '@/actions/skills';
 import { createSessionAction } from '@/actions/sessions';
 import { createSupabaseBrowser } from '@/lib/supabase/browser-client';
 import { Navbar } from '@/components/Navbar';
@@ -32,7 +33,7 @@ import {
   type YLRenderProps,
   type ExamRenderProps,
 } from '@/lib/routing';
-import type { PracticeMode } from '@/lib/types/practice';
+import type { PracticeMode, CefrLevel } from '@/lib/types/practice';
 import type { StoredMessage } from '@/actions/messages';
 import type { Skill } from '@/lib/types/skills';
 import type { AssessmentResultSpeaking, AssessmentResultListening, AssessmentResultReading, AssessmentResultWriting } from '@/lib/types/skills';
@@ -227,9 +228,26 @@ export default function App() {
     }
   }, [selectedSkill]);
 
-  const handleSkipToA1 = useCallback(() => {
+  const handleResetSkillLevel = useCallback(async () => {
+    if (!selectedSkill) return;
+    const result = await resetOwnSkillLevelAction(selectedSkill);
+    if (result.ok) {
+      await refreshSkillLevels();
+      setAppState('assessment-invite');
+    }
+  }, [selectedSkill, refreshSkillLevels]);
+
+  const handlePickLevel = useCallback(async (level: CefrLevel) => {
+    if (!selectedSkill) return;
+    const existing = skillLevels?.[selectedSkill]?.cefr_level;
+    if (existing !== level) {
+      const result = await applyDefaultSkillLevelAction(selectedSkill, level);
+      if (result.ok) {
+        await refreshSkillLevels();
+      }
+    }
     setAppState('catalog-filtered');
-  }, []);
+  }, [selectedSkill, skillLevels, refreshSkillLevels]);
 
   const showBanner = cefrActiveLevel === null && !cefrLevelLocked;
 
@@ -307,7 +325,7 @@ export default function App() {
                 <AssessmentInvite
                   skill={selectedSkill}
                   onStartAssessment={handleAssessmentStart}
-                  onSkipToA1={handleSkipToA1}
+                  onPickLevel={handlePickLevel}
                   onBack={() => setAppState('skill-selection')}
                 />
               </motion.div>
@@ -449,15 +467,13 @@ export default function App() {
                     </motion.div>
                   )}
                 </div>
-                {showBanner && <CefrCtaBanner onScroll={handleBannerScroll} />}
                 <ModeSelection
                   ref={cefrSelectorRef}
                   onSelect={handleModeSelect}
                   enabledModes={enabledModes}
                   availableModes={availableModes}
-                  cefrActiveLevel={cefrActiveLevel}
+                  cefrActiveLevel={(selectedSkill ? skillLevels?.[selectedSkill]?.cefr_level : null) ?? cefrActiveLevel}
                   cefrLevelLocked={cefrLevelLocked}
-                  onCefrChange={setCefrActiveLevel}
                   organizationName={organization?.name}
                 />
               </motion.div>
@@ -482,7 +498,6 @@ export default function App() {
                   </div>
                 ) : (
                   <>
-                    {showBanner && <CefrCtaBanner onScroll={handleBannerScroll} />}
                     <ModeSelection
                       ref={cefrSelectorRef}
                       onSelect={handleModeSelect}
@@ -490,7 +505,6 @@ export default function App() {
                       availableModes={availableModes}
                       cefrActiveLevel={cefrActiveLevel}
                       cefrLevelLocked={cefrLevelLocked}
-                      onCefrChange={setCefrActiveLevel}
                       organizationName={organization?.name}
                     />
                   </>
@@ -580,6 +594,16 @@ export default function App() {
                   onBack={() => setAppState('skill-selection')}
                   onAfterReset={() => {
                     void refreshSessions();
+                  }}
+                  onTakeAssessment={(skill) => {
+                    setSelectedSkill(skill);
+                    setAppState('assessment-invite');
+                  }}
+                  onChangeLevel={async (skill, level) => {
+                    const result = await applyDefaultSkillLevelAction(skill, level as CefrLevel);
+                    if (result.ok) {
+                      await refreshSkillLevels();
+                    }
                   }}
                 />
               </motion.div>

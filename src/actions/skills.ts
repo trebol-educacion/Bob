@@ -358,3 +358,60 @@ export async function setSkillLevelManualAction(
     return { ok: false };
   }
 }
+
+/**
+ * Student self-resets their own level for a skill (used when re-evaluating
+ * from the navbar chip). Removes the row so the next entry forces the
+ * Assessment invite again.
+ */
+export async function resetOwnSkillLevelAction(skill: Skill): Promise<{ ok: boolean }> {
+  try {
+    const supabase = await createSupabaseServer();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { ok: false };
+
+    const { error } = await supabase
+      .from('bob_skill_levels')
+      .delete()
+      .eq('user_id', user.id)
+      .eq('skill', skill);
+
+    return { ok: !error };
+  } catch {
+    return { ok: false };
+  }
+}
+
+/**
+ * Student self-sets a default level for a skill (used when skipping the
+ * Assessment with "Start with A1"). Writes origin='default' so the trigger
+ * registers it in the history.
+ */
+export async function applyDefaultSkillLevelAction(
+  skill: Skill,
+  cefrLevel: CefrLevel = 'a1',
+): Promise<{ ok: boolean }> {
+  try {
+    const supabase = await createSupabaseServer();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { ok: false };
+
+    const { error } = await supabase
+      .from('bob_skill_levels')
+      .upsert(
+        {
+          user_id: user.id,
+          skill,
+          cefr_level: cefrLevel,
+          origin: 'default',
+          confidence: null,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'user_id,skill' },
+      );
+
+    return { ok: !error };
+  } catch {
+    return { ok: false };
+  }
+}

@@ -18,7 +18,6 @@ import {
   BookImage,
 } from 'lucide-react';
 import type { ModeKey, PracticeMode, CefrLevel, DynamicCard, CardVisibility } from '@/lib/types/practice';
-import { CefrLevelSelector } from '@/components/CefrLevelSelector';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import type { AvailableMode } from '@/contexts/OrganizationContext';
 import { getModeIcon, getModeBadge, getModeSection, getModeTitle, getModeDescription, getModeSortWeight, getModeOfficialName, isGenericGroupedWithCambridge } from '@/lib/mode-ui';
@@ -190,24 +189,23 @@ interface ModeSelectionProps {
   availableModes?: AvailableMode[];
   cefrActiveLevel?: CefrLevel | null;
   cefrLevelLocked?: boolean;
-  onCefrChange?: (level: CefrLevel | null) => void;
   organizationName?: string;
 }
 
 export const ModeSelection = forwardRef<HTMLDivElement, ModeSelectionProps>(function ModeSelection(
-  { onSelect, cefrActiveLevel = null, cefrLevelLocked = false, onCefrChange, organizationName },
+  { onSelect, cefrActiveLevel = null },
   selectorRef
 ) {
-  const { allDynamicCards, enabledModes, resolvedCards } = useOrganization();
+  const { allDynamicCards, resolvedCards } = useOrganization();
   const t = useTranslations('home.modeSelection');
 
   const HIDDEN_MODES = new Set<string>(['cambridge_flyers_part1']);
-  const enabledSet = new Set(enabledModes);
-
   const resolvedCardMap = new Map(resolvedCards.map(rc => [rc.mode_key, rc]));
 
   const visibleCards = allDynamicCards.filter(card => {
-    if (!enabledSet.has(card.mode_key)) return false;
+    const resolved = resolvedCardMap.get(card.mode_key);
+    if (!resolved) return false;
+    if (resolved.visibility !== 'enabled') return false;
     if (HIDDEN_MODES.has(card.mode_key)) return false;
     if (card.framework === 'generic' && card.cefr_level !== null) {
       if (card.cefr_level !== cefrActiveLevel) return false;
@@ -271,62 +269,7 @@ export const ModeSelection = forwardRef<HTMLDivElement, ModeSelectionProps>(func
 
   return (
     <div className="relative w-full min-h-full overflow-y-auto bg-white">
-      <div className={`relative z-10 w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-10 ${cefrActiveLevel ? 'pt-4 pb-16' : 'min-h-full flex flex-col justify-center py-10'} space-y-10`}>
-        <motion.div
-          initial={{ opacity: 0, y: 14 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="relative text-center pt-2"
-        >
-          <motion.div
-            initial={{ scale: 0, rotate: -20 }}
-            animate={{ scale: 1, rotate: 0 }}
-            transition={{ delay: 0.1, type: 'spring', stiffness: 200, damping: 14 }}
-            className="relative w-40 h-40 sm:w-48 sm:h-48 mx-auto mb-4"
-          >
-            <BobIntroAvatar />
-          </motion.div>
-
-          <p className="text-[10px] font-black uppercase tracking-[0.3em] text-trebol-text/45 mb-2">
-            {t('tagline', { org: organizationName ? ` · ${organizationName}` : '' })}
-          </p>
-          <h2 className="text-4xl sm:text-5xl font-black text-trebol-text tracking-tight leading-[1.05]">
-            {t('heading')}
-          </h2>
-          <p className="text-trebol-text/65 font-bold mt-3 text-base">
-            {t('subtitle')}
-          </p>
-        </motion.div>
-
-        <motion.div
-          ref={selectorRef}
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2, duration: 0.4 }}
-          className="flex justify-center"
-        >
-          <CefrLevelSelector
-            value={cefrActiveLevel}
-            onChange={onCefrChange ?? (() => {})}
-            onClear={onCefrChange ? () => onCefrChange(null) : undefined}
-            disabled={!onCefrChange}
-            locked={cefrLevelLocked}
-          />
-        </motion.div>
-
-        {!cefrActiveLevel && (
-          <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.35, duration: 0.4 }}
-            className="text-center"
-          >
-            <p className="text-sm sm:text-base font-bold text-trebol-text/65 max-w-md mx-auto">
-              {t('pickLevelHint')}
-            </p>
-          </motion.div>
-        )}
-
+      <div ref={selectorRef} className="relative z-10 w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-10 pt-4 pb-16 space-y-10">
         {cefrActiveLevel && showFreePractice && genericCards.length > 0 && (
           <motion.div
             key={`generic-${cefrActiveLevel}`}
