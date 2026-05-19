@@ -95,8 +95,10 @@ const MODE_ICON: Record<NonNullable<SessionMode>, React.ElementType> = {
   toefl_writing_email: MessageSquare,
   toefl_writing_academic_discussion: MessageSquare,
   cambridge_pet_writing_part1: PETWritingIcon,
+  cambridge_pet_listening_part2: PETListeningIcon,
   cambridge_fce_writing_part1: FCEWritingIcon,
   cambridge_fce_reading_part1: FCEReadingIcon,
+  cambridge_fce_listening_part1: Headphones,
 };
 
 interface FrameworkAccent {

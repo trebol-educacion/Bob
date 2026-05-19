@@ -26,7 +26,10 @@ function PhraseBobMessage({ children }: { children: React.ReactNode }) {
 function PhraseUserMessage({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex justify-end">
-      <div className="bg-emerald-600 text-white rounded-2xl rounded-tr-sm px-4 py-3 max-w-[80%] text-sm shadow-sm leading-relaxed">
+      <div
+        className="text-white rounded-2xl rounded-tr-sm px-4 py-3 max-w-[80%] text-sm shadow-sm leading-relaxed"
+        style={{ background: 'var(--color-bob-brand)' }}
+      >
         {children}
       </div>
     </div>
@@ -38,10 +41,19 @@ function PhraseDots({ scores, currentIndex, total, finished }: { scores: number[
     <div className="flex items-center gap-1.5">
       {Array.from({ length: total }).map((_, i) => {
         const score = scores[i];
+        const isCurrent = !finished && i === currentIndex && typeof score !== 'number';
         let cls = 'bg-gray-200';
-        if (typeof score === 'number') cls = score >= 50 ? 'bg-emerald-500' : 'bg-rose-400';
-        else if (!finished && i === currentIndex) cls = 'bg-blue-500 ring-2 ring-blue-200';
-        return <span key={i} className={`w-2 h-2 rounded-full ${cls}`} />;
+        let style: React.CSSProperties | undefined;
+        if (typeof score === 'number') {
+          cls = score >= 50 ? 'bg-green-500' : 'bg-red-400';
+        } else if (isCurrent) {
+          cls = 'ring-2';
+          style = {
+            background: 'var(--color-bob-brand)',
+            boxShadow: '0 0 0 2px color-mix(in oklab, var(--color-bob-brand) 25%, white)',
+          };
+        }
+        return <span key={i} className={`w-2 h-2 rounded-full ${cls}`} style={style} />;
       })}
     </div>
   );

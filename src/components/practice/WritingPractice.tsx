@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { CheckCircle } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { InfoCard } from '@/components/chat';
+import { ChatInputBar } from '@/components/chat/ChatInputBar';
 import { persistMessage } from '@/lib/persist-activity';
 import type { WritingResponse, WritingFormativeFeedback } from '@/lib/types/practice';
 
@@ -185,15 +186,16 @@ export function WritingPractice({
         </ul>
       )}
 
-      <textarea
+      <ChatInputBar
+        variant="text"
         value={text}
-        onChange={(e) => setText(e.target.value)}
         placeholder={t('writeAnswerPlaceholder')}
-        rows={10}
-        className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-800 leading-relaxed resize-none focus:outline-none focus:ring-2 focus:ring-blue-300"
+        disabled={submitting || wordCount < minWords}
+        onChange={setText}
+        onSend={handleSubmit}
       />
 
-      <div className="flex items-center justify-between text-xs text-gray-400">
+      <div className="flex items-center justify-between text-xs text-gray-400 px-1">
         <span>
           {t('words')} <strong className={wordCount < minWords ? 'text-amber-500' : wordCount > maxWords ? 'text-red-400' : 'text-green-600'}>{wordCount}</strong> / {minWords}–{maxWords}
         </span>
@@ -212,14 +214,6 @@ export function WritingPractice({
           </motion.p>
         )}
       </AnimatePresence>
-
-      <button
-        onClick={handleSubmit}
-        disabled={submitting || wordCount < minWords}
-        className="py-3 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 disabled:opacity-40 transition-colors"
-      >
-        {submitting ? t('evaluating') : t('submit')}
-      </button>
 
       {wordCount < minWords && (
         <p className="text-xs text-gray-400 text-center">

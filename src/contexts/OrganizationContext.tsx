@@ -1,10 +1,13 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { Organization, getOrganizationForUser } from '@/lib/organization';
 import { createSupabaseBrowser } from '@/lib/supabase/browser-client';
 import { resolveEnabledModes } from '@/lib/modes';
-import type { ModeKey, ModeFramework, CefrLevel, DynamicCard } from '@/lib/types/practice';
+import { detectSustainedImprovementAction } from '@/actions/skills';
+import { getPendingAssessmentsAction, type PendingAssessmentsMap } from '@/actions/assessment';
+import type { ModeKey, ModeFramework, CefrLevel, DynamicCard, ResolvedCard } from '@/lib/types/practice';
+import type { Skill, SkillLevelMap } from '@/lib/types/skills';
 
 /** AvailableMode — a mode row fetched from bob_prompts (DB-driven). */
 export interface AvailableMode {
@@ -39,10 +42,36 @@ interface OrganizationContextValue {
   availableModes: AvailableMode[];
   /**
    * DB-driven full catalog from bob_prompts (all `activity_type='generation'` rows
-   * including generic_*). Source of truth for ModeSelection in B3. Derived once at
-   * mount; consumers filter client-side per spec §2.2. (bob-core T2.3, D9-1, D9-3.)
+   * including generic_*). Source of truth for ModeSelection. Derived once at mount;
+   * consumers filter client-side per spec §2.2. (bob-core T2.3, D9-1, D9-3.)
    */
   allDynamicCards: DynamicCard[];
+  /** CEFR levels per skill loaded from `bob_skill_levels`. Null while loading. */
+  skillLevels: SkillLevelMap | null;
+  /** Refreshes `skillLevels` from the DB — call after a completed Assessment. */
+  refreshSkillLevels: () => Promise<void>;
+  refreshPendingAssessments: () => Promise<void>;
+  /** Skill selected by the student in the skill-first flow; null when on home. */
+  selectedSkill: Skill | null;
+  /** Sets the currently selected skill; stored in sessionStorage for navigation resilience. */
+  setSelectedSkill: (skill: Skill | null) => void;
+  /**
+   * Cards resolved for `selectedSkill` with visibility per card.
+   * Empty array when `selectedSkill` is null.
+   */
+  resolvedCards: ResolvedCard[];
+  /** Cooldown period in days read from `organizations.assessment_cooldown_days`. */
+  assessmentCooldownDays: number;
+  /** Per-skill pending evaluations currently in the queue (pending or processing). */
+  pendingAssessments: PendingAssessmentsMap;
+  /**
+   * True when the student has shown sustained improvement (≥85% accuracy over last 5 sessions)
+   * and cooldown has expired. Loaded once when entering catalog-filtered; null while not yet checked.
+   */
+  sustainedImprovementDetected: boolean | null;
+  /** Trigger a single check for sustained improvement for the currently selected skill. */
+  checkSustainedImprovement: () => void;
+  /** Legacy scalar level from `profiles.cefr_active_level`. Kept for backward-compat surfaces. */
   cefrActiveLevel: CefrLevel | null;
   cefrLevelLocked: boolean;
   setCefrActiveLevel: (level: CefrLevel | null) => Promise<void>;
@@ -57,6 +86,16 @@ const OrganizationContext = createContext<OrganizationContextValue>({
   enabledModes: ['generic_situation', 'generic_image', 'generic_conversation'],
   availableModes: [],
   allDynamicCards: [],
+  skillLevels: null,
+  refreshSkillLevels: async () => {},
+  refreshPendingAssessments: async () => {},
+  selectedSkill: null,
+  setSelectedSkill: () => {},
+  resolvedCards: [],
+  assessmentCooldownDays: 7,
+  pendingAssessments: { speaking: null, listening: null, reading: null, writing: null },
+  sustainedImprovementDetected: null,
+  checkSustainedImprovement: () => {},
   cefrActiveLevel: null,
   cefrLevelLocked: false,
   setCefrActiveLevel: async () => {},
@@ -79,11 +118,36 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
   const [cefrLevelLocked, setCefrLevelLocked] = useState(false);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [accessDenialReason, setAccessDenialReason] = useState<BobAccessDenialReason | null>(null);
+  const [skillLevels, setSkillLevels] = useState<SkillLevelMap | null>(null);
+  const [assessmentCooldownDays, setAssessmentCooldownDays] = useState<number>(7);
+  const [pendingAssessments, setPendingAssessments] = useState<PendingAssessmentsMap>({
+    speaking: null, listening: null, reading: null, writing: null,
+  });
+  const [selectedSkill, setSelectedSkillState] = useState<Skill | null>(() => {
+    if (typeof window !== 'undefined') {
+      return (sessionStorage.getItem('bob_selected_skill') as Skill | null) ?? null;
+    }
+    return null;
+  });
+  const [sustainedImprovementDetected, setSustainedImprovementDetected] = useState<boolean | null>(null);
+  const improvementCheckedForRef = useRef<string | null>(null);
+
+  const setSelectedSkill = useCallback((skill: Skill | null) => {
+    setSelectedSkillState(skill);
+    if (typeof window !== 'undefined') {
+      if (skill === null) {
+        sessionStorage.removeItem('bob_selected_skill');
+      } else {
+        sessionStorage.setItem('bob_selected_skill', skill);
+      }
+    }
+  }, []);
 
   // Cached for re-running resolveEnabledModes on CEFR level change without a full re-fetch.
   const [cachedOrg, setCachedOrg] = useState<Organization | null>(null);
   const [cachedStudentFrameworks, setCachedStudentFrameworks] = useState<ModeFramework[]>([]);
   const [cachedOrgFrameworks, setCachedOrgFrameworks] = useState<ModeFramework[]>([]);
+  const [cachedUserId, setCachedUserId] = useState<string | null>(null);
 
   useEffect(() => {
     const supabase = createSupabaseBrowser();
@@ -116,7 +180,7 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
         setOrganization(org);
         setCachedOrg(org);
 
-        const [profileResult, studentFwResult, orgFwResult, availableModesResult, allCardsResult] = await Promise.all([
+        const [profileResult, studentFwResult, orgFwResult, availableModesResult, allCardsResult, skillLevelsResult, cooldownResult] = await Promise.all([
           supabase
             .from('profiles')
             .select('role, cefr_active_level, cefr_level_locked')
@@ -142,12 +206,23 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
             .order('exam_part'),
           supabase
             .from('bob_prompts')
-            .select('framework, exam_part, cefr_level, label, description, status')
+            .select('framework, exam_part, cefr_level, label, description, status, skill')
             .eq('activity_type', 'generation')
             .neq('status', 'hidden')
             .order('framework')
             .order('cefr_level', { ascending: true, nullsFirst: false })
             .order('exam_part'),
+          supabase
+            .from('bob_skill_levels')
+            .select('skill, cefr_level, origin, confidence, last_assessment_at, updated_at')
+            .eq('user_id', userId),
+          org?.id
+            ? supabase
+                .from('organizations')
+                .select('assessment_cooldown_days')
+                .eq('id', org.id)
+                .maybeSingle()
+            : Promise.resolve({ data: null, error: null }),
         ]);
 
         if (profileResult.error) {
@@ -165,6 +240,12 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
         if (allCardsResult.error) {
           console.error('[OrganizationContext] bob_prompts (allDynamicCards) query failed:', allCardsResult.error);
         }
+        if (skillLevelsResult.error) {
+          console.error('[OrganizationContext] bob_skill_levels query failed:', skillLevelsResult.error);
+        }
+        if (cooldownResult.error) {
+          console.error('[OrganizationContext] organizations cooldown query failed:', cooldownResult.error);
+        }
 
         const activeLevel = (profileResult.data?.cefr_active_level ?? null) as CefrLevel | null;
         const levelLocked = profileResult.data?.cefr_level_locked ?? false;
@@ -173,6 +254,34 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
         setCefrActiveLevelState(activeLevel);
         setCefrLevelLocked(levelLocked);
         setUserRole(role);
+        setCachedUserId(userId);
+
+        const rawSkillRows = (skillLevelsResult.data ?? []) as Array<{
+          skill: string;
+          cefr_level: string;
+          origin: string;
+          confidence: number | null;
+          last_assessment_at: string | null;
+          updated_at: string;
+        }>;
+        const ALL_SKILLS: Skill[] = ['reading', 'listening', 'writing', 'speaking'];
+        const map: SkillLevelMap = {};
+        for (const row of rawSkillRows) {
+          const skill = row.skill as Skill;
+          if (ALL_SKILLS.includes(skill)) {
+            map[skill] = {
+              cefr_level: row.cefr_level as CefrLevel,
+              origin: row.origin as import('@/lib/types/skills').SkillLevelOrigin,
+              confidence: row.confidence,
+              last_assessment_at: row.last_assessment_at,
+              updated_at: row.updated_at,
+            };
+          }
+        }
+        setSkillLevels(map);
+
+        const cooldown = cooldownResult.data?.assessment_cooldown_days ?? 7;
+        setAssessmentCooldownDays(cooldown);
 
         if (profileResult.error) {
           console.warn('[Bob access gate] profile query errored, deferring denial', profileResult.error);
@@ -216,6 +325,7 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
           label: string;
           description: string | null;
           status: string;
+          skill: string;
         }>;
         const seenAll = new Set<string>();
         const dedupedAll: DynamicCard[] = [];
@@ -234,18 +344,34 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
               description: row.description,
               mode_key: `${row.framework}_${row.exam_part}`,
               status,
+              skill: row.skill,
             });
           }
         }
         setAllDynamicCards(dedupedAll);
 
-        const modes = resolveEnabledModes({
-          isBobEnabled: org?.is_bob_enabled ?? false,
-          studentActiveCefr: activeLevel,
-          studentFrameworks,
-          orgFrameworks,
-          allDynamicCards: dedupedAll,
-        });
+        const isBobEnabled = org?.is_bob_enabled ?? false;
+        const effectiveFws = studentFrameworks.filter(f => orgFrameworks.includes(f));
+        const hasAssignedFws = effectiveFws.length > 0;
+        const GENERIC_ALWAYS_VISIBLE = new Set(['generic_situation|b1', 'generic_situation|b2']);
+        const modes: ModeKey[] = isBobEnabled
+          ? dedupedAll
+              .filter(card => {
+                if (card.framework === 'generic') {
+                  const lk = `${card.mode_key}|${card.cefr_level ?? ''}`;
+                  if (GENERIC_ALWAYS_VISIBLE.has(lk)) {
+                    return activeLevel !== null && card.cefr_level === activeLevel;
+                  }
+                  if (hasAssignedFws) return false;
+                  if (card.cefr_level === null) return true;
+                  return activeLevel !== null && card.cefr_level === activeLevel;
+                }
+                if (activeLevel === null) return false;
+                if (!(effectiveFws as string[]).includes(card.framework)) return false;
+                return card.cefr_level === activeLevel;
+              })
+              .map(card => card.mode_key)
+          : [];
 
         setEnabledModes(modes);
 
@@ -272,12 +398,73 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
           }
         }
         setAvailableModes(deduped);
+        void getPendingAssessmentsAction().then(setPendingAssessments);
       } catch (err) {
         console.error('[OrganizationContext] Unexpected error loading org data:', err);
       } finally {
         setLoading(false);
       }
     })();
+  }, []);
+
+  useEffect(() => {
+    const supabase = createSupabaseBrowser();
+    let userId: string | null = null;
+
+    supabase.auth.getUser().then(({ data }) => {
+      userId = data.user?.id ?? null;
+      if (!userId) return;
+
+      const refreshAll = () => {
+        void getPendingAssessmentsAction().then(setPendingAssessments);
+        void (async () => {
+          const { data: rows } = await supabase
+            .from('bob_skill_levels')
+            .select('skill, cefr_level, origin, confidence, last_assessment_at, updated_at')
+            .eq('user_id', userId!);
+          const ALL_SKILLS: Skill[] = ['reading', 'listening', 'writing', 'speaking'];
+          const map: SkillLevelMap = {};
+          for (const row of (rows ?? []) as Array<{
+            skill: string;
+            cefr_level: string;
+            origin: string;
+            confidence: number | null;
+            last_assessment_at: string | null;
+            updated_at: string;
+          }>) {
+            const skill = row.skill as Skill;
+            if (ALL_SKILLS.includes(skill)) {
+              map[skill] = {
+                cefr_level: row.cefr_level as CefrLevel,
+                origin: row.origin as import('@/lib/types/skills').SkillLevelOrigin,
+                confidence: row.confidence,
+                last_assessment_at: row.last_assessment_at,
+                updated_at: row.updated_at,
+              };
+            }
+          }
+          setSkillLevels(map);
+        })();
+      };
+
+      const channel = supabase
+        .channel('bob_assessment_changes')
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'bob_skill_levels', filter: `user_id=eq.${userId}` },
+          refreshAll
+        )
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'bob_assessment_queue', filter: `user_id=eq.${userId}` },
+          refreshAll
+        )
+        .subscribe();
+
+      return () => {
+        void supabase.removeChannel(channel);
+      };
+    });
   }, []);
 
   const setCefrActiveLevel = useCallback(async (level: CefrLevel | null) => {
@@ -301,15 +488,93 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
 
     setCefrActiveLevelState(level);
 
-    const newModes = resolveEnabledModes({
-      isBobEnabled: cachedOrg?.is_bob_enabled ?? true,
-      studentActiveCefr: level,
+    const isBobEnabled = cachedOrg?.is_bob_enabled ?? true;
+    const effectiveFws = cachedStudentFrameworks.filter(f => cachedOrgFrameworks.includes(f));
+    const hasAssignedFws = effectiveFws.length > 0;
+    const GENERIC_ALWAYS_VISIBLE = new Set(['generic_situation|b1', 'generic_situation|b2']);
+    const newModes: ModeKey[] = isBobEnabled
+      ? allDynamicCards
+          .filter(card => {
+            if (card.framework === 'generic') {
+              const lk = `${card.mode_key}|${card.cefr_level ?? ''}`;
+              if (GENERIC_ALWAYS_VISIBLE.has(lk)) {
+                return level !== null && card.cefr_level === level;
+              }
+              if (hasAssignedFws) return false;
+              if (card.cefr_level === null) return true;
+              return level !== null && card.cefr_level === level;
+            }
+            if (level === null) return false;
+            if (!(effectiveFws as string[]).includes(card.framework)) return false;
+            return card.cefr_level === level;
+          })
+          .map(card => card.mode_key)
+      : [];
+    setEnabledModes(newModes);
+  }, [cefrLevelLocked, cachedOrg, cachedStudentFrameworks, cachedOrgFrameworks, allDynamicCards]);
+
+  const refreshSkillLevels = useCallback(async () => {
+    if (!cachedUserId) return;
+    const supabase = createSupabaseBrowser();
+    const { data, error } = await supabase
+      .from('bob_skill_levels')
+      .select('skill, cefr_level, origin, confidence, last_assessment_at, updated_at')
+      .eq('user_id', cachedUserId);
+    if (error) {
+      console.error('[OrganizationContext] refreshSkillLevels failed:', error);
+      return;
+    }
+    const ALL_SKILLS: Skill[] = ['reading', 'listening', 'writing', 'speaking'];
+    const map: SkillLevelMap = {};
+    for (const row of (data ?? []) as Array<{
+      skill: string;
+      cefr_level: string;
+      origin: string;
+      confidence: number | null;
+      last_assessment_at: string | null;
+      updated_at: string;
+    }>) {
+      const skill = row.skill as Skill;
+      if (ALL_SKILLS.includes(skill)) {
+        map[skill] = {
+          cefr_level: row.cefr_level as CefrLevel,
+          origin: row.origin as import('@/lib/types/skills').SkillLevelOrigin,
+          confidence: row.confidence,
+          last_assessment_at: row.last_assessment_at,
+          updated_at: row.updated_at,
+        };
+      }
+    }
+    setSkillLevels(map);
+  }, [cachedUserId]);
+
+  const refreshPendingAssessments = useCallback(async () => {
+    const data = await getPendingAssessmentsAction();
+    setPendingAssessments(data);
+  }, []);
+
+  const checkSustainedImprovement = useCallback(() => {
+    if (!selectedSkill) return;
+    const cacheKey = selectedSkill;
+    if (improvementCheckedForRef.current === cacheKey) return;
+    improvementCheckedForRef.current = cacheKey;
+    setSustainedImprovementDetected(null);
+    void detectSustainedImprovementAction(selectedSkill).then((result) => {
+      setSustainedImprovementDetected(result);
+    });
+  }, [selectedSkill]);
+
+  const resolvedCards = useMemo<ResolvedCard[]>(() => {
+    if (!selectedSkill || !skillLevels) return [];
+    return resolveEnabledModes({
+      isBobEnabled: cachedOrg?.is_bob_enabled ?? false,
+      selectedSkill,
+      skillLevels,
       studentFrameworks: cachedStudentFrameworks,
       orgFrameworks: cachedOrgFrameworks,
       allDynamicCards,
     });
-    setEnabledModes(newModes);
-  }, [cefrLevelLocked, cachedOrg, cachedStudentFrameworks, cachedOrgFrameworks, allDynamicCards]);
+  }, [selectedSkill, skillLevels, cachedOrg, cachedStudentFrameworks, cachedOrgFrameworks, allDynamicCards]);
 
   const accessGranted = accessDenialReason === null && !loading;
 
@@ -320,6 +585,16 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
       enabledModes,
       availableModes,
       allDynamicCards,
+      skillLevels,
+      refreshSkillLevels,
+      refreshPendingAssessments,
+      selectedSkill,
+      setSelectedSkill,
+      resolvedCards,
+      assessmentCooldownDays,
+      pendingAssessments,
+      sustainedImprovementDetected,
+      checkSustainedImprovement,
       cefrActiveLevel,
       cefrLevelLocked,
       setCefrActiveLevel,

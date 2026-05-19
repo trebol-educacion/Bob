@@ -1,8 +1,9 @@
 'use client';
 
 import React from 'react';
-import { Send, Mic, Square, Loader2, ArrowRight, RotateCcw } from 'lucide-react';
+import { Mic, Square, Loader2, ArrowRight, RotateCcw } from 'lucide-react';
 import { UsePracticeChatReturn } from '@/hooks/usePracticeChat';
+import { ChatInputBar } from '@/components/chat/ChatInputBar';
 
 type PhrasePhaseProps = Pick<
   UsePracticeChatReturn,
@@ -35,33 +36,21 @@ export function PhrasePhase({
   currentIndex,
   onBack,
 }: PhrasePhaseProps) {
+  if (phase === 'topic-input') {
+    return (
+      <ChatInputBar
+        variant="text"
+        value={inputText}
+        placeholder="Write your situation here..."
+        disabled={!inputText.trim()}
+        onChange={setInputText}
+        onSend={handleTopicSubmit}
+      />
+    );
+  }
+
   return (
     <div className="shrink-0 border-t border-trebol-border bg-white px-4 py-3">
-      {phase === 'topic-input' && (
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            handleTopicSubmit();
-          }}
-          className="flex gap-2"
-        >
-          <input
-            value={inputText}
-            onChange={(e) => setInputText(e.target.value)}
-            placeholder="Write your situation here..."
-            className="flex-1 px-4 py-2.5 rounded-xl border-2 border-trebol-border focus:border-trebol-primary focus:outline-none text-sm bg-slate-50"
-            autoFocus
-          />
-          <button
-            type="submit"
-            disabled={!inputText.trim()}
-            className="px-4 py-2.5 bg-trebol-primary text-white rounded-xl font-bold text-sm disabled:opacity-40 hover:opacity-90 transition-opacity"
-          >
-            <Send size={18} />
-          </button>
-        </form>
-      )}
-
       {phase === 'phrase-ready' && (
         <div className="flex justify-center">
           <button

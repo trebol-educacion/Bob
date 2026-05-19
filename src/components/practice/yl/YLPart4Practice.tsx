@@ -298,7 +298,10 @@ export function YLPart4Practice({
   );
 
   const partBadge = (
-    <span className="text-xs font-bold bg-amber-50 text-amber-700 px-2 py-1 rounded-md">
+    <span
+      className="text-xs font-bold text-bob-brand px-2 py-1 rounded-md"
+      style={{ background: 'color-mix(in oklab, var(--color-bob-brand) 10%, white)' }}
+    >
       {partBadgeLabel}
     </span>
   );
@@ -341,7 +344,8 @@ export function YLPart4Practice({
         <div className="flex gap-3 pb-4">
           <button
             onClick={onBack}
-            className="flex-1 py-3 bg-blue-600 text-white rounded-xl font-bold hover:opacity-90 transition-opacity"
+            className="flex-1 py-3 text-white rounded-xl font-bold hover:opacity-90 transition-opacity"
+            style={{ background: 'var(--color-bob-brand)' }}
           >
             {t('common.backToActivities')}
           </button>
@@ -355,7 +359,8 @@ export function YLPart4Practice({
       <motion.div
         animate={{ width: `${progress}%` }}
         transition={{ duration: 0.4 }}
-        className="h-full bg-blue-600"
+        className="h-full"
+        style={{ background: 'var(--color-bob-brand)' }}
       />
     </div>
   );
@@ -371,9 +376,13 @@ export function YLPart4Practice({
         <motion.div
           animate={phase === 'playing-cue' ? { scale: [1, 1.05, 1] } : {}}
           transition={{ repeat: Infinity, duration: 1.5 }}
-          className="w-20 h-20 rounded-full bg-amber-50 border border-amber-100 flex items-center justify-center"
+          className="w-20 h-20 rounded-full flex items-center justify-center"
+          style={{
+            background: 'color-mix(in oklab, var(--color-bob-brand) 8%, white)',
+            border: '1px solid color-mix(in oklab, var(--color-bob-brand) 15%, white)',
+          }}
         >
-          <User size={40} className="text-amber-600" />
+          <User size={40} className="text-bob-brand" />
         </motion.div>
 
         <AnimatePresence mode="wait">
@@ -409,7 +418,7 @@ export function YLPart4Practice({
                   key={countdown}
                   initial={{ scale: 1.4, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
-                  className="text-5xl font-black text-blue-600 block"
+                  className="text-5xl font-black text-bob-brand block"
                 >
                   {countdown}
                 </motion.span>
@@ -427,7 +436,10 @@ export function YLPart4Practice({
 
             {phase === 'processing' && (
               <div className="flex flex-col items-center gap-3">
-                <div className="w-8 h-8 border-3 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                <div
+                  className="w-8 h-8 border-3 border-t-transparent rounded-full animate-spin"
+                  style={{ borderColor: 'var(--color-bob-brand)', borderTopColor: 'transparent' }}
+                />
                 <p className="text-gray-500 font-semibold text-sm">
                   {t('common.processingAnswer')}
                 </p>

@@ -8,6 +8,7 @@ import { useTranslations } from 'next-intl';
 import { PETSpeakingIcon } from '@/components/icons/PETIcons';
 import { CelebrationCard } from '@/components/practice/yl/CelebrationCard';
 import { BobMascotLoader } from '@/components/chat/BobMascotLoader';
+import { ChatInputBar } from '@/components/chat/ChatInputBar';
 import { BobAvatar } from '@/components/practice/yl/_shared';
 import { useCountdownTimer } from '@/hooks/useCountdownTimer';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
@@ -659,23 +660,13 @@ export function PETPictureDescriptionPractice({
             <div className="h-24" />
           </div>
 
-          <div className="shrink-0 border-t border-gray-100 bg-white/90 backdrop-blur px-4 py-3 flex items-center justify-between gap-3">
-            <p className="text-xs text-gray-500 font-medium pl-2">
-              {t('pet.pictureDescription.mic.tap')}
-            </p>
-            <button
-              type="button"
-              onClick={handleStartRecording}
-              className="w-14 h-14 rounded-full bg-blue-600 text-white shadow-lg hover:scale-105 active:scale-95 transition-transform flex items-center justify-center"
-              aria-label={t('pet.pictureDescription.mic.tap')}
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
-                <rect x="9" y="3" width="6" height="12" rx="3" />
-                <path d="M5 11a7 7 0 0 0 14 0" />
-                <line x1="12" y1="18" x2="12" y2="22" />
-              </svg>
-            </button>
-          </div>
+          <ChatInputBar
+            variant="mic"
+            placeholder={t('pet.pictureDescription.mic.tap')}
+            recording={false}
+            onStart={handleStartRecording}
+            onStop={() => {}}
+          />
         </>
       )}
 
@@ -719,18 +710,13 @@ export function PETPictureDescriptionPractice({
             </div>
           </div>
 
-          <div className="shrink-0 border-t border-gray-100 bg-white/90 backdrop-blur px-4 py-3 flex items-center justify-center">
-            <button
-              type="button"
-              onClick={handleStopRecording}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gray-100 text-gray-700 text-sm font-bold hover:bg-gray-200 transition-colors"
-            >
-              <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
-                <rect x="6" y="6" width="12" height="12" rx="2" />
-              </svg>
-              {t('pet.pictureDescription.mic.stop')}
-            </button>
-          </div>
+          <ChatInputBar
+            variant="mic"
+            placeholder={t('pet.pictureDescription.mic.stop')}
+            recording={true}
+            onStart={() => {}}
+            onStop={handleStopRecording}
+          />
         </>
       )}
 

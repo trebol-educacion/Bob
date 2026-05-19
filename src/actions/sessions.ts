@@ -56,6 +56,7 @@ export async function getSessionsAction(): Promise<ActionResult<BobSession[]>> {
       .from('bob_sessions')
       .select('*')
       .eq('user_id', user.id)
+      .not('mode', 'like', 'assessment_%')
       .order('created_at', { ascending: false });
 
     if (error) return { data: null, error: error.message };
