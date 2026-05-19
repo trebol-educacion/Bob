@@ -6,6 +6,7 @@ import { CheckCircle, XCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { PETWritingIcon } from '@/components/icons/PETIcons';
 import { CelebrationCard } from '@/components/practice/yl/CelebrationCard';
 import { BobMascotLoader } from '@/components/chat/BobMascotLoader';
+import { ChatInputBar } from '@/components/chat/ChatInputBar';
 import { BobAvatar } from '@/components/practice/yl/_shared';
 import {
   generatePETEmailAction,
@@ -40,9 +41,21 @@ function EmailScenarioCard({
 }) {
   const t = useTranslations('cambridge');
   return (
-    <div className="rounded-2xl border border-blue-100 bg-blue-50/60 px-4 py-3 space-y-3">
-      <div className="flex items-start gap-3 border-b border-blue-100 pb-2">
-        <div className="w-8 h-8 rounded-full bg-blue-200 text-blue-700 text-sm font-bold flex items-center justify-center shrink-0">
+    <div
+      className="rounded-2xl px-4 py-3 space-y-3"
+      style={{
+        background: 'color-mix(in oklab, var(--color-bob-brand) 6%, white)',
+        border: '1px solid color-mix(in oklab, var(--color-bob-brand) 15%, white)',
+      }}
+    >
+      <div
+        className="flex items-start gap-3 pb-2"
+        style={{ borderBottom: '1px solid color-mix(in oklab, var(--color-bob-brand) 15%, white)' }}
+      >
+        <div
+          className="w-8 h-8 rounded-full text-bob-brand text-sm font-bold flex items-center justify-center shrink-0"
+          style={{ background: 'color-mix(in oklab, var(--color-bob-brand) 18%, white)' }}
+        >
           {emailReceived.from.charAt(0).toUpperCase()}
         </div>
         <div className="min-w-0">
@@ -51,11 +64,17 @@ function EmailScenarioCard({
         </div>
       </div>
       <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-line">{emailReceived.body}</p>
-      <div className="border-t border-blue-100 pt-2 space-y-1">
-        <p className="text-xs font-bold uppercase tracking-widest text-blue-500">{t('pet.emailWriting.replyPointsTitle')}</p>
+      <div
+        className="pt-2 space-y-1"
+        style={{ borderTop: '1px solid color-mix(in oklab, var(--color-bob-brand) 15%, white)' }}
+      >
+        <p className="text-xs font-bold uppercase tracking-widest text-bob-brand">{t('pet.emailWriting.replyPointsTitle')}</p>
         {contentPoints.map((point, i) => (
           <div key={i} className="flex items-start gap-2 text-sm text-gray-700">
-            <span className="mt-0.5 shrink-0 w-5 h-5 rounded-full bg-blue-100 text-blue-600 text-xs font-bold flex items-center justify-center">
+            <span
+              className="mt-0.5 shrink-0 w-5 h-5 rounded-full text-bob-brand text-xs font-bold flex items-center justify-center"
+              style={{ background: 'color-mix(in oklab, var(--color-bob-brand) 14%, white)' }}
+            >
               {i + 1}
             </span>
             <span>{point}</span>
@@ -106,7 +125,7 @@ function FeedbackPanel({
         </div>
 
         <div>
-          <p className="text-xs font-bold uppercase tracking-widest text-blue-500 mb-1.5">Content points</p>
+          <p className="text-xs font-bold uppercase tracking-widest text-bob-brand mb-1.5">Content points</p>
           <div className="space-y-1">
             {contentPoints.map((point, i) => (
               <div key={i} className="flex items-center gap-2 text-sm">
@@ -350,14 +369,20 @@ export function PETEmailWritingPractice({
         >
           ←
         </button>
-        <div className="w-8 h-8 rounded-xl bg-blue-100 flex items-center justify-center shrink-0">
-          <PETWritingIcon size={18} className="text-blue-600" />
+        <div
+          className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0"
+          style={{ background: 'color-mix(in oklab, var(--color-bob-brand) 12%, white)' }}
+        >
+          <PETWritingIcon size={18} className="text-bob-brand" />
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-bold text-gray-800 truncate">{t('pet.emailWriting.headerTitle')}</p>
           <p className="text-xs text-gray-400">{t('pet.emailWriting.headerSubtitle')}</p>
         </div>
-        <span className="shrink-0 px-2 py-0.5 rounded-full bg-blue-100 text-blue-600 text-[10px] font-bold uppercase tracking-widest">
+        <span
+          className="shrink-0 px-2 py-0.5 rounded-full text-bob-brand text-[10px] font-bold uppercase tracking-widest"
+          style={{ background: 'color-mix(in oklab, var(--color-bob-brand) 12%, white)' }}
+        >
           {t('pet.emailWriting.partBadge')}
         </span>
       </div>
@@ -396,51 +421,35 @@ export function PETEmailWritingPractice({
             </motion.div>
           </div>
 
-          <div className="shrink-0 border-t border-gray-100 bg-white px-4 py-3 space-y-2">
-            <div className="relative">
-              <textarea
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-                placeholder={t('pet.emailWriting.placeholder')}
-                rows={4}
-                disabled={phase !== 'ready'}
-                className="w-full rounded-2xl border border-gray-200 px-4 py-3 pr-14 text-sm text-gray-800 leading-relaxed resize-none focus:outline-none focus:ring-2 focus:ring-blue-300 transition-shadow disabled:bg-gray-50 disabled:cursor-not-allowed"
-              />
-              <button
-                type="button"
-                onClick={handleSubmit}
-                disabled={phase !== 'ready' || wordCount < MIN_WORDS}
-                aria-label="Send email"
-                className="absolute right-2.5 bottom-2.5 w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center shadow-sm hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+          <ChatInputBar
+            variant="text"
+            value={text}
+            placeholder={t('pet.emailWriting.placeholder')}
+            disabled={phase !== 'ready' || wordCount < MIN_WORDS}
+            onChange={setText}
+            onSend={handleSubmit}
+          />
+          <div className="shrink-0 px-4 pb-3 -mt-1 flex items-center justify-between text-xs text-gray-400 bg-white">
+            <span>
+              {t('pet.emailWriting.words')}{' '}
+              <strong
+                className={
+                  wordCount < MIN_WORDS
+                    ? 'text-amber-500'
+                    : wordCount > WARN_WORDS
+                    ? 'text-red-400'
+                    : 'text-green-600'
+                }
               >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
-                  <line x1="5" y1="12" x2="19" y2="12" />
-                  <polyline points="13 6 19 12 13 18" />
-                </svg>
-              </button>
-            </div>
-            <div className="flex items-center justify-between text-xs text-gray-400">
-              <span>
-                {t('pet.emailWriting.words')}{' '}
-                <strong
-                  className={
-                    wordCount < MIN_WORDS
-                      ? 'text-amber-500'
-                      : wordCount > WARN_WORDS
-                      ? 'text-red-400'
-                      : 'text-green-600'
-                  }
-                >
-                  {wordCount}
-                </strong>{' '}
-                {t('pet.emailWriting.target')}
+                {wordCount}
+              </strong>{' '}
+              {t('pet.emailWriting.target')}
+            </span>
+            {wordCount < MIN_WORDS && (
+              <span className="text-amber-500">
+                {t('pet.emailWriting.moreToSend', { remaining: MIN_WORDS - wordCount })}
               </span>
-              {wordCount < MIN_WORDS && (
-                <span className="text-amber-500">
-                  {t('pet.emailWriting.moreToSend', { remaining: MIN_WORDS - wordCount })}
-                </span>
-              )}
-            </div>
+            )}
           </div>
         </>
       )}

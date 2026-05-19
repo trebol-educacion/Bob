@@ -267,8 +267,8 @@ export function ConversationPractice({ topic: topicProp = '', onFinish, noFrame,
   if (conv.phase === 'finished') {
     return (
       <div className="w-full max-w-2xl mx-auto flex flex-col items-center justify-center p-12 bg-white rounded-sm shadow-xl space-y-8">
-        <div className="bg-blue-50 p-6 rounded-full">
-          <CheckCircle size={64} className="text-blue-600" />
+        <div className="p-6 rounded-full" style={{ background: 'color-mix(in oklab, var(--color-bob-brand) 10%, white)' }}>
+          <CheckCircle size={64} className="text-bob-brand" />
         </div>
         <div className="text-center space-y-2">
           <h2 className="text-3xl font-black text-gray-900 uppercase tracking-tighter">{t('finished.heading')}</h2>
@@ -289,10 +289,17 @@ export function ConversationPractice({ topic: topicProp = '', onFinish, noFrame,
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 10 }}
-            className="px-4 py-3 bg-blue-50 border border-blue-100 rounded-xl flex items-center justify-between gap-3"
+            className="px-4 py-3 rounded-xl flex items-center justify-between gap-3"
+            style={{
+              background: 'color-mix(in oklab, var(--color-bob-brand) 8%, white)',
+              border: '1px solid color-mix(in oklab, var(--color-bob-brand) 15%, white)',
+            }}
           >
             <div className="flex items-center gap-3">
-              <span className="bg-blue-600 text-white font-black text-sm px-2 py-1 rounded-lg">
+              <span
+                className="text-white font-black text-sm px-2 py-1 rounded-lg"
+                style={{ background: 'var(--color-bob-brand)' }}
+              >
                 {conv.currentEvaluation.score}/100
               </span>
               <p className="text-sm font-medium text-gray-700 italic truncate max-w-xs">
@@ -301,7 +308,7 @@ export function ConversationPractice({ topic: topicProp = '', onFinish, noFrame,
             </div>
             <button
               onClick={() => conv.setShowEvaluation(false)}
-              className="text-xs font-black text-blue-600 uppercase tracking-wider hover:underline shrink-0"
+              className="text-xs font-black text-bob-brand uppercase tracking-wider hover:underline shrink-0"
             >
               Ok
             </button>
@@ -318,13 +325,14 @@ export function ConversationPractice({ topic: topicProp = '', onFinish, noFrame,
             value={conv.topicInput}
             onChange={(e) => conv.setTopicInput(e.target.value)}
             placeholder={t('placeholderTopic')}
-            className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 focus:border-blue-400 focus:outline-none text-sm bg-slate-50"
+            className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 focus:border-gray-400 focus:outline-none text-sm bg-slate-50"
             autoFocus
           />
           <button
             type="submit"
             disabled={!conv.topicInput.trim()}
-            className="px-4 py-2.5 bg-blue-600 text-white rounded-xl font-bold text-sm disabled:opacity-40 hover:opacity-90 transition-opacity"
+            className="px-4 py-2.5 text-white rounded-xl font-bold text-sm disabled:opacity-40 hover:opacity-90 transition-opacity"
+            style={{ background: 'var(--color-bob-brand)' }}
           >
             <Send size={18} />
           </button>
@@ -342,12 +350,13 @@ export function ConversationPractice({ topic: topicProp = '', onFinish, noFrame,
                 onKeyDown={(e) => e.key === 'Enter' && handleSendTextMessage()}
                 placeholder={t('placeholderAnswer')}
                 disabled={conv.isProcessing || isRecording}
-                className="w-full pl-4 pr-12 py-3 bg-gray-50 border border-gray-200 rounded-full focus:outline-none focus:border-blue-400 font-medium text-sm"
+                className="w-full pl-4 pr-12 py-3 bg-gray-50 border border-gray-200 rounded-full focus:outline-none focus:border-gray-400 font-medium text-sm"
               />
               <button
                 onClick={handleSendTextMessage}
                 disabled={!conv.inputText.trim() || conv.isProcessing || isRecording}
-                className="absolute right-2 top-1/2 -translate-y-1/2 bg-blue-600 text-white p-2 rounded-full hover:scale-105 transition-transform disabled:opacity-30"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-white p-2 rounded-full hover:scale-105 transition-transform disabled:opacity-30"
+                style={{ background: 'var(--color-bob-brand)' }}
               >
                 <Send size={18} />
               </button>
@@ -358,7 +367,8 @@ export function ConversationPractice({ topic: topicProp = '', onFinish, noFrame,
                 <button
                   onClick={startRecording}
                   disabled={conv.isProcessing}
-                  className="bg-blue-600 text-white p-4 rounded-full shadow-lg hover:scale-110 transition-transform disabled:opacity-50"
+                  className="text-white p-4 rounded-full shadow-lg hover:scale-110 transition-transform disabled:opacity-50"
+                  style={{ background: 'var(--color-bob-brand)' }}
                 >
                   <Mic size={24} />
                 </button>
@@ -496,7 +506,8 @@ export function ConversationPractice({ topic: topicProp = '', onFinish, noFrame,
                           <button
                             onClick={() => handleListen(msg.text, i)}
                             disabled={conv.isGeneratingAudio !== null}
-                            className="flex items-center space-x-2 bg-blue-600 text-white px-3 py-1 rounded-lg text-xs font-bold uppercase hover:opacity-90 transition-opacity disabled:opacity-50"
+                            className="flex items-center space-x-2 text-white px-3 py-1 rounded-lg text-xs font-bold uppercase hover:opacity-90 transition-opacity disabled:opacity-50"
+                            style={{ background: 'var(--color-bob-brand)' }}
                           >
                             {conv.isGeneratingAudio === i ? (
                               <Loader2 size={12} className="animate-spin" />
@@ -508,7 +519,7 @@ export function ConversationPractice({ topic: topicProp = '', onFinish, noFrame,
                           {conv.playCounts[i] >= 2 && (
                             <button
                               onClick={() => conv.toggleVisibleText(i)}
-                              className="flex items-center space-x-1 text-blue-600 hover:text-blue-700 transition-colors"
+                              className="flex items-center space-x-1 text-bob-brand transition-colors"
                             >
                               <HelpCircle size={14} />
                               <span className="text-[10px] font-black uppercase tracking-tighter">
@@ -537,7 +548,10 @@ export function ConversationPractice({ topic: topicProp = '', onFinish, noFrame,
             className="space-y-8 py-8"
           >
             <div className="text-center space-y-4">
-              <div className="inline-block bg-blue-600 text-white px-4 py-1 rounded-full text-xs font-black uppercase tracking-widest">
+              <div
+                className="inline-block text-white px-4 py-1 rounded-full text-xs font-black uppercase tracking-widest"
+                style={{ background: 'var(--color-bob-brand)' }}
+              >
                 {t('questionCounter', { current: qf.currentQuestionIndex + 1, total: qf.questions.length })}
               </div>
               <h3 className="text-2xl font-black text-gray-900 leading-tight">
@@ -561,7 +575,7 @@ export function ConversationPractice({ topic: topicProp = '', onFinish, noFrame,
         {conv.isProcessing && (
           <div className="flex justify-start">
             <div className="bg-white border border-gray-100 p-4 rounded-2xl rounded-tl-sm shadow-sm flex items-center space-x-2">
-              <Loader2 size={16} className="animate-spin text-blue-600" />
+              <Loader2 size={16} className="animate-spin text-bob-brand" />
               <span className="text-sm font-medium text-gray-500">
                 {conv.phase === 'conversation' ? t('bobThinking') : t('evaluatingAnswer')}
               </span>

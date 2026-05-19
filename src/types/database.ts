@@ -14,6 +14,99 @@ export type Database = {
   }
   public: {
     Tables: {
+      audit_log: {
+        Row: {
+          action: string
+          actor_user_id: string
+          created_at: string
+          details: Json | null
+          id: string
+          organization_id: string | null
+          target_user_id: string | null
+        }
+        Insert: {
+          action: string
+          actor_user_id: string
+          created_at?: string
+          details?: Json | null
+          id?: string
+          organization_id?: string | null
+          target_user_id?: string | null
+        }
+        Update: {
+          action?: string
+          actor_user_id?: string
+          created_at?: string
+          details?: Json | null
+          id?: string
+          organization_id?: string | null
+          target_user_id?: string | null
+        }
+        Relationships: []
+      }
+      bob_closed_items: {
+        Row: {
+          cefr_level: string | null
+          correct_key: string
+          created_at: string
+          exam_part: string
+          explanation: string | null
+          framework: string
+          id: string
+          metadata: Json | null
+          options: Json
+          question: string
+          skill: string | null
+          source: string
+          status: string
+          stimulus_audio_url: string | null
+          stimulus_image_url: string | null
+          stimulus_text: string | null
+          transcript: string | null
+          variant_id: string
+        }
+        Insert: {
+          cefr_level?: string | null
+          correct_key: string
+          created_at?: string
+          exam_part: string
+          explanation?: string | null
+          framework: string
+          id?: string
+          metadata?: Json | null
+          options: Json
+          question: string
+          skill?: string | null
+          source?: string
+          status?: string
+          stimulus_audio_url?: string | null
+          stimulus_image_url?: string | null
+          stimulus_text?: string | null
+          transcript?: string | null
+          variant_id: string
+        }
+        Update: {
+          cefr_level?: string | null
+          correct_key?: string
+          created_at?: string
+          exam_part?: string
+          explanation?: string | null
+          framework?: string
+          id?: string
+          metadata?: Json | null
+          options?: Json
+          question?: string
+          skill?: string | null
+          source?: string
+          status?: string
+          stimulus_audio_url?: string | null
+          stimulus_image_url?: string | null
+          stimulus_text?: string | null
+          transcript?: string | null
+          variant_id?: string
+        }
+        Relationships: []
+      }
       bob_generation_cache: {
         Row: {
           cache_key: string
@@ -107,6 +200,8 @@ export type Database = {
           prompt_current: string
           prompt_default: string
           prompt_key: string
+          skill: string
+          status: string
           updated_at: string
           updated_by: string | null
           variables: Json
@@ -123,6 +218,8 @@ export type Database = {
           prompt_current: string
           prompt_default: string
           prompt_key: string
+          skill: string
+          status?: string
           updated_at?: string
           updated_by?: string | null
           variables?: Json
@@ -139,6 +236,8 @@ export type Database = {
           prompt_current?: string
           prompt_default?: string
           prompt_key?: string
+          skill?: string
+          status?: string
           updated_at?: string
           updated_by?: string | null
           variables?: Json
@@ -220,6 +319,156 @@ export type Database = {
           topic?: string | null
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      bob_skill_level_history: {
+        Row: {
+          assessment_id: string | null
+          confidence: number | null
+          id: number
+          new_level: string
+          occurred_at: string
+          origin: string
+          previous_level: string | null
+          skill: string
+          triggered_by: string | null
+          user_id: string
+        }
+        Insert: {
+          assessment_id?: string | null
+          confidence?: number | null
+          id?: number
+          new_level: string
+          occurred_at?: string
+          origin: string
+          previous_level?: string | null
+          skill: string
+          triggered_by?: string | null
+          user_id: string
+        }
+        Update: {
+          assessment_id?: string | null
+          confidence?: number | null
+          id?: number
+          new_level?: string
+          occurred_at?: string
+          origin?: string
+          previous_level?: string | null
+          skill?: string
+          triggered_by?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      bob_skill_levels: {
+        Row: {
+          cefr_level: string
+          confidence: number | null
+          last_assessment_at: string | null
+          origin: string
+          skill: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          cefr_level: string
+          confidence?: number | null
+          last_assessment_at?: string | null
+          origin: string
+          skill: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          cefr_level?: string
+          confidence?: number | null
+          last_assessment_at?: string | null
+          origin?: string
+          skill?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      bob_vocabulary: {
+        Row: {
+          category: string
+          cefr_level: string
+          created_at: string
+          exam_part: string | null
+          framework: string
+          id: number
+          notes: string | null
+          object_card_friendly: boolean
+          pointable: boolean
+          word: string
+          word_type: string
+        }
+        Insert: {
+          category: string
+          cefr_level: string
+          created_at?: string
+          exam_part?: string | null
+          framework: string
+          id?: number
+          notes?: string | null
+          object_card_friendly?: boolean
+          pointable?: boolean
+          word: string
+          word_type?: string
+        }
+        Update: {
+          category?: string
+          cefr_level?: string
+          created_at?: string
+          exam_part?: string | null
+          framework?: string
+          id?: number
+          notes?: string | null
+          object_card_friendly?: boolean
+          pointable?: boolean
+          word?: string
+          word_type?: string
+        }
+        Relationships: []
+      }
+      bob_word_images: {
+        Row: {
+          cefr_level: string
+          created_at: string
+          framework: string
+          hit_count: number
+          id: number
+          image_type: string
+          image_url: string
+          last_used_at: string | null
+          scene_prompt: string | null
+          word: string
+        }
+        Insert: {
+          cefr_level: string
+          created_at?: string
+          framework: string
+          hit_count?: number
+          id?: number
+          image_type?: string
+          image_url: string
+          last_used_at?: string | null
+          scene_prompt?: string | null
+          word: string
+        }
+        Update: {
+          cefr_level?: string
+          created_at?: string
+          framework?: string
+          hit_count?: number
+          id?: number
+          image_type?: string
+          image_url?: string
+          last_used_at?: string | null
+          scene_prompt?: string | null
+          word?: string
         }
         Relationships: []
       }
@@ -1190,6 +1439,7 @@ export type Database = {
           adaptations_enabled: boolean | null
           allow_data_retention: boolean
           allow_voice_storage: boolean
+          assessment_cooldown_days: number
           autonomous_community: string | null
           background_color: string | null
           country: string | null
@@ -1231,6 +1481,7 @@ export type Database = {
           adaptations_enabled?: boolean | null
           allow_data_retention?: boolean
           allow_voice_storage?: boolean
+          assessment_cooldown_days?: number
           autonomous_community?: string | null
           background_color?: string | null
           country?: string | null
@@ -1272,6 +1523,7 @@ export type Database = {
           adaptations_enabled?: boolean | null
           allow_data_retention?: boolean
           allow_voice_storage?: boolean
+          assessment_cooldown_days?: number
           autonomous_community?: string | null
           background_color?: string | null
           country?: string | null

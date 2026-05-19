@@ -10,6 +10,15 @@ import { BobPracticeChat } from '@/components/BobPracticeChat';
 import { CefrCtaBanner } from '@/components/CefrCtaBanner';
 import { BobAccessDenied } from '@/components/BobAccessDenied';
 import { StudentStatsPanel } from '@/components/StudentStatsPanel';
+import { SkillSelector } from '@/components/assessment/SkillSelector';
+import { AssessmentInvite } from '@/components/assessment/AssessmentInvite';
+import { AssessmentSpeakingRunner } from '@/components/assessment/AssessmentSpeakingRunner';
+import { AssessmentListeningRunner } from '@/components/assessment/AssessmentListeningRunner';
+import { AssessmentReadingRunner } from '@/components/assessment/AssessmentReadingRunner';
+import { AssessmentWritingRunner } from '@/components/assessment/AssessmentWritingRunner';
+import { AssessmentResultCard } from '@/components/assessment/AssessmentResultCard';
+import { startAssessmentAction } from '@/actions/assessment';
+import { applyDefaultSkillLevelAction, resetOwnSkillLevelAction } from '@/actions/skills';
 import { createSessionAction } from '@/actions/sessions';
 import { createSupabaseBrowser } from '@/lib/supabase/browser-client';
 import { Navbar } from '@/components/Navbar';
@@ -24,14 +33,41 @@ import {
   type YLRenderProps,
   type ExamRenderProps,
 } from '@/lib/routing';
-import type { PracticeMode } from '@/lib/types/practice';
+import type { PracticeMode, CefrLevel } from '@/lib/types/practice';
 import type { StoredMessage } from '@/actions/messages';
+import type { Skill } from '@/lib/types/skills';
+import type { AssessmentResultSpeaking, AssessmentResultListening, AssessmentResultReading, AssessmentResultWriting } from '@/lib/types/skills';
+import type { AssessmentPrompt, AssessmentListeningItem, AssessmentReadingItem, AssessmentWritingTask } from '@/actions/assessment';
 
 export default function App() {
   const t = useTranslations('home.bobUnavailable');
-  const [appState, setAppState] = useState<AppState>('mode-selection');
+  const [appState, setAppState] = useState<AppState>('skill-selection');
   const [userEmail, setUserEmail] = useState<string | undefined>();
-  const { organization, enabledModes, availableModes, cefrActiveLevel, cefrLevelLocked, setCefrActiveLevel, loading: orgLoading, accessDenialReason } = useOrganization();
+  const {
+    organization,
+    enabledModes,
+    availableModes,
+    cefrActiveLevel,
+    cefrLevelLocked,
+    setCefrActiveLevel,
+    loading: orgLoading,
+    accessDenialReason,
+    skillLevels,
+    selectedSkill,
+    setSelectedSkill,
+    refreshSkillLevels,
+    refreshPendingAssessments,
+    sustainedImprovementDetected,
+    checkSustainedImprovement,
+  } = useOrganization();
+
+  const [assessmentId, setAssessmentId] = useState<string | null>(null);
+  const [assessmentPrompts, setAssessmentPrompts] = useState<AssessmentPrompt[]>([]);
+  const [assessmentIsYl, setAssessmentIsYl] = useState(false);
+  const [assessmentListeningItems, setAssessmentListeningItems] = useState<AssessmentListeningItem[]>([]);
+  const [assessmentReadingItems, setAssessmentReadingItems] = useState<AssessmentReadingItem[]>([]);
+  const [assessmentWritingTask, setAssessmentWritingTask] = useState<AssessmentWritingTask | null>(null);
+  const [assessmentResult, setAssessmentResult] = useState<AssessmentResultSpeaking | AssessmentResultListening | AssessmentResultReading | AssessmentResultWriting | null>(null);
 
   const cefrSelectorRef = useRef<HTMLDivElement>(null);
 
@@ -44,16 +80,30 @@ export default function App() {
 
   const [mode, setMode] = useState<PracticeMode>(null);
   const [topic, setTopic] = useState('');
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 767px)');
+    if (mq.matches) setSidebarCollapsed(true);
     const handler = (e: MediaQueryListEvent) => {
       if (e.matches) setSidebarCollapsed(true);
     };
     mq.addEventListener('change', handler);
     return () => mq.removeEventListener('change', handler);
   }, []);
+
+  useEffect(() => {
+    if (appState === 'catalog-filtered') {
+      checkSustainedImprovement();
+    }
+  }, [appState, checkSustainedImprovement]);
+
+  const resetToSkillSelection = useCallback(() => {
+    setAppState('skill-selection');
+    setSelectedSkill(null);
+    setMode(null);
+    setTopic('');
+  }, [setSelectedSkill]);
 
   const resetToModeSelection = useCallback(() => {
     setAppState('mode-selection');
@@ -86,8 +136,8 @@ export default function App() {
   );
 
   const onNewSession = useCallback(() => {
-    handleNewSession(resetToModeSelection);
-  }, [handleNewSession, resetToModeSelection]);
+    handleNewSession(resetToSkillSelection);
+  }, [handleNewSession, resetToSkillSelection]);
 
   const onSelectSession = useCallback(async (id: string) => {
     await handleSelectSession(id, (sessionMode, sessionTopic) => {
@@ -104,8 +154,8 @@ export default function App() {
   }, [handleSelectSession]);
 
   const onDeleteSession = useCallback(async (id: string) => {
-    await handleDeleteSession(id, activeSessionId, resetToModeSelection);
-  }, [handleDeleteSession, activeSessionId, resetToModeSelection]);
+    await handleDeleteSession(id, activeSessionId, resetToSkillSelection);
+  }, [handleDeleteSession, activeSessionId, resetToSkillSelection]);
 
   const handleModeSelect = (m: PracticeMode) => {
     setMode(m);
@@ -118,20 +168,87 @@ export default function App() {
     }
   };
 
-  const onConversationSessionStart = useCallback((t: string) => {
-    setTopic(t);
-    handleConversationSessionStart(t);
+  const onConversationSessionStart = useCallback((topicStr: string) => {
+    setTopic(topicStr);
+    handleConversationSessionStart(topicStr);
   }, [handleConversationSessionStart]);
 
   const onFinish = useCallback(() => {
     setSelectedMessages([]);
     setSelectedSession(null);
-    resetToModeSelection();
-  }, [resetToModeSelection, setSelectedMessages, setSelectedSession]);
+    resetToSkillSelection();
+  }, [resetToSkillSelection, setSelectedMessages, setSelectedSession]);
 
   const handleBannerScroll = useCallback(() => {
     cefrSelectorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }, []);
+
+  const handleSkillSelect = useCallback((skill: Skill) => {
+    setSelectedSkill(skill);
+    const level = skillLevels?.[skill];
+    if (level?.cefr_level) {
+      setAppState('catalog-filtered');
+    } else {
+      setAppState('assessment-invite');
+    }
+  }, [skillLevels, setSelectedSkill]);
+
+  const handleAssessmentStart = useCallback(async () => {
+    if (!selectedSkill) return;
+    const result = await startAssessmentAction(selectedSkill);
+    if (result.status === 'ok') {
+      setAssessmentId(result.assessment_id);
+      setAssessmentResult(null);
+      if (result.skill === 'listening') {
+        setAssessmentListeningItems(result.items);
+        setAssessmentReadingItems([]);
+        setAssessmentWritingTask(null);
+        setAssessmentPrompts([]);
+      } else if (result.skill === 'reading') {
+        setAssessmentReadingItems(result.items);
+        setAssessmentListeningItems([]);
+        setAssessmentWritingTask(null);
+        setAssessmentPrompts([]);
+      } else if (result.skill === 'writing') {
+        setAssessmentWritingTask(result.task);
+        setAssessmentListeningItems([]);
+        setAssessmentReadingItems([]);
+        setAssessmentPrompts([]);
+      } else {
+        setAssessmentPrompts(result.prompts);
+        setAssessmentIsYl(result.is_yl);
+        setAssessmentListeningItems([]);
+        setAssessmentReadingItems([]);
+        setAssessmentWritingTask(null);
+      }
+      setAppState('assessment-running');
+    } else if (result.status === 'cooldown') {
+      setAppState('assessment-invite');
+    } else {
+      setAppState('assessment-invite');
+    }
+  }, [selectedSkill]);
+
+  const handleResetSkillLevel = useCallback(async () => {
+    if (!selectedSkill) return;
+    const result = await resetOwnSkillLevelAction(selectedSkill);
+    if (result.ok) {
+      await refreshSkillLevels();
+      setAppState('assessment-invite');
+    }
+  }, [selectedSkill, refreshSkillLevels]);
+
+  const handlePickLevel = useCallback(async (level: CefrLevel) => {
+    if (!selectedSkill) return;
+    const existing = skillLevels?.[selectedSkill]?.cefr_level;
+    if (existing !== level) {
+      const result = await applyDefaultSkillLevelAction(selectedSkill, level);
+      if (result.ok) {
+        await refreshSkillLevels();
+      }
+    }
+    setAppState('catalog-filtered');
+  }, [selectedSkill, skillLevels, refreshSkillLevels]);
 
   const showBanner = cefrActiveLevel === null && !cefrLevelLocked;
 
@@ -149,7 +266,7 @@ export default function App() {
   };
 
   const examProps: ExamRenderProps = {
-    onBack: () => setAppState('mode-selection'),
+    onBack: () => setAppState('catalog-filtered'),
   };
 
   return (
@@ -174,6 +291,187 @@ export default function App() {
         <main className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden">
 
           <AnimatePresence mode="wait">
+
+            {appState === 'skill-selection' && (
+              <motion.div
+                key="skill-selection"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                className="w-full flex-1 overflow-y-auto"
+              >
+                {organization && organization.is_bob_enabled === false ? (
+                  <div className="w-full flex-1 flex flex-col items-center justify-center py-24 px-4 text-center">
+                    <div className="bg-white shadow-md rounded-2xl p-10 max-w-md w-full space-y-3">
+                      <p className="text-2xl font-black text-trebol-text">{t('title')}</p>
+                      <p className="text-trebol-text opacity-60 font-medium text-sm">
+                        {t('body')}
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <SkillSelector onSelect={handleSkillSelect} />
+                )}
+              </motion.div>
+            )}
+
+            {appState === 'assessment-invite' && selectedSkill && (
+              <motion.div
+                key="assessment-invite"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                className="w-full flex-1 overflow-y-auto"
+              >
+                <AssessmentInvite
+                  skill={selectedSkill}
+                  onStartAssessment={handleAssessmentStart}
+                  onPickLevel={handlePickLevel}
+                  onBack={() => setAppState('skill-selection')}
+                />
+              </motion.div>
+            )}
+
+            {appState === 'assessment-running' && assessmentId && assessmentPrompts.length > 0 && (
+              <motion.div
+                key="assessment-running-speaking"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="w-full flex-1 flex flex-col"
+              >
+                <AssessmentSpeakingRunner
+                  assessment_id={assessmentId}
+                  prompts={assessmentPrompts}
+                  is_yl={assessmentIsYl}
+                  onQueued={() => setAppState('dashboard')}
+                  onCancel={() => setAppState('assessment-invite')}
+                />
+              </motion.div>
+            )}
+
+            {appState === 'assessment-running' && assessmentId && assessmentListeningItems.length > 0 && (
+              <motion.div
+                key="assessment-running-listening"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="w-full flex-1 flex flex-col"
+              >
+                <AssessmentListeningRunner
+                  assessment_id={assessmentId}
+                  items={assessmentListeningItems}
+                  onResult={async (result) => {
+                    setAssessmentResult(result);
+                    await refreshSkillLevels();
+                    setAppState('assessment-result');
+                  }}
+                  onCancel={() => setAppState('assessment-invite')}
+                />
+              </motion.div>
+            )}
+
+            {appState === 'assessment-running' && assessmentId && assessmentReadingItems.length > 0 && (
+              <motion.div
+                key="assessment-running-reading"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="w-full flex-1 flex flex-col"
+              >
+                <AssessmentReadingRunner
+                  assessment_id={assessmentId}
+                  items={assessmentReadingItems}
+                  onResult={async (result) => {
+                    setAssessmentResult(result);
+                    await refreshSkillLevels();
+                    setAppState('assessment-result');
+                  }}
+                  onCancel={() => setAppState('assessment-invite')}
+                />
+              </motion.div>
+            )}
+
+            {appState === 'assessment-running' && assessmentId && assessmentWritingTask && (
+              <motion.div
+                key="assessment-running-writing"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="w-full flex-1 flex flex-col"
+              >
+                <AssessmentWritingRunner
+                  assessment_id={assessmentId}
+                  task={assessmentWritingTask}
+                  onQueued={() => setAppState('dashboard')}
+                  onCancel={() => setAppState('assessment-invite')}
+                />
+              </motion.div>
+            )}
+
+            {appState === 'assessment-result' && assessmentResult && (
+              <motion.div
+                key="assessment-result"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                className="w-full flex-1 flex flex-col"
+              >
+                <AssessmentResultCard
+                  result={assessmentResult}
+                  onPracticeNow={() => setAppState('catalog-filtered')}
+                />
+              </motion.div>
+            )}
+
+            {appState === 'catalog-filtered' && (
+              <motion.div
+                key="catalog-filtered"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                className="w-full flex-1 overflow-y-auto"
+              >
+                <div className="px-4 pt-4">
+                  <button
+                    onClick={() => setAppState('skill-selection')}
+                    className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 transition-colors font-medium mb-2"
+                  >
+                    ← Back
+                  </button>
+                  {sustainedImprovementDetected === true && selectedSkill && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="mb-4 flex items-center justify-between gap-3 rounded-2xl bg-green-50 border border-green-200 px-4 py-3"
+                    >
+                      <div>
+                        <p className="text-sm font-black text-green-800">Ready to level up?</p>
+                        <p className="text-xs text-green-600 font-medium mt-0.5">
+                          Your recent sessions show strong accuracy. Take an Assessment to confirm your next level.
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => setAppState('assessment-invite')}
+                        className="shrink-0 px-3 py-1.5 rounded-xl bg-green-600 text-white text-xs font-black hover:bg-green-700 transition-colors shadow-sm"
+                      >
+                        Take Assessment
+                      </button>
+                    </motion.div>
+                  )}
+                </div>
+                <ModeSelection
+                  ref={cefrSelectorRef}
+                  onSelect={handleModeSelect}
+                  enabledModes={enabledModes}
+                  availableModes={availableModes}
+                  cefrActiveLevel={(selectedSkill ? skillLevels?.[selectedSkill]?.cefr_level : null) ?? cefrActiveLevel}
+                  cefrLevelLocked={cefrLevelLocked}
+                  organizationName={organization?.name}
+                />
+              </motion.div>
+            )}
+
             {appState === 'mode-selection' && (
               <motion.div
                 key="mode-selection"
@@ -193,7 +491,6 @@ export default function App() {
                   </div>
                 ) : (
                   <>
-                    {showBanner && <CefrCtaBanner onScroll={handleBannerScroll} />}
                     <ModeSelection
                       ref={cefrSelectorRef}
                       onSelect={handleModeSelect}
@@ -201,14 +498,12 @@ export default function App() {
                       availableModes={availableModes}
                       cefrActiveLevel={cefrActiveLevel}
                       cefrLevelLocked={cefrLevelLocked}
-                      onCefrChange={setCefrActiveLevel}
                       organizationName={organization?.name}
                     />
                   </>
                 )}
               </motion.div>
             )}
-
 
             {appState === 'practicing' && mode && !isConversationMode(mode) && (
               <motion.div
@@ -289,13 +584,24 @@ export default function App() {
                 className="flex-1 flex flex-col min-h-0"
               >
                 <StudentStatsPanel
-                  onBack={() => setAppState('mode-selection')}
+                  onBack={() => setAppState('skill-selection')}
                   onAfterReset={() => {
                     void refreshSessions();
+                  }}
+                  onTakeAssessment={(skill) => {
+                    setSelectedSkill(skill);
+                    setAppState('assessment-invite');
+                  }}
+                  onChangeLevel={async (skill, level) => {
+                    const result = await applyDefaultSkillLevelAction(skill, level as CefrLevel);
+                    if (result.ok) {
+                      await refreshSkillLevels();
+                    }
                   }}
                 />
               </motion.div>
             )}
+
           </AnimatePresence>
 
         </main>

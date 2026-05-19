@@ -160,25 +160,24 @@ function AudioPlayer({ audiob64, audiomime, itemNumber }: { audiob64: string; au
     : t('ket.listenAndChoose.listen');
 
   return (
-    <div className="flex items-center gap-3 bg-white ring-1 ring-violet-100 rounded-2xl px-3 py-2.5 w-full max-w-xs">
+    <div className="flex items-center gap-3 bg-white ring-1 ring-gray-100 rounded-2xl px-3 py-2.5 w-full max-w-xs">
       <button
         type="button"
         onClick={handlePlay}
         aria-label={label}
         className={[
-          'w-10 h-10 rounded-full flex items-center justify-center shrink-0 transition-all',
-          playing
-            ? 'bg-violet-600 text-white animate-pulse'
-            : 'bg-violet-600 text-white hover:bg-violet-700',
+          'w-10 h-10 rounded-full flex items-center justify-center shrink-0 transition-all text-white',
+          playing ? 'animate-pulse' : '',
         ].join(' ')}
+        style={{ background: 'var(--color-bob-brand)' }}
       >
         {playing ? <PauseIcon /> : hasPlayed ? <ReplayIcon /> : <PlayIcon />}
       </button>
       <div className="flex-1 min-w-0">
         <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
           <div
-            className="h-full bg-violet-600 transition-all"
-            style={{ width: `${Math.round(progress * 100)}%` }}
+            className="h-full transition-all"
+            style={{ width: `${Math.round(progress * 100)}%`, background: 'var(--color-bob-brand)' }}
           />
         </div>
         <p className="text-[11px] text-gray-400 mt-1">{label}</p>
@@ -210,21 +209,30 @@ function OptionCard({
       disabled={disabled}
       className={[
         'flex items-center gap-3 rounded-xl border p-2 text-left w-full transition-colors cursor-pointer',
-        selected
-          ? 'border-rose-400 bg-rose-50'
-          : 'border-gray-100 bg-gray-50 hover:border-rose-200 hover:bg-rose-50/40',
+        selected ? '' : 'border-gray-100 bg-gray-50',
         disabled ? 'cursor-not-allowed' : '',
       ]
         .filter(Boolean)
         .join(' ')}
+      style={
+        selected
+          ? {
+              borderColor: 'color-mix(in oklab, var(--color-bob-brand) 50%, white)',
+              background: 'color-mix(in oklab, var(--color-bob-brand) 10%, white)',
+            }
+          : undefined
+      }
     >
       <span
         className={[
           'shrink-0 w-7 h-7 rounded-full border text-xs font-black flex items-center justify-center',
-          selected
-            ? 'border-rose-500 bg-rose-500 text-white'
-            : 'border-gray-300 bg-white text-gray-500',
+          selected ? 'text-white' : 'border-gray-300 bg-white text-gray-500',
         ].join(' ')}
+        style={
+          selected
+            ? { borderColor: 'var(--color-bob-brand)', background: 'var(--color-bob-brand)' }
+            : undefined
+        }
       >
         {optionId}
       </span>
@@ -269,7 +277,10 @@ function ListenCard({
     >
       <div className="px-4 pt-4 pb-3 space-y-3">
         <div className="flex items-center gap-2">
-          <span className="w-6 h-6 rounded-full bg-rose-100 text-rose-600 text-xs font-black flex items-center justify-center shrink-0">
+          <span
+            className="w-6 h-6 rounded-full text-bob-brand text-xs font-black flex items-center justify-center shrink-0"
+            style={{ background: 'color-mix(in oklab, var(--color-bob-brand) 14%, white)' }}
+          >
             {item.number}
           </span>
           <p className="text-xs text-gray-400 leading-tight">{item.context}</p>
@@ -387,7 +398,10 @@ function ResultCard({
     >
       <div className="px-4 pt-4 pb-2 space-y-2">
         <div className="flex items-center gap-2">
-          <span className="w-6 h-6 rounded-full bg-rose-100 text-rose-600 text-xs font-black flex items-center justify-center shrink-0">
+          <span
+            className="w-6 h-6 rounded-full text-bob-brand text-xs font-black flex items-center justify-center shrink-0"
+            style={{ background: 'color-mix(in oklab, var(--color-bob-brand) 14%, white)' }}
+          >
             {item.number}
           </span>
           <p className="text-xs text-gray-400 leading-tight">{item.context}</p>
@@ -421,7 +435,7 @@ function ResultCard({
         <button
           type="button"
           onClick={() => setShowTranscript((v) => !v)}
-          className="text-[11px] text-violet-500 hover:text-violet-700 font-semibold underline underline-offset-2 transition-colors"
+          className="text-[11px] text-bob-brand font-semibold underline underline-offset-2 transition-colors"
         >
           {showTranscript
             ? t('ket.listenAndChoose.hideTranscript')
@@ -582,14 +596,20 @@ export function KETListenAndChoosePractice({
         >
           ←
         </button>
-        <div className="w-8 h-8 rounded-xl bg-rose-100 flex items-center justify-center shrink-0">
-          <KETListeningIcon size={18} className="text-rose-600" />
+        <div
+          className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0"
+          style={{ background: 'color-mix(in oklab, var(--color-bob-brand) 12%, white)' }}
+        >
+          <KETListeningIcon size={18} className="text-bob-brand" />
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-bold text-gray-800 truncate">{t('ket.listenAndChoose.headerTitle')}</p>
           <p className="text-xs text-gray-400">{t('ket.listenAndChoose.headerSubtitle')}</p>
         </div>
-        <span className="shrink-0 px-2 py-0.5 rounded-full bg-rose-100 text-rose-600 text-[10px] font-bold uppercase tracking-widest">
+        <span
+          className="shrink-0 px-2 py-0.5 rounded-full text-bob-brand text-[10px] font-bold uppercase tracking-widest"
+          style={{ background: 'color-mix(in oklab, var(--color-bob-brand) 12%, white)' }}
+        >
           {t('ket.listenAndChoose.partBadge')}
         </span>
       </div>
@@ -646,7 +666,8 @@ export function KETListenAndChoosePractice({
               type="button"
               onClick={handleSubmit}
               disabled={!allAnswered}
-              className="px-5 py-2.5 rounded-xl bg-rose-600 text-white text-sm font-bold shadow-sm hover:bg-rose-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+              className="px-5 py-2.5 rounded-xl text-white text-sm font-bold shadow-sm disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+              style={{ background: 'var(--color-bob-brand)' }}
             >
               {t('ket.listenAndChoose.submitAnswers')}
             </button>

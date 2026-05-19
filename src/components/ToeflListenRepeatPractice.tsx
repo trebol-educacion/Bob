@@ -286,8 +286,8 @@ export function ToeflListenRepeatPractice({ onBack }: ToeflListenRepeatPracticeP
       </p>
       <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
         <div
-          className="bg-blue-600 h-full rounded-full transition-all duration-500"
-          style={{ width: `${(loadingProgress / (items.length || 10)) * 100}%` }}
+          className="h-full rounded-full transition-all duration-500"
+          style={{ background: 'var(--color-bob-brand)', width: `${(loadingProgress / (items.length || 10)) * 100}%` }}
         />
       </div>
     </div>
@@ -312,8 +312,14 @@ export function ToeflListenRepeatPractice({ onBack }: ToeflListenRepeatPracticeP
     >
       {phase === 'loading' && (
         <div className="flex flex-col items-center justify-center gap-6 py-12">
-          <div className="bg-blue-50 border border-blue-100 rounded-2xl p-5 w-20 h-20 flex items-center justify-center">
-            <Headphones size={36} className="text-blue-600 animate-pulse" />
+          <div
+            className="rounded-2xl p-5 w-20 h-20 flex items-center justify-center"
+            style={{
+              background: 'color-mix(in oklab, var(--color-bob-brand) 8%, white)',
+              border: '1px solid color-mix(in oklab, var(--color-bob-brand) 15%, white)',
+            }}
+          >
+            <Headphones size={36} className="text-bob-brand animate-pulse" />
           </div>
           <MessageBubble variant="assistant" accentColor="blue">
             <p className="font-semibold">{t('listenRepeat.preparingSession')}</p>
@@ -324,8 +330,14 @@ export function ToeflListenRepeatPractice({ onBack }: ToeflListenRepeatPracticeP
 
       {phase === 'play' && items[currentIndex] && (
         <div className="flex flex-col items-center gap-4 py-8">
-          <div className="bg-blue-50 border border-blue-100 rounded-2xl p-5 w-24 h-24 flex items-center justify-center">
-            <Headphones size={40} className="text-blue-600 animate-bounce" />
+          <div
+            className="rounded-2xl p-5 w-24 h-24 flex items-center justify-center"
+            style={{
+              background: 'color-mix(in oklab, var(--color-bob-brand) 8%, white)',
+              border: '1px solid color-mix(in oklab, var(--color-bob-brand) 15%, white)',
+            }}
+          >
+            <Headphones size={40} className="text-bob-brand animate-bounce" />
           </div>
           <MessageBubble variant="assistant" accentColor="blue">
             <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">
@@ -354,7 +366,8 @@ export function ToeflListenRepeatPractice({ onBack }: ToeflListenRepeatPracticeP
           </MessageBubble>
           <button
             onClick={() => setPhase('record')}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl transition-colors flex items-center justify-center gap-2"
+            className="w-full text-white font-bold py-3 rounded-xl transition-colors flex items-center justify-center gap-2"
+            style={{ background: 'var(--color-bob-brand)' }}
           >
             <Mic size={18} />
             {t('listenRepeat.startRecording')}
@@ -386,7 +399,7 @@ export function ToeflListenRepeatPractice({ onBack }: ToeflListenRepeatPracticeP
               countdown.stop();
               stopRecording();
             }}
-            className="w-full border-2 border-gray-200 hover:border-blue-600 text-gray-700 font-semibold py-3 rounded-xl transition-colors text-sm"
+            className="w-full border-2 border-gray-200 hover:border-gray-400 text-gray-700 font-semibold py-3 rounded-xl transition-colors text-sm"
           >
             {t('listenRepeat.stopEarly')}
           </button>
@@ -395,7 +408,13 @@ export function ToeflListenRepeatPractice({ onBack }: ToeflListenRepeatPracticeP
 
       {phase === 'evaluating' && (
         <div className="flex flex-col items-center gap-4 py-8">
-          <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 w-20 h-20 flex items-center justify-center">
+          <div
+            className="rounded-2xl p-4 w-20 h-20 flex items-center justify-center"
+            style={{
+              background: 'color-mix(in oklab, var(--color-bob-brand) 8%, white)',
+              border: '1px solid color-mix(in oklab, var(--color-bob-brand) 15%, white)',
+            }}
+          >
             <span className="text-3xl animate-spin">⚙️</span>
           </div>
           <MessageBubble variant="assistant" accentColor="blue">
@@ -446,14 +465,15 @@ export function ToeflListenRepeatPractice({ onBack }: ToeflListenRepeatPracticeP
           <div className="flex gap-3">
             <button
               onClick={() => setPhase('play')}
-              className="flex-1 border-2 border-gray-200 hover:border-blue-600 text-gray-700 font-bold py-3 rounded-xl transition-colors flex items-center justify-center gap-2 text-sm"
+              className="flex-1 border-2 border-gray-200 hover:border-gray-400 text-gray-700 font-bold py-3 rounded-xl transition-colors flex items-center justify-center gap-2 text-sm"
             >
               <RotateCcw size={16} />
               {t('listenRepeat.retry')}
             </button>
             <button
               onClick={handleNext}
-              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl transition-colors flex items-center justify-center gap-2"
+              className="flex-1 text-white font-bold py-3 rounded-xl transition-colors flex items-center justify-center gap-2"
+              style={{ background: 'var(--color-bob-brand)' }}
             >
               {currentIndex + 1 >= items.length ? (
                 <>
@@ -479,7 +499,7 @@ export function ToeflListenRepeatPractice({ onBack }: ToeflListenRepeatPracticeP
         <div className="flex flex-col gap-6">
           <MessageBubble variant="assistant" accentColor="blue">
             <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">{t('listenRepeat.finished.sessionComplete')}</p>
-            <p className="text-4xl font-black text-blue-600">{exactCount} / {results.length}</p>
+            <p className="text-4xl font-black text-bob-brand">{exactCount} / {results.length}</p>
             <p className="text-sm font-bold text-gray-400 mt-1">{t('listenRepeat.finished.exactRepetitions')}</p>
           </MessageBubble>
 
@@ -503,14 +523,15 @@ export function ToeflListenRepeatPractice({ onBack }: ToeflListenRepeatPracticeP
           <div className="flex gap-3">
             <button
               onClick={handleRestart}
-              className="flex-1 border-2 border-gray-200 hover:border-blue-600 text-gray-700 font-bold py-3 rounded-xl transition-colors flex items-center justify-center gap-2"
+              className="flex-1 border-2 border-gray-200 hover:border-gray-400 text-gray-700 font-bold py-3 rounded-xl transition-colors flex items-center justify-center gap-2"
             >
               <RotateCcw size={16} />
               {t('common.tryAgain')}
             </button>
             <button
               onClick={onBack}
-              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl transition-colors flex items-center justify-center gap-2"
+              className="flex-1 text-white font-bold py-3 rounded-xl transition-colors flex items-center justify-center gap-2"
+              style={{ background: 'var(--color-bob-brand)' }}
             >
               <ArrowLeft size={16} />
               {t('common.back')}

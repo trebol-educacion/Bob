@@ -75,9 +75,12 @@ function FormativeFeedbackCard({ feedback }: { feedback: FormativeFeedback }) {
         </div>
       )}
       {feedback.model_answer && (
-        <div className="bg-blue-50 rounded-xl p-3 space-y-1">
-          <p className="text-xs font-bold text-blue-600 uppercase tracking-widest">{t('example')}</p>
-          <p className="text-sm text-blue-800 italic">"{feedback.model_answer}"</p>
+        <div
+          className="rounded-xl p-3 space-y-1"
+          style={{ background: 'color-mix(in oklab, var(--color-bob-brand) 8%, white)' }}
+        >
+          <p className="text-xs font-bold text-bob-brand uppercase tracking-widest">{t('example')}</p>
+          <p className="text-sm text-gray-800 italic">"{feedback.model_answer}"</p>
         </div>
       )}
     </div>
@@ -334,13 +337,15 @@ export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) 
       {plan.questions.map((_, i) => (
         <div
           key={i}
-          className={`w-2 h-2 rounded-full transition-colors ${
-            i < currentIndex
-              ? 'bg-blue-600'
-              : i === currentIndex
-                ? 'bg-blue-400 ring-2 ring-blue-200'
-                : 'bg-gray-200'
-          }`}
+          className="w-2 h-2 rounded-full transition-colors"
+          style={{
+            background:
+              i < currentIndex
+                ? 'var(--color-bob-brand)'
+                : i === currentIndex
+                  ? 'color-mix(in oklab, var(--color-bob-brand) 60%, white)'
+                  : '#e5e7eb',
+          }}
         />
       ))}
     </div>
@@ -376,7 +381,8 @@ export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) 
       {phase === 'question' && subPhase === 'result-preview' && currentEval && (
         <button
           onClick={handleNext}
-          className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white font-black px-6 py-3 rounded-xl hover:opacity-90 transition-opacity"
+          className="w-full flex items-center justify-center gap-2 text-white font-black px-6 py-3 rounded-xl hover:opacity-90 transition-opacity"
+          style={{ background: 'var(--color-bob-brand)' }}
         >
           {currentIndex + 1 < (plan?.questions.length ?? 0) ? (
             <>{t('interview.nextQuestion')} <ChevronRight size={16} /></>
@@ -389,7 +395,8 @@ export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) 
       {phase === 'intro' && (
         <button
           onClick={handleStart}
-          className="w-full bg-blue-600 text-white font-black px-8 py-3 rounded-xl hover:opacity-90 transition-opacity"
+          className="w-full text-white font-black px-8 py-3 rounded-xl hover:opacity-90 transition-opacity"
+          style={{ background: 'var(--color-bob-brand)' }}
         >
           {t('interview.startButton')}
         </button>
@@ -399,14 +406,16 @@ export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) 
         <div className="flex gap-3">
           <button
             onClick={handleRestart}
-            className="flex-1 flex items-center justify-center gap-2 border-2 border-blue-600 text-blue-600 font-black px-4 py-2.5 rounded-xl hover:bg-blue-600 hover:text-white transition-colors"
+            className="flex-1 flex items-center justify-center gap-2 border-2 text-bob-brand font-black px-4 py-2.5 rounded-xl transition-colors"
+            style={{ borderColor: 'var(--color-bob-brand)' }}
           >
             <RotateCcw size={15} />
             {t('common.tryAgain')}
           </button>
           <button
             onClick={onBack}
-            className="flex-1 flex items-center justify-center gap-2 bg-blue-600 text-white font-black px-4 py-2.5 rounded-xl hover:opacity-90 transition-opacity"
+            className="flex-1 flex items-center justify-center gap-2 text-white font-black px-4 py-2.5 rounded-xl hover:opacity-90 transition-opacity"
+            style={{ background: 'var(--color-bob-brand)' }}
           >
             <ArrowLeft size={15} />
             {t('common.back')}
@@ -438,7 +447,7 @@ export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) 
               </p>
               {plan.questions.map((q, i) => (
                 <div key={i} className="flex items-center gap-3">
-                  <span className="text-xs font-black text-blue-600 w-4">{i + 1}</span>
+                  <span className="text-xs font-black text-bob-brand w-4">{i + 1}</span>
                   <span className="text-xs font-bold text-amber-700/60 uppercase tracking-wide">
                     {t(`interview.difficulty.${difficultyKey(q.difficulty)}`)}
                   </span>
@@ -453,7 +462,7 @@ export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) 
         <div className="space-y-4 py-2">
           <MessageBubble variant="assistant" icon={ClipboardList} accentColor="blue">
             <div className="space-y-1">
-              <p className="text-[10px] font-bold text-blue-400 uppercase tracking-widest">
+              <p className="text-[10px] font-bold text-bob-brand uppercase tracking-widest">
                 {t(`interview.difficulty.${difficultyKey(plan.questions[currentIndex].difficulty)}`)}
               </p>
               <p className="text-base font-bold leading-snug">
@@ -464,7 +473,10 @@ export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) 
 
           {(subPhase === 'reading' || subPhase === 'listening') && (
             <div className="flex flex-col items-center gap-3 py-4">
-              <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
+              <div
+                className="w-8 h-8 border-4 border-t-transparent rounded-full animate-spin"
+                style={{ borderColor: 'var(--color-bob-brand)', borderTopColor: 'transparent' }}
+              />
               <p className="text-gray-400 font-medium text-sm">
                 {subPhase === 'reading' ? t('interview.questionLoading') : t('interview.listenCarefully')}
               </p>
@@ -497,7 +509,10 @@ export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) 
 
           {subPhase === 'evaluating' && (
             <div className="flex flex-col items-center gap-3 py-4">
-              <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
+              <div
+                className="w-8 h-8 border-4 border-t-transparent rounded-full animate-spin"
+                style={{ borderColor: 'var(--color-bob-brand)', borderTopColor: 'transparent' }}
+              />
               <p className="text-gray-400 font-medium text-sm">{t('interview.evaluating')}</p>
             </div>
           )}
@@ -542,7 +557,7 @@ export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) 
               return (
                 <MessageBubble key={i} variant="assistant" icon={ClipboardList} accentColor="blue" noAnimate>
                   <div className="space-y-1">
-                    <p className="text-[10px] font-bold text-blue-400 uppercase tracking-widest">
+                    <p className="text-[10px] font-bold text-bob-brand uppercase tracking-widest">
                       {t('interview.questionLabel', { n: i + 1, difficulty: t(`interview.difficulty.${difficultyKey(q.difficulty)}`) })}
                     </p>
                     <p className="text-sm font-bold leading-snug line-clamp-2">{q.text}</p>

@@ -470,7 +470,8 @@ export function YLPointingPractice({
         <button
           type="button"
           onClick={handleNext}
-          className="px-6 py-3 rounded-full bg-blue-600 text-white font-bold text-sm hover:opacity-90 transition-opacity flex items-center gap-2"
+          className="px-6 py-3 rounded-full text-white font-bold text-sm hover:opacity-90 transition-opacity flex items-center gap-2"
+          style={{ background: 'var(--color-bob-brand)' }}
         >
           {cueIndex + 1 >= totalCues ? t('pointing.seeResults') : t('pointing.next')}
           <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
@@ -483,7 +484,8 @@ export function YLPointingPractice({
         <button
           type="button"
           onClick={onBack}
-          className="px-6 py-3 rounded-full bg-blue-600 text-white font-bold text-sm hover:opacity-90 transition-opacity"
+          className="px-6 py-3 rounded-full text-white font-bold text-sm hover:opacity-90 transition-opacity"
+          style={{ background: 'var(--color-bob-brand)' }}
         >
           {t('common.backToActivities')}
         </button>

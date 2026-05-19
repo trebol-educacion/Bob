@@ -80,7 +80,10 @@ function SignCard({
     >
       <div className="px-4 pt-4 pb-3 space-y-2">
         <div className="flex items-center gap-2">
-          <span className="w-6 h-6 rounded-full bg-rose-100 text-rose-600 text-xs font-black flex items-center justify-center shrink-0">
+          <span
+            className="w-6 h-6 rounded-full text-bob-brand text-xs font-black flex items-center justify-center shrink-0"
+            style={{ background: 'color-mix(in oklab, var(--color-bob-brand) 14%, white)' }}
+          >
             {item.number}
           </span>
           <p className="text-xs text-gray-400 leading-tight">{item.sign_context}</p>
@@ -106,21 +109,30 @@ function SignCard({
               onClick={() => onSelect(opt.id as 'A' | 'B' | 'C')}
               className={[
                 'w-full flex items-start gap-3 rounded-xl border px-3 py-2.5 text-left text-sm transition-colors cursor-pointer',
-                isSelected
-                  ? 'border-rose-400 bg-rose-50 text-gray-800'
-                  : 'border-gray-100 bg-gray-50 text-gray-700 hover:border-rose-200 hover:bg-rose-50/40',
+                isSelected ? 'text-gray-800' : 'border-gray-100 bg-gray-50 text-gray-700',
                 disabled ? 'cursor-not-allowed' : '',
               ]
                 .filter(Boolean)
                 .join(' ')}
+              style={
+                isSelected
+                  ? {
+                      borderColor: 'color-mix(in oklab, var(--color-bob-brand) 50%, white)',
+                      background: 'color-mix(in oklab, var(--color-bob-brand) 10%, white)',
+                    }
+                  : undefined
+              }
             >
               <span
                 className={[
                   'shrink-0 w-6 h-6 rounded-full border text-xs font-bold flex items-center justify-center mt-0.5',
-                  isSelected
-                    ? 'border-rose-500 bg-rose-500 text-white'
-                    : 'border-gray-300 bg-white text-gray-500',
+                  isSelected ? 'text-white' : 'border-gray-300 bg-white text-gray-500',
                 ].join(' ')}
+                style={
+                  isSelected
+                    ? { borderColor: 'var(--color-bob-brand)', background: 'var(--color-bob-brand)' }
+                    : undefined
+                }
               >
                 {opt.id}
               </span>
@@ -153,7 +165,10 @@ function ResultCard({
     >
       <div className="px-4 pt-4 pb-2 space-y-2">
         <div className="flex items-center gap-2">
-          <span className="w-6 h-6 rounded-full bg-rose-100 text-rose-600 text-xs font-black flex items-center justify-center shrink-0">
+          <span
+            className="w-6 h-6 rounded-full text-bob-brand text-xs font-black flex items-center justify-center shrink-0"
+            style={{ background: 'color-mix(in oklab, var(--color-bob-brand) 14%, white)' }}
+          >
             {item.number}
           </span>
           <p className="text-xs text-gray-400 leading-tight">{item.sign_context}</p>
@@ -350,14 +365,20 @@ export function KETSignsAndNoticesPractice({
         >
           ←
         </button>
-        <div className="w-8 h-8 rounded-xl bg-rose-100 flex items-center justify-center shrink-0">
-          <KETReadingIcon size={18} className="text-rose-600" />
+        <div
+          className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0"
+          style={{ background: 'color-mix(in oklab, var(--color-bob-brand) 12%, white)' }}
+        >
+          <KETReadingIcon size={18} className="text-bob-brand" />
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-bold text-gray-800 truncate">{t('ket.signsAndNotices.headerTitle')}</p>
           <p className="text-xs text-gray-400">{t('ket.signsAndNotices.headerSubtitle')}</p>
         </div>
-        <span className="shrink-0 px-2 py-0.5 rounded-full bg-rose-100 text-rose-600 text-[10px] font-bold uppercase tracking-widest">
+        <span
+          className="shrink-0 px-2 py-0.5 rounded-full text-bob-brand text-[10px] font-bold uppercase tracking-widest"
+          style={{ background: 'color-mix(in oklab, var(--color-bob-brand) 12%, white)' }}
+        >
           {t('ket.signsAndNotices.partBadge')}
         </span>
       </div>
@@ -405,7 +426,8 @@ export function KETSignsAndNoticesPractice({
               type="button"
               onClick={handleSubmit}
               disabled={!allAnswered}
-              className="px-5 py-2.5 rounded-xl bg-rose-600 text-white text-sm font-bold shadow-sm hover:bg-rose-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+              className="px-5 py-2.5 rounded-xl text-white text-sm font-bold shadow-sm disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+              style={{ background: 'var(--color-bob-brand)' }}
             >
               {t('ket.signsAndNotices.submitAnswers')}
             </button>

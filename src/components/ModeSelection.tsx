@@ -17,11 +17,10 @@ import {
   MessageCircle,
   BookImage,
 } from 'lucide-react';
-import type { ModeKey, PracticeMode, CefrLevel, DynamicCard } from '@/lib/types/practice';
-import { CefrLevelSelector } from '@/components/CefrLevelSelector';
+import type { ModeKey, PracticeMode, CefrLevel, DynamicCard, CardVisibility } from '@/lib/types/practice';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import type { AvailableMode } from '@/contexts/OrganizationContext';
-import { getModeIcon, getModeBadge, getModeSection, getModeTitle, getModeDescription, getModeSortWeight, getModeOfficialName, getYLCardTheme, isGenericGroupedWithCambridge, type YLCardTheme } from '@/lib/mode-ui';
+import { getModeIcon, getModeBadge, getModeSection, getModeTitle, getModeDescription, getModeSortWeight, getModeOfficialName, isGenericGroupedWithCambridge } from '@/lib/mode-ui';
 import { ListenAndPointIcon } from '@/components/icons/ModeIcons';
 import { LookAndAnswerIcon, TellTheStoryIcon, WhatsThisIcon, PersonalQuestionsIcon } from '@/components/icons/StartersIcons';
 import { FindTheDifferencesIcon, InformationExchangeIcon, PictureStoryMoversIcon, PersonalQuestionsMoversIcon, MoreAboutYouIcon } from '@/components/icons/MoversIcons';
@@ -94,127 +93,52 @@ interface ModeCardProps {
   description: string;
   badge?: string;
   officialName?: string;
-  theme?: YLCardTheme | null;
-  disabled?: boolean;
+  visibility: CardVisibility;
+  tooltip?: string;
   onSelect: (mode: ModeKey) => void;
 }
 
-function ModeCard({ mode, icon, title, description, badge, officialName, theme, disabled, onSelect }: ModeCardProps) {
-  if (theme) {
-    return (
-      <motion.button
-        initial="rest"
-        animate="rest"
-        whileHover={disabled ? undefined : 'hover'}
-        whileTap={disabled ? {} : { scale: 0.99 }}
-        variants={{ rest: { y: 0 }, hover: { y: -2 } }}
-        transition={{ duration: 0.2, ease: 'easeOut' }}
-        onClick={() => !disabled && onSelect(mode)}
-        disabled={disabled}
-        className={`font-nunito ${theme.cardBg} ${theme.cardRing} shadow-[0_1px_2px_rgba(0,0,0,0.04)] hover:shadow-md rounded-2xl p-6 text-left space-y-4 transition-shadow duration-200 group relative overflow-hidden
-          ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-      >
-        <div className="flex items-start justify-between gap-2">
-          <motion.div
-            variants={{ rest: { rotate: 0 }, hover: { rotate: -10 } }}
-            transition={{ type: 'spring', stiffness: 400, damping: 12 }}
-            className={`${theme.iconBg} ${theme.iconText} p-3.5 rounded-xl w-fit transition-colors duration-200`}
-          >
-            {icon}
-          </motion.div>
-          {badge && (
-            <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full shrink-0 tracking-wide ${
-              disabled
-                ? 'bg-slate-100 text-slate-500 ring-1 ring-slate-200'
-                : `${theme.badgeBg} ${theme.badgeText}`
-            }`}>
-              {badge}
-            </span>
-          )}
-        </div>
-        <div>
-          <h3 className={`text-xl font-extrabold ${theme.titleText} leading-tight tracking-tight`}>{title}</h3>
-          <p className="text-slate-500 font-medium mt-2 text-sm leading-snug">{description}</p>
-          {officialName && (
-            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mt-3">
-              {officialName}
-            </p>
-          )}
-        </div>
-      </motion.button>
-    );
-  }
-
+function ModeCard({ mode, icon, title, description, badge, officialName, visibility, tooltip, onSelect, exploreLabel }: ModeCardProps & { exploreLabel: string }) {
+  const isDisabled = visibility !== 'enabled';
   return (
     <motion.button
-      whileHover={disabled ? {} : { scale: 1.02 }}
-      whileTap={disabled ? {} : { scale: 0.98 }}
-      onClick={() => !disabled && onSelect(mode)}
-      disabled={disabled}
-      className={`bg-white shadow-md rounded-xl p-6 text-left space-y-3 hover:shadow-lg transition-shadow group relative overflow-hidden
-        ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+      whileHover={isDisabled ? {} : { y: -2 }}
+      whileTap={isDisabled ? {} : { scale: 0.99 }}
+      transition={{ duration: 0.2, ease: 'easeOut' }}
+      onClick={() => !isDisabled && onSelect(mode)}
+      disabled={isDisabled}
+      aria-disabled={isDisabled}
+      title={tooltip}
+      className={`bg-white border hover:shadow-md rounded-2xl p-6 text-center transition-all duration-200 group relative flex flex-col items-center h-full w-full
+        border-[color-mix(in_oklab,var(--color-bob-brand)_15%,white)]
+        hover:border-[color-mix(in_oklab,var(--color-bob-brand)_28%,white)]
+        ${isDisabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
     >
-      <div className="flex items-start justify-between">
-        <div className="bg-trebol-secondary/20 p-3 rounded-lg w-fit group-hover:bg-trebol-primary group-hover:text-white transition-colors">
-          {icon}
-        </div>
-        {badge && (
-          <span className="text-xs font-bold text-trebol-primary bg-trebol-secondary/20 px-2 py-1 rounded-full shrink-0">
-            {badge}
+      {badge && (
+        <span className="absolute top-3 right-3 text-[11px] font-bold px-2.5 py-1 rounded-full tracking-wide text-bob-brand bg-[color-mix(in_oklab,var(--color-bob-brand)_10%,white)]">
+          {badge}
+        </span>
+      )}
+      <div className="text-bob-brand p-3.5 rounded-xl mb-4 bg-[color-mix(in_oklab,var(--color-bob-brand)_10%,white)]">
+        {icon}
+      </div>
+      <h3 className="text-lg font-extrabold text-bob-brand leading-tight tracking-tight">{title}</h3>
+      <p className="text-slate-500 font-medium mt-2 text-sm leading-snug">{description}</p>
+      {officialName && (
+        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mt-3">
+          {officialName}
+        </p>
+      )}
+      {!isDisabled && (
+        <div className="mt-auto pt-4">
+          <span className="inline-flex items-center justify-center text-sm font-bold text-bob-brand px-4 py-1.5 rounded-full transition-colors
+            bg-[color-mix(in_oklab,var(--color-bob-brand)_10%,white)]
+            group-hover:bg-[color-mix(in_oklab,var(--color-bob-brand)_18%,white)]">
+            {exploreLabel}
           </span>
-        )}
-      </div>
-      <div>
-        <h3 className="text-lg font-black text-trebol-text">{title}</h3>
-        <p className="text-trebol-text opacity-70 font-medium mt-1 text-sm">{description}</p>
-        {officialName && (
-          <p className="text-[10px] font-bold uppercase tracking-wider text-trebol-text/40 mt-2">
-            {officialName}
-          </p>
-        )}
-      </div>
-      <Sparkles className="absolute -bottom-4 -right-4 text-trebol-secondary opacity-10 group-hover:opacity-30 transition-opacity" size={80} />
+        </div>
+      )}
     </motion.button>
-  );
-}
-
-const SECTION_ACCENT: { match: (s: string) => boolean; color: string; soft: string }[] = [
-  { match: (s) => /young learners|starters|movers|flyers/i.test(s), color: '#469E7B', soft: '#dcebe3' },
-  { match: (s) => /ket|a2/i.test(s), color: '#3660AB', soft: '#dde4f2' },
-  { match: (s) => /pet|b1/i.test(s), color: '#F8AC37', soft: '#fde9c8' },
-  { match: (s) => /fce|b2/i.test(s), color: '#E62D2B', soft: '#fad6d5' },
-  { match: (s) => /cae|c1/i.test(s), color: '#1E1E1C', soft: '#e5e5e2' },
-  { match: (s) => /cpe|c2/i.test(s), color: '#1E1E1C', soft: '#e5e5e2' },
-  { match: (s) => /toefl/i.test(s), color: '#3660AB', soft: '#dde4f2' },
-  { match: (s) => /free/i.test(s), color: '#469E7B', soft: '#dcebe3' },
-];
-
-function getSectionAccent(name: string) {
-  return SECTION_ACCENT.find((a) => a.match(name)) ?? { color: '#1E1E1C', soft: '#e5e5e2' };
-}
-
-function SectionTitle({ children }: { children: React.ReactNode }) {
-  const text = typeof children === 'string' ? children : '';
-  const accent = getSectionAccent(text);
-  return (
-    <div className="flex items-center gap-3 mb-4">
-      <span
-        aria-hidden
-        className="inline-block w-2 h-2 rounded-full shrink-0"
-        style={{ background: accent.color, boxShadow: `0 0 0 4px ${accent.soft}` }}
-      />
-      <h3
-        className="text-xs font-black uppercase tracking-[0.22em] shrink-0"
-        style={{ color: accent.color }}
-      >
-        {children}
-      </h3>
-      <span
-        aria-hidden
-        className="flex-1 h-px"
-        style={{ background: `linear-gradient(to right, ${accent.soft}, transparent)` }}
-      />
-    </div>
   );
 }
 
@@ -265,24 +189,23 @@ interface ModeSelectionProps {
   availableModes?: AvailableMode[];
   cefrActiveLevel?: CefrLevel | null;
   cefrLevelLocked?: boolean;
-  onCefrChange?: (level: CefrLevel | null) => void;
   organizationName?: string;
 }
 
 export const ModeSelection = forwardRef<HTMLDivElement, ModeSelectionProps>(function ModeSelection(
-  { onSelect, cefrActiveLevel = null, cefrLevelLocked = false, onCefrChange, organizationName },
+  { onSelect, cefrActiveLevel = null },
   selectorRef
 ) {
-  const { allDynamicCards, enabledModes } = useOrganization();
+  const { allDynamicCards, resolvedCards } = useOrganization();
   const t = useTranslations('home.modeSelection');
-  const tModeUi = useTranslations('mode_ui.sections');
-  const iconClass = 'text-trebol-primary group-hover:text-white transition-colors';
 
   const HIDDEN_MODES = new Set<string>(['cambridge_flyers_part1']);
-  const COMING_SOON_MODES = new Set<string>(['cambridge_ket_writing_part7']);
-  const enabledSet = new Set(enabledModes);
+  const resolvedCardMap = new Map(resolvedCards.map(rc => [rc.mode_key, rc]));
+
   const visibleCards = allDynamicCards.filter(card => {
-    if (!enabledSet.has(card.mode_key)) return false;
+    const resolved = resolvedCardMap.get(card.mode_key);
+    if (!resolved) return false;
+    if (resolved.visibility !== 'enabled') return false;
     if (HIDDEN_MODES.has(card.mode_key)) return false;
     if (card.framework === 'generic' && card.cefr_level !== null) {
       if (card.cefr_level !== cefrActiveLevel) return false;
@@ -310,111 +233,43 @@ export const ModeSelection = forwardRef<HTMLDivElement, ModeSelectionProps>(func
     cards.sort((a, b) => getModeSortWeight(a) - getModeSortWeight(b));
   }
 
+  const exploreLabel = t('explore');
+
+  function resolveTooltip(visibility: CardVisibility, card: DynamicCard): string | undefined {
+    if (visibility === 'disabled-mismatch') {
+      const level = card.cefr_level?.toUpperCase() ?? '';
+      return t('availableForLevel', { level });
+    }
+    if (visibility === 'disabled-not-available') {
+      return t('notAvailableYet');
+    }
+    return undefined;
+  }
+
   function renderCard(card: DynamicCard) {
-    const ylTheme = getYLCardTheme(card);
-    const isComingSoon = card.status === 'coming_soon' || COMING_SOON_MODES.has(card.mode_key);
-    const iconColorClass = ylTheme
-      ? `${ylTheme.iconText} transition-colors duration-200`
-      : iconClass;
+    const resolved = resolvedCardMap.get(card.mode_key);
+    const visibility: CardVisibility = resolved?.visibility ?? 'enabled';
+    const tooltip = resolveTooltip(visibility, card);
     return (
       <ModeCard
         key={card.mode_key}
         mode={card.mode_key}
-        icon={resolveIcon(getModeIcon(card), 28, iconColorClass)}
+        icon={resolveIcon(getModeIcon(card), 26, 'text-bob-brand')}
         title={getModeTitle(card)}
         description={getModeDescription(card)}
-        badge={isComingSoon ? t('comingSoon') : getModeBadge(card)}
+        badge={getModeBadge(card)}
         officialName={getModeOfficialName(card)}
-        theme={ylTheme}
-        disabled={isComingSoon}
+        visibility={visibility}
+        tooltip={tooltip}
         onSelect={onSelect}
+        exploreLabel={exploreLabel}
       />
     );
   }
 
   return (
-    <div className="relative w-full min-h-full overflow-y-auto bg-[#fffbf2]">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 opacity-[0.35]"
-        style={{
-          backgroundImage:
-            'radial-gradient(circle at 12% 14%, #fde9c8 0, transparent 38%), radial-gradient(circle at 88% 10%, #dde4f2 0, transparent 32%), radial-gradient(circle at 75% 88%, #dcebe3 0, transparent 36%)',
-        }}
-      />
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 opacity-[0.05]"
-        style={{
-          backgroundImage: 'radial-gradient(circle, #1e293b 1px, transparent 1px)',
-          backgroundSize: '22px 22px',
-        }}
-      />
-
-      <div className={`relative z-10 w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-10 ${cefrActiveLevel ? 'pt-4 pb-16' : 'min-h-full flex flex-col justify-center py-10'} space-y-10`}>
-        <motion.div
-          initial={{ opacity: 0, y: 14 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="relative text-center pt-2"
-        >
-          <motion.div
-            initial={{ scale: 0, rotate: -20 }}
-            animate={{ scale: 1, rotate: 0 }}
-            transition={{ delay: 0.1, type: 'spring', stiffness: 200, damping: 14 }}
-            className="relative w-40 h-40 sm:w-48 sm:h-48 mx-auto mb-4"
-          >            <div
-              aria-hidden
-              className="absolute -inset-2 rounded-full"
-              style={{
-                background: 'conic-gradient(from 0deg, #F8AC37, #469E7B, #3660AB, #E62D2B, #F8AC37)',
-                filter: 'blur(10px)',
-                opacity: 0.55,
-              }}
-            />
-            <BobIntroAvatar />
-          </motion.div>
-
-          <p className="text-[10px] font-black uppercase tracking-[0.3em] text-trebol-text/45 mb-2">
-            {t('tagline', { org: organizationName ? ` · ${organizationName}` : '' })}
-          </p>
-          <h2 className="text-4xl sm:text-5xl font-black text-trebol-text tracking-tight leading-[1.05]">
-            {t('heading')}
-          </h2>
-          <p className="text-trebol-text/65 font-bold mt-3 text-base">
-            {t('subtitle')}
-          </p>
-        </motion.div>
-
-        <motion.div
-          ref={selectorRef}
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2, duration: 0.4 }}
-          className="flex justify-center"
-        >
-          <CefrLevelSelector
-            value={cefrActiveLevel}
-            onChange={onCefrChange ?? (() => {})}
-            onClear={onCefrChange ? () => onCefrChange(null) : undefined}
-            disabled={!onCefrChange}
-            locked={cefrLevelLocked}
-          />
-        </motion.div>
-
-        {!cefrActiveLevel && (
-          <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.35, duration: 0.4 }}
-            className="text-center"
-          >
-            <p className="text-sm sm:text-base font-bold text-trebol-text/65 max-w-md mx-auto">
-              {t('pickLevelHint')}
-            </p>
-          </motion.div>
-        )}
-
+    <div className="relative w-full min-h-full overflow-y-auto bg-white">
+      <div ref={selectorRef} className="relative z-10 w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-10 pt-4 pb-16 space-y-10">
         {cefrActiveLevel && showFreePractice && genericCards.length > 0 && (
           <motion.div
             key={`generic-${cefrActiveLevel}`}
@@ -425,13 +280,11 @@ export const ModeSelection = forwardRef<HTMLDivElement, ModeSelectionProps>(func
               show: { transition: { staggerChildren: 0.06, delayChildren: 0.05 } },
             }}
           >
-            <motion.div variants={{ hidden: { opacity: 0, y: 6 }, show: { opacity: 1, y: 0 } }}>
-              <SectionTitle>{tModeUi('freePractice')}</SectionTitle>
-            </motion.div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 sm:gap-5">
               {genericCards.map((card, idx) => (
                 <motion.div
                   key={card.mode_key}
+                  className="h-full"
                   variants={{
                     hidden: { opacity: 0, y: 24, scale: 0.94 },
                     show: { opacity: 1, y: 0, scale: 1 },
@@ -455,13 +308,11 @@ export const ModeSelection = forwardRef<HTMLDivElement, ModeSelectionProps>(func
               show: { transition: { staggerChildren: 0.05, delayChildren: 0.1 + i * 0.08 } },
             }}
           >
-            <motion.div variants={{ hidden: { opacity: 0, y: 6 }, show: { opacity: 1, y: 0 } }}>
-              <SectionTitle>{sectionName}</SectionTitle>
-            </motion.div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 sm:gap-5">
               {cards.map((card) => (
                 <motion.div
                   key={card.mode_key}
+                  className="h-full"
                   variants={{
                     hidden: { opacity: 0, y: 28, scale: 0.92 },
                     show: { opacity: 1, y: 0, scale: 1 },

@@ -32,24 +32,7 @@ export function BobMascotLoader({
   }, [tips.length]);
 
   return (
-    <div className="flex-1 flex flex-col items-center justify-center px-6 relative overflow-hidden bg-[#fffbf2]">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 opacity-[0.35]"
-        style={{
-          backgroundImage:
-            'radial-gradient(circle at 18% 22%, #fde9c8 0, transparent 36%), radial-gradient(circle at 82% 18%, #dde4f2 0, transparent 30%), radial-gradient(circle at 70% 84%, #dcebe3 0, transparent 34%)',
-        }}
-      />
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 opacity-[0.05]"
-        style={{
-          backgroundImage: 'radial-gradient(circle, #1e293b 1px, transparent 1px)',
-          backgroundSize: '22px 22px',
-        }}
-      />
-
+    <div className="flex-1 flex flex-col items-center justify-center px-6 relative overflow-hidden bg-white">
       <div className="relative z-10 flex flex-col items-center gap-6 max-w-md w-full">
         <motion.div
           initial={{ scale: 0.85, opacity: 0 }}
@@ -62,13 +45,11 @@ export function BobMascotLoader({
             aria-hidden
             className="absolute inset-0 rounded-full"
             style={{
-              background:
-                'conic-gradient(from 0deg, #F8AC37, #469E7B, #3660AB, #E62D2B, #F8AC37)',
+              background: 'var(--color-bob-brand)',
               filter: 'blur(14px)',
             }}
-            animate={{ rotate: 360, opacity: [0.4, 0.55, 0.4] }}
+            animate={{ opacity: [0.25, 0.4, 0.25] }}
             transition={{
-              rotate: { duration: 6, repeat: Infinity, ease: 'linear' },
               opacity: { duration: 2.4, repeat: Infinity, ease: 'easeInOut' },
             }}
           />
@@ -122,7 +103,7 @@ export function BobMascotLoader({
               className="absolute inset-y-0 w-1/3 rounded-full"
               style={{
                 background:
-                  'linear-gradient(90deg, transparent, #3660AB 20%, #469E7B 50%, #F8AC37 80%, transparent)',
+                  'linear-gradient(90deg, transparent, var(--color-bob-brand) 50%, transparent)',
               }}
               animate={{ x: ['-100%', '300%'] }}
               transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
@@ -139,7 +120,7 @@ export function BobMascotLoader({
             transition={{ duration: 0.4 }}
             className={`${text} text-trebol-text/55 font-semibold text-center leading-relaxed`}
           >
-            <span className="inline-block mr-1.5 text-[#F8AC37]">✨</span>
+            <span className="inline-block mr-1.5 text-bob-brand">✨</span>
             {tips[tipIndex]}
           </motion.p>
         </div>

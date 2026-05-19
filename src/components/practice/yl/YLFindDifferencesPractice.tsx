@@ -586,7 +586,8 @@ export function YLFindDifferencesPractice({
         <button
           type="button"
           onClick={handleNext}
-          className="px-6 py-3 rounded-full bg-amber-600 text-white font-bold text-sm hover:opacity-90 transition-opacity flex items-center gap-2 cursor-pointer"
+          className="px-6 py-3 rounded-full text-white font-bold text-sm hover:opacity-90 transition-opacity flex items-center gap-2 cursor-pointer"
+          style={{ background: 'var(--color-bob-brand)' }}
         >
           {turnIndex + 1 >= TOTAL_TURNS ? t('findDifferences.seeResults') : t('shared.next')}
           <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
@@ -603,7 +604,8 @@ export function YLFindDifferencesPractice({
         <button
           type="button"
           onClick={onBack}
-          className="px-6 py-3 rounded-full bg-amber-600 text-white font-bold text-sm hover:opacity-90 transition-opacity cursor-pointer"
+          className="px-6 py-3 rounded-full text-white font-bold text-sm hover:opacity-90 transition-opacity cursor-pointer"
+          style={{ background: 'var(--color-bob-brand)' }}
         >
           {t('common.backToActivities')}
         </button>

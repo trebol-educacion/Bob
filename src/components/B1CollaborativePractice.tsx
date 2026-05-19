@@ -120,9 +120,15 @@ function FormativeFeedbackPanel({ feedback }: { feedback: FormativeFeedback }) {
         </div>
       )}
       {feedback.model_answer && (
-        <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 space-y-1">
-          <p className="text-xs font-bold text-blue-600 uppercase tracking-widest">Example phrase</p>
-          <p className="text-sm text-blue-800 italic">"{feedback.model_answer}"</p>
+        <div
+          className="rounded-2xl p-4 space-y-1"
+          style={{
+            background: 'color-mix(in oklab, var(--color-bob-brand) 8%, white)',
+            border: '1px solid color-mix(in oklab, var(--color-bob-brand) 15%, white)',
+          }}
+        >
+          <p className="text-xs font-bold text-bob-brand uppercase tracking-widest">Example phrase</p>
+          <p className="text-sm text-gray-800 italic">"{feedback.model_answer}"</p>
         </div>
       )}
     </div>

@@ -83,9 +83,12 @@ function FormativeFeedbackPanel({ feedback }: { feedback: FormativeFeedback }) {
         </div>
       )}
       {feedback.model_answer && (
-        <div className="bg-blue-50 rounded-xl p-4 space-y-1">
-          <p className="text-xs font-bold text-blue-600 uppercase tracking-widest">Example answer</p>
-          <p className="text-sm text-blue-800 italic">"{feedback.model_answer}"</p>
+        <div
+          className="rounded-xl p-4 space-y-1"
+          style={{ background: 'color-mix(in oklab, var(--color-bob-brand) 8%, white)' }}
+        >
+          <p className="text-xs font-bold text-bob-brand uppercase tracking-widest">Example answer</p>
+          <p className="text-sm text-gray-800 italic">"{feedback.model_answer}"</p>
         </div>
       )}
     </div>
@@ -394,7 +397,8 @@ export function A2Part1Practice({ onBack }: A2Part1PracticeProps) {
       <motion.div
         animate={{ width: `${progress}%` }}
         transition={{ duration: 0.4 }}
-        className="h-full bg-blue-600 rounded-full"
+        className="h-full rounded-full"
+        style={{ background: 'var(--color-bob-brand)' }}
       />
     </div>
   );
@@ -417,7 +421,7 @@ export function A2Part1Practice({ onBack }: A2Part1PracticeProps) {
         className="space-y-6 pb-4"
       >
         <div className="text-center space-y-2 pt-2">
-          <CheckCircle className="mx-auto text-blue-600" size={48} />
+          <CheckCircle className="mx-auto text-bob-brand" size={48} />
           <h2 className="text-2xl font-black text-gray-900">{t('a2.part1.interviewComplete')}</h2>
           <p className="text-gray-400 font-medium">{t('a2.part1.subtitle')}</p>
         </div>
@@ -427,7 +431,8 @@ export function A2Part1Practice({ onBack }: A2Part1PracticeProps) {
         <div className="flex gap-3">
           <button
             onClick={handleTryAgain}
-            className="flex-1 py-3 bg-blue-600 text-white rounded-xl font-bold hover:opacity-90 transition-opacity"
+            className="flex-1 py-3 text-white rounded-xl font-bold hover:opacity-90 transition-opacity"
+            style={{ background: 'var(--color-bob-brand)' }}
           >
             {t('common.tryAgain')}
           </button>
@@ -514,7 +519,10 @@ export function A2Part1Practice({ onBack }: A2Part1PracticeProps) {
             exit={{ opacity: 0, scale: 0.9 }}
             className="fixed inset-0 flex items-center justify-center bg-white/80 backdrop-blur-sm z-30"
           >
-            <div className="bg-blue-600 text-white px-8 py-5 rounded-2xl shadow-lg text-center space-y-1">
+            <div
+              className="text-white px-8 py-5 rounded-2xl shadow-lg text-center space-y-1"
+              style={{ background: 'var(--color-bob-brand)' }}
+            >
               <ChevronRight className="mx-auto opacity-60" size={20} />
               <p className="text-xl font-black">{phaseTransition.label}</p>
             </div>
@@ -554,7 +562,7 @@ export function A2Part1Practice({ onBack }: A2Part1PracticeProps) {
             key={countdown}
             initial={{ scale: 1.4, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            className="text-5xl font-black text-blue-600 block"
+            className="text-5xl font-black text-bob-brand block"
           >
             {countdown}
           </motion.span>
@@ -563,7 +571,10 @@ export function A2Part1Practice({ onBack }: A2Part1PracticeProps) {
 
       {questionStep === 'processing' && (
         <div className="flex flex-col items-center gap-3 py-4">
-          <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+          <div
+            className="w-8 h-8 border-2 border-t-transparent rounded-full animate-spin"
+            style={{ borderColor: 'var(--color-bob-brand)', borderTopColor: 'transparent' }}
+          />
           <p className="text-gray-400 font-semibold text-sm">{t('a2.part1.processingAnswer')}</p>
         </div>
       )}

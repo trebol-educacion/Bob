@@ -6,6 +6,7 @@ import { CheckCircle, XCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { KETWritingIcon } from '@/components/icons/KETIcons';
 import { CelebrationCard } from '@/components/practice/yl/CelebrationCard';
 import { BobMascotLoader } from '@/components/chat/BobMascotLoader';
+import { ChatInputBar } from '@/components/chat/ChatInputBar';
 import { BobAvatar } from '@/components/practice/yl/_shared';
 import {
   generateKETShortMessageAction,
@@ -34,15 +35,26 @@ function countWords(text: string): number {
 function ScenarioCard({ scenario, recipient, contentPoints }: { scenario: string; recipient: string; contentPoints: string[] }) {
   const t = useTranslations('cambridge');
   return (
-    <div className="rounded-2xl border border-rose-100 bg-rose-50/60 px-4 py-3 space-y-2">
-      <p className="text-xs font-bold uppercase tracking-widest text-rose-400">{t('ket.shortMessage.situation')}</p>
+    <div
+      className="rounded-2xl px-4 py-3 space-y-2"
+      style={{
+        background: 'color-mix(in oklab, var(--color-bob-brand) 6%, white)',
+        border: '1px solid color-mix(in oklab, var(--color-bob-brand) 15%, white)',
+      }}
+    >
+      <p className="text-xs font-bold uppercase tracking-widest text-bob-brand">{t('ket.shortMessage.situation')}</p>
       <p className="text-sm text-gray-800 leading-relaxed">
         Write a message to <strong>{recipient}</strong>. {scenario}
       </p>
       <div className="space-y-1 pt-1">
         {contentPoints.map((point, i) => (
           <div key={i} className="flex items-start gap-2 text-sm text-gray-700">
-            <span className="mt-0.5 shrink-0 w-5 h-5 rounded-full bg-rose-100 text-rose-600 text-xs font-bold flex items-center justify-center">{i + 1}</span>
+            <span
+              className="mt-0.5 shrink-0 w-5 h-5 rounded-full text-bob-brand text-xs font-bold flex items-center justify-center"
+              style={{ background: 'color-mix(in oklab, var(--color-bob-brand) 14%, white)' }}
+            >
+              {i + 1}
+            </span>
             <span>{point}</span>
           </div>
         ))}
@@ -312,14 +324,20 @@ export function KETShortMessagePractice({
         >
           ←
         </button>
-        <div className="w-8 h-8 rounded-xl bg-rose-100 flex items-center justify-center shrink-0">
-          <KETWritingIcon size={18} className="text-rose-600" />
+        <div
+          className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0"
+          style={{ background: 'color-mix(in oklab, var(--color-bob-brand) 12%, white)' }}
+        >
+          <KETWritingIcon size={18} className="text-bob-brand" />
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-bold text-gray-800 truncate">{t('ket.shortMessage.headerTitle')}</p>
           <p className="text-xs text-gray-400">{t('ket.shortMessage.headerSubtitle')}</p>
         </div>
-        <span className="shrink-0 px-2 py-0.5 rounded-full bg-rose-100 text-rose-600 text-[10px] font-bold uppercase tracking-widest">
+        <span
+          className="shrink-0 px-2 py-0.5 rounded-full text-bob-brand text-[10px] font-bold uppercase tracking-widest"
+          style={{ background: 'color-mix(in oklab, var(--color-bob-brand) 12%, white)' }}
+        >
           {t('ket.shortMessage.partBadge')}
         </span>
       </div>
@@ -359,51 +377,35 @@ export function KETShortMessagePractice({
             </motion.div>
           </div>
 
-          <div className="shrink-0 border-t border-gray-100 bg-white px-4 py-3 space-y-2">
-            <div className="relative">
-              <textarea
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-                placeholder="Write your message here…"
-                rows={3}
-                disabled={phase !== 'ready'}
-                className="w-full rounded-2xl border border-gray-200 px-4 py-3 pr-14 text-sm text-gray-800 leading-relaxed resize-none focus:outline-none focus:ring-2 focus:ring-rose-300 transition-shadow disabled:bg-gray-50 disabled:cursor-not-allowed"
-              />
-              <button
-                type="button"
-                onClick={handleSubmit}
-                disabled={phase !== 'ready' || wordCount < MIN_WORDS}
-                aria-label="Send message"
-                className="absolute right-2.5 bottom-2.5 w-10 h-10 rounded-full bg-rose-600 text-white flex items-center justify-center shadow-sm hover:bg-rose-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+          <ChatInputBar
+            variant="text"
+            value={text}
+            placeholder="Write your message here…"
+            disabled={phase !== 'ready' || wordCount < MIN_WORDS}
+            onChange={setText}
+            onSend={handleSubmit}
+          />
+          <div className="shrink-0 px-4 pb-3 -mt-1 flex items-center justify-between text-xs text-gray-400 bg-white">
+            <span>
+              Words:{' '}
+              <strong
+                className={
+                  wordCount < MIN_WORDS
+                    ? 'text-amber-500'
+                    : wordCount > 40
+                    ? 'text-red-400'
+                    : 'text-green-600'
+                }
               >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
-                  <line x1="5" y1="12" x2="19" y2="12" />
-                  <polyline points="13 6 19 12 13 18" />
-                </svg>
-              </button>
-            </div>
-            <div className="flex items-center justify-between text-xs text-gray-400">
-              <span>
-                Words:{' '}
-                <strong
-                  className={
-                    wordCount < MIN_WORDS
-                      ? 'text-amber-500'
-                      : wordCount > 40
-                      ? 'text-red-400'
-                      : 'text-green-600'
-                  }
-                >
-                  {wordCount}
-                </strong>{' '}
-                / target ~25
+                {wordCount}
+              </strong>{' '}
+              / target ~25
+            </span>
+            {wordCount < MIN_WORDS && (
+              <span className="text-amber-500">
+                {MIN_WORDS - wordCount} more to send
               </span>
-              {wordCount < MIN_WORDS && (
-                <span className="text-amber-500">
-                  {MIN_WORDS - wordCount} more to send
-                </span>
-              )}
-            </div>
+            )}
           </div>
         </>
       )}
