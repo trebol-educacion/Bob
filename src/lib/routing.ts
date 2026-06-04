@@ -30,6 +30,8 @@ import {
   KETVocabGapPractice,
   KETReadingTFDSPractice,
   KETStoryWritingPractice,
+  KETHobbyTalkPractice,
+  KETDescribePicturePractice,
 } from '@/components/practice/ket';
 import {
   PETPictureDescriptionPractice,
@@ -155,6 +157,16 @@ export const EXAM_PART_COMPONENT_MAP: Record<ModeKey, RouteEntry> = {
     appState: 'exam-practicing',
     kind: 'exam',
     render: (p) => React.createElement(A2Part1Practice, { onBack: (p as ExamRenderProps).onBack }),
+  },
+  cambridge_ket_part2: {
+    appState: 'exam-practicing',
+    kind: 'yl',
+    render: (p) => React.createElement(KETHobbyTalkPractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
+  },
+  cambridge_ket_part3: {
+    appState: 'exam-practicing',
+    kind: 'yl',
+    render: (p) => React.createElement(KETDescribePicturePractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
   },
   toefl_listen_repeat: {
     appState: 'exam-practicing',

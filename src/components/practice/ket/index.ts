@@ -22,3 +22,7 @@ export { KETReadingTFDSPractice } from './KETReadingTFDSPractice';
 export type { KETReadingTFDSPracticeProps } from './KETReadingTFDSPractice';
 export { KETStoryWritingPractice } from './KETStoryWritingPractice';
 export type { KETStoryWritingPracticeProps } from './KETStoryWritingPractice';
+export { KETHobbyTalkPractice } from './KETHobbyTalkPractice';
+export type { KETHobbyTalkPracticeProps } from './KETHobbyTalkPractice';
+export { KETDescribePicturePractice } from './KETDescribePicturePractice';
+export type { KETDescribePicturePracticeProps } from './KETDescribePicturePractice';
