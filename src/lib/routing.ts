@@ -29,6 +29,7 @@ import {
   KETLongTextPractice,
   KETVocabGapPractice,
   KETReadingTFDSPractice,
+  KETStoryWritingPractice,
 } from '@/components/practice/ket';
 import {
   PETPictureDescriptionPractice,
@@ -199,6 +200,11 @@ export const EXAM_PART_COMPONENT_MAP: Record<ModeKey, RouteEntry> = {
     appState: 'exam-practicing',
     kind: 'yl',
     render: (p) => React.createElement(KETShortMessagePractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
+  },
+  cambridge_ket_writing_part7: {
+    appState: 'exam-practicing',
+    kind: 'yl',
+    render: (p) => React.createElement(KETStoryWritingPractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
   },
   cambridge_pet_reading_part1: {
     appState: 'exam-practicing',

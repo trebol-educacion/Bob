@@ -20,3 +20,5 @@ export { KETVocabGapPractice } from './KETVocabGapPractice';
 export type { KETVocabGapPracticeProps } from './KETVocabGapPractice';
 export { KETReadingTFDSPractice } from './KETReadingTFDSPractice';
 export type { KETReadingTFDSPracticeProps } from './KETReadingTFDSPractice';
+export { KETStoryWritingPractice } from './KETStoryWritingPractice';
+export type { KETStoryWritingPracticeProps } from './KETStoryWritingPractice';
