@@ -89,7 +89,7 @@ export async function generateKETMatchQuestionAction(input: {
     (ai) => ai.models.generateContent({
       model: MODELS.FLASH_LITE_PREVIEW,
       contents: [{ role: 'user', parts: [{ text: generationPrompt }] }],
-      config: { responseMimeType: 'application/json' },
+      config: { responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
     })
   );
 

@@ -139,7 +139,7 @@ Return ONLY valid JSON. No score, no band, no percentage.`;
           ],
         },
       ],
-      config: { responseMimeType: 'application/json' },
+      config: { responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
     })
   );
 

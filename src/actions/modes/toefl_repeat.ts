@@ -225,7 +225,7 @@ Return ONLY valid JSON. No score, no pronunciation rating, no subjective assessm
           ],
         },
       ],
-      config: { responseMimeType: 'application/json' },
+      config: { responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
     })
   );
 

@@ -310,7 +310,7 @@ export async function generateYLContentAction(
         (ai) => ai.models.generateContent({
           model: MODELS.FLASH_LITE_PREVIEW,
           contents: [{ role: 'user', parts: [{ text: promptText }] }],
-          config: { responseMimeType: 'application/json' },
+          config: { responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
         })
       );
 
@@ -720,7 +720,7 @@ export async function evaluateYLTurnAction(input: {
       (ai) => ai.models.generateContent({
         model: MODELS.FLASH_LITE_PREVIEW,
         contents: [{ role: 'user', parts: [{ text: evalPrompt }] }],
-        config: { responseMimeType: 'application/json' },
+        config: { responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
       })
     ),
     callGemini(
@@ -728,7 +728,7 @@ export async function evaluateYLTurnAction(input: {
       (ai) => ai.models.generateContent({
         model: MODELS.FLASH_LITE_PREVIEW,
         contents: [{ role: 'user', parts: [{ text: reactionPrompt }] }],
-        config: { responseMimeType: 'application/json' },
+        config: { responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
       })
     ),
   ]);
@@ -810,7 +810,7 @@ export async function evaluateYLFinalAction(input: {
     (ai) => ai.models.generateContent({
       model: MODELS.FLASH_LITE_PREVIEW,
       contents: [{ role: 'user', parts: [{ text: promptText }] }],
-      config: { responseMimeType: 'application/json' },
+      config: { responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
     })
   );
 
@@ -1059,7 +1059,7 @@ export async function evaluateWhatsThisAnswerAction(input: {
     (ai) => ai.models.generateContent({
       model: MODELS.FLASH_LITE_PREVIEW,
       contents: [{ role: 'user', parts: [{ text: evalPromptText }] }],
-      config: { responseMimeType: 'application/json' },
+      config: { responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
     })
   );
 
@@ -1167,7 +1167,7 @@ export async function evaluateFindDifferencesAnswerAction(input: {
     (ai) => ai.models.generateContent({
       model: MODELS.FLASH_LITE_PREVIEW,
       contents: [{ role: 'user', parts: [{ text: evalPromptText }] }],
-      config: { responseMimeType: 'application/json' },
+      config: { responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
     })
   );
 
@@ -1277,7 +1277,7 @@ export async function evaluateTellTheStoryAnswerAction(input: {
     (ai) => ai.models.generateContent({
       model: MODELS.FLASH_LITE_PREVIEW,
       contents: [{ role: 'user', parts: [{ text: evalPromptText }] }],
-      config: { responseMimeType: 'application/json' },
+      config: { responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
     })
   );
 

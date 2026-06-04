@@ -74,7 +74,7 @@ export async function generateKETPictureDescAction(input: {
     (ai) => ai.models.generateContent({
       model: MODELS.FLASH_LITE_PREVIEW,
       contents: [{ role: 'user', parts: [{ text: generationPrompt }] }],
-      config: { responseMimeType: 'application/json' },
+      config: { responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
     })
   );
 
@@ -130,7 +130,7 @@ export async function evaluateKETPictureDescAction(input: {
           { inlineData: { mimeType: input.audioMime, data: input.audioBase64 } },
         ],
       }],
-      config: { responseMimeType: 'application/json' },
+      config: { responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
     })
   );
 

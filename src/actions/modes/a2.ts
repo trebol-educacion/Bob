@@ -57,7 +57,7 @@ export async function generateA2SessionAction(sessionId: string, userId: string)
         (ai) => ai.models.generateContent({
           model: MODELS.FLASH_LITE_PREVIEW,
           contents: [{ role: 'user', parts: [{ text: planPromptText }] }],
-          config: { responseMimeType: 'application/json' },
+          config: { responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
         })
       );
 
@@ -181,7 +181,7 @@ Return ONLY valid JSON. No score, no band, no percentage.`;
     (ai) => ai.models.generateContent({
       model: MODELS.FLASH_LITE_PREVIEW,
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      config: { responseMimeType: 'application/json' },
+      config: { responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
     })
   );
 
