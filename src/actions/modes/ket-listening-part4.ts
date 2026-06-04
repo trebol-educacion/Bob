@@ -49,6 +49,15 @@ export interface ShortTalksResult {
   exercise: ShortTalksExercise;
 }
 
+/** Plan without audio — returned by the fast first-phase action. */
+export interface ShortTalksPlan {
+  sessionId: string;
+  userId: string;
+  framing_text: string;
+  people: Person[];
+  characteristics: Characteristic[];
+}
+
 export interface PersonResult {
   number: number;
   name: string;
@@ -72,6 +81,91 @@ function safeParse<T>(schema: z.ZodType<T>, raw: string): T | null {
   }
 }
 
+/**
+ * Phase 1 — fast (~3s): generates text only, no TTS.
+ * The component calls this first, renders the exercise immediately,
+ * then loads audio per person in the background via generateKETPersonAudioAction.
+ */
+export async function generateKETShortTalksPlanAction(input: {
+  sessionId?: string;
+}): Promise<ShortTalksPlan | { error: string }> {
+  let sessionId = input.sessionId;
+  let userId: string | undefined;
+
+  if (!sessionId) {
+    const result = await createSessionAction({
+      mode: 'cambridge_ket_listening_part4',
+      title: 'KET Listening Part 4 — Short Talks',
+    });
+    if (!result.data) return { error: result.error ?? 'Could not create session' };
+    sessionId = result.data.id;
+    userId = result.data.user_id;
+  } else {
+    const supabase = await createSupabaseServer();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { error: 'Not authenticated' };
+    userId = user.id;
+  }
+
+  const [generationPrompt, framingText] = await Promise.all([
+    getPrompt('cambridge_ket_listening_part4_a2_generation').catch(() => null),
+    getPrompt('cambridge_ket_listening_part4_a2_framing').catch(
+      () => 'You will hear five people talking about themselves. Match each person to the correct description — A to H. There are three descriptions you do not need.'
+    ),
+  ]);
+
+  if (!generationPrompt) return { error: 'Could not load generation prompt' };
+
+  const geminiResult = await callGemini(
+    { promptKey: 'cambridge_ket_listening_part4_a2_generation', model: MODELS.FLASH_LITE_PREVIEW, userId },
+    (ai) =>
+      ai.models.generateContent({
+        model: MODELS.FLASH_LITE_PREVIEW,
+        contents: [{ role: 'user', parts: [{ text: generationPrompt }] }],
+        config: { responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
+      })
+  );
+
+  if (!isOk(geminiResult)) return { error: 'Could not generate exercise' };
+
+  const rawText = geminiResult.data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+  const parsed = safeParse(GenerationSchema, rawText);
+  if (!parsed) return { error: 'Unexpected model response' };
+
+  persistMessage({
+    sessionId: sessionId!,
+    userId: userId!,
+    role: 'bob',
+    msgType: 'text',
+    contentText: null,
+    contentJson: {
+      kind: 'short_talks_plan',
+      framing_text: framingText,
+      exercise: { people: parsed.people, characteristics: parsed.characteristics },
+    },
+  }).catch(() => undefined);
+
+  return {
+    sessionId: sessionId!,
+    userId: userId!,
+    framing_text: framingText,
+    people: parsed.people,
+    characteristics: parsed.characteristics,
+  };
+}
+
+/** Phase 2 — generates TTS for a single person monologue (~7-9s, cached). */
+export async function generateKETPersonAudioAction(
+  monologue: string
+): Promise<{ audio_b64: string; audio_mime: string }> {
+  const result = await generateSpeechAction(monologue).catch(() => ({
+    data: '',
+    mimeType: 'audio/L16;codec=pcm;rate=24000',
+  }));
+  return { audio_b64: result.data, audio_mime: result.mimeType };
+}
+
+/** Legacy full action kept for internal use (restore path already has audio in memory). */
 export async function generateKETShortTalksAction(input: {
   sessionId?: string;
 }): Promise<ShortTalksResult | { error: string }> {

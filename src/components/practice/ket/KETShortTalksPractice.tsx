@@ -9,7 +9,8 @@ import { BobMascotLoader } from '@/components/chat/BobMascotLoader';
 import { BobAvatar } from '@/components/practice/yl/_shared';
 import { pcmToWavBase64 } from '@/lib/audio';
 import {
-  generateKETShortTalksAction,
+  generateKETShortTalksPlanAction,
+  generateKETPersonAudioAction,
   submitKETShortTalksAction,
   type CharKey,
   type Person,
@@ -82,7 +83,7 @@ function stopActiveAudio() {
   }
 }
 
-function MiniAudioPlayer({ audiob64, audiomime, name }: { audiob64: string; audiomime: string; name: string }) {
+function MiniAudioPlayer({ audiob64, audiomime, name, loading }: { audiob64: string; audiomime: string; name: string; loading: boolean }) {
   const [playing, setPlaying] = useState(false);
   const [hasPlayed, setHasPlayed] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -108,6 +109,21 @@ function MiniAudioPlayer({ audiob64, audiomime, name }: { audiob64: string; audi
     setPlaying(true);
     try { await audio.play(); } catch { stopLocal(); }
   };
+
+  if (loading) {
+    return (
+      <span
+        className="w-8 h-8 rounded-full flex items-center justify-center shrink-0"
+        style={{ background: 'color-mix(in oklab, var(--color-bob-brand) 12%, white)' }}
+        aria-label={`Loading audio for ${name}`}
+      >
+        <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4 animate-spin" style={{ color: 'var(--color-bob-brand)' }}>
+          <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2.5" opacity="0.25" />
+          <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+        </svg>
+      </span>
+    );
+  }
 
   if (!audiob64) {
     return (
@@ -176,12 +192,14 @@ function PersonRow({
   takenKeys,
   onSelect,
   disabled,
+  audioLoading,
 }: {
   person: PersonWithAudio;
   selected: CharKey | null;
   takenKeys: Set<CharKey>;
   onSelect: (k: CharKey) => void;
   disabled: boolean;
+  audioLoading: boolean;
 }) {
   return (
     <motion.div
@@ -201,7 +219,7 @@ function PersonRow({
           {person.number}
         </span>
         <span className="text-sm font-bold text-gray-800 flex-1">{person.name}</span>
-        <MiniAudioPlayer audiob64={person.audio_b64} audiomime={person.audio_mime} name={person.name} />
+        <MiniAudioPlayer audiob64={person.audio_b64} audiomime={person.audio_mime} name={person.name} loading={audioLoading} />
       </div>
       <div className="px-4 py-3 flex flex-wrap gap-2">
         {CHAR_KEYS.map((k) => {
@@ -321,9 +339,41 @@ export function KETShortTalksPractice({
   const [personResults, setPersonResults] = useState<PersonResult[]>([]);
   const [correctCount, setCorrectCount] = useState(0);
   const [characteristics, setCharacteristics] = useState<Characteristic[]>([]);
+  const [audioLoading, setAudioLoading] = useState<Set<number>>(new Set());
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isNewSession, setIsNewSession] = useState(false);
   const initStartedRef = useRef(false);
+
+  /**
+   * Phase 2 of two-phase loading: fetches each person's TTS audio in parallel
+   * and patches it into the exercise as each one resolves, so players activate
+   * progressively instead of blocking the whole screen on a 12s "Preparing…".
+   */
+  async function loadAudiosInBackground(people: Person[]) {
+    setAudioLoading(new Set(people.map((p) => p.number)));
+    await Promise.all(
+      people.map(async (p) => {
+        const audio = await generateKETPersonAudioAction(p.monologue).catch(() => ({
+          audio_b64: '',
+          audio_mime: 'audio/L16;codec=pcm;rate=24000',
+        }));
+        setExercise((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            people: prev.people.map((pp) =>
+              pp.number === p.number ? { ...pp, audio_b64: audio.audio_b64, audio_mime: audio.audio_mime } : pp
+            ),
+          };
+        });
+        setAudioLoading((prev) => {
+          const next = new Set(prev);
+          next.delete(p.number);
+          return next;
+        });
+      })
+    );
+  }
 
   useEffect(() => {
     if (initStartedRef.current) return;
@@ -345,6 +395,7 @@ export function KETShortTalksPractice({
             const { data: { user } } = await createSupabaseBrowser().auth.getUser();
             if (user) setUserId(user.id);
             setPhase('ready');
+            void loadAudiosInBackground(restored.exercise.people);
           }
           return;
         }
@@ -355,20 +406,25 @@ export function KETShortTalksPractice({
       setIsNewSession(true);
       setPhase('generating');
 
-      const result = await generateKETShortTalksAction({ sessionId: initialSessionId });
+      const plan = await generateKETShortTalksPlanAction({ sessionId: initialSessionId });
 
-      if ('error' in result) {
-        setErrorMsg(result.error);
+      if ('error' in plan) {
+        setErrorMsg(plan.error);
         return;
       }
 
-      onSessionCreated?.(result.sessionId);
-      setSessionId(result.sessionId);
-      setUserId(result.userId);
-      setExercise(result.exercise);
-      setFramingText(result.framing_text);
-      setCharacteristics(result.exercise.characteristics);
+      onSessionCreated?.(plan.sessionId);
+      setSessionId(plan.sessionId);
+      setUserId(plan.userId);
+      setExercise({
+        people: plan.people.map((p) => ({ ...p, audio_b64: '', audio_mime: 'audio/L16;codec=pcm;rate=24000' })),
+        characteristics: plan.characteristics,
+      });
+      setFramingText(plan.framing_text);
+      setCharacteristics(plan.characteristics);
       setPhase('ready');
+
+      void loadAudiosInBackground(plan.people);
     }
 
     void init();
@@ -490,6 +546,7 @@ export function KETShortTalksPractice({
                 takenKeys={takenKeys}
                 onSelect={(k) => setAnswers((prev) => ({ ...prev, [person.number]: k }))}
                 disabled={false}
+                audioLoading={audioLoading.has(person.number)}
               />
             ))}
 
