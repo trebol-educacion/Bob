@@ -25,6 +25,10 @@ import {
   KETListenAndDecidePractice,
   KETShortTalksPractice,
   KETTrueFalseDoesntSayPractice,
+  KETMatchQuestionPractice,
+  KETLongTextPractice,
+  KETVocabGapPractice,
+  KETReadingTFDSPractice,
 } from '@/components/practice/ket';
 import {
   PETPictureDescriptionPractice,
@@ -205,6 +209,26 @@ export const EXAM_PART_COMPONENT_MAP: Record<ModeKey, RouteEntry> = {
     appState: 'exam-practicing',
     kind: 'yl',
     render: (p) => React.createElement(KETSignsAndNoticesPractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
+  },
+  cambridge_ket_reading_part2: {
+    appState: 'exam-practicing',
+    kind: 'yl',
+    render: (p) => React.createElement(KETMatchQuestionPractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
+  },
+  cambridge_ket_reading_part3: {
+    appState: 'exam-practicing',
+    kind: 'yl',
+    render: (p) => React.createElement(KETLongTextPractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
+  },
+  cambridge_ket_reading_part4: {
+    appState: 'exam-practicing',
+    kind: 'yl',
+    render: (p) => React.createElement(KETVocabGapPractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
+  },
+  cambridge_ket_reading_part5: {
+    appState: 'exam-practicing',
+    kind: 'yl',
+    render: (p) => React.createElement(KETReadingTFDSPractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
   },
   cambridge_ket_listening_part1: {
     appState: 'exam-practicing',
