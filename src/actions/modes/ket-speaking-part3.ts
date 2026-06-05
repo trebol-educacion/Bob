@@ -33,6 +33,22 @@ export interface PictureDescPrompt {
   image_url: string;
 }
 
+/** Plan without media — returned by the fast first-phase action. */
+export interface PictureDescPlan {
+  sessionId: string;
+  userId: string;
+  scene_description: string;
+  instruction: string;
+  image_prompt: string;
+}
+
+/** Media (TTS + image) loaded in the background after the plan renders. */
+export interface PictureDescMedia {
+  instruction_audio_b64: string;
+  instruction_audio_mime: string;
+  image_url: string;
+}
+
 export interface PictureDescFeedback {
   understood: boolean;
   highlights: string[];
@@ -48,6 +64,80 @@ function fallbackFeedback(): PictureDescFeedback {
   return { understood: false, highlights: [], suggestions: ['Try again — we could not process your response.'], model_answer: null };
 }
 
+/**
+ * Phase 1 — fast (~1.5s): generates text only (scene description, instruction,
+ * image prompt). The component renders immediately and loads TTS + image in the
+ * background via generateKETPictureDescMediaAction. The image is required before
+ * the student can start, so the Start button stays disabled until it resolves.
+ */
+export async function generateKETPictureDescPlanAction(input: {
+  sessionId?: string;
+}): Promise<PictureDescPlan | { error: string }> {
+  let sessionId = input.sessionId;
+  let userId: string | undefined;
+
+  if (!sessionId) {
+    const result = await createSessionAction({ mode: 'cambridge_ket_part3', title: 'KET Speaking Part 3 — Describe the Picture' });
+    if (!result.data) return { error: result.error ?? 'Could not create session' };
+    sessionId = result.data.id;
+    userId = result.data.user_id;
+  } else {
+    const supabase = await createSupabaseServer();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { error: 'Not authenticated' };
+    userId = user.id;
+  }
+
+  const generationPrompt = await getPrompt('cambridge_ket_part3_a2_generation').catch(() => null);
+  if (!generationPrompt) return { error: 'Could not load generation prompt' };
+
+  const geminiResult = await callGemini(
+    { promptKey: 'cambridge_ket_part3_a2_generation', model: MODELS.FLASH_LITE_PREVIEW, userId },
+    (ai) => ai.models.generateContent({
+      model: MODELS.FLASH_LITE_PREVIEW,
+      contents: [{ role: 'user', parts: [{ text: generationPrompt }] }],
+      config: { responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
+    })
+  );
+
+  if (!isOk(geminiResult)) return { error: 'Could not generate exercise' };
+
+  const rawText = geminiResult.data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+  const parsed = safeParse(GenerationSchema, rawText);
+  if (!parsed) return { error: 'Unexpected model response' };
+
+  persistMessage({
+    sessionId: sessionId!, userId: userId!, role: 'bob', msgType: 'text',
+    contentText: null,
+    contentJson: { kind: 'picture_desc_prompt', scene_description: parsed.scene_description, instruction: parsed.instruction, image_prompt: parsed.image_prompt, image_url: '' },
+  }).catch(() => undefined);
+
+  return {
+    sessionId: sessionId!, userId: userId!,
+    scene_description: parsed.scene_description,
+    instruction: parsed.instruction,
+    image_prompt: parsed.image_prompt,
+  };
+}
+
+/** Phase 2 — generates TTS + image in parallel (~7s, cached). */
+export async function generateKETPictureDescMediaAction(input: {
+  instruction: string;
+  image_prompt: string;
+  sessionId: string;
+}): Promise<PictureDescMedia> {
+  const [imageUrls, audioResult] = await Promise.all([
+    generateYLImagesParallelAction('movers', 3, [input.image_prompt], input.sessionId, undefined, 'scene').catch(() => ['']),
+    generateSpeechAction(input.instruction).catch(() => ({ data: '', mimeType: 'audio/L16;codec=pcm;rate=24000' })),
+  ]);
+  return {
+    instruction_audio_b64: audioResult.data,
+    instruction_audio_mime: audioResult.mimeType,
+    image_url: imageUrls[0] ?? '',
+  };
+}
+
+/** Legacy full action (kept for compatibility). */
 export async function generateKETPictureDescAction(input: {
   sessionId?: string;
 }): Promise<PictureDescPrompt | { error: string }> {

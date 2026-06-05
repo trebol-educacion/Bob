@@ -4,9 +4,11 @@ import React, { useEffect, useRef, useState } from 'react';
 import { BobMascotLoader } from '@/components/chat/BobMascotLoader';
 import { KETSpeakingPractice } from './KETSpeakingPractice';
 import {
-  generateKETPictureDescAction,
+  generateKETPictureDescPlanAction,
+  generateKETPictureDescMediaAction,
   evaluateKETPictureDescAction,
-  type PictureDescPrompt,
+  type PictureDescPlan,
+  type PictureDescMedia,
 } from '@/actions/modes/ket-speaking-part3';
 import type { StoredMessage } from '@/actions/messages';
 
@@ -19,16 +21,21 @@ export interface KETDescribePicturePracticeProps {
   onOpenDashboard?: () => void;
 }
 
-function tryRestore(messages: StoredMessage[]): PictureDescPrompt | null {
+interface RestoredPlan {
+  scene_description: string;
+  instruction: string;
+  image_prompt: string;
+  image_url: string;
+}
+
+function tryRestore(messages: StoredMessage[]): RestoredPlan | null {
   for (const msg of messages) {
     const cj = msg.content_json as Record<string, unknown> | null;
     if (cj?.kind === 'picture_desc_prompt') {
       return {
-        sessionId: '', userId: '',
         scene_description: String(cj.scene_description ?? ''),
         instruction: String(cj.instruction ?? ''),
-        instruction_audio_b64: '',
-        instruction_audio_mime: 'audio/L16;codec=pcm;rate=24000',
+        image_prompt: String(cj.image_prompt ?? ''),
         image_url: String(cj.image_url ?? ''),
       };
     }
@@ -36,14 +43,33 @@ function tryRestore(messages: StoredMessage[]): PictureDescPrompt | null {
   return null;
 }
 
-/** KET Speaking Part 3 — Describe the Picture. */
+const EMPTY_MEDIA: PictureDescMedia = {
+  instruction_audio_b64: '',
+  instruction_audio_mime: 'audio/L16;codec=pcm;rate=24000',
+  image_url: '',
+};
+
+/** KET Speaking Part 3 — Describe the Picture (two-phase loading). */
 export function KETDescribePicturePractice({
   onBack, sessionId: initialSessionId, initialMessages, onSessionCreated, onSessionFinished, onOpenDashboard,
 }: KETDescribePicturePracticeProps) {
   const [loading, setLoading] = useState(true);
-  const [prompt, setPrompt] = useState<PictureDescPrompt | null>(null);
+  const [plan, setPlan] = useState<PictureDescPlan | null>(null);
+  const [media, setMedia] = useState<PictureDescMedia>(EMPTY_MEDIA);
+  const [mediaLoading, setMediaLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const initRef = useRef(false);
+
+  async function loadMedia(p: PictureDescPlan) {
+    setMediaLoading(true);
+    const m = await generateKETPictureDescMediaAction({
+      instruction: p.instruction,
+      image_prompt: p.image_prompt,
+      sessionId: p.sessionId,
+    }).catch(() => EMPTY_MEDIA);
+    setMedia(m);
+    setMediaLoading(false);
+  }
 
   useEffect(() => {
     if (initRef.current) return;
@@ -52,15 +78,28 @@ export function KETDescribePicturePractice({
     async function init() {
       if (initialMessages?.length) {
         const r = tryRestore(initialMessages);
-        if (r) { setPrompt(r); setLoading(false); return; }
+        if (r) {
+          const { createSupabaseBrowser } = await import('@/lib/supabase/browser-client');
+          const { data: { user } } = await createSupabaseBrowser().auth.getUser();
+          const p: PictureDescPlan = {
+            sessionId: initialSessionId ?? '', userId: user?.id ?? '',
+            scene_description: r.scene_description, instruction: r.instruction, image_prompt: r.image_prompt,
+          };
+          setPlan(p);
+          if (r.image_url) setMedia({ instruction_audio_b64: '', instruction_audio_mime: 'audio/L16;codec=pcm;rate=24000', image_url: r.image_url });
+          else if (initialSessionId) void loadMedia(p);
+          setLoading(false);
+          return;
+        }
       }
       if (initialSessionId) { setLoading(false); return; }
 
-      const result = await generateKETPictureDescAction({ sessionId: initialSessionId });
+      const result = await generateKETPictureDescPlanAction({ sessionId: initialSessionId });
       if ('error' in result) { setErrorMsg(result.error); setLoading(false); return; }
       onSessionCreated?.(result.sessionId);
-      setPrompt(result);
+      setPlan(result);
       setLoading(false);
+      void loadMedia(result);
     }
     void init();
   }, []);
@@ -72,24 +111,26 @@ export function KETDescribePicturePractice({
     </div>
   );
 
-  if (loading || !prompt) return <div className="flex-1 flex flex-col min-h-0"><BobMascotLoader message="Preparing speaking exercise…" /></div>;
+  if (loading || !plan) return <div className="flex-1 flex flex-col min-h-0"><BobMascotLoader message="Preparing speaking exercise…" /></div>;
 
   return (
     <KETSpeakingPractice
       partLabel="Part 3"
       title="Describe the Picture"
       recordingSeconds={40}
-      instructionAudioB64={prompt.instruction_audio_b64}
-      instructionAudioMime={prompt.instruction_audio_mime}
-      instructionText={prompt.instruction}
-      imageUrl={prompt.image_url || undefined}
+      instructionAudioB64={media.instruction_audio_b64}
+      instructionAudioMime={media.instruction_audio_mime}
+      instructionText={plan.instruction}
+      imageUrl={media.image_url || undefined}
+      mediaLoading={mediaLoading}
+      imageRequired={true}
       onSubmit={async ({ base64, mime }) => {
         const result = await evaluateKETPictureDescAction({
-          sessionId: prompt.sessionId,
-          userId: prompt.userId,
+          sessionId: plan.sessionId,
+          userId: plan.userId,
           audioBase64: base64,
           audioMime: mime,
-          scene_description: prompt.scene_description,
+          scene_description: plan.scene_description,
         });
         if (!('error' in result)) onSessionFinished?.();
         return result;

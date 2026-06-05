@@ -35,6 +35,23 @@ export interface HobbyTalkPrompt {
   image_url: string;
 }
 
+/** Plan without media — returned by the fast first-phase action. */
+export interface HobbyTalkPlan {
+  sessionId: string;
+  userId: string;
+  hobby: string;
+  instruction: string;
+  bullet_points: string[];
+  image_prompt: string;
+}
+
+/** Media (TTS + image) loaded in the background after the plan renders. */
+export interface HobbyTalkMedia {
+  instruction_audio_b64: string;
+  instruction_audio_mime: string;
+  image_url: string;
+}
+
 export interface HobbyTalkFeedback {
   understood: boolean;
   highlights: string[];
@@ -50,6 +67,80 @@ function fallbackFeedback(): HobbyTalkFeedback {
   return { understood: false, highlights: [], suggestions: ['Try again — we could not process your response.'], model_answer: null };
 }
 
+/**
+ * Phase 1 — fast (~1.5s): generates text only (hobby, instruction, bullets,
+ * image prompt). The component renders immediately and loads TTS + image in
+ * the background via generateKETHobbyTalkMediaAction.
+ */
+export async function generateKETHobbyTalkPlanAction(input: {
+  sessionId?: string;
+}): Promise<HobbyTalkPlan | { error: string }> {
+  let sessionId = input.sessionId;
+  let userId: string | undefined;
+
+  if (!sessionId) {
+    const result = await createSessionAction({ mode: 'cambridge_ket_part2', title: 'KET Speaking Part 2 — Talk About a Hobby' });
+    if (!result.data) return { error: result.error ?? 'Could not create session' };
+    sessionId = result.data.id;
+    userId = result.data.user_id;
+  } else {
+    const supabase = await createSupabaseServer();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { error: 'Not authenticated' };
+    userId = user.id;
+  }
+
+  const generationPrompt = await getPrompt('cambridge_ket_part2_a2_generation').catch(() => null);
+  if (!generationPrompt) return { error: 'Could not load generation prompt' };
+
+  const geminiResult = await callGemini(
+    { promptKey: 'cambridge_ket_part2_a2_generation', model: MODELS.FLASH_LITE_PREVIEW, userId },
+    (ai) => ai.models.generateContent({
+      model: MODELS.FLASH_LITE_PREVIEW,
+      contents: [{ role: 'user', parts: [{ text: generationPrompt }] }],
+      config: { responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
+    })
+  );
+
+  if (!isOk(geminiResult)) return { error: 'Could not generate exercise' };
+
+  const rawText = geminiResult.data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+  const parsed = safeParse(GenerationSchema, rawText);
+  if (!parsed) return { error: 'Unexpected model response' };
+
+  persistMessage({
+    sessionId: sessionId!, userId: userId!, role: 'bob', msgType: 'text',
+    contentText: null,
+    contentJson: { kind: 'hobby_talk_prompt', hobby: parsed.hobby, instruction: parsed.instruction, bullet_points: parsed.bullet_points, image_prompt: parsed.image_prompt, image_url: '' },
+  }).catch(() => undefined);
+
+  return {
+    sessionId: sessionId!, userId: userId!,
+    hobby: parsed.hobby,
+    instruction: parsed.instruction,
+    bullet_points: parsed.bullet_points,
+    image_prompt: parsed.image_prompt,
+  };
+}
+
+/** Phase 2 — generates TTS + image in parallel (~7s, cached). */
+export async function generateKETHobbyTalkMediaAction(input: {
+  instruction: string;
+  image_prompt: string;
+  sessionId: string;
+}): Promise<HobbyTalkMedia> {
+  const [imageUrls, audioResult] = await Promise.all([
+    generateYLImagesParallelAction('movers', 2, [input.image_prompt], input.sessionId, undefined, 'scene').catch(() => ['']),
+    generateSpeechAction(input.instruction).catch(() => ({ data: '', mimeType: 'audio/L16;codec=pcm;rate=24000' })),
+  ]);
+  return {
+    instruction_audio_b64: audioResult.data,
+    instruction_audio_mime: audioResult.mimeType,
+    image_url: imageUrls[0] ?? '',
+  };
+}
+
+/** Legacy full action (kept for compatibility). */
 export async function generateKETHobbyTalkAction(input: {
   sessionId?: string;
 }): Promise<HobbyTalkPrompt | { error: string }> {

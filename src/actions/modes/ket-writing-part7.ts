@@ -41,6 +41,15 @@ export interface PictureStoryPrompt {
   framing_text: string;
 }
 
+/** Plan without images — returned by the fast first-phase action. */
+export interface PictureStoryPlan {
+  sessionId: string;
+  userId: string;
+  story_premise: string;
+  scenes: StoryScene[];
+  framing_text: string;
+}
+
 export interface PictureStoryFeedback {
   understood: boolean;
   highlights: string[];
@@ -56,6 +65,85 @@ function buildFallbackFeedback(): PictureStoryFeedback {
   return { understood: false, highlights: [], suggestions: ['Please write your story and try again.'], model_answer: null };
 }
 
+/**
+ * Phase 1 — fast (~2s): generates the story premise + scene descriptions only.
+ * The component renders the exercise immediately, then loads the 3 scene
+ * images in the background via generateKETSceneImageAction.
+ */
+export async function generateKETPictureStoryPlanAction(input: {
+  sessionId?: string;
+}): Promise<PictureStoryPlan | { error: string }> {
+  let sessionId = input.sessionId;
+  let userId: string | undefined;
+
+  if (!sessionId) {
+    const result = await createSessionAction({ mode: 'cambridge_ket_writing_part7', title: 'KET Writing Part 7 — Picture Story' });
+    if (!result.data) return { error: result.error ?? 'Could not create session' };
+    sessionId = result.data.id;
+    userId = result.data.user_id;
+  } else {
+    const supabase = await createSupabaseServer();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { error: 'Not authenticated' };
+    userId = user.id;
+  }
+
+  const [generationPrompt, framingText] = await Promise.all([
+    getPrompt('cambridge_ket_writing_part7_a2_generation').catch(() => null),
+    getPrompt('cambridge_ket_writing_part7_a2_framing').catch(
+      () => 'Look at the three pictures. They tell a story. Write the story in about 35 words or more.'
+    ),
+  ]);
+
+  if (!generationPrompt) return { error: 'Could not load generation prompt' };
+
+  const geminiResult = await callGemini(
+    { promptKey: 'cambridge_ket_writing_part7_a2_generation', model: MODELS.FLASH_LITE_PREVIEW, userId },
+    (ai) => ai.models.generateContent({
+      model: MODELS.FLASH_LITE_PREVIEW,
+      contents: [{ role: 'user', parts: [{ text: generationPrompt }] }],
+      config: { responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
+    })
+  );
+
+  if (!isOk(geminiResult)) return { error: 'Could not generate story prompt' };
+
+  const rawText = geminiResult.data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+  const parsed = safeParse(GenerationSchema, rawText);
+  if (!parsed) return { error: 'Unexpected model response' };
+
+  persistMessage({
+    sessionId: sessionId!, userId: userId!, role: 'bob', msgType: 'text',
+    contentText: null,
+    contentJson: {
+      kind: 'picture_story_prompt',
+      framing_text: framingText,
+      story_premise: parsed.story_premise,
+      scenes: parsed.scenes,
+      image_urls: ['', '', ''],
+    },
+  }).catch(() => undefined);
+
+  return {
+    sessionId: sessionId!, userId: userId!,
+    story_premise: parsed.story_premise,
+    scenes: parsed.scenes,
+    framing_text: framingText,
+  };
+}
+
+/** Phase 2 — generates a single scene image (~6-9s, cached). */
+export async function generateKETSceneImageAction(input: {
+  imagePrompt: string;
+  sessionId: string;
+}): Promise<{ image_url: string }> {
+  const urls = await generateYLImagesParallelAction('movers', 7, [input.imagePrompt], input.sessionId, undefined, 'scene').catch(
+    () => ['']
+  );
+  return { image_url: urls[0] ?? '' };
+}
+
+/** Legacy full action (kept for compatibility — restore path uses persisted images). */
 export async function generateKETPictureStoryAction(input: {
   sessionId?: string;
 }): Promise<PictureStoryPrompt | { error: string }> {

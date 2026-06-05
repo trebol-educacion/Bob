@@ -9,7 +9,8 @@ import { CelebrationCard } from '@/components/practice/yl/CelebrationCard';
 import { BobMascotLoader } from '@/components/chat/BobMascotLoader';
 import { BobAvatar } from '@/components/practice/yl/_shared';
 import {
-  generateKETPictureStoryAction,
+  generateKETPictureStoryPlanAction,
+  generateKETSceneImageAction,
   evaluateKETPictureStoryAction,
   type StorySceneWithImage,
   type StoryScene,
@@ -77,7 +78,7 @@ function tryRestore(messages: StoredMessage[]): RestoredState | null {
   return null;
 }
 
-function SceneStrip({ scenes }: { scenes: StorySceneWithImage[] }) {
+function SceneStrip({ scenes, loadingNumbers }: { scenes: StorySceneWithImage[]; loadingNumbers?: Set<number> }) {
   return (
     <div className="grid grid-cols-3 gap-2">
       {scenes.map((scene) => (
@@ -92,6 +93,13 @@ function SceneStrip({ scenes }: { scenes: StorySceneWithImage[] }) {
                 className="object-cover"
                 unoptimized={scene.image_url.startsWith('data:')}
               />
+            ) : loadingNumbers?.has(scene.number) ? (
+              <div className="w-full h-full flex items-center justify-center">
+                <svg viewBox="0 0 24 24" fill="none" className="w-6 h-6 animate-spin" style={{ color: 'var(--color-bob-brand)' }}>
+                  <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2.5" opacity="0.25" />
+                  <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+                </svg>
+              </div>
             ) : (
               <div className="w-full h-full flex items-center justify-center text-gray-300 text-2xl">📷</div>
             )}
@@ -214,10 +222,35 @@ export function KETStoryWritingPractice({
   const [framingText, setFramingText] = useState('');
   const [text, setText] = useState('');
   const [feedback, setFeedback] = useState<PictureStoryFeedback | null>(null);
+  const [imageLoading, setImageLoading] = useState<Set<number>>(new Set());
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isNewSession, setIsNewSession] = useState(false);
   const initRef = useRef(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  /**
+   * Phase 2 of two-phase loading: fetches each scene image in parallel and
+   * patches it in as it resolves, so the strip fills progressively instead of
+   * blocking the screen on a ~9s "Creating your story pictures…".
+   */
+  async function loadSceneImagesInBackground(sid: string, planScenes: StoryScene[]) {
+    setImageLoading(new Set(planScenes.map((s) => s.number)));
+    await Promise.all(
+      planScenes.map(async (scene) => {
+        const { image_url } = await generateKETSceneImageAction({ imagePrompt: scene.image_prompt, sessionId: sid }).catch(
+          () => ({ image_url: '' })
+        );
+        setScenes((prev) =>
+          prev.map((s) => (s.number === scene.number ? { ...s, image_url } : s))
+        );
+        setImageLoading((prev) => {
+          const next = new Set(prev);
+          next.delete(scene.number);
+          return next;
+        });
+      })
+    );
+  }
 
   useEffect(() => {
     if (initRef.current) return;
@@ -232,18 +265,30 @@ export function KETStoryWritingPractice({
           setFramingText(r.framingText);
           setText(r.userText);
           if (r.feedback) { setFeedback(r.feedback); setPhase('finished'); }
-          else { const { createSupabaseBrowser } = await import('@/lib/supabase/browser-client'); const { data: { user } } = await createSupabaseBrowser().auth.getUser(); if (user) setUserId(user.id); setPhase('ready'); }
+          else {
+            const { createSupabaseBrowser } = await import('@/lib/supabase/browser-client');
+            const { data: { user } } = await createSupabaseBrowser().auth.getUser();
+            if (user) setUserId(user.id);
+            setPhase('ready');
+            const missing = r.scenes.filter((s) => !s.image_url);
+            if (missing.length > 0 && initialSessionId) {
+              void loadSceneImagesInBackground(initialSessionId, missing.map(({ image_url: _i, ...s }) => s));
+            }
+          }
           return;
         }
       }
       if (initialSessionId) return;
       setIsNewSession(true); setPhase('generating');
-      const result = await generateKETPictureStoryAction({ sessionId: initialSessionId });
-      if ('error' in result) { setErrorMsg(result.error); return; }
-      onSessionCreated?.(result.sessionId);
-      setSessionId(result.sessionId); setUserId(result.userId);
-      setStoryPremise(result.story_premise); setScenes(result.scenes); setFramingText(result.framing_text);
+      const plan = await generateKETPictureStoryPlanAction({ sessionId: initialSessionId });
+      if ('error' in plan) { setErrorMsg(plan.error); return; }
+      onSessionCreated?.(plan.sessionId);
+      setSessionId(plan.sessionId); setUserId(plan.userId);
+      setStoryPremise(plan.story_premise);
+      setScenes(plan.scenes.map((s) => ({ ...s, image_url: '' })));
+      setFramingText(plan.framing_text);
       setPhase('ready');
+      void loadSceneImagesInBackground(plan.sessionId, plan.scenes);
     }
     void init();
   }, []);
@@ -305,7 +350,7 @@ export function KETStoryWritingPractice({
             </div>
 
             <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}>
-              <SceneStrip scenes={scenes} />
+              <SceneStrip scenes={scenes} loadingNumbers={imageLoading} />
             </motion.div>
 
             <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden">

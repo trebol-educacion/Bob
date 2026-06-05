@@ -34,6 +34,10 @@ export interface KETSpeakingPracticeProps {
   bulletPoints?: string[];
   /** Main image for the exercise */
   imageUrl?: string;
+  /** True while TTS/image are still loading in the background (two-phase). */
+  mediaLoading?: boolean;
+  /** True if this activity requires the image before the student can start. */
+  imageRequired?: boolean;
   /** Called with { audioBase64, audioMime } when student stops recording */
   onSubmit: (audio: { base64: string; mime: string }) => Promise<SpeakingFeedback | { error: string }>;
   onBack: () => void;
@@ -109,6 +113,8 @@ export function KETSpeakingPractice({
   instructionText,
   bulletPoints,
   imageUrl,
+  mediaLoading = false,
+  imageRequired = false,
   onSubmit,
   onBack,
   onOpenDashboard,
@@ -199,13 +205,22 @@ export function KETSpeakingPractice({
               <div className="bg-gray-50 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-gray-700 leading-relaxed max-w-sm">{instructionText}</div>
             </div>
 
-            {imageUrl && (
+            {imageUrl ? (
               <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="rounded-2xl overflow-hidden border border-gray-100 shadow-sm">
                 <div className="relative w-full" style={{ paddingBottom: '60%' }}>
                   <Image src={imageUrl} alt="Speaking prompt" fill sizes="100vw" className="object-cover" unoptimized={imageUrl.startsWith('data:')} />
                 </div>
               </motion.div>
-            )}
+            ) : (imageRequired && mediaLoading) ? (
+              <div className="rounded-2xl overflow-hidden border border-gray-100 bg-gray-50">
+                <div className="relative w-full flex items-center justify-center" style={{ paddingBottom: '60%' }}>
+                  <svg viewBox="0 0 24 24" fill="none" className="w-8 h-8 animate-spin absolute" style={{ color: 'var(--color-bob-brand)' }}>
+                    <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2.5" opacity="0.25" />
+                    <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+                  </svg>
+                </div>
+              </div>
+            ) : null}
 
             {bulletPoints && bulletPoints.length > 0 && (
               <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
@@ -251,10 +266,11 @@ export function KETSpeakingPractice({
           <div className="shrink-0 border-t border-gray-100 bg-white px-4 py-4 flex items-center justify-center">
             {phase === 'ready' && (
               <button type="button" onClick={handleStartPress}
-                className="flex items-center gap-2 px-6 py-3 rounded-2xl text-white font-bold shadow-md transition-all cursor-pointer"
+                disabled={imageRequired && mediaLoading}
+                className="flex items-center gap-2 px-6 py-3 rounded-2xl text-white font-bold shadow-md transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{ background: 'var(--color-bob-brand)' }}>
                 <Mic size={18} />
-                Start speaking
+                {imageRequired && mediaLoading ? 'Preparing picture…' : 'Start speaking'}
               </button>
             )}
             {phase === 'playing-instruction' && (
