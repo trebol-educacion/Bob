@@ -206,9 +206,9 @@ export function KETSpeakingPractice({
             </div>
 
             {imageUrl ? (
-              <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="rounded-2xl overflow-hidden border border-gray-100 shadow-sm">
-                <div className="relative w-full" style={{ paddingBottom: '60%' }}>
-                  <Image src={imageUrl} alt="Speaking prompt" fill sizes="100vw" className="object-cover" unoptimized={imageUrl.startsWith('data:')} />
+              <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="rounded-2xl overflow-hidden border border-gray-100 shadow-sm max-w-xl w-full mx-auto">
+                <div className="relative w-full bg-gray-50" style={{ paddingBottom: '60%' }}>
+                  <Image src={imageUrl} alt="Speaking prompt" fill sizes="(max-width: 640px) 100vw, 576px" className="object-contain" unoptimized={imageUrl.startsWith('data:')} />
                 </div>
               </motion.div>
             ) : (imageRequired && mediaLoading) ? (
@@ -299,9 +299,9 @@ export function KETSpeakingPractice({
       {phase === 'finished' && feedback && (
         <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
           {imageUrl && (
-            <div className="rounded-2xl overflow-hidden border border-gray-100 shadow-sm">
-              <div className="relative w-full" style={{ paddingBottom: '40%' }}>
-                <Image src={imageUrl} alt="Speaking prompt" fill sizes="100vw" className="object-cover" unoptimized={imageUrl.startsWith('data:')} />
+            <div className="rounded-2xl overflow-hidden border border-gray-100 shadow-sm max-w-xl w-full mx-auto">
+              <div className="relative w-full bg-gray-50" style={{ paddingBottom: '40%' }}>
+                <Image src={imageUrl} alt="Speaking prompt" fill sizes="(max-width: 640px) 100vw, 576px" className="object-contain" unoptimized={imageUrl.startsWith('data:')} />
               </div>
             </div>
           )}
