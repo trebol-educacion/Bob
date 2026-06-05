@@ -2,29 +2,46 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'motion/react';
-import { BookOpen, Check, Gift, Headphones, Lock, Mic, PenLine, Star, Trophy } from 'lucide-react';
+import {
+  BookOpen,
+  Check,
+  ClipboardList,
+  Gift,
+  Headphones,
+  Lock,
+  Mic,
+  PenLine,
+  RefreshCw,
+  Star,
+  Trophy,
+} from 'lucide-react';
 
 type SkillKey = 'speaking' | 'reading' | 'listening' | 'writing';
 
 /**
- * One skill's progress, used to render its winding Duolingo-style activity path.
- * `done` activities show as completed nodes, `total - done` as locked, with
- * reward checkpoints every few activities and a final goal node (`goalLevel`).
+ * One skill's full state for the unified path block: tab + detail (score ring,
+ * level, last test, actions) + the winding activity path. `done` activities show
+ * as completed nodes, the rest locked, with reward checkpoints and a goal node.
  */
 export interface SkillPathSkill {
   key: SkillKey;
   label: string;
   level: string;
   goalLevel: string;
+  cefrValue: string | null;
   done: number;
   total: number;
+  pct: number;
+  sessions: number;
+  lastTest: string | null;
+  pending: boolean;
 }
 
-const PALETTE: Record<SkillKey, { c: string; light: string; dark: string; tint: string }> = {
-  speaking: { c: '#3660AB', light: '#7aa0ff', dark: '#26417a', tint: '#e7edf9' },
-  reading: { c: '#469E7B', light: '#7fd0ad', dark: '#2f7256', tint: '#e3f1ea' },
-  listening: { c: '#F8AC37', light: '#ffce7a', dark: '#c97f12', tint: '#fdefd6' },
-  writing: { c: '#9333EA', light: '#c084fc', dark: '#6d28d9', tint: '#f3e8ff' },
+const PALETTE: Record<SkillKey, { c: string; light: string; dark: string; tint: string; soft: string }> = {
+  speaking: { c: '#3660AB', light: '#7aa0ff', dark: '#26417a', tint: '#e7edf9', soft: '#dde4f2' },
+  reading: { c: '#469E7B', light: '#7fd0ad', dark: '#2f7256', tint: '#e3f1ea', soft: '#dcebe3' },
+  listening: { c: '#F8AC37', light: '#ffce7a', dark: '#c97f12', tint: '#fdefd6', soft: '#fde9c8' },
+  writing: { c: '#9333EA', light: '#c084fc', dark: '#6d28d9', tint: '#f3e8ff', soft: '#ede0fb' },
 };
 
 const ICON: Record<SkillKey, typeof Headphones> = {
@@ -100,22 +117,63 @@ function buildItems(total: number): Item[] {
   return items;
 }
 
+function ScoreRing({ pct, active, color, soft }: { pct: number; active: boolean; color: string; soft: string }) {
+  const r = 27;
+  const circ = 2 * Math.PI * r;
+  const offset = circ * (1 - pct / 100);
+  return (
+    <div className="relative w-[68px] h-[68px] shrink-0">
+      <svg width="68" height="68" viewBox="0 0 68 68" className="-rotate-90">
+        <circle cx="34" cy="34" r={r} fill="none" stroke={soft} strokeWidth="8" />
+        <motion.circle
+          cx="34"
+          cy="34"
+          r={r}
+          fill="none"
+          stroke={color}
+          strokeWidth="8"
+          strokeLinecap="round"
+          strokeDasharray={circ}
+          initial={{ strokeDashoffset: circ }}
+          animate={{ strokeDashoffset: active ? offset : circ }}
+          transition={{ duration: 1, ease: [0.22, 1, 0.36, 1] }}
+        />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center leading-none">
+        <span className="text-lg font-black tabular-nums" style={{ color: active ? color : '#cbd5e1' }}>
+          {active ? Math.round(pct) : '—'}
+        </span>
+        {active && <span className="text-[8px] font-bold uppercase tracking-widest text-trebol-text/40">avg</span>}
+      </div>
+    </div>
+  );
+}
+
 /**
- * Tabbed, full-width skill path for the student dashboard. Each tab is a skill;
- * the active skill renders as a vertical winding trail of evenly-spaced 3D nodes
- * with reward checkpoints, ambient decorations and Bob cheering beside the current
- * step, ending in a goal node with the target CEFR level.
+ * Unified, full-width skill block for the student dashboard: a row of skill tabs
+ * (each with its CEFR level), then the active skill's detail (score ring, level,
+ * last test, change / take-test actions), then the active skill's winding activity
+ * path with reward checkpoints, ambient decorations and Bob cheering beside the
+ * current step.
  */
 export function SkillPath({
   skills,
   title,
   startLabel,
+  pickableLevels,
+  onTakeTest,
+  onChangeLevel,
 }: {
   skills: SkillPathSkill[];
   title: string;
   startLabel: string;
+  pickableLevels?: Array<{ value: string; label: string }>;
+  onTakeTest?: (skill: SkillKey) => void;
+  onChangeLevel?: (skill: SkillKey, level: string) => void | Promise<void>;
 }) {
   const [active, setActive] = useState(0);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [savingLevel, setSavingLevel] = useState(false);
   const trackRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(760);
 
@@ -137,11 +195,15 @@ export function SkillPath({
   if (!skill || pts.length === 0) return null;
 
   const p = PALETTE[skill.key];
-  const pct = skill.total ? Math.round((skill.done / skill.total) * 100) : 0;
+  const pctDone = skill.total ? Math.round((skill.done / skill.total) * 100) : 0;
   const lastPt = pts[pts.length - 1];
   const colHeight = lastPt.y + PAD * 2;
   const showDecor = width >= 680;
   const currentIdx = items.findIndex((it) => it.kind === 'activity' && it.idx === skill.done);
+  const select = (i: number) => {
+    setActive(i);
+    setPickerOpen(false);
+  };
 
   return (
     <motion.section
@@ -170,7 +232,7 @@ export function SkillPath({
               <button
                 key={s.key}
                 type="button"
-                onClick={() => setActive(i)}
+                onClick={() => select(i)}
                 className="flex flex-col items-center gap-1 py-2 rounded-2xl text-[11px] sm:text-xs font-bold transition-all"
                 style={
                   on
@@ -185,27 +247,114 @@ export function SkillPath({
               >
                 <Ic size={22} strokeWidth={2.4} />
                 <span>{s.label}</span>
+                <span
+                  className="px-1.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider leading-none"
+                  style={on ? { background: 'rgba(255,255,255,.25)', color: '#fff' } : { background: sp.soft, color: sp.c }}
+                >
+                  {s.cefrValue ? s.cefrValue.replace('_', ' ') : '—'}
+                </span>
               </button>
             );
           })}
         </div>
-        <div className="max-w-5xl mx-auto px-4 pb-2.5 flex items-center gap-3">
-          <span className="text-[11px] font-black whitespace-nowrap" style={{ color: p.c }}>
-            {skill.level} ▸ {skill.goalLevel}
-          </span>
-          <div className="flex-1 h-2 rounded-full bg-trebol-text/10 overflow-hidden">
-            <div
-              className="h-full rounded-full"
-              style={{ width: `${pct}%`, background: `linear-gradient(90deg, ${p.light}, ${p.c})` }}
-            />
+      </div>
+
+      <div className="max-w-5xl mx-auto px-4 pt-4">
+        <div className="flex items-center gap-4">
+          <ScoreRing pct={skill.pct} active={skill.sessions > 0} color={p.c} soft={p.soft} />
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-sm font-black whitespace-nowrap" style={{ color: p.c }}>
+                {skill.level} ▸ {skill.goalLevel}
+              </span>
+              <span className="text-[11px] font-black tabular-nums text-trebol-text/55">{skill.done}/{skill.total}</span>
+            </div>
+            <div className="mt-1.5 h-2 rounded-full bg-trebol-text/10 overflow-hidden">
+              <div
+                className="h-full rounded-full"
+                style={{ width: `${pctDone}%`, background: `linear-gradient(90deg, ${p.light}, ${p.c})` }}
+              />
+            </div>
+            <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1.5">
+              {skill.pending ? (
+                <span className="flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wider" style={{ color: p.c }}>
+                  <span className="inline-block w-2 h-2 rounded-full animate-pulse" style={{ background: p.c }} />
+                  Evaluating
+                </span>
+              ) : skill.lastTest ? (
+                <span
+                  className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider"
+                  style={{ background: p.soft, color: p.c }}
+                >
+                  <ClipboardList size={10} />
+                  {skill.lastTest}
+                </span>
+              ) : (
+                <span className="text-[10px] font-bold uppercase tracking-wider text-trebol-text/35">No test yet</span>
+              )}
+
+              <div className="flex items-center gap-3 text-[11px] font-bold ml-auto">
+                {onChangeLevel && pickableLevels && (
+                  <button
+                    type="button"
+                    onClick={() => setPickerOpen((v) => !v)}
+                    disabled={savingLevel}
+                    className="flex items-center gap-1 text-trebol-text/50 hover:text-trebol-text transition-colors cursor-pointer disabled:opacity-50"
+                  >
+                    <RefreshCw size={12} />
+                    Change
+                  </button>
+                )}
+                {onTakeTest && (
+                  <button
+                    type="button"
+                    onClick={() => onTakeTest(skill.key)}
+                    className="flex items-center gap-1 cursor-pointer"
+                    style={{ color: p.c }}
+                  >
+                    <ClipboardList size={12} />
+                    Take test
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {pickerOpen && onChangeLevel && pickableLevels && (
+              <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} className="mt-2 flex flex-wrap items-center gap-1">
+                {pickableLevels.map((lvl) => {
+                  const isCurrent = skill.cefrValue === lvl.value;
+                  return (
+                    <button
+                      key={lvl.value}
+                      type="button"
+                      disabled={savingLevel || isCurrent}
+                      onClick={async () => {
+                        setSavingLevel(true);
+                        try {
+                          await onChangeLevel(skill.key, lvl.value);
+                          setPickerOpen(false);
+                        } finally {
+                          setSavingLevel(false);
+                        }
+                      }}
+                      className="rounded-md font-black uppercase tracking-tight whitespace-nowrap border transition-all cursor-pointer disabled:cursor-default hover:scale-105 text-[10px] px-2 py-1 leading-none"
+                      style={
+                        isCurrent
+                          ? { background: p.c, color: '#fff', borderColor: p.c }
+                          : { background: '#fff', color: p.c, borderColor: `${p.c}33` }
+                      }
+                    >
+                      {lvl.label}
+                    </button>
+                  );
+                })}
+              </motion.div>
+            )}
           </div>
-          <span className="text-[11px] font-black tabular-nums" style={{ color: p.c }}>
-            {skill.done}/{skill.total}
-          </span>
         </div>
       </div>
 
-      <div ref={trackRef} className="relative mx-auto max-w-5xl px-4 overflow-hidden" style={{ height: colHeight }}>
+      <div ref={trackRef} className="relative mx-auto max-w-5xl px-4 overflow-hidden mt-4" style={{ height: colHeight }}>
         <div
           aria-hidden
           className="absolute inset-x-0 top-0 h-72 pointer-events-none"

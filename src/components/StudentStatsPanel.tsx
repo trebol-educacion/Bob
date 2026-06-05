@@ -2,14 +2,11 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
-import { motion, useReducedMotion } from 'motion/react';
+import { motion } from 'motion/react';
 import {
   ArrowLeft,
-  BarChart3,
-  ClipboardList,
   RefreshCw,
   Sparkles,
-  Star,
 } from 'lucide-react';
 import { createSupabaseBrowser } from '@/lib/supabase/browser-client';
 import { useTranslations } from 'next-intl';
@@ -161,218 +158,6 @@ function relativeTime(iso: string): string {
 }
 
 type LastAssessment = { cefr_band: string; occurred_at: string };
-
-function SkillRing({
-  skill,
-  pct,
-  sessions,
-  cefrLevel,
-  lastAssessment,
-  index,
-  isPending,
-  onTakeAssessment,
-  onChangeLevel,
-}: {
-  skill: Skill;
-  pct: number;
-  sessions: number;
-  cefrLevel: string | null;
-  lastAssessment: LastAssessment | null;
-  index: number;
-  isPending?: boolean;
-  onTakeAssessment?: (skill: Skill) => void;
-  onChangeLevel?: (skill: Skill, level: string) => Promise<void> | void;
-}) {
-  const [showPicker, setShowPicker] = useState(false);
-  const [savingLevel, setSavingLevel] = useState(false);
-  const t = useTranslations('dashboard');
-  const meta = SKILL_META[skill];
-  const radius = 34;
-  const circumference = 2 * Math.PI * radius;
-  const offset = circumference * (1 - pct / 100);
-  const active = sessions > 0;
-
-  const skillLabelKey = `skill${skill.charAt(0).toUpperCase()}${skill.slice(1)}` as
-    | 'skillSpeaking'
-    | 'skillReading'
-    | 'skillListening'
-    | 'skillWriting';
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 12, scale: 0.92 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={{ delay: 0.15 + index * 0.07, type: 'spring', stiffness: 260, damping: 22 }}
-      className="relative flex flex-col items-center gap-1.5"
-    >
-      <div className="relative">
-        <svg width="92" height="92" viewBox="0 0 92 92" className="-rotate-90">
-          <circle
-            cx="46"
-            cy="46"
-            r={radius}
-            fill="none"
-            stroke={meta.soft}
-            strokeWidth="9"
-          />
-          <motion.circle
-            cx="46"
-            cy="46"
-            r={radius}
-            fill="none"
-            stroke={meta.color}
-            strokeWidth="9"
-            strokeLinecap="round"
-            strokeDasharray={circumference}
-            initial={{ strokeDashoffset: circumference }}
-            animate={{ strokeDashoffset: active ? offset : circumference }}
-            transition={{ delay: 0.4 + index * 0.07, duration: 1.1, ease: [0.22, 1, 0.36, 1] }}
-          />
-        </svg>
-        <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span
-            className="text-xl font-black tabular-nums"
-            style={{ color: active ? meta.color : '#cbd5e1' }}
-          >
-            {active ? Math.round(pct) : '—'}
-          </span>
-          {active && (
-            <span className="text-[8px] font-bold uppercase tracking-widest text-trebol-text/40">
-              {t('avg')}
-            </span>
-          )}
-        </div>
-      </div>
-      <span
-        className="text-[11px] font-black uppercase tracking-wider"
-        style={{ color: active ? meta.color : '#94a3b8' }}
-      >
-        {t(skillLabelKey)}
-      </span>
-      <span
-        className="px-1.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider"
-        style={
-          cefrLevel
-            ? { background: meta.soft, color: meta.color }
-            : { background: '#f1f5f9', color: '#94a3b8' }
-        }
-      >
-        {cefrLevel ? cefrLevel.replace('_', ' ') : '—'}
-      </span>
-      <span className="text-[10px] font-semibold text-trebol-text/40">
-        {t('sessionCount', { n: sessions })}
-      </span>
-      {isPending && (
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="mt-1 flex items-center gap-1 px-2 py-1 rounded-full"
-          style={{ background: meta.soft, border: `1px solid ${meta.color}50` }}
-        >
-          <span
-            className="inline-block w-2 h-2 rounded-full animate-pulse"
-            style={{ background: meta.color }}
-          />
-          <span className="text-[9px] font-black uppercase tracking-wider" style={{ color: meta.color }}>
-            Evaluating
-          </span>
-        </motion.div>
-      )}
-      {lastAssessment ? (
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: 0.5 + index * 0.07, duration: 0.3 }}
-          className="mt-1 flex items-center gap-1 px-2 py-1 rounded-full shadow-sm"
-          style={{ background: meta.soft, border: `1px solid ${meta.color}30` }}
-        >
-          <ClipboardList size={9} style={{ color: meta.color }} />
-          <span className="text-[9px] font-black uppercase tracking-wider" style={{ color: meta.color }}>
-            {lastAssessment.cefr_band.replace('_', ' ')}
-          </span>
-          <span className="text-[8px] font-semibold text-trebol-text/40 ml-0.5">
-            {relativeTime(lastAssessment.occurred_at)}
-          </span>
-        </motion.div>
-      ) : (
-        <span className="mt-1 text-[8px] font-semibold uppercase tracking-wider text-trebol-text/30">
-          No test yet
-        </span>
-      )}
-
-      {(onTakeAssessment || onChangeLevel) && (
-        <div className="mt-2 flex flex-col items-center gap-1.5 w-full">
-          <div className="flex items-center justify-center gap-3 text-[10px] font-bold">
-            {onChangeLevel && (
-              <button
-                type="button"
-                onClick={() => setShowPicker((v) => !v)}
-                disabled={savingLevel}
-                title="Change level"
-                aria-label="Change level"
-                className="flex items-center gap-1 text-trebol-text/50 hover:text-trebol-text transition-colors cursor-pointer disabled:opacity-50"
-              >
-                <RefreshCw size={11} />
-                <span>Change</span>
-              </button>
-            )}
-            {onTakeAssessment && (
-              <button
-                type="button"
-                onClick={() => onTakeAssessment(skill)}
-                title="Take assessment"
-                aria-label="Take assessment"
-                className="flex items-center gap-1 transition-colors cursor-pointer"
-                style={{ color: meta.color }}
-              >
-                <ClipboardList size={11} />
-                <span>Take test</span>
-              </button>
-            )}
-          </div>
-          {showPicker && onChangeLevel && (
-            <motion.div
-              initial={{ opacity: 0, y: -4 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="flex items-center gap-0.5"
-            >
-              {PICKABLE_LEVELS.map((lvl) => {
-                const isCurrent = cefrLevel === lvl;
-                return (
-                  <button
-                    key={lvl}
-                    type="button"
-                    disabled={savingLevel || isCurrent}
-                    onClick={async () => {
-                      setSavingLevel(true);
-                      try {
-                        await onChangeLevel(skill, lvl);
-                        setShowPicker(false);
-                      } finally {
-                        setSavingLevel(false);
-                      }
-                    }}
-                    className="rounded font-black uppercase tracking-tight whitespace-nowrap border transition-all cursor-pointer disabled:cursor-default hover:scale-110"
-                    style={{
-                      fontSize: '8px',
-                      lineHeight: 1,
-                      padding: '3px 4px',
-                      ...(isCurrent
-                        ? { background: meta.color, color: 'white', borderColor: meta.color }
-                        : { background: 'white', color: meta.color, borderColor: `${meta.color}33` }),
-                    }}
-                  >
-                    {LEVEL_LABEL[lvl]}
-                  </button>
-                );
-              })}
-            </motion.div>
-          )}
-        </div>
-      )}
-    </motion.div>
-  );
-}
 
 interface PathNode {
   mode: string;
@@ -531,18 +316,29 @@ export function StudentStatsPanel({ onBack, onTakeAssessment, onChangeLevel }: P
   const pathSkills = useMemo<SkillPathSkill[]>(() => {
     if (!derived) return [];
     return (['speaking', 'reading', 'listening', 'writing'] as Skill[]).map((skill) => {
-      const current = skillLevels?.[skill]?.cefr_level ?? 'a1';
-      const done = derived.bySkill[skill].sessions;
+      const current = skillLevels?.[skill]?.cefr_level ?? null;
+      const stat = derived.bySkill[skill];
+      const la = lastAssessments[skill];
       return {
         key: skill,
         label: t(SKILL_LABEL_KEY[skill]),
-        level: LEVEL_LABEL[current] ?? current,
-        goalLevel: nextLevelLabel(current),
-        done,
-        total: Math.max(30, done + 4),
+        level: current ? LEVEL_LABEL[current] ?? current : '—',
+        goalLevel: nextLevelLabel(current ?? 'a1'),
+        cefrValue: current,
+        done: stat.sessions,
+        total: Math.max(30, stat.sessions + 4),
+        pct: stat.pct,
+        sessions: stat.sessions,
+        lastTest: la ? `${la.cefr_band.replace('_', ' ')} · ${relativeTime(la.occurred_at)}` : null,
+        pending: !!pendingAssessments[skill],
       };
     });
-  }, [derived, skillLevels, t]);
+  }, [derived, skillLevels, lastAssessments, pendingAssessments, t]);
+
+  const pickableLevels = useMemo(
+    () => PICKABLE_LEVELS.map((value) => ({ value, label: LEVEL_LABEL[value] })),
+    [],
+  );
 
   return (
     <div className="flex-1 flex flex-col min-h-0 relative overflow-hidden bg-white">
@@ -624,33 +420,6 @@ export function StudentStatsPanel({ onBack, onTakeAssessment, onChangeLevel }: P
                 {t('emptyBody')}
               </p>
             </motion.div>
-
-            <motion.section
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.15, duration: 0.5 }}
-              className="relative bg-white/80 backdrop-blur-sm border border-white shadow-lg rounded-[28px] p-5 mb-6"
-            >
-              <div className="flex items-baseline justify-between mb-4">
-                <h3 className="text-base font-black text-trebol-text tracking-tight">{t('skills')}</h3>
-              </div>
-              <div className="grid grid-cols-4 gap-2">
-                {(['speaking', 'reading', 'listening', 'writing'] as Skill[]).map((skill, i) => (
-                  <SkillRing
-                    key={skill}
-                    skill={skill}
-                    pct={0}
-                    sessions={0}
-                    cefrLevel={skillLevels?.[skill]?.cefr_level ?? null}
-                    lastAssessment={lastAssessments[skill]}
-                    index={i}
-                    isPending={!!pendingAssessments[skill]}
-                    onTakeAssessment={onTakeAssessment}
-                    onChangeLevel={onChangeLevel}
-                  />
-                ))}
-              </div>
-            </motion.section>
           </>
         )}
 
@@ -709,47 +478,19 @@ export function StudentStatsPanel({ onBack, onTakeAssessment, onChangeLevel }: P
                 </div>
               </div>
             </motion.section>
-
-            <motion.section
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.15, duration: 0.5 }}
-              className="relative bg-white/80 backdrop-blur-sm border border-white shadow-lg rounded-[28px] p-5 mb-6"
-            >
-              <div className="flex items-baseline justify-between mb-4">
-                <h3 className="text-base font-black text-trebol-text tracking-tight">{t('skills')}</h3>
-                <div className="flex items-center gap-1 text-[#F8AC37]">
-                  {Array.from({ length: Math.min(5, derived.totalStars) }).map((_, i) => (
-                    <Star key={i} size={12} className="fill-[#F8AC37] stroke-[#d98e1d]" />
-                  ))}
-                  <span className="text-xs font-black tabular-nums text-trebol-text/60 ml-1">
-                    {derived.totalStars}
-                  </span>
-                </div>
-              </div>
-              <div className="grid grid-cols-4 gap-2">
-                {(['speaking', 'reading', 'listening', 'writing'] as Skill[]).map((skill, i) => (
-                  <SkillRing
-                    key={skill}
-                    skill={skill}
-                    pct={derived.bySkill[skill].pct}
-                    sessions={derived.bySkill[skill].sessions}
-                    cefrLevel={skillLevels?.[skill]?.cefr_level ?? null}
-                    lastAssessment={lastAssessments[skill]}
-                    index={i}
-                    isPending={!!pendingAssessments[skill]}
-                    onTakeAssessment={onTakeAssessment}
-                    onChangeLevel={onChangeLevel}
-                  />
-                ))}
-              </div>
-            </motion.section>
           </>
         )}
         </div>
 
         {stats && derived && pathSkills.length > 0 && (
-          <SkillPath skills={pathSkills} title={t('pathTitle')} startLabel={t('pathStart')} />
+          <SkillPath
+            skills={pathSkills}
+            title={t('pathTitle')}
+            startLabel={t('pathStart')}
+            pickableLevels={pickableLevels}
+            onTakeTest={onTakeAssessment}
+            onChangeLevel={onChangeLevel}
+          />
         )}
       </div>
     </div>
