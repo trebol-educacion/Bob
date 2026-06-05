@@ -7,23 +7,19 @@ import {
   ArrowLeft,
   BarChart3,
   ClipboardList,
-  Flame,
-  Lock,
   RefreshCw,
   Sparkles,
   Star,
-  Trash2,
-  Trophy,
 } from 'lucide-react';
 import { createSupabaseBrowser } from '@/lib/supabase/browser-client';
 import { useTranslations } from 'next-intl';
 import {
   getStudentStatsAction,
-  resetStudentHistoryAction,
   type StudentStatRow,
   type StudentStatsResult,
 } from '@/actions/stats';
 import { useOrganization } from '@/hooks/useOrganization';
+import { SkillPath, type SkillPathSkill } from './SkillPath';
 
 interface Props {
   onBack: () => void;
@@ -67,8 +63,22 @@ const SKILL_META: Record<Skill, { color: string; soft: string; ring: string }> =
   speaking: { color: '#3660AB', soft: '#dde4f2', ring: 'shadow-blue-200' },
   reading: { color: '#469E7B', soft: '#dcebe3', ring: 'shadow-emerald-200' },
   listening: { color: '#F8AC37', soft: '#fde9c8', ring: 'shadow-amber-200' },
-  writing: { color: '#E62D2B', soft: '#fad6d5', ring: 'shadow-rose-200' },
+  writing: { color: '#9333EA', soft: '#f3e8ff', ring: 'shadow-purple-200' },
 };
+
+const SKILL_LABEL_KEY: Record<Skill, string> = {
+  speaking: 'skillSpeaking',
+  reading: 'skillReading',
+  listening: 'skillListening',
+  writing: 'skillWriting',
+};
+
+function nextLevelLabel(current: string): string {
+  const i = PICKABLE_LEVELS.indexOf(current as (typeof PICKABLE_LEVELS)[number]);
+  if (i < 0) return LEVEL_LABEL[current] ?? current;
+  const next = PICKABLE_LEVELS[Math.min(i + 1, PICKABLE_LEVELS.length - 1)];
+  return LEVEL_LABEL[next] ?? next;
+}
 
 const MODE_SKILL_OVERRIDE: Record<string, Skill> = {
   cambridge_starters_part1: 'listening',
@@ -118,17 +128,6 @@ function starsFor(pct: number): 0 | 1 | 2 | 3 {
   return 0;
 }
 
-function formatRelative(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime();
-  const mins = Math.floor(diff / 60_000);
-  if (mins < 1) return 'now';
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  const days = Math.floor(hrs / 24);
-  return `${days}d ago`;
-}
-
 function calcStreak(dates: string[]): number {
   if (!dates.length) return 0;
   const days = new Set(dates.map((d) => d.slice(0, 10)));
@@ -145,28 +144,6 @@ function calcStreak(dates: string[]): number {
     } else break;
   }
   return streak;
-}
-
-function CountUp({ value, duration = 900 }: { value: number; duration?: number }) {
-  const [n, setN] = useState(0);
-  const reduce = useReducedMotion();
-  useEffect(() => {
-    if (reduce) {
-      setN(value);
-      return;
-    }
-    const start = performance.now();
-    let raf = 0;
-    const tick = (t: number) => {
-      const p = Math.min(1, (t - start) / duration);
-      const eased = 1 - Math.pow(1 - p, 3);
-      setN(Math.round(eased * value));
-      if (p < 1) raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [value, duration, reduce]);
-  return <>{n.toLocaleString()}</>;
 }
 
 function relativeTime(iso: string): string {
@@ -410,162 +387,6 @@ interface PathNode {
   order: number;
 }
 
-function PathNodeCard({ node, index }: { node: PathNode; index: number }) {
-  const t = useTranslations('dashboard');
-  const meta = SKILL_META[node.skill];
-  const completed = node.pct >= 80;
-  const inProgress = node.sessions > 0 && !completed;
-  const side = index % 2 === 0 ? 'left' : 'right';
-  const skillLabelKey = `skill${node.skill.charAt(0).toUpperCase()}${node.skill.slice(1)}` as
-    | 'skillSpeaking'
-    | 'skillReading'
-    | 'skillListening'
-    | 'skillWriting';
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, x: side === 'left' ? -24 : 24 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ delay: 0.5 + index * 0.08, type: 'spring', stiffness: 220, damping: 24 }}
-      className={`relative flex items-center gap-4 ${
-        side === 'left' ? 'justify-start' : 'justify-end flex-row-reverse'
-      }`}
-    >
-      <div className="relative shrink-0">
-        <motion.div
-          whileHover={{ scale: 1.06, rotate: side === 'left' ? -3 : 3 }}
-          transition={{ type: 'spring', stiffness: 400, damping: 15 }}
-          className="relative w-20 h-20 rounded-full flex items-center justify-center font-black text-2xl shadow-lg"
-          style={{
-            background: completed
-              ? `linear-gradient(135deg, ${meta.color}, ${meta.color}dd)`
-              : inProgress
-                ? `linear-gradient(135deg, #fff, ${meta.soft})`
-                : 'linear-gradient(135deg, #f1f5f9, #e2e8f0)',
-            color: completed ? '#fff' : inProgress ? meta.color : '#94a3b8',
-            border: inProgress ? `3px solid ${meta.color}` : '3px solid transparent',
-            boxShadow: completed
-              ? `0 10px 24px -8px ${meta.color}80, inset 0 -4px 0 0 ${meta.color}cc`
-              : inProgress
-                ? `0 6px 16px -4px ${meta.color}40`
-                : '0 4px 10px -4px rgba(0,0,0,0.08), inset 0 -3px 0 0 #cbd5e1',
-          }}
-        >
-          {completed ? (
-            <Trophy size={28} strokeWidth={2.5} />
-          ) : inProgress ? (
-            <span className="tabular-nums">{node.order}</span>
-          ) : (
-            <Lock size={22} strokeWidth={2.5} />
-          )}
-        </motion.div>
-        <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 flex gap-0.5">
-          {[1, 2, 3].map((s) => (
-            <Star
-              key={s}
-              size={12}
-              strokeWidth={2}
-              className={s <= node.stars ? 'fill-[#F8AC37] stroke-[#d98e1d]' : 'fill-white stroke-slate-300'}
-            />
-          ))}
-        </div>
-      </div>
-
-      <div
-        className={`flex-1 max-w-[260px] ${side === 'left' ? 'text-left' : 'text-right'}`}
-      >
-        <div className={`flex items-center gap-1.5 mb-1 ${side === 'right' ? 'justify-end' : ''}`}>
-          <span
-            className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest"
-            style={{ background: meta.soft, color: meta.color }}
-          >
-            {t(skillLabelKey)}
-          </span>
-          {node.sessions > 0 && (
-            <span className="text-[10px] font-semibold text-trebol-text/40">
-              {formatRelative(node.last_done)}
-            </span>
-          )}
-        </div>
-        <p className="text-sm font-black text-trebol-text leading-tight">{node.label}</p>
-        {node.sessions > 0 ? (
-          <p className="text-xs font-semibold text-trebol-text/50 mt-1">
-            <span className="tabular-nums" style={{ color: meta.color }}>
-              {Math.round(node.pct)}%
-            </span>{' '}
-            · {t('attemptCount', { n: node.sessions })}
-          </p>
-        ) : (
-          <p className="text-xs font-semibold text-trebol-text/30 mt-1 italic">{t('notStarted')}</p>
-        )}
-      </div>
-    </motion.div>
-  );
-}
-
-function PathGroup({ title, level, framework, nodes }: { title: string; level: string; framework: string; nodes: PathNode[] }) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: 0.45, duration: 0.5 }}
-      className="relative"
-    >
-      <div className="sticky top-0 z-10 bg-gradient-to-b from-white via-white to-transparent pt-2 pb-3 mb-2">
-        <div className="flex items-baseline gap-2">
-          <h3 className="text-lg font-black text-trebol-text tracking-tight">{title}</h3>
-          <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-trebol-text/5 text-trebol-text/60">
-            {framework} · {level}
-          </span>
-        </div>
-      </div>
-      <div className="relative pl-2 pr-2">
-        <div
-          aria-hidden
-          className="absolute left-1/2 -translate-x-1/2 top-0 bottom-0 w-1 bg-[repeating-linear-gradient(to_bottom,#e2e8f0_0,#e2e8f0_6px,transparent_6px,transparent_12px)] rounded-full"
-        />
-        <div className="space-y-6 relative">
-          {nodes.map((n, i) => (
-            <PathNodeCard key={n.mode} node={n} index={i} />
-          ))}
-        </div>
-      </div>
-    </motion.div>
-  );
-}
-
-function HeroChip({
-  icon,
-  label,
-  value,
-  bg,
-  fg,
-  delay,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: React.ReactNode;
-  bg: string;
-  fg: string;
-  delay: number;
-}) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 10, scale: 0.9 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={{ delay, type: 'spring', stiffness: 300, damping: 18 }}
-      className="flex items-center gap-2.5 px-4 py-2.5 rounded-2xl shadow-sm"
-      style={{ background: bg, color: fg }}
-    >
-      <span className="shrink-0">{icon}</span>
-      <div className="flex flex-col leading-none">
-        <span className="text-[9px] font-black uppercase tracking-widest opacity-70">{label}</span>
-        <span className="text-xl font-black tabular-nums mt-0.5">{value}</span>
-      </div>
-    </motion.div>
-  );
-}
-
 interface Derived {
   streak: number;
   totalXp: number;
@@ -646,13 +467,11 @@ function deriveStats(stats: StudentStatsResult): Derived {
   return { streak, totalXp, goldBadges, totalStars, bySkill, groups };
 }
 
-export function StudentStatsPanel({ onBack, onAfterReset, onTakeAssessment, onChangeLevel }: Props) {
+export function StudentStatsPanel({ onBack, onTakeAssessment, onChangeLevel }: Props) {
   const t = useTranslations('dashboard');
   const { skillLevels, pendingAssessments } = useOrganization();
   const [stats, setStats] = useState<StudentStatsResult | null>(null);
   const [loading, setLoading] = useState(true);
-  const [resetting, setResetting] = useState(false);
-  const [confirmOpen, setConfirmOpen] = useState(false);
   const [lastAssessments, setLastAssessments] = useState<Record<Skill, LastAssessment | null>>({
     speaking: null, reading: null, listening: null, writing: null,
   });
@@ -707,21 +526,23 @@ export function StudentStatsPanel({ onBack, onAfterReset, onTakeAssessment, onCh
     return t('greetingFirst');
   }, [derived, stats, t]);
 
-  const handleReset = async () => {
-    setResetting(true);
-    try {
-      await resetStudentHistoryAction();
-      setConfirmOpen(false);
-      await load();
-      onAfterReset();
-    } catch (err) {
-      console.error('[stats] reset failed:', err);
-    } finally {
-      setResetting(false);
-    }
-  };
-
   const hasData = !!stats && stats.total_sessions > 0 && !!derived;
+
+  const pathSkills = useMemo<SkillPathSkill[]>(() => {
+    if (!derived) return [];
+    return (['speaking', 'reading', 'listening', 'writing'] as Skill[]).map((skill) => {
+      const current = skillLevels?.[skill]?.cefr_level ?? 'a1';
+      const done = derived.bySkill[skill].sessions;
+      return {
+        key: skill,
+        label: t(SKILL_LABEL_KEY[skill]),
+        level: LEVEL_LABEL[current] ?? current,
+        goalLevel: nextLevelLabel(current),
+        done,
+        total: Math.max(done + 6, 8),
+      };
+    });
+  }, [derived, skillLevels, t]);
 
   return (
     <div className="flex-1 flex flex-col min-h-0 relative overflow-hidden bg-white">
@@ -885,37 +706,6 @@ export function StudentStatsPanel({ onBack, onAfterReset, onTakeAssessment, onCh
                   >
                     {greeting}
                   </motion.h2>
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: 0.35 }}
-                    className="flex flex-wrap items-center gap-2 mt-3 justify-center sm:justify-start"
-                  >
-                    <HeroChip
-                      icon={<Flame size={18} fill="#fff" strokeWidth={0} />}
-                      label={t('streak')}
-                      value={<CountUp value={derived.streak} />}
-                      bg="linear-gradient(135deg, #E62D2B, #b8201f)"
-                      fg="#fff"
-                      delay={0.4}
-                    />
-                    <HeroChip
-                      icon={<Sparkles size={18} fill="#fffbe8" strokeWidth={1.5} className="text-white" />}
-                      label="XP"
-                      value={<CountUp value={derived.totalXp} />}
-                      bg="linear-gradient(135deg, #F8AC37, #d98e1d)"
-                      fg="#fff"
-                      delay={0.5}
-                    />
-                    <HeroChip
-                      icon={<Trophy size={18} strokeWidth={2.2} />}
-                      label={t('trophies')}
-                      value={<CountUp value={derived.goldBadges} />}
-                      bg="linear-gradient(135deg, #1E1E1C, #3a3a36)"
-                      fg="#fff"
-                      delay={0.6}
-                    />
-                  </motion.div>
                 </div>
               </div>
             </motion.section>
@@ -954,66 +744,14 @@ export function StudentStatsPanel({ onBack, onAfterReset, onTakeAssessment, onCh
                 ))}
               </div>
             </motion.section>
-
-            <section className="space-y-8 pb-12">
-              {derived.groups.map((g) => (
-                <PathGroup
-                  key={g.key}
-                  title={g.title}
-                  level={g.level}
-                  framework={g.framework}
-                  nodes={g.nodes}
-                />
-              ))}
-            </section>
-
-            <div className="flex justify-center pb-8">
-              <button
-                type="button"
-                onClick={() => setConfirmOpen(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded-full text-trebol-text/40 hover:text-red-500 hover:bg-red-50 transition-colors"
-              >
-                <Trash2 size={11} />
-                {t('deleteHistory')}
-              </button>
-            </div>
           </>
         )}
         </div>
-      </div>
 
-      {confirmOpen && (
-        <div className="fixed inset-0 z-50 bg-trebol-text/40 backdrop-blur-sm flex items-center justify-center p-6">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.92 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ type: 'spring', stiffness: 280, damping: 22 }}
-            className="bg-white rounded-3xl p-6 max-w-sm w-full space-y-4 shadow-2xl border border-white"
-          >
-            <h3 className="text-lg font-black text-trebol-text tracking-tight">{t('confirmDeleteTitle')}</h3>
-            <p className="text-sm text-trebol-text/70 font-semibold leading-relaxed">
-              {t('confirmDeleteBody')}
-            </p>
-            <div className="flex gap-2 justify-end">
-              <button
-                onClick={() => setConfirmOpen(false)}
-                disabled={resetting}
-                className="px-4 py-2 rounded-xl text-sm font-black text-trebol-text/70 hover:bg-trebol-secondary/30 transition-colors disabled:opacity-50"
-              >
-                {t('cancel')}
-              </button>
-              <button
-                onClick={handleReset}
-                disabled={resetting}
-                className="px-4 py-2 rounded-xl text-sm font-black bg-red-500 text-white hover:bg-red-600 transition-colors disabled:opacity-60 flex items-center gap-2 shadow-md"
-              >
-                {resetting && <RefreshCw size={14} className="animate-spin" />}
-                {t('confirmDelete')}
-              </button>
-            </div>
-          </motion.div>
-        </div>
-      )}
+        {stats && derived && pathSkills.length > 0 && (
+          <SkillPath skills={pathSkills} title={t('pathTitle')} startLabel={t('pathStart')} />
+        )}
+      </div>
     </div>
   );
 }

@@ -42,5 +42,7 @@
   "skillSpeaking": "Speaking",
   "skillReading": "Reading",
   "skillListening": "Listening",
-  "skillWriting": "Writing"
+  "skillWriting": "Writing",
+  "pathTitle": "Your path",
+  "pathStart": "Start"
 }
