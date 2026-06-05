@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'motion/react';
 import { BookOpen, Check, Headphones, Lock, Mic, PenLine, Star, Trophy } from 'lucide-react';
 
@@ -34,22 +34,50 @@ const ICON: Record<SkillKey, typeof Headphones> = {
   writing: PenLine,
 };
 
-const GAP = 92;
-const AMP = 78;
-const FREQ = 0.74;
-const PAD = 92;
+const SPACING = 92;
+const SLOPE = 7;
+const PAD = 96;
 const NODE = 60;
 const GOAL = 76;
 
 const GREY_BG = 'radial-gradient(120% 120% at 50% 24%, #f6f2fd, #e3ddef 72%)';
 const GREY_SHADOW = '0 7px 0 #cdc4e2, 0 13px 16px -7px rgba(60,40,110,.4), 0 2px 1px #fff inset';
 
-const offAt = (i: number) => Math.sin(i * FREQ) * AMP;
+/**
+ * Sample evenly-spaced points (by arc length) along a vertical sine curve, so the
+ * nodes stay equidistant no matter how wide the swing is — the path always reads
+ * as a single uniform winding trail. `count` points are returned plus one extra
+ * for the goal node. The horizontal amplitude scales with the measured width.
+ */
+function buildPoints(count: number, width: number): Array<{ x: number; y: number }> {
+  const amp = Math.max(64, Math.min(230, width * 0.21));
+  const k = (2 * Math.PI) / (amp * SLOPE);
+  const xOf = (y: number) => amp * Math.sin(y * k);
+
+  const out: Array<{ x: number; y: number }> = [{ x: xOf(0), y: 0 }];
+  let target = SPACING;
+  let acc = 0;
+  let lastX = xOf(0);
+  let lastY = 0;
+  const limit = (count + 2) * SPACING * 2;
+
+  for (let y = 0; out.length <= count && y < limit; y += 2) {
+    const x = xOf(y);
+    acc += Math.hypot(x - lastX, y - lastY);
+    lastX = x;
+    lastY = y;
+    if (acc >= target) {
+      out.push({ x, y });
+      target += SPACING;
+    }
+  }
+  return out;
+}
 
 /**
  * Tabbed, full-width skill path for the student dashboard. Each tab is a skill;
- * the active skill renders as a vertical winding trail of 3D activity nodes that
- * scrolls, ending in a goal node with the target CEFR level.
+ * the active skill renders as a vertical winding trail of evenly-spaced 3D
+ * activity nodes that scrolls, ending in a goal node with the target CEFR level.
  */
 export function SkillPath({
   skills,
@@ -61,17 +89,33 @@ export function SkillPath({
   startLabel: string;
 }) {
   const [active, setActive] = useState(0);
-  if (skills.length === 0) return null;
+  const trackRef = useRef<HTMLDivElement>(null);
+  const [width, setWidth] = useState(760);
+
+  useEffect(() => {
+    const el = trackRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver((entries) => {
+      const w = entries[0]?.contentRect.width;
+      if (w) setWidth(w);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   const skill = skills[active];
+  const points = useMemo(
+    () => (skill ? buildPoints(skill.total, width) : []),
+    [skill, width],
+  );
+
+  if (!skill || points.length === 0) return null;
+
   const p = PALETTE[skill.key];
   const pct = skill.total ? Math.round((skill.done / skill.total) * 100) : 0;
-  const colHeight = skill.total * GAP + PAD * 2 + GOAL;
-
-  const colorBg = `radial-gradient(120% 120% at 50% 24%, ${p.light}, ${p.c} 78%)`;
-  const colorShadow = `0 7px 0 ${p.dark}, 0 14px 18px -7px ${p.c}, 0 2px 1px rgba(255,255,255,.55) inset`;
-
   const reached = skill.done >= skill.total;
+  const goalPt = points[points.length - 1];
+  const colHeight = goalPt.y + PAD * 2;
 
   return (
     <motion.section
@@ -81,12 +125,12 @@ export function SkillPath({
       transition={{ duration: 0.5 }}
       className="w-full mt-6 pb-16"
     >
-      <div className="max-w-2xl mx-auto px-4 mb-3">
+      <div className="max-w-5xl mx-auto px-4 mb-3">
         <h3 className="text-base font-black text-trebol-text tracking-tight">{title}</h3>
       </div>
 
       <div className="sticky top-0 z-20 bg-white/85 backdrop-blur-md border-y border-trebol-border/40">
-        <div className="max-w-2xl mx-auto px-3 py-2.5 grid grid-cols-4 gap-2">
+        <div className="max-w-5xl mx-auto px-3 py-2.5 grid grid-cols-4 gap-2">
           {skills.map((s, i) => {
             const sp = PALETTE[s.key];
             const Ic = ICON[s.key];
@@ -96,7 +140,7 @@ export function SkillPath({
                 key={s.key}
                 type="button"
                 onClick={() => setActive(i)}
-                className="flex flex-col items-center gap-1 py-2 rounded-2xl text-[11px] font-bold transition-all"
+                className="flex flex-col items-center gap-1 py-2 rounded-2xl text-[11px] sm:text-xs font-bold transition-all"
                 style={
                   on
                     ? {
@@ -114,7 +158,7 @@ export function SkillPath({
             );
           })}
         </div>
-        <div className="max-w-2xl mx-auto px-4 pb-2.5 flex items-center gap-3">
+        <div className="max-w-5xl mx-auto px-4 pb-2.5 flex items-center gap-3">
           <span className="text-[11px] font-black whitespace-nowrap" style={{ color: p.c }}>
             {skill.level} ▸ {skill.goalLevel}
           </span>
@@ -130,23 +174,27 @@ export function SkillPath({
         </div>
       </div>
 
-      <div className="relative mx-auto max-w-md px-4" style={{ height: colHeight }}>
-        {Array.from({ length: skill.total }).map((_, i) => {
-          const off = offAt(i);
+      <div ref={trackRef} className="relative mx-auto max-w-5xl px-4" style={{ height: colHeight }}>
+        {points.slice(0, skill.total).map((pt, i) => {
           const state = i < skill.done ? 'done' : i === skill.done ? 'current' : 'locked';
           const isColor = state !== 'locked';
           return (
             <div
               key={i}
-              className="absolute left-1/2 grid place-items-center"
+              className="absolute grid place-items-center"
               style={{
-                top: i * GAP + PAD,
+                top: pt.y + PAD,
+                left: `calc(50% + (${pt.x}px))`,
                 width: NODE,
                 height: NODE,
-                transform: `translate(calc(-50% + ${off}px), -50%)`,
+                transform: 'translate(-50%, -50%)',
                 borderRadius: '50%',
-                background: isColor ? colorBg : GREY_BG,
-                boxShadow: isColor ? colorShadow : GREY_SHADOW,
+                background: isColor
+                  ? `radial-gradient(120% 120% at 50% 24%, ${p.light}, ${p.c} 78%)`
+                  : GREY_BG,
+                boxShadow: isColor
+                  ? `0 7px 0 ${p.dark}, 0 14px 18px -7px ${p.c}, 0 2px 1px rgba(255,255,255,.55) inset`
+                  : GREY_SHADOW,
                 zIndex: state === 'current' ? 6 : 3,
               }}
             >
@@ -172,9 +220,10 @@ export function SkillPath({
         })}
 
         <div
-          className="absolute left-1/2 flex flex-col items-center justify-center"
+          className="absolute flex flex-col items-center justify-center"
           style={{
-            top: skill.total * GAP + PAD,
+            top: goalPt.y + PAD,
+            left: `calc(50% + (${goalPt.x}px))`,
             width: GOAL,
             height: GOAL,
             transform: 'translate(-50%, -50%)',

@@ -539,7 +539,7 @@ export function StudentStatsPanel({ onBack, onTakeAssessment, onChangeLevel }: P
         level: LEVEL_LABEL[current] ?? current,
         goalLevel: nextLevelLabel(current),
         done,
-        total: Math.max(done + 6, 8),
+        total: Math.max(30, done + 4),
       };
     });
   }, [derived, skillLevels, t]);
@@ -588,7 +588,7 @@ export function StudentStatsPanel({ onBack, onTakeAssessment, onChangeLevel }: P
       </div>
 
       <div className="relative z-10 flex-1 overflow-y-auto">
-        <div className="px-4 sm:px-6 py-6 max-w-3xl mx-auto w-full">
+        <div className="px-4 sm:px-6 py-6 max-w-5xl mx-auto w-full">
         {loading && !stats && (
           <div className="text-center text-sm text-trebol-text/50 py-20 font-semibold">
             {t('loadingAdventure')}
