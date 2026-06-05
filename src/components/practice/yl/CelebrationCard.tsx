@@ -14,6 +14,12 @@ export interface CelebrationCardProps {
   actionLabel?: string;
   /** When false, the dopaminergic effects (confetti, count-up) are skipped — useful in history view. */
   animate?: boolean;
+  /**
+   * Hides the numeric grade (score out of 10). Required for open Speaking and
+   * Writing tasks, which give qualitative formative feedback only — never an
+   * exam-style score (decision D-D2). The trophy, stars and feedback remain.
+   */
+  hideGrade?: boolean;
 }
 
 function fireConfetti(intensity: 'mega' | 'normal' | 'mini') {
@@ -73,6 +79,7 @@ export function CelebrationCard({
   onAction,
   actionLabel,
   animate = true,
+  hideGrade = false,
 }: CelebrationCardProps) {
   const t = useTranslations('yl');
   const resolvedActionLabel = actionLabel ?? t('celebration.defaultActionLabel');
@@ -189,20 +196,24 @@ export function CelebrationCard({
         })}
       </div>
 
-      <div className="mt-5 flex items-baseline justify-center gap-2">
-        <motion.span
-          initial={animate ? { opacity: 0, y: 8 } : false}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.6, duration: 0.4 }}
-          className={`text-5xl font-black tabular-nums ${tierConfig.accent}`}
-        >
-          {displayedPct}
-        </motion.span>
-        <span className="text-2xl font-black text-slate-400">%</span>
-      </div>
-      <p className="mt-1 text-center text-[11px] font-bold uppercase tracking-widest text-slate-400">
-        {score} / {scoreMax} {t('celebration.pointsLabel')}
-      </p>
+      {!hideGrade && (
+        <>
+          <div className="mt-5 flex items-baseline justify-center gap-2">
+            <motion.span
+              initial={animate ? { opacity: 0, y: 8 } : false}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.6, duration: 0.4 }}
+              className={`text-5xl font-black tabular-nums ${tierConfig.accent}`}
+            >
+              {(displayedPct / 10).toFixed(1)}
+            </motion.span>
+            <span className="text-2xl font-black text-slate-400">/ 10</span>
+          </div>
+          <p className="mt-1 text-center text-[11px] font-bold uppercase tracking-widest text-slate-400">
+            {score} / {scoreMax} {t('celebration.pointsLabel')}
+          </p>
+        </>
+      )}
 
       {feedback && (
         <motion.p

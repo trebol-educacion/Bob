@@ -97,7 +97,7 @@ function FeedbackPanel({
         </div>
       )}
       <div className="flex justify-center pt-2">
-        <CelebrationCard score={feedback.understood ? 1 : 0} scoreMax={1} feedback="Keep practising your speaking!" onAction={onOpenDashboard} actionLabel="See my progress" animate={animate} />
+        <CelebrationCard score={feedback.understood ? 1 : 0} scoreMax={1} hideGrade feedback="Keep practising your speaking!" onAction={onOpenDashboard} actionLabel="See my progress" animate={animate} />
       </div>
     </motion.div>
   );

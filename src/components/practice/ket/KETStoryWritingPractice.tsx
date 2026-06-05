@@ -195,6 +195,7 @@ function FeedbackPanel({
         <CelebrationCard
           score={feedback.understood ? 1 : 0}
           scoreMax={1}
+          hideGrade
           feedback="Keep practising your writing!"
           onAction={onOpenDashboard}
           actionLabel="See my progress"

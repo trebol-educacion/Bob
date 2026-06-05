@@ -156,6 +156,7 @@ function FeedbackPanel({ feedback, userText, onOpenDashboard, animate }: {
       <CelebrationCard
         score={score}
         scoreMax={1}
+        hideGrade
         feedback={feedback.understood
           ? '¡Escribiste tu mensaje! Sigue practicando para que te salga cada vez mejor.'
           : 'Vuelve a intentarlo — cada intento te hace más fuerte.'}

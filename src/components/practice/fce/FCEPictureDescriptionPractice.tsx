@@ -877,6 +877,7 @@ export function FCEPictureDescriptionPractice({
             <CelebrationCard
               score={coverageHits}
               scoreMax={6}
+              hideGrade
               feedback={t('fce.pictureDescription.celebrationFeedback')}
               onAction={onOpenDashboard}
               actionLabel={t('fce.pictureDescription.celebrationAction')}
