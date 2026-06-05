@@ -141,7 +141,7 @@ export async function generateFCEPictureDescriptionAction(input: {
   if (!sessionId) {
     const result = await createSessionAction({
       mode: 'cambridge_fce_p2',
-      title: 'FCE Speaking Part 2 — Long Turn',
+      title: 'Speaking Part 2 — Long Turn',
     });
     if (!result.data) {
       console.error(JSON.stringify({

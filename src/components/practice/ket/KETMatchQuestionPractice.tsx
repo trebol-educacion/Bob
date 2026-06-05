@@ -106,7 +106,7 @@ export function KETMatchQuestionPractice({
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-bold text-gray-800 truncate">Match the Question</p>
-          <p className="text-xs text-gray-400">KET Reading · Part 2</p>
+          <p className="text-xs text-gray-400">Reading · Part 2</p>
         </div>
         <span className="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-widest" style={{ background: 'color-mix(in oklab, var(--color-bob-brand) 12%, white)', color: 'var(--color-bob-brand)' }}>A2</span>
       </div>

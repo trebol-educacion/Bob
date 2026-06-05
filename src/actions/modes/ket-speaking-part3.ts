@@ -77,7 +77,7 @@ export async function generateKETPictureDescPlanAction(input: {
   let userId: string | undefined;
 
   if (!sessionId) {
-    const result = await createSessionAction({ mode: 'cambridge_ket_part3', title: 'KET Speaking Part 3 — Describe the Picture' });
+    const result = await createSessionAction({ mode: 'cambridge_ket_part3', title: 'Speaking Part 3 — Describe the Picture' });
     if (!result.data) return { error: result.error ?? 'Could not create session' };
     sessionId = result.data.id;
     userId = result.data.user_id;
@@ -145,7 +145,7 @@ export async function generateKETPictureDescAction(input: {
   let userId: string | undefined;
 
   if (!sessionId) {
-    const result = await createSessionAction({ mode: 'cambridge_ket_part3', title: 'KET Speaking Part 3 — Describe the Picture' });
+    const result = await createSessionAction({ mode: 'cambridge_ket_part3', title: 'Speaking Part 3 — Describe the Picture' });
     if (!result.data) return { error: result.error ?? 'Could not create session' };
     sessionId = result.data.id;
     userId = result.data.user_id;

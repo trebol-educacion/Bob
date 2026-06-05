@@ -82,7 +82,7 @@ export async function generateKETSignsAndNoticesAction(input: {
   if (!sessionId) {
     const result = await createSessionAction({
       mode: 'cambridge_ket_reading_part1',
-      title: 'KET Reading Part 1 — Signs and Notices',
+      title: 'Reading Part 1 — Signs and Notices',
     });
     if (!result.data) {
       return { error: result.error ?? 'Could not create session' };

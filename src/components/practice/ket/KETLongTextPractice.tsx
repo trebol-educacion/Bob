@@ -104,7 +104,7 @@ export function KETLongTextPractice({
         <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style={{ background: 'color-mix(in oklab, var(--color-bob-brand) 12%, white)' }}><KETReadingIcon size={18} className="text-bob-brand" /></div>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-bold text-gray-800 truncate">Read and Decide</p>
-          <p className="text-xs text-gray-400">KET Reading · Part 3</p>
+          <p className="text-xs text-gray-400">Reading · Part 3</p>
         </div>
         <span className="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-widest" style={{ background: 'color-mix(in oklab, var(--color-bob-brand) 12%, white)', color: 'var(--color-bob-brand)' }}>A2</span>
       </div>

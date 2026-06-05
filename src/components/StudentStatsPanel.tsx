@@ -44,18 +44,18 @@ const LEVEL_LABEL: Record<string, string> = {
 type Skill = 'speaking' | 'reading' | 'listening' | 'writing';
 
 const MODE_LABEL: Record<string, string> = {
-  cambridge_starters_part1: 'Starters · Point to the picture',
-  cambridge_starters_part2: 'Starters · Scene questions',
-  cambridge_starters_part3: 'Starters · Story',
-  cambridge_starters_part4: 'Starters · Personal questions',
-  cambridge_movers_part1: 'Movers · Spot the differences',
-  cambridge_movers_part2: 'Movers · Information exchange',
-  cambridge_movers_part3: 'Movers · Picture story',
-  cambridge_movers_part4: 'Movers · Personal questions',
-  cambridge_movers_part5: 'Movers · Picture description',
-  cambridge_ket_part1: 'KET · Part 1',
-  cambridge_pet_p3: 'PET · Collaborative Task',
-  cambridge_fce_p1: 'FCE · Speaking',
+  cambridge_starters_part1: 'Point to the picture',
+  cambridge_starters_part2: 'Scene questions',
+  cambridge_starters_part3: 'Story',
+  cambridge_starters_part4: 'Personal questions',
+  cambridge_movers_part1: 'Spot the differences',
+  cambridge_movers_part2: 'Information exchange',
+  cambridge_movers_part3: 'Picture story',
+  cambridge_movers_part4: 'Personal questions',
+  cambridge_movers_part5: 'Picture description',
+  cambridge_ket_part1: 'Part 1',
+  cambridge_pet_p3: 'Collaborative Task',
+  cambridge_fce_p1: 'Speaking',
   toefl_listen_repeat: 'TOEFL · Listen & Repeat',
   toefl_interview: 'TOEFL · Take an Interview',
   generic_conversation: 'Free Practice · Conversation',
@@ -85,20 +85,20 @@ function inferSkill(mode: string): Skill {
 }
 
 function inferLevel(mode: string): string {
-  if (mode.includes('starters')) return 'A1 Starters';
-  if (mode.includes('movers')) return 'A1 Movers';
-  if (mode.includes('flyers')) return 'A2 Flyers';
-  if (mode.includes('ket')) return 'A2 KET';
-  if (mode.includes('pet')) return 'B1 PET';
-  if (mode.includes('fce')) return 'B2 FCE';
-  if (mode.includes('cae')) return 'C1 CAE';
-  if (mode.includes('cpe')) return 'C2 CPE';
+  if (mode.includes('starters')) return 'Pre-A1';
+  if (mode.includes('movers')) return 'A1';
+  if (mode.includes('flyers')) return 'A2';
+  if (mode.includes('ket')) return 'A2';
+  if (mode.includes('pet')) return 'B1';
+  if (mode.includes('fce')) return 'B2';
+  if (mode.includes('cae')) return 'C1';
+  if (mode.includes('cpe')) return 'C2';
   if (mode.startsWith('toefl')) return 'TOEFL';
   return 'Free';
 }
 
 function inferFramework(mode: string): string {
-  if (mode.startsWith('cambridge_')) return 'Cambridge';
+  if (mode.startsWith('cambridge_')) return 'English';
   if (mode.startsWith('toefl_')) return 'TOEFL';
   return 'Free';
 }

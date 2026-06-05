@@ -60,7 +60,7 @@ export async function generateKETLongTextAction(input: {
   let userId: string | undefined;
 
   if (!sessionId) {
-    const result = await createSessionAction({ mode: 'cambridge_ket_reading_part3', title: 'KET Reading Part 3 — Read and Decide' });
+    const result = await createSessionAction({ mode: 'cambridge_ket_reading_part3', title: 'Reading Part 3 — Read and Decide' });
     if (!result.data) return { error: result.error ?? 'Could not create session' };
     sessionId = result.data.id;
     userId = result.data.user_id;

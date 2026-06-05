@@ -11,8 +11,8 @@
     "part1": {
       "preparingInterview": "Preparing your A2 interview…",
       "interviewComplete": "Interview Complete!",
-      "subtitle": "A2 Key — Part 1 Speaking",
-      "headerTitle": "A2 Key – Part 1 Interview",
+      "subtitle": "A2 — Part 1 Speaking",
+      "headerTitle": "A2 – Part 1 Interview",
       "interviewCompleteSubtitle": "Interview complete",
       "questionOf": "Question {current} of {total}",
       "phase2Topic": "Phase 2: Topic — {topic}",
@@ -29,7 +29,7 @@
   "b1": {
     "collaborative": {
       "headerTitle": "B1 Collaborative Task",
-      "headerSubtitle": "Cambridge B1 Preliminary · Part 3",
+      "headerSubtitle": "B1 · Part 3",
       "conversationSubtitle": "B1 · Part 3",
       "feedbackTitle": "Your Feedback",
       "evaluatingPerformance": "Evaluating your performance…",
@@ -56,7 +56,7 @@
   "ket": {
     "signsAndNotices": {
       "headerTitle": "Signs and Notices",
-      "headerSubtitle": "KET · Reading Part 1",
+      "headerSubtitle": "Reading Part 1",
       "partBadge": "PART 1",
       "preparingExercise": "Preparing your reading exercise…",
       "checkingAnswers": "Checking your answers…",
@@ -73,7 +73,7 @@
     },
     "listenAndChoose": {
       "headerTitle": "Listen and Choose",
-      "headerSubtitle": "KET · Listening Part 1",
+      "headerSubtitle": "Listening Part 1",
       "partBadge": "PART 1",
       "back": "Back",
       "preparingExercise": "Preparing your listening exercise…",
@@ -93,7 +93,7 @@
     },
     "shortMessage": {
       "headerTitle": "Short Message",
-      "headerSubtitle": "KET · Writing Part 6",
+      "headerSubtitle": "Writing Part 6",
       "partBadge": "PART 6",
       "situation": "Situation",
       "situationPrompt": "Write a message to <strong>{recipient}</strong>. {scenario}",
@@ -117,7 +117,7 @@
     "cloze": {
       "back": "Back",
       "headerTitle": "Multiple-Choice Cloze",
-      "headerSubtitle": "FCE · Reading & Use of English Part 1",
+      "headerSubtitle": "Reading & Use of English Part 1",
       "partBadge": "PART 1",
       "preparingExercise": "Preparing your cloze exercise…",
       "checkingAnswers": "Checking your answers…",
@@ -134,7 +134,7 @@
     "essay": {
       "back": "Back",
       "headerTitle": "Essay",
-      "headerSubtitle": "FCE · Writing Part 1",
+      "headerSubtitle": "Writing Part 1",
       "partBadge": "PART 1",
       "preparingExercise": "Preparing your essay…",
       "reviewingMessage": "Reviewing your essay…",
@@ -167,7 +167,7 @@
     "pictureDescription": {
       "back": "Back",
       "headerTitle": "Picture Description",
-      "headerSubtitle": "FCE · Speaking Part 2",
+      "headerSubtitle": "Speaking Part 2",
       "partBadge": "PART 2",
       "preparingExercise": "Bob is preparing your two pictures…",
       "processingDescription": "Bob is listening to your description…",
@@ -227,7 +227,7 @@
   "pet": {
     "shortTexts": {
       "headerTitle": "Short Texts",
-      "headerSubtitle": "PET · Reading Part 1",
+      "headerSubtitle": "Reading Part 1",
       "partBadge": "PART 1",
       "preparingExercise": "Preparing your reading exercise…",
       "checkingAnswers": "Checking your answers…",
@@ -245,7 +245,7 @@
     "pictureDescription": {
       "back": "Back",
       "headerTitle": "Picture Description",
-      "headerSubtitle": "PET · Speaking Part 2",
+      "headerSubtitle": "Speaking Part 2",
       "partBadge": "PART 2",
       "preparingExercise": "Bob is preparing your picture…",
       "processingDescription": "Bob is listening to your description…",
@@ -299,7 +299,7 @@
     "emailWriting": {
       "back": "Back",
       "headerTitle": "Email Writing",
-      "headerSubtitle": "PET · Writing Part 1",
+      "headerSubtitle": "Writing Part 1",
       "partBadge": "PART 1",
       "preparingExercise": "Preparing your email exercise…",
       "reviewingMessage": "Reviewing your email…",

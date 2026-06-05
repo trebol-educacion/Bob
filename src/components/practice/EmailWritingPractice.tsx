@@ -30,7 +30,7 @@ const CONFIG: Record<
   cambridge_pet_writing_part1: {
     framework: 'cambridge',
     exam_part: 'cambridge_pet_writing_part1',
-    modeTitle: 'PET Writing — Part 1 Email',
+    modeTitle: 'Writing — Part 1 Email',
     instructions: 'You have received an email from your English-speaking friend. Read the email and write a reply. Write about 100 words.',
     bullets: ['Thank your friend', 'Answer their questions', 'Invite them to visit'],
     targetWordCount: [80, 100],

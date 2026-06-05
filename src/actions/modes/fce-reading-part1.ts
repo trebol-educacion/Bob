@@ -87,7 +87,7 @@ export async function generateFCEClozeAction(input: {
   if (!sessionId) {
     const result = await createSessionAction({
       mode: 'cambridge_fce_reading_part1',
-      title: 'FCE Reading Part 1 — Multiple-Choice Cloze',
+      title: 'Reading Part 1 — Multiple-Choice Cloze',
     });
     if (!result.data) {
       return { error: result.error ?? 'Could not create session' };

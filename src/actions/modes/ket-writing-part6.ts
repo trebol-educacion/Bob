@@ -66,7 +66,7 @@ export async function generateKETShortMessageAction(input: {
   if (!sessionId) {
     const result = await createSessionAction({
       mode: 'cambridge_ket_writing_part6',
-      title: 'KET Writing Part 6 — Short Message',
+      title: 'Writing Part 6 — Short Message',
     });
     if (!result.data) {
       return { error: result.error ?? 'No se pudo crear la sesión' };

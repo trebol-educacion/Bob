@@ -102,7 +102,7 @@ export async function generateKETListenAndChooseAction(input: {
   if (!sessionId) {
     const result = await createSessionAction({
       mode: 'cambridge_ket_listening_part1',
-      title: 'KET Listening Part 1 — Listen and Choose',
+      title: 'Listening Part 1 — Listen and Choose',
     });
     if (!result.data) {
       return { error: result.error ?? 'Could not create session' };

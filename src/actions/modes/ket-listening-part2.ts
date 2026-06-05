@@ -106,7 +106,7 @@ export async function generateKETListenCompleteAction(input: {
   if (!sessionId) {
     const result = await createSessionAction({
       mode: 'cambridge_ket_listening_part2',
-      title: 'KET Listening Part 2 — Listen and Complete',
+      title: 'Listening Part 2 — Listen and Complete',
     });
     if (!result.data) return { error: result.error ?? 'Could not create session' };
     sessionId = result.data.id;

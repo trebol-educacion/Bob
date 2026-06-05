@@ -78,7 +78,7 @@ export async function startFCEListeningPart1Action(): Promise<
 
   const sessionResult = await createSessionAction({
     mode: 'cambridge_fce_listening_part1',
-    title: 'FCE Listening Part 1 — Short Extracts',
+    title: 'Listening Part 1 — Short Extracts',
   });
 
   if (!sessionResult.data) {

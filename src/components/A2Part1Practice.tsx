@@ -175,7 +175,7 @@ export function A2Part1Practice({ onBack }: A2Part1PracticeProps) {
   useEffect(() => {
     async function init() {
       try {
-        const sessionResult = await createSessionAction({ mode: 'cambridge_ket_part1', title: 'A2 Key Speaking – Part 1' });
+        const sessionResult = await createSessionAction({ mode: 'cambridge_ket_part1', title: 'A2 Speaking – Part 1' });
         if (!sessionResult.data) throw new Error(sessionResult.error ?? 'Failed to create session');
         sessionIdRef.current = sessionResult.data.id;
         userIdRef.current = sessionResult.data.user_id;
@@ -344,7 +344,7 @@ export function A2Part1Practice({ onBack }: A2Part1PracticeProps) {
 
     void (async () => {
       try {
-        const sessionResult = await createSessionAction({ mode: 'cambridge_ket_part1', title: 'A2 Key Speaking – Part 1' });
+        const sessionResult = await createSessionAction({ mode: 'cambridge_ket_part1', title: 'A2 Speaking – Part 1' });
         if (!sessionResult.data) throw new Error(sessionResult.error ?? 'Failed to create session');
         sessionIdRef.current = sessionResult.data.id;
         userIdRef.current = sessionResult.data.user_id;

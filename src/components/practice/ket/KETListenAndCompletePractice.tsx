@@ -393,7 +393,7 @@ export function KETListenAndCompletePractice({
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-bold text-gray-800 truncate">Listen and Complete</p>
-          <p className="text-xs text-gray-400">KET Listening · Part 2</p>
+          <p className="text-xs text-gray-400">Listening · Part 2</p>
         </div>
         <span
           className="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-widest"

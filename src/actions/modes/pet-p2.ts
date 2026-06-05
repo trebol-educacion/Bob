@@ -138,7 +138,7 @@ export async function generatePETPictureDescriptionAction(input: {
   if (!sessionId) {
     const result = await createSessionAction({
       mode: 'cambridge_pet_p2',
-      title: 'PET Speaking Part 2 — Picture Description',
+      title: 'Speaking Part 2 — Picture Description',
     });
     if (!result.data) {
       console.error(JSON.stringify({

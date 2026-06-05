@@ -62,7 +62,7 @@ export async function generateKETReadingTFDSAction(input: {
   let userId: string | undefined;
 
   if (!sessionId) {
-    const result = await createSessionAction({ mode: 'cambridge_ket_reading_part5', title: 'KET Reading Part 5 — True, False or Doesn\'t Say' });
+    const result = await createSessionAction({ mode: 'cambridge_ket_reading_part5', title: 'Reading Part 5 — True, False or Doesn\'t Say' });
     if (!result.data) return { error: result.error ?? 'Could not create session' };
     sessionId = result.data.id;
     userId = result.data.user_id;

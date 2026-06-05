@@ -79,7 +79,7 @@ export async function generatePETEmailAction(input: {
   if (!sessionId) {
     const result = await createSessionAction({
       mode: 'cambridge_pet_writing_part1',
-      title: 'PET Writing Part 1 — Email',
+      title: 'Writing Part 1 — Email',
     });
     if (!result.data) {
       return { error: result.error ?? 'Could not create session' };

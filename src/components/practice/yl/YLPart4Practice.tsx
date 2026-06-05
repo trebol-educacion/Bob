@@ -269,7 +269,7 @@ export function YLPart4Practice({
     if (exam === 'starters' && part === 4) return t('part4.startersPersonalLabel');
     if (exam === 'movers' && part === 4) return t('part4.moversPersonalLabel');
     if (exam === 'movers' && part === 5) return t('part4.moversDescribeLabel');
-    return `Cambridge ${exam} Part ${part}`;
+    return `Part ${part}`;
   })();
 
   const headerTitle = (() => {

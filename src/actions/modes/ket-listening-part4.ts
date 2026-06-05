@@ -95,7 +95,7 @@ export async function generateKETShortTalksPlanAction(input: {
   if (!sessionId) {
     const result = await createSessionAction({
       mode: 'cambridge_ket_listening_part4',
-      title: 'KET Listening Part 4 — Short Talks',
+      title: 'Listening Part 4 — Short Talks',
     });
     if (!result.data) return { error: result.error ?? 'Could not create session' };
     sessionId = result.data.id;
@@ -175,7 +175,7 @@ export async function generateKETShortTalksAction(input: {
   if (!sessionId) {
     const result = await createSessionAction({
       mode: 'cambridge_ket_listening_part4',
-      title: 'KET Listening Part 4 — Short Talks',
+      title: 'Listening Part 4 — Short Talks',
     });
     if (!result.data) return { error: result.error ?? 'Could not create session' };
     sessionId = result.data.id;
