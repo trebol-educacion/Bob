@@ -12,6 +12,8 @@ import { createSupabaseBrowser } from '@/lib/supabase/browser-client';
 import { useTranslations } from 'next-intl';
 import {
   getStudentStatsAction,
+  getActivityTargetsAction,
+  type ActivityTargets,
   type StudentStatRow,
   type StudentStatsResult,
 } from '@/actions/stats';
@@ -25,6 +27,7 @@ interface Props {
   onChangeLevel?: (skill: Skill, level: string) => Promise<void> | void;
 }
 
+const DEFAULT_ACTIVITY_TARGET = 10;
 const PICKABLE_LEVELS = ['pre_a1', 'a1', 'a2', 'b1', 'b2'] as const;
 const LEVEL_LABEL: Record<string, string> = {
   pre_a1: 'Pre-A1',
@@ -256,6 +259,7 @@ export function StudentStatsPanel({ onBack, onTakeAssessment, onChangeLevel }: P
   const t = useTranslations('dashboard');
   const { skillLevels, pendingAssessments } = useOrganization();
   const [stats, setStats] = useState<StudentStatsResult | null>(null);
+  const [targets, setTargets] = useState<ActivityTargets>({});
   const [loading, setLoading] = useState(true);
   const [lastAssessments, setLastAssessments] = useState<Record<Skill, LastAssessment | null>>({
     speaking: null, reading: null, listening: null, writing: null,
@@ -264,8 +268,12 @@ export function StudentStatsPanel({ onBack, onTakeAssessment, onChangeLevel }: P
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await getStudentStatsAction();
+      const [data, targetData] = await Promise.all([
+        getStudentStatsAction(),
+        getActivityTargetsAction(),
+      ]);
       setStats(data);
+      setTargets(targetData);
     } finally {
       setLoading(false);
     }
@@ -319,21 +327,22 @@ export function StudentStatsPanel({ onBack, onTakeAssessment, onChangeLevel }: P
       const current = skillLevels?.[skill]?.cefr_level ?? null;
       const stat = derived.bySkill[skill];
       const la = lastAssessments[skill];
+      const target = (current && targets[skill]?.[current]) || DEFAULT_ACTIVITY_TARGET;
       return {
         key: skill,
         label: t(SKILL_LABEL_KEY[skill]),
         level: current ? LEVEL_LABEL[current] ?? current : '—',
         goalLevel: nextLevelLabel(current ?? 'a1'),
         cefrValue: current,
-        done: stat.sessions,
-        total: Math.max(30, stat.sessions + 4),
+        done: Math.min(stat.sessions, target),
+        total: target,
         pct: stat.pct,
         sessions: stat.sessions,
         lastTest: la ? `${la.cefr_band.replace('_', ' ')} · ${relativeTime(la.occurred_at)}` : null,
         pending: !!pendingAssessments[skill],
       };
     });
-  }, [derived, skillLevels, lastAssessments, pendingAssessments, t]);
+  }, [derived, skillLevels, lastAssessments, pendingAssessments, targets, t]);
 
   const pickableLevels = useMemo(
     () => PICKABLE_LEVELS.map((value) => ({ value, label: LEVEL_LABEL[value] })),

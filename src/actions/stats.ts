@@ -82,6 +82,28 @@ export async function getStudentStatsAction(): Promise<StudentStatsResult> {
   };
 }
 
+export type ActivityTargets = Record<string, Record<string, number>>;
+
+/**
+ * Global, super-admin-managed number of activities a student must complete per
+ * (skill, CEFR level). Returned as a nested map skill -> level -> count so the
+ * dashboard can size each skill path without hardcoding a length.
+ */
+export async function getActivityTargetsAction(): Promise<ActivityTargets> {
+  const supabase = await createSupabaseServer();
+  const { data } = await supabase
+    .from('bob_activity_targets')
+    .select('skill, cefr_level, target_count');
+
+  const targets: ActivityTargets = {};
+  for (const row of data ?? []) {
+    const skill = row.skill as string;
+    const level = row.cefr_level as string;
+    (targets[skill] ??= {})[level] = row.target_count as number;
+  }
+  return targets;
+}
+
 /**
  * Hard-delete all sessions of the current student. Cascades to bob_messages
  * thanks to ON DELETE CASCADE.
