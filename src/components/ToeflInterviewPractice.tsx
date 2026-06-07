@@ -6,8 +6,8 @@ import { ArrowLeft, Mic, Square, RotateCcw, ChevronRight, ClipboardList } from '
 import { CountdownTimer } from '@/components/CountdownTimer';
 import { useCountdown } from '@/hooks/useCountdown';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
-import { blobToBase64, pcmToWavBase64 } from '@/lib/audio';
-import { generateSpeechAction } from '@/actions/gemini';
+import { blobToBase64 } from '@/lib/audio';
+import { useTTS } from '@/hooks/useTTS';
 import { createSessionAction } from '@/actions/sessions';
 import {
   generateToeflInterviewAction,
@@ -102,7 +102,7 @@ export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) 
   const [error, setError] = useState<string | null>(null);
 
   const recordedBlobRef = useRef<Blob | null>(null);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const { play: playTTS, stop: stopTTS } = useTTS();
   const autoStartedRef = useRef(false);
   const sessionCreatedRef = useRef(false);
   const sessionIdRef = useRef<string | null>(null);
@@ -184,38 +184,19 @@ export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) 
     const question = plan.questions[currentIndex];
 
     async function playQuestion() {
-      try {
-        const tts = await generateSpeechAction(question.text);
-        if (cancelled) return;
-        const wavUrl = pcmToWavBase64(tts.data, tts.mimeType);
-        const audio = new Audio(wavUrl);
-        audioRef.current = audio;
-        setSubPhase('listening');
-
-        audio.onended = () => {
-          if (!cancelled) setSubPhase('prep');
-        };
-        audio.onerror = () => {
-          if (!cancelled) setSubPhase('prep');
-        };
-        audio.play().catch(() => {
-          if (!cancelled) setSubPhase('prep');
-        });
-      } catch {
-        if (!cancelled) setSubPhase('prep');
-      }
+      await playTTS(question.text, {
+        onStart: () => {
+          if (!cancelled) setSubPhase('listening');
+        },
+      });
+      if (!cancelled) setSubPhase('prep');
     }
 
     playQuestion();
 
     return () => {
       cancelled = true;
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current.onended = null;
-        audioRef.current.onerror = null;
-        audioRef.current = null;
-      }
+      stopTTS();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, subPhase, currentIndex]);

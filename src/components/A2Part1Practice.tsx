@@ -3,11 +3,11 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ArrowLeft, Mic, MicOff, CheckCircle, ChevronRight } from 'lucide-react';
-import { generateSpeechAction } from '@/actions/gemini';
 import { generateA2SessionAction, processA2AnswerAction, evaluateA2FinalAction } from '@/actions/modes/a2';
 import { createSessionAction } from '@/actions/sessions';
-import { pcmToWavBase64, blobToBase64 } from '@/lib/audio';
+import { blobToBase64 } from '@/lib/audio';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
+import { useTTS } from '@/hooks/useTTS';
 import type { A2SessionPlan } from '@/actions/modes/a2';
 import type { FormativeFeedback } from '@/lib/types/practice';
 import { BobMascotLoader } from '@/components/chat/BobMascotLoader';
@@ -114,7 +114,7 @@ export function A2Part1Practice({ onBack }: A2Part1PracticeProps) {
   const userIdRef = useRef<string>('');
 
   const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const currentAudioRef = useRef<HTMLAudioElement | null>(null);
+  const { play: playTTS, stop: stopCurrentAudio } = useTTS();
 
   const getAllQuestions = useCallback((p: A2SessionPlan): string[] => {
     return [
@@ -132,31 +132,6 @@ export function A2Part1Practice({ onBack }: A2Part1PracticeProps) {
     return 'final-question';
   }, []);
 
-  const stopCurrentAudio = useCallback(() => {
-    if (currentAudioRef.current) {
-      currentAudioRef.current.pause();
-      currentAudioRef.current = null;
-    }
-  }, []);
-
-  const playTTS = useCallback(async (text: string): Promise<void> => {
-    stopCurrentAudio();
-    try {
-      const { data, mimeType } = await generateSpeechAction(text);
-      const url = pcmToWavBase64(data, mimeType);
-      const audio = new Audio(url);
-      currentAudioRef.current = audio;
-      await new Promise<void>((resolve) => {
-        audio.onended = () => resolve();
-        audio.onerror = () => resolve();
-        audio.play().catch(() => resolve());
-      });
-      currentAudioRef.current = null;
-    } catch {
-      // Non-fatal — continue even if TTS fails
-    }
-  }, [stopCurrentAudio]);
-
   const recordedBlobRef = useRef<Blob | null>(null);
 
   const { isRecording, startRecording, stopRecording } = useAudioRecorder({
@@ -167,10 +142,9 @@ export function A2Part1Practice({ onBack }: A2Part1PracticeProps) {
 
   useEffect(() => {
     return () => {
-      stopCurrentAudio();
       if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
     };
-  }, [stopCurrentAudio]);
+  }, []);
 
   useEffect(() => {
     async function init() {

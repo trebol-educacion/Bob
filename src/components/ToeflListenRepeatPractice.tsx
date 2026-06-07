@@ -7,6 +7,7 @@ import { CountdownTimer } from './CountdownTimer';
 import { useCountdown } from '@/hooks/useCountdown';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
 import { pcmToWavBase64, blobToBase64 } from '@/lib/audio';
+import { useTTS } from '@/hooks/useTTS';
 import {
   generateToeflRepeatSessionAction,
   generateToeflRepeatAudiosAction,
@@ -53,7 +54,7 @@ export function ToeflListenRepeatPractice({ onBack }: ToeflListenRepeatPracticeP
   const [currentEvaluation, setCurrentEvaluation] = useState<RepetitionObjectiveFeedback | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const { playUrl: playAudioUrl, stop: stopAudio } = useTTS();
   const recordedBlobRef = useRef<Blob | null>(null);
   const autoRecordStartedRef = useRef(false);
   const readyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -133,32 +134,34 @@ export function ToeflListenRepeatPractice({ onBack }: ToeflListenRepeatPracticeP
     const chunk = audioChunks[currentIndex];
     if (!chunk) return;
 
+    let cancelled = false;
+    let errored = false;
     const wavUrl = pcmToWavBase64(chunk.data, chunk.mimeType);
-    const audio = new Audio(wavUrl);
-    audioRef.current = audio;
 
-    audio.onended = () => {
-      readyTimerRef.current = setTimeout(() => {
+    playAudioUrl(wavUrl, {
+      onError: () => {
+        errored = true;
+      },
+    }).then(() => {
+      if (cancelled) return;
+      if (errored) {
         setPhase('ready');
+        return;
+      }
+      readyTimerRef.current = setTimeout(() => {
+        if (!cancelled) setPhase('ready');
       }, 2000);
-    };
-
-    audio.onerror = () => {
-      setPhase('ready');
-    };
-
-    audio.play().catch(() => setPhase('ready'));
+    });
 
     return () => {
-      audio.pause();
-      audio.onended = null;
-      audio.onerror = null;
+      cancelled = true;
+      stopAudio();
       if (readyTimerRef.current) {
         clearTimeout(readyTimerRef.current);
         readyTimerRef.current = null;
       }
     };
-  }, [phase, currentIndex, audioChunks]);
+  }, [phase, currentIndex, audioChunks, playAudioUrl, stopAudio]);
 
   useEffect(() => {
     if (phase !== 'record') {
