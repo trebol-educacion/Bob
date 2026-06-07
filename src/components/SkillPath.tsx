@@ -141,9 +141,9 @@ function ScoreRing({ pct, active, color, soft }: { pct: number; active: boolean;
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center leading-none">
         <span className="text-lg font-black tabular-nums" style={{ color: active ? color : '#cbd5e1' }}>
-          {active ? Math.round(pct) : '—'}
+          {active ? (pct / 10).toFixed(1) : '—'}
         </span>
-        {active && <span className="text-[8px] font-bold uppercase tracking-widest text-trebol-text/40">avg</span>}
+        {active && <span className="text-[9px] font-bold tracking-wider text-trebol-text/40">/10</span>}
       </div>
     </div>
   );
@@ -199,7 +199,6 @@ export function SkillPath({
   const lastPt = pts[pts.length - 1];
   const colHeight = lastPt.y + PAD * 2;
   const showDecor = width >= 680;
-  const currentIdx = items.findIndex((it) => it.kind === 'activity' && it.idx === skill.done);
   const select = (i: number) => {
     setActive(i);
     setPickerOpen(false);
@@ -215,7 +214,6 @@ export function SkillPath({
     >
       <style>{`
         @keyframes sp-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-12px)}}
-        @keyframes sp-bob{0%,100%{transform:translateY(0) rotate(-2deg)}50%{transform:translateY(-10px) rotate(2deg)}}
       `}</style>
 
       <div className="max-w-5xl mx-auto px-4 mb-3">
@@ -490,26 +488,6 @@ export function SkillPath({
             </div>
           );
         })}
-
-        {currentIdx >= 0 && pts[currentIdx] && (
-          <div
-            aria-hidden
-            className="absolute"
-            style={{
-              top: pts[currentIdx].y + PAD + 4,
-              left: `calc(50% + (${pts[currentIdx].x + (pts[currentIdx].x >= 0 ? -1 : 1) * (NODE / 2 + 58)}px))`,
-              transform: 'translate(-50%, -50%)',
-              zIndex: 7,
-            }}
-          >
-            <div
-              className="w-16 h-16 rounded-full bg-white shadow-lg ring-4 ring-white overflow-hidden"
-              style={{ animation: 'sp-bob 2.4s ease-in-out infinite', transformOrigin: '50% 85%' }}
-            >
-              <img src="/bob_avatar.png" alt="" className="w-full h-full object-cover" />
-            </div>
-          </div>
-        )}
       </div>
     </motion.section>
   );
