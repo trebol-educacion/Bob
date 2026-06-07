@@ -7,6 +7,7 @@ import { persistMessage, persistMessages } from '@/lib/persist-activity';
 import { createSessionAction } from '@/actions/sessions';
 import { createSupabaseServer } from '@/lib/supabase/server';
 import { MODELS } from '@/lib/models';
+import { stripDashes } from '@/lib/text';
 
 const GapItemSchema = z.object({
   number: z.number().int().min(1).max(6),
@@ -59,7 +60,7 @@ export async function generateKETVocabGapAction(input: {
   let userId: string | undefined;
 
   if (!sessionId) {
-    const result = await createSessionAction({ mode: 'cambridge_ket_reading_part4', title: 'Reading Part 4 — Choose the Word' });
+    const result = await createSessionAction({ mode: 'cambridge_ket_reading_part4', title: 'Reading Part 4, Choose the Word' });
     if (!result.data) return { error: result.error ?? 'Could not create session' };
     sessionId = result.data.id;
     userId = result.data.user_id;
@@ -70,29 +71,40 @@ export async function generateKETVocabGapAction(input: {
     userId = user.id;
   }
 
-  const [generationPrompt, framingText] = await Promise.all([
+  const [generationPrompt, rawFramingText] = await Promise.all([
     getPrompt('cambridge_ket_reading_part4_a2_generation').catch(() => null),
-    getPrompt('cambridge_ket_reading_part4_a2_framing').catch(() => 'Read the text and choose the best word — A, B or C — for each gap.'),
+    getPrompt('cambridge_ket_reading_part4_a2_framing').catch(() => 'Read the text and choose the best word, A, B or C, for each gap.'),
   ]);
 
   if (!generationPrompt) return { error: 'Could not load generation prompt' };
 
-  const geminiResult = await callGemini(
-    { promptKey: 'cambridge_ket_reading_part4_a2_generation', model: MODELS.FLASH_LITE_PREVIEW, userId },
-    (ai) => ai.models.generateContent({
-      model: MODELS.FLASH_LITE_PREVIEW,
-      contents: [{ role: 'user', parts: [{ text: generationPrompt }] }],
-      config: { responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
-    })
-  );
+  const framingText = stripDashes(rawFramingText);
 
-  if (!isOk(geminiResult)) return { error: 'Could not generate exercise' };
+  let parsed: z.infer<typeof GenerationSchema> | null = null;
+  for (let attempt = 0; attempt < 3 && !parsed; attempt++) {
+    const geminiResult = await callGemini(
+      { promptKey: 'cambridge_ket_reading_part4_a2_generation', model: MODELS.FLASH_LITE, userId },
+      (ai) => ai.models.generateContent({
+        model: MODELS.FLASH_LITE,
+        contents: [{ role: 'user', parts: [{ text: generationPrompt }] }],
+        config: { responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
+      })
+    );
+    if (!isOk(geminiResult)) continue;
+    const rawText = geminiResult.data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+    parsed = safeParse(GenerationSchema, rawText);
+  }
 
-  const rawText = geminiResult.data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
-  const parsed = safeParse(GenerationSchema, rawText);
-  if (!parsed) return { error: 'Unexpected model response' };
+  if (!parsed) return { error: 'Could not generate exercise' };
 
-  const exercise: VocabGapExercise = { title: parsed.title, text: parsed.text, items: parsed.items };
+  const exercise: VocabGapExercise = {
+    title: stripDashes(parsed.title),
+    text: parsed.text,
+    items: parsed.items.map((it) => ({
+      ...it,
+      options: { A: stripDashes(it.options.A), B: stripDashes(it.options.B), C: stripDashes(it.options.C) },
+    })),
+  };
 
   persistMessage({
     sessionId: sessionId!, userId: userId!, role: 'bob', msgType: 'text',

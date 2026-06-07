@@ -7,6 +7,7 @@ import { persistMessage, persistMessages } from '@/lib/persist-activity';
 import { createSessionAction } from '@/actions/sessions';
 import { createSupabaseServer } from '@/lib/supabase/server';
 import { MODELS } from '@/lib/models';
+import { stripDashes } from '@/lib/text';
 
 const TextSchema = z.object({
   label: z.enum(['A', 'B', 'C']),
@@ -66,7 +67,7 @@ export async function generateKETMatchQuestionAction(input: {
   let userId: string | undefined;
 
   if (!sessionId) {
-    const result = await createSessionAction({ mode: 'cambridge_ket_reading_part2', title: 'Reading Part 2 — Match the Question' });
+    const result = await createSessionAction({ mode: 'cambridge_ket_reading_part2', title: 'Reading Part 2: Match the Question' });
     if (!result.data) return { error: result.error ?? 'Could not create session' };
     sessionId = result.data.id;
     userId = result.data.user_id;
@@ -84,30 +85,38 @@ export async function generateKETMatchQuestionAction(input: {
 
   if (!generationPrompt) return { error: 'Could not load generation prompt' };
 
-  const geminiResult = await callGemini(
-    { promptKey: 'cambridge_ket_reading_part2_a2_generation', model: MODELS.FLASH_LITE_PREVIEW, userId },
-    (ai) => ai.models.generateContent({
-      model: MODELS.FLASH_LITE_PREVIEW,
-      contents: [{ role: 'user', parts: [{ text: generationPrompt }] }],
-      config: { responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
-    })
-  );
+  let parsed: z.infer<typeof GenerationSchema> | null = null;
+  for (let attempt = 0; attempt < 3 && !parsed; attempt += 1) {
+    const geminiResult = await callGemini(
+      { promptKey: 'cambridge_ket_reading_part2_a2_generation', model: MODELS.FLASH_LITE, userId },
+      (ai) => ai.models.generateContent({
+        model: MODELS.FLASH_LITE,
+        contents: [{ role: 'user', parts: [{ text: generationPrompt }] }],
+        config: { responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
+      })
+    );
+    if (!isOk(geminiResult)) continue;
+    const rawText = geminiResult.data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+    parsed = safeParse(GenerationSchema, rawText);
+  }
 
-  if (!isOk(geminiResult)) return { error: 'Could not generate exercise' };
-
-  const rawText = geminiResult.data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
-  const parsed = safeParse(GenerationSchema, rawText);
   if (!parsed) return { error: 'Unexpected model response' };
 
-  const exercise: MatchExercise = { topic: parsed.topic, texts: parsed.texts, questions: parsed.questions };
+  const exercise: MatchExercise = {
+    topic: parsed.topic,
+    texts: parsed.texts.map((t) => ({ ...t, author: stripDashes(t.author), text: stripDashes(t.text) })),
+    questions: parsed.questions.map((q) => ({ ...q, text: stripDashes(q.text) })),
+  };
+
+  const cleanFramingText = stripDashes(framingText);
 
   persistMessage({
     sessionId: sessionId!, userId: userId!, role: 'bob', msgType: 'text',
     contentText: null,
-    contentJson: { kind: 'reading_match_plan', framing_text: framingText, exercise },
+    contentJson: { kind: 'reading_match_plan', framing_text: cleanFramingText, exercise },
   }).catch(() => undefined);
 
-  return { sessionId: sessionId!, userId: userId!, framing_text: framingText, exercise };
+  return { sessionId: sessionId!, userId: userId!, framing_text: cleanFramingText, exercise };
 }
 
 export async function submitKETMatchQuestionAction(input: {
