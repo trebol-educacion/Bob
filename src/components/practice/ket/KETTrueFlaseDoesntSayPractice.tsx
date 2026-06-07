@@ -1,15 +1,15 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { motion } from 'motion/react';
-import { CheckCircle, XCircle } from 'lucide-react';
+import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
+import { Check, X } from 'lucide-react';
 import { KETListeningIcon } from '@/components/icons/KETIcons';
 import { CelebrationCard } from '@/components/practice/yl/CelebrationCard';
 import { BobMascotLoader } from '@/components/chat/BobMascotLoader';
-import { BobAvatar } from '@/components/practice/yl/_shared';
 import { pcmToWavBase64 } from '@/lib/audio';
 import {
   generateKETTFDSAction,
+  generateKETTFDSAudioAction,
   submitKETTFDSAction,
   type Verdict,
   type AudioTurn,
@@ -18,6 +18,12 @@ import {
   type TFDSExercise,
 } from '@/actions/modes/ket-listening-part5';
 import type { StoredMessage } from '@/actions/messages';
+
+const ACCENT = '#F8AC37';
+const ACCENT_DARK = '#D8881C';
+const ACCENT_TEXT = '#B5710F';
+const ACCENT_TINT = 'color-mix(in oklab, #F8AC37 14%, white)';
+const CARD_SURFACE = '#FAFAF8';
 
 export interface KETTrueFalseDoesntSayPracticeProps {
   onBack: () => void;
@@ -29,18 +35,81 @@ export interface KETTrueFalseDoesntSayPracticeProps {
 }
 
 type Phase = 'loading' | 'generating' | 'ready' | 'submitting' | 'finished';
+type AudioStatus = 'loading' | 'ready' | 'error';
 
-const VERDICTS: { value: Verdict; label: string; short: string }[] = [
-  { value: 'T',  label: 'True',         short: 'T'  },
-  { value: 'F',  label: 'False',        short: 'F'  },
-  { value: 'DS', label: "Doesn't Say",  short: 'DS' },
-];
+interface VerdictMeta {
+  value: Verdict;
+  primary: string;
+  secondary: string;
+  swatch: string;
+  selBg: string;
+  selBorder: string;
+  selText: string;
+}
 
-const VERDICT_COLORS: Record<Verdict, { bg: string; text: string; border: string }> = {
-  T:  { bg: 'bg-green-50',  text: 'text-green-700',  border: 'border-green-300' },
-  F:  { bg: 'bg-red-50',    text: 'text-red-600',    border: 'border-red-300'   },
-  DS: { bg: 'bg-amber-50',  text: 'text-amber-700',  border: 'border-amber-300' },
+const VERDICT_META: Record<Verdict, VerdictMeta> = {
+  T: {
+    value: 'T',
+    primary: 'True',
+    secondary: 'The speaker says so',
+    swatch: 'bg-emerald-500',
+    selBg: 'bg-emerald-50',
+    selBorder: 'border-emerald-400',
+    selText: 'text-emerald-800',
+  },
+  F: {
+    value: 'F',
+    primary: 'False',
+    secondary: 'The speaker says different',
+    swatch: 'bg-red-500',
+    selBg: 'bg-red-50',
+    selBorder: 'border-red-400',
+    selText: 'text-red-700',
+  },
+  DS: {
+    value: 'DS',
+    primary: 'Not in the text',
+    secondary: "Doesn't Say",
+    swatch: 'bg-stone-400',
+    selBg: 'bg-stone-100',
+    selBorder: 'border-stone-400',
+    selText: 'text-stone-700',
+  },
 };
+
+const VERDICT_ORDER: Verdict[] = ['T', 'F', 'DS'];
+
+function VerdictIcon({ verdict, size = 18 }: { verdict: Verdict; size?: number }) {
+  if (verdict === 'T') return <Check size={size} strokeWidth={3.5} className="text-white" />;
+  if (verdict === 'F') return <X size={size} strokeWidth={3.5} className="text-white" />;
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" width={size} height={size} className="text-white" aria-hidden>
+      <path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3" />
+      <line x1="12" y1="17" x2="12.01" y2="17" />
+    </svg>
+  );
+}
+
+/** Compact 3-signal verdict badge (icon + color + word) used in results. */
+function VerdictBadge({ verdict, struck }: { verdict: Verdict; struck?: boolean }) {
+  const meta = VERDICT_META[verdict];
+  return (
+    <span
+      className={[
+        'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border',
+        meta.selBg,
+        meta.selBorder,
+        meta.selText,
+        struck ? 'line-through opacity-70' : '',
+      ].join(' ')}
+    >
+      <span className={`w-4 h-4 rounded-full flex items-center justify-center shrink-0 ${meta.swatch}`}>
+        <VerdictIcon verdict={verdict} size={11} />
+      </span>
+      {meta.primary}
+    </span>
+  );
+}
 
 interface RestoredState {
   exercise: TFDSExercise;
@@ -88,7 +157,51 @@ function stopActiveAudio() {
   }
 }
 
-function AudioPlayer({ audiob64, audiomime }: { audiob64: string; audiomime: string }) {
+function PlayIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+      <path d="M8 5v14l11-7z" />
+    </svg>
+  );
+}
+
+function PauseIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+      <rect x="6" y="5" width="4" height="14" rx="1" />
+      <rect x="14" y="5" width="4" height="14" rx="1" />
+    </svg>
+  );
+}
+
+function ReplayIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+      <path d="M3 12a9 9 0 1 0 3-6.7" />
+      <polyline points="3 4 3 10 9 10" />
+    </svg>
+  );
+}
+
+function Spinner() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4 animate-spin" aria-hidden>
+      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeOpacity="0.25" strokeWidth="3" />
+      <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function AudioPill({
+  audiob64,
+  audiomime,
+  status,
+}: {
+  audiob64: string;
+  audiomime: string;
+  status: AudioStatus;
+}) {
+  const reduceMotion = useReducedMotion();
   const [playing, setPlaying] = useState(false);
   const [hasPlayed, setHasPlayed] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -96,231 +209,216 @@ function AudioPlayer({ audiob64, audiomime }: { audiob64: string; audiomime: str
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const stopLocal = () => {
-    if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
-    if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = null; }
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
     setPlaying(false);
+    if (_activeAudio === audioRef.current) _activeAudio = null;
   };
 
   useEffect(() => () => stopLocal(), []);
 
   const handlePlay = async () => {
-    if (playing) { stopLocal(); setProgress(0); return; }
+    if (playing) {
+      stopLocal();
+      setProgress(0);
+      return;
+    }
+
     stopActiveAudio();
+
     const url = pcmToWavBase64(audiob64, audiomime);
     const audio = new Audio(url);
     audioRef.current = audio;
     _activeAudio = audio;
-    audio.onended = () => { stopLocal(); setHasPlayed(true); setProgress(1); setTimeout(() => setProgress(0), 600); };
+
+    audio.onended = () => {
+      stopLocal();
+      setHasPlayed(true);
+      setProgress(1);
+      setTimeout(() => setProgress(0), 600);
+    };
     audio.onerror = () => stopLocal();
+
     setPlaying(true);
     intervalRef.current = setInterval(() => {
       if (audio.duration > 0) setProgress(audio.currentTime / audio.duration);
     }, 100);
-    try { await audio.play(); } catch { stopLocal(); }
+
+    try {
+      await audio.play();
+    } catch {
+      stopLocal();
+    }
   };
 
-  const label = playing ? 'Playing…' : hasPlayed ? 'Listen again' : 'Listen';
-
-  if (!audiob64) {
+  if (status === 'error') {
     return (
-      <div className="flex items-center gap-3 bg-gray-50 rounded-2xl px-4 py-3 text-sm text-gray-400">
-        Audio not available — session restored without audio.
+      <div className="sticky top-0 z-10 bg-white/95 backdrop-blur-sm pb-2 pt-4">
+        <div className="rounded-full ring-1 ring-gray-100 bg-gray-50 px-3 py-2 flex items-center gap-3 h-12">
+          <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 bg-gray-200 text-gray-400">
+            <PlayIcon />
+          </div>
+          <p className="flex-1 text-sm font-semibold text-gray-400">Audio unavailable</p>
+        </div>
       </div>
     );
   }
 
-  return (
-    <div className="flex items-center gap-3 bg-white ring-1 ring-gray-100 rounded-2xl px-4 py-3 w-full">
-      <button
-        type="button"
-        onClick={handlePlay}
-        aria-label={label}
-        className={[
-          'w-11 h-11 rounded-full flex items-center justify-center shrink-0 text-white transition-all',
-          playing ? 'animate-pulse' : '',
-        ].join(' ')}
-        style={{ background: 'var(--color-bob-brand)' }}
-      >
-        {playing ? (
-          <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
-            <rect x="6" y="5" width="4" height="14" rx="1" />
-            <rect x="14" y="5" width="4" height="14" rx="1" />
-          </svg>
-        ) : hasPlayed ? (
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
-            <path d="M3 12a9 9 0 1 0 3-6.7" /><polyline points="3 4 3 10 9 10" />
-          </svg>
-        ) : (
-          <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
-            <path d="M8 5v14l11-7z" />
-          </svg>
-        )}
-      </button>
-      <div className="flex-1 min-w-0">
-        <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-          <div className="h-full transition-all" style={{ width: `${Math.round(progress * 100)}%`, background: 'var(--color-bob-brand)' }} />
+  if (status === 'loading') {
+    return (
+      <div className="sticky top-0 z-10 bg-white/95 backdrop-blur-sm pb-2 pt-4">
+        <div className="rounded-full ring-1 bg-amber-50 px-3 py-2 flex items-center gap-3 h-12" style={{ borderColor: ACCENT_TINT }}>
+          <div
+            className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 text-white opacity-60"
+            style={{ background: ACCENT }}
+            aria-hidden
+          >
+            <Spinner />
+          </div>
+          <p className="flex-1 text-xs font-semibold" style={{ color: ACCENT_TEXT }}>Preparing audio…</p>
         </div>
-        <p className="text-[11px] text-gray-400 mt-1">{label}</p>
+      </div>
+    );
+  }
+
+  const label = playing ? 'Playing…' : hasPlayed ? 'Listen again' : 'Listen';
+
+  return (
+    <div className="sticky top-0 z-10 bg-white/95 backdrop-blur-sm pb-2 pt-4">
+      <div className="relative rounded-full ring-1 ring-amber-100 bg-amber-50 px-3 py-2 flex items-center gap-3 h-12 overflow-hidden">
+        <div className="relative shrink-0 w-10 h-10">
+          {playing && (
+            <motion.div
+              aria-hidden
+              className="absolute inset-0 rounded-full"
+              style={{ background: ACCENT }}
+              initial={{ scale: 1, opacity: 0.4 }}
+              animate={reduceMotion ? { scale: 1, opacity: 0.25 } : { scale: [1, 1.6], opacity: [0.4, 0] }}
+              transition={reduceMotion ? { duration: 0 } : { duration: 1.2, ease: 'easeOut', repeat: Infinity }}
+            />
+          )}
+          <button
+            type="button"
+            onClick={handlePlay}
+            aria-label={label}
+            className="relative w-10 h-10 rounded-full flex items-center justify-center transition-transform active:scale-95 text-white"
+            style={{ background: ACCENT }}
+          >
+            {playing ? <PauseIcon /> : hasPlayed ? <ReplayIcon /> : <PlayIcon />}
+          </button>
+        </div>
+        <p className="flex-1 text-xs font-semibold truncate" style={{ color: ACCENT_TEXT }}>{label}</p>
+        <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-[3px] bg-amber-200/60">
+          <div
+            className="h-full transition-all"
+            style={{ width: `${Math.round(progress * 100)}%`, background: ACCENT }}
+          />
+        </div>
       </div>
     </div>
   );
 }
 
-function StatementCard({
-  statement,
+function ProgressDots({
+  statements,
+  answers,
+  current,
+  onJump,
+}: {
+  statements: Statement[];
+  answers: Record<number, Verdict | null>;
+  current: number;
+  onJump: (index: number) => void;
+}) {
+  return (
+    <div className="flex items-center justify-center gap-2">
+      {statements.map((s, i) => {
+        const done = answers[s.number] != null;
+        const isCurrent = i === current;
+        return (
+          <button
+            key={s.number}
+            type="button"
+            onClick={() => onJump(i)}
+            aria-label={`Statement ${i + 1}`}
+            className="p-1.5 -m-1 cursor-pointer"
+          >
+            <span
+              className="block w-3 h-3 rounded-full transition-all"
+              style={
+                done
+                  ? { background: ACCENT }
+                  : isCurrent
+                    ? { background: 'white', boxShadow: `0 0 0 2.5px ${ACCENT}` }
+                    : { background: '#E5E7EB' }
+              }
+            />
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function VerdictCard({
+  verdict,
   selected,
   onSelect,
   disabled,
+  reduceMotion,
 }: {
-  statement: Statement;
-  selected: Verdict | null;
-  onSelect: (v: Verdict) => void;
+  verdict: Verdict;
+  selected: boolean;
+  onSelect: () => void;
   disabled: boolean;
+  reduceMotion: boolean;
 }) {
+  const meta = VERDICT_META[verdict];
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 6 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.2, delay: statement.number * 0.06 }}
-      className="rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden"
+    <motion.button
+      type="button"
+      onClick={onSelect}
+      disabled={disabled}
+      whileTap={reduceMotion || disabled ? undefined : { scale: 0.98 }}
+      className={[
+        'relative w-full min-h-16 rounded-2xl border-2 px-4 py-3 flex items-center gap-3 text-left cursor-pointer transition-colors',
+        selected ? `${meta.selBg} ${meta.selBorder}` : 'border-gray-100',
+        disabled ? 'cursor-not-allowed' : '',
+      ].join(' ')}
+      style={
+        selected
+          ? { transform: 'translateY(2px)', boxShadow: 'none' }
+          : { background: CARD_SURFACE, boxShadow: '0 3px 0 #e5e7eb' }
+      }
     >
-      <div className="px-4 pt-3 pb-3 flex items-start gap-2">
-        <span
-          className="w-6 h-6 rounded-full text-xs font-black flex items-center justify-center shrink-0 mt-0.5"
-          style={{
-            background: 'color-mix(in oklab, var(--color-bob-brand) 14%, white)',
-            color: 'var(--color-bob-brand)',
-          }}
+      <span className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${meta.swatch}`}>
+        <VerdictIcon verdict={verdict} />
+      </span>
+      <span className="flex-1 min-w-0">
+        <span className={`block text-base font-bold leading-tight ${selected ? meta.selText : 'text-gray-800'}`}>{meta.primary}</span>
+        <span className="block text-xs text-gray-400 leading-tight">{meta.secondary}</span>
+      </span>
+      {selected && (
+        <motion.span
+          initial={reduceMotion ? false : { scale: 0 }}
+          animate={{ scale: 1 }}
+          transition={{ type: 'spring', stiffness: 500, damping: 22 }}
+          className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${meta.swatch}`}
         >
-          {statement.number}
-        </span>
-        <p className="text-sm text-gray-800 leading-snug flex-1">{statement.text}</p>
-      </div>
-      <div className="px-4 pb-4 flex gap-2">
-        {VERDICTS.map((v) => (
-          <button
-            key={v.value}
-            type="button"
-            disabled={disabled}
-            onClick={() => onSelect(v.value)}
-            className={[
-              'flex-1 py-2 rounded-xl border text-sm font-bold transition-all cursor-pointer',
-              selected === v.value ? '' : 'border-gray-200 bg-gray-50 text-gray-500 hover:border-gray-300 hover:bg-gray-100',
-              disabled ? 'cursor-not-allowed' : '',
-            ].filter(Boolean).join(' ')}
-            style={
-              selected === v.value
-                ? { background: 'var(--color-bob-brand)', borderColor: 'var(--color-bob-brand)', color: 'white' }
-                : undefined
-            }
-          >
-            {v.short}
-          </button>
-        ))}
-      </div>
-    </motion.div>
-  );
-}
-
-function StatementResultCard({
-  result,
-  animate,
-}: {
-  result: StatementResult;
-  animate: boolean;
-}) {
-  const correctColors = VERDICT_COLORS[result.correct_verdict];
-  const chosenColors = result.chosen ? VERDICT_COLORS[result.chosen] : null;
-  const correctLabel = VERDICTS.find((v) => v.value === result.correct_verdict)?.label ?? result.correct_verdict;
-  const chosenLabel = result.chosen ? (VERDICTS.find((v) => v.value === result.chosen)?.label ?? result.chosen) : null;
-
-  return (
-    <motion.div
-      initial={animate ? { opacity: 0, y: 6 } : false}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.2, delay: result.number * 0.06 }}
-      className="rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden"
-    >
-      <div className="px-4 pt-3 pb-2 flex items-start gap-2">
-        <span
-          className="w-6 h-6 rounded-full text-xs font-black flex items-center justify-center shrink-0 mt-0.5"
-          style={{
-            background: 'color-mix(in oklab, var(--color-bob-brand) 14%, white)',
-            color: 'var(--color-bob-brand)',
-          }}
-        >
-          {result.number}
-        </span>
-        <p className="text-sm text-gray-800 leading-snug flex-1">{result.text}</p>
-        {result.is_correct ? (
-          <CheckCircle size={16} className="text-green-500 shrink-0 mt-0.5" />
-        ) : (
-          <XCircle size={16} className="text-red-400 shrink-0 mt-0.5" />
-        )}
-      </div>
-      <div className="px-4 pb-4 flex items-center gap-2 flex-wrap">
-        {result.is_correct ? (
-          <span className={`px-3 py-1 rounded-full text-xs font-bold border ${correctColors.bg} ${correctColors.text} ${correctColors.border}`}>
-            {correctLabel}
-          </span>
-        ) : (
-          <>
-            {chosenColors && chosenLabel && (
-              <span className={`px-3 py-1 rounded-full text-xs font-bold border border-red-200 bg-red-50 text-red-500 line-through`}>
-                {chosenLabel}
-              </span>
-            )}
-            {!chosenLabel && (
-              <span className="px-3 py-1 rounded-full text-xs font-bold border border-gray-200 bg-gray-50 text-gray-400 italic">
-                No answer
-              </span>
-            )}
-            <span className="text-xs text-gray-400">→</span>
-            <span className={`px-3 py-1 rounded-full text-xs font-bold border ${correctColors.bg} ${correctColors.text} ${correctColors.border}`}>
-              {correctLabel}
-            </span>
-          </>
-        )}
-      </div>
-    </motion.div>
-  );
-}
-
-function TranscriptBlock({ turns }: { turns: AudioTurn[] }) {
-  const [open, setOpen] = useState(false);
-  const isMonologue = turns.length === 1;
-
-  return (
-    <div className="rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center justify-between px-4 py-3 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
-      >
-        <span>Show transcript</span>
-        <span className="text-gray-400 text-xs">{open ? '▲' : '▼'}</span>
-      </button>
-      {open && (
-        <div className="px-4 pb-4 space-y-1.5 border-t border-gray-100 pt-3">
-          {isMonologue ? (
-            <p className="text-xs text-gray-600 leading-relaxed">{turns[0].line}</p>
-          ) : (
-            turns.map((t, i) => (
-              <p key={i} className="text-xs text-gray-600 leading-snug">
-                <span className="font-bold text-gray-700 mr-1">
-                  {t.speaker === 'M' ? 'Man:' : 'Woman:'}
-                </span>
-                {t.line}
-              </p>
-            ))
-          )}
-        </div>
+          <Check size={14} strokeWidth={3.5} className="text-white" />
+        </motion.span>
       )}
-    </div>
+    </motion.button>
   );
 }
 
-/** KET Listening Part 5 — True, False or Doesn't Say practice component. */
+/** KET Listening Part 5 — True, False or Doesn't Say focus-mode practice component. */
 export function KETTrueFalseDoesntSayPractice({
   onBack,
   sessionId: initialSessionId,
@@ -329,6 +427,7 @@ export function KETTrueFalseDoesntSayPractice({
   onSessionFinished,
   onOpenDashboard,
 }: KETTrueFalseDoesntSayPracticeProps) {
+  const reduceMotion = useReducedMotion();
   const [phase, setPhase] = useState<Phase>('loading');
   const [sessionId, setSessionId] = useState<string | undefined>(initialSessionId);
   const [userId, setUserId] = useState<string | undefined>();
@@ -340,7 +439,13 @@ export function KETTrueFalseDoesntSayPractice({
   const [audio, setAudio] = useState<AudioTurn[]>([]);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isNewSession, setIsNewSession] = useState(false);
+  const [current, setCurrent] = useState(0);
+  const [audioStatus, setAudioStatus] = useState<AudioStatus>('loading');
+  const [audioB64, setAudioB64] = useState('');
+  const [audioMime, setAudioMime] = useState('audio/L16;codec=pcm;rate=24000');
   const initStartedRef = useRef(false);
+  const audioStartedRef = useRef(false);
+  const advanceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (initStartedRef.current) return;
@@ -391,6 +496,45 @@ export function KETTrueFalseDoesntSayPractice({
     void init();
   }, []);
 
+  useEffect(() => {
+    if (audioStartedRef.current) return;
+    if (phase !== 'ready') return;
+    if (audio.length === 0) return;
+    audioStartedRef.current = true;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const generated = await generateKETTFDSAudioAction({ audio });
+        if (cancelled) return;
+        if (generated.data) {
+          setAudioB64(generated.data);
+          setAudioMime(generated.mimeType);
+          setAudioStatus('ready');
+        } else {
+          setAudioStatus('error');
+        }
+      } catch {
+        if (!cancelled) setAudioStatus('error');
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [phase, audio]);
+
+  useEffect(() => () => { if (advanceRef.current) clearTimeout(advanceRef.current); }, []);
+
+  function handlePick(statementNumber: number, verdict: Verdict, index: number, total: number) {
+    setAnswers((prev) => ({ ...prev, [statementNumber]: verdict }));
+    if (advanceRef.current) clearTimeout(advanceRef.current);
+    if (index < total - 1) {
+      const delay = reduceMotion ? 120 : 400;
+      advanceRef.current = setTimeout(() => setCurrent((c) => (c === index ? index + 1 : c)), delay);
+    }
+  }
+
   async function handleSubmit() {
     if (!sessionId || !userId || !exercise) return;
     stopActiveAudio();
@@ -416,7 +560,7 @@ export function KETTrueFalseDoesntSayPractice({
     onSessionFinished?.();
   }
 
-  const answeredCount = Object.values(answers).filter((v) => v !== null).length;
+  const answeredCount = exercise ? Object.values(answers).filter((v) => v != null).length : 0;
   const allAnswered = exercise ? answeredCount === exercise.statements.length : false;
 
   if (errorMsg) {
@@ -430,23 +574,32 @@ export function KETTrueFalseDoesntSayPractice({
     );
   }
 
+  const currentStatement = exercise?.statements[current];
+
   return (
     <div className="flex flex-col h-full relative">
       <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-100 bg-white shrink-0">
-        <button type="button" onClick={onBack} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-600" aria-label="Back">←</button>
-        <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style={{ background: 'color-mix(in oklab, var(--color-bob-brand) 12%, white)' }}>
-          <KETListeningIcon size={18} className="text-bob-brand" />
+        <button
+          type="button"
+          onClick={onBack}
+          className="w-11 h-11 flex items-center justify-center rounded-xl hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-600 text-lg"
+          aria-label="Back"
+        >
+          ←
+        </button>
+        <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style={{ background: ACCENT_TINT, color: ACCENT }}>
+          <KETListeningIcon size={18} />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-bold text-gray-800 truncate">True, False or Doesn't Say</p>
+          <p className="text-sm font-bold text-gray-800 truncate">True, False or Doesn&apos;t Say</p>
           <p className="text-xs text-gray-400">Listening · Part 5</p>
         </div>
-        <span className="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-widest" style={{ background: 'color-mix(in oklab, var(--color-bob-brand) 12%, white)', color: 'var(--color-bob-brand)' }}>A2</span>
+        <span className="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-widest" style={{ background: ACCENT_TINT, color: ACCENT_TEXT }}>A2</span>
       </div>
 
       {(phase === 'loading' || phase === 'generating') && (
         <div className="flex-1 flex flex-col min-h-0">
-          <BobMascotLoader message={phase === 'loading' ? 'Preparing exercise…' : 'Generating audio…'} />
+          <BobMascotLoader message="Preparing exercise…" />
         </div>
       )}
 
@@ -456,69 +609,128 @@ export function KETTrueFalseDoesntSayPractice({
         </div>
       )}
 
-      {phase === 'ready' && exercise && (
+      {phase === 'ready' && exercise && currentStatement && (
         <>
-          <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
-            <div className="flex items-start gap-2">
-              <BobAvatar />
-              <div className="bg-gray-50 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-gray-700 leading-relaxed max-w-sm">
-                {framingText}
+          <div className="flex-1 overflow-y-auto px-4 pb-4">
+            <div className="mx-auto w-full max-w-lg flex flex-col gap-4">
+              <AudioPill audiob64={audioB64} audiomime={audioMime} status={audioStatus} />
+
+              <div className="flex items-start gap-3 rounded-3xl border border-gray-100 shadow-sm px-4 py-3" style={{ background: CARD_SURFACE }}>
+                <span className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: ACCENT_TINT, color: ACCENT }}>
+                  <KETListeningIcon size={20} />
+                </span>
+                <p className="text-sm text-gray-700 leading-relaxed flex-1">{framingText}</p>
               </div>
-            </div>
 
-            <AudioPlayer audiob64={exercise.audio_b64} audiomime={exercise.audio_mime} />
-
-            <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-2.5">
-              <p className="text-xs text-amber-800 leading-snug">
-                <span className="font-bold">DS = Doesn't Say</span> — the speaker doesn't mention this at all. It's not wrong, it's just not said.
-              </p>
-            </div>
-
-            {exercise.statements.map((s) => (
-              <StatementCard
-                key={s.number}
-                statement={s}
-                selected={answers[s.number] ?? null}
-                onSelect={(v) => setAnswers((prev) => ({ ...prev, [s.number]: v }))}
-                disabled={false}
+              <ProgressDots
+                statements={exercise.statements}
+                answers={answers}
+                current={current}
+                onJump={(i) => { if (advanceRef.current) clearTimeout(advanceRef.current); setCurrent(i); }}
               />
-            ))}
 
-            <div className="h-20" />
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={currentStatement.number}
+                  initial={reduceMotion ? false : { opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -10 }}
+                  transition={{ type: 'spring', stiffness: 320, damping: 28 }}
+                  className="flex flex-col gap-3"
+                >
+                  <div className="rounded-3xl border border-gray-100 shadow-sm px-4 py-4 flex items-start gap-3" style={{ background: CARD_SURFACE }}>
+                    <span className="w-7 h-7 rounded-full text-xs font-black flex items-center justify-center shrink-0 mt-0.5" style={{ background: ACCENT_TINT, color: ACCENT_TEXT }}>
+                      {currentStatement.number}
+                    </span>
+                    <p className="text-base font-semibold text-gray-800 leading-snug flex-1">{currentStatement.text}</p>
+                  </div>
+
+                  <div className="flex flex-col gap-2.5">
+                    {VERDICT_ORDER.map((v) => (
+                      <VerdictCard
+                        key={v}
+                        verdict={v}
+                        selected={answers[currentStatement.number] === v}
+                        onSelect={() => handlePick(currentStatement.number, v, current, exercise.statements.length)}
+                        disabled={false}
+                        reduceMotion={!!reduceMotion}
+                      />
+                    ))}
+                  </div>
+                </motion.div>
+              </AnimatePresence>
+
+              <div className="h-4" />
+            </div>
           </div>
 
-          <div className="shrink-0 border-t border-gray-100 bg-white px-4 py-3 flex items-center gap-3">
-            <p className="text-xs text-gray-400 flex-1">{answeredCount} of {exercise.statements.length} answered</p>
-            <button
-              type="button"
-              onClick={handleSubmit}
-              disabled={!allAnswered}
-              className="px-5 py-2.5 rounded-xl text-white text-sm font-bold shadow-sm disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
-              style={{ background: 'var(--color-bob-brand)' }}
-            >
-              Check answers
-            </button>
+          <div className="shrink-0 border-t border-gray-100 bg-white px-4 py-3">
+            <div className="mx-auto w-full max-w-lg">
+              <button
+                type="button"
+                onClick={handleSubmit}
+                disabled={!allAnswered}
+                className="w-full px-6 py-3 rounded-2xl text-white text-sm font-bold transition-transform duration-75 cursor-pointer active:translate-y-1 active:shadow-none disabled:opacity-40 disabled:cursor-not-allowed disabled:translate-y-0 disabled:shadow-none"
+                style={{ background: ACCENT, boxShadow: allAnswered ? `0 4px 0 ${ACCENT_DARK}` : 'none' }}
+              >
+                Check answers
+              </button>
+            </div>
           </div>
         </>
       )}
 
       {phase === 'finished' && exercise && (
-        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
-          {statementResults.map((r) => (
-            <StatementResultCard key={r.number} result={r} animate={isNewSession} />
-          ))}
+        <div className="flex-1 overflow-y-auto px-4 py-4">
+          <div className="mx-auto w-full max-w-lg flex flex-col gap-4">
+            {statementResults.map((r, i) => (
+              <motion.div
+                key={r.number}
+                initial={isNewSession && !reduceMotion ? { opacity: 0, y: 8 } : false}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ type: 'spring', stiffness: 280, damping: 24, delay: isNewSession ? i * 0.07 : 0 }}
+                className="rounded-3xl border border-gray-100 shadow-sm overflow-hidden"
+                style={{ background: CARD_SURFACE }}
+              >
+                <div className="px-4 pt-4 pb-2 flex items-start gap-2">
+                  <span className="w-7 h-7 rounded-full text-xs font-black flex items-center justify-center shrink-0 mt-0.5" style={{ background: ACCENT_TINT, color: ACCENT_TEXT }}>{r.number}</span>
+                  <p className="text-sm font-semibold text-gray-800 leading-snug flex-1">{r.text}</p>
+                  <span
+                    className={[
+                      'ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0',
+                      r.is_correct ? 'text-emerald-600 bg-emerald-50' : 'text-red-500 bg-red-50',
+                    ].join(' ')}
+                  >
+                    {r.is_correct ? 'Correct' : 'Incorrect'}
+                  </span>
+                </div>
+                <div className="px-4 pb-4 flex items-center gap-2 flex-wrap">
+                  {r.is_correct ? (
+                    <VerdictBadge verdict={r.correct_verdict} />
+                  ) : (
+                    <>
+                      {r.chosen
+                        ? <VerdictBadge verdict={r.chosen} struck />
+                        : <span className="px-3 py-1 rounded-full text-xs font-bold border border-gray-200 bg-gray-50 text-gray-400 italic">No answer</span>}
+                      <span className="text-gray-300 text-sm" aria-hidden>→</span>
+                      <VerdictBadge verdict={r.correct_verdict} />
+                      <p className="w-full text-xs text-gray-500 leading-snug mt-1">{VERDICT_META[r.correct_verdict].secondary}.</p>
+                    </>
+                  )}
+                </div>
+              </motion.div>
+            ))}
 
-          {audio.length > 0 && <TranscriptBlock turns={audio} />}
-
-          <div className="flex justify-center pt-2">
-            <CelebrationCard
-              score={correctCount}
-              scoreMax={exercise.statements.length}
-              feedback="Great listening practice!"
-              onAction={onOpenDashboard}
-              actionLabel="See my progress"
-              animate={isNewSession}
-            />
+            <div className="flex justify-center pt-2">
+              <CelebrationCard
+                score={correctCount}
+                scoreMax={exercise.statements.length}
+                feedback="Great listening practice!"
+                onAction={onOpenDashboard}
+                actionLabel="See my progress"
+                animate={isNewSession}
+              />
+            </div>
           </div>
         </div>
       )}

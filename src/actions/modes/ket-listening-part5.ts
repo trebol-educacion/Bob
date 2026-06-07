@@ -2,6 +2,7 @@
 
 import { z } from 'zod';
 import { getPrompt } from '@/lib/prompts/db-prompts';
+import { stripDashes } from '@/lib/text';
 import { callGemini, isOk } from '@/lib/gemini-client';
 import { persistMessage, persistMessages } from '@/lib/persist-activity';
 import { createSessionAction } from '@/actions/sessions';
@@ -85,7 +86,7 @@ export async function generateKETTFDSAction(input: {
   if (!sessionId) {
     const result = await createSessionAction({
       mode: 'cambridge_ket_listening_part5',
-      title: 'Listening Part 5 — True, False or Doesn\'t Say',
+      title: 'Listening Part 5: True, False or Doesn\'t Say',
     });
     if (!result.data) return { error: result.error ?? 'Could not create session' };
     sessionId = result.data.id;
@@ -107,11 +108,13 @@ export async function generateKETTFDSAction(input: {
 
   if (!generationPrompt) return { error: 'Could not load generation prompt' };
 
+  const cleanFramingText = stripDashes(framingText);
+
   const geminiResult = await callGemini(
-    { promptKey: 'cambridge_ket_listening_part5_a2_generation', model: MODELS.FLASH_LITE_PREVIEW, userId },
+    { promptKey: 'cambridge_ket_listening_part5_a2_generation', model: MODELS.FLASH_LITE, userId },
     (ai) =>
       ai.models.generateContent({
-        model: MODELS.FLASH_LITE_PREVIEW,
+        model: MODELS.FLASH_LITE,
         contents: [{ role: 'user', parts: [{ text: generationPrompt }] }],
         config: { responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
       })
@@ -123,16 +126,14 @@ export async function generateKETTFDSAction(input: {
   const parsed = safeParse(GenerationSchema, rawText);
   if (!parsed) return { error: 'Unexpected model response' };
 
-  const audioResult = await generateSpeechAction(buildAudioText(parsed.audio)).catch(
-    () => ({ data: '', mimeType: 'audio/L16;codec=pcm;rate=24000' })
-  );
+  const cleanStatements = parsed.statements.map((s) => ({ ...s, text: stripDashes(s.text) }));
 
   const exercise: TFDSExercise = {
-    context: parsed.context,
+    context: stripDashes(parsed.context),
     audio: parsed.audio,
-    statements: parsed.statements,
-    audio_b64: audioResult.data,
-    audio_mime: audioResult.mimeType,
+    statements: cleanStatements,
+    audio_b64: '',
+    audio_mime: 'audio/L16;codec=pcm;rate=24000',
   };
 
   persistMessage({
@@ -143,7 +144,7 @@ export async function generateKETTFDSAction(input: {
     contentText: null,
     contentJson: {
       kind: 'tfds_plan',
-      framing_text: framingText,
+      framing_text: cleanFramingText,
       exercise: {
         context: exercise.context,
         audio: exercise.audio,
@@ -155,9 +156,16 @@ export async function generateKETTFDSAction(input: {
   return {
     sessionId: sessionId!,
     userId: userId!,
-    framing_text: framingText,
+    framing_text: cleanFramingText,
     exercise,
   };
+}
+
+/** Generates the TTS audio for the TFDS monologue, off the critical path. */
+export async function generateKETTFDSAudioAction(input: {
+  audio: AudioTurn[];
+}): Promise<{ data: string; mimeType: string }> {
+  return generateSpeechAction(buildAudioText(input.audio));
 }
 
 export async function submitKETTFDSAction(input: {
