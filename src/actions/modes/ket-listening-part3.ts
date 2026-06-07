@@ -2,6 +2,7 @@
 
 import { z } from 'zod';
 import { getPrompt } from '@/lib/prompts/db-prompts';
+import { stripDashes } from '@/lib/text';
 import { callGemini, isOk } from '@/lib/gemini-client';
 import { persistMessage, persistMessages } from '@/lib/persist-activity';
 import { createSessionAction } from '@/actions/sessions';
@@ -86,7 +87,7 @@ export async function generateKETListenDecideAction(input: {
   if (!sessionId) {
     const result = await createSessionAction({
       mode: 'cambridge_ket_listening_part3',
-      title: 'Listening Part 3 — Listen and Decide',
+      title: 'Listening Part 3: Listen and Decide',
     });
     if (!result.data) return { error: result.error ?? 'Could not create session' };
     sessionId = result.data.id;
@@ -105,13 +106,15 @@ export async function generateKETListenDecideAction(input: {
     ),
   ]);
 
+  const cleanFramingText = stripDashes(framingText);
+
   if (!generationPrompt) return { error: 'Could not load generation prompt' };
 
   const geminiResult = await callGemini(
-    { promptKey: 'cambridge_ket_listening_part3_a2_generation', model: MODELS.FLASH_LITE_PREVIEW, userId },
+    { promptKey: 'cambridge_ket_listening_part3_a2_generation', model: MODELS.FLASH_LITE, userId },
     (ai) =>
       ai.models.generateContent({
-        model: MODELS.FLASH_LITE_PREVIEW,
+        model: MODELS.FLASH_LITE,
         contents: [{ role: 'user', parts: [{ text: generationPrompt }] }],
         config: { responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
       })
@@ -123,16 +126,22 @@ export async function generateKETListenDecideAction(input: {
   const parsed = safeParse(GenerationSchema, rawText);
   if (!parsed) return { error: 'Unexpected model response' };
 
-  const audioResult = await generateSpeechAction(buildConversationText(parsed.conversation)).catch(
-    () => ({ data: '', mimeType: 'audio/L16;codec=pcm;rate=24000' })
-  );
+  const cleanItems: ListenDecideItem[] = parsed.items.map((item) => ({
+    ...item,
+    question: stripDashes(item.question),
+    options: {
+      A: stripDashes(item.options.A),
+      B: stripDashes(item.options.B),
+      C: stripDashes(item.options.C),
+    },
+  }));
 
   const exercise: ListenDecideExercise = {
-    context: parsed.context,
+    context: stripDashes(parsed.context),
     conversation: parsed.conversation,
-    items: parsed.items,
-    audio_b64: audioResult.data,
-    audio_mime: audioResult.mimeType,
+    items: cleanItems,
+    audio_b64: '',
+    audio_mime: 'audio/L16;codec=pcm;rate=24000',
   };
 
   persistMessage({
@@ -143,7 +152,7 @@ export async function generateKETListenDecideAction(input: {
     contentText: null,
     contentJson: {
       kind: 'listen_decide_plan',
-      framing_text: framingText,
+      framing_text: cleanFramingText,
       exercise: {
         context: exercise.context,
         conversation: exercise.conversation,
@@ -155,9 +164,16 @@ export async function generateKETListenDecideAction(input: {
   return {
     sessionId: sessionId!,
     userId: userId!,
-    framing_text: framingText,
+    framing_text: cleanFramingText,
     exercise,
   };
+}
+
+/** Generates the TTS audio for a Listen and Decide conversation, off the critical path. */
+export async function generateKETListenDecideAudioAction(input: {
+  conversation: ConversationTurn[];
+}): Promise<{ data: string; mimeType: string }> {
+  return generateSpeechAction(buildConversationText(input.conversation));
 }
 
 export async function submitKETListenDecideAction(input: {

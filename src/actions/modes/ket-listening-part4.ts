@@ -8,6 +8,7 @@ import { createSessionAction } from '@/actions/sessions';
 import { createSupabaseServer } from '@/lib/supabase/server';
 import { generateSpeechAction } from '@/actions/gemini';
 import { MODELS } from '@/lib/models';
+import { stripDashes } from '@/lib/text';
 
 export type CharKey = 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G' | 'H';
 const CHAR_KEYS: CharKey[] = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
@@ -95,7 +96,7 @@ export async function generateKETShortTalksPlanAction(input: {
   if (!sessionId) {
     const result = await createSessionAction({
       mode: 'cambridge_ket_listening_part4',
-      title: 'Listening Part 4 — Short Talks',
+      title: 'Listening Part 4, Short Talks',
     });
     if (!result.data) return { error: result.error ?? 'Could not create session' };
     sessionId = result.data.id;
@@ -107,20 +108,20 @@ export async function generateKETShortTalksPlanAction(input: {
     userId = user.id;
   }
 
-  const [generationPrompt, framingText] = await Promise.all([
+  const [generationPrompt, framingTextRaw] = await Promise.all([
     getPrompt('cambridge_ket_listening_part4_a2_generation').catch(() => null),
     getPrompt('cambridge_ket_listening_part4_a2_framing').catch(
-      () => 'You will hear five people talking about themselves. Match each person to the correct description — A to H. There are three descriptions you do not need.'
+      () => 'You will hear five people talking about themselves. Match each person to the correct description, A to H. There are three descriptions you do not need.'
     ),
   ]);
 
   if (!generationPrompt) return { error: 'Could not load generation prompt' };
 
   const geminiResult = await callGemini(
-    { promptKey: 'cambridge_ket_listening_part4_a2_generation', model: MODELS.FLASH_LITE_PREVIEW, userId },
+    { promptKey: 'cambridge_ket_listening_part4_a2_generation', model: MODELS.FLASH_LITE, userId },
     (ai) =>
       ai.models.generateContent({
-        model: MODELS.FLASH_LITE_PREVIEW,
+        model: MODELS.FLASH_LITE,
         contents: [{ role: 'user', parts: [{ text: generationPrompt }] }],
         config: { responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
       })
@@ -132,6 +133,17 @@ export async function generateKETShortTalksPlanAction(input: {
   const parsed = safeParse(GenerationSchema, rawText);
   if (!parsed) return { error: 'Unexpected model response' };
 
+  const framingText = stripDashes(framingTextRaw);
+  const people: Person[] = parsed.people.map((p) => ({
+    ...p,
+    name: stripDashes(p.name),
+    monologue: stripDashes(p.monologue),
+  }));
+  const characteristics: Characteristic[] = parsed.characteristics.map((c) => ({
+    ...c,
+    text: stripDashes(c.text),
+  }));
+
   persistMessage({
     sessionId: sessionId!,
     userId: userId!,
@@ -141,7 +153,7 @@ export async function generateKETShortTalksPlanAction(input: {
     contentJson: {
       kind: 'short_talks_plan',
       framing_text: framingText,
-      exercise: { people: parsed.people, characteristics: parsed.characteristics },
+      exercise: { people, characteristics },
     },
   }).catch(() => undefined);
 
@@ -149,8 +161,8 @@ export async function generateKETShortTalksPlanAction(input: {
     sessionId: sessionId!,
     userId: userId!,
     framing_text: framingText,
-    people: parsed.people,
-    characteristics: parsed.characteristics,
+    people,
+    characteristics,
   };
 }
 
@@ -175,7 +187,7 @@ export async function generateKETShortTalksAction(input: {
   if (!sessionId) {
     const result = await createSessionAction({
       mode: 'cambridge_ket_listening_part4',
-      title: 'Listening Part 4 — Short Talks',
+      title: 'Listening Part 4, Short Talks',
     });
     if (!result.data) return { error: result.error ?? 'Could not create session' };
     sessionId = result.data.id;
@@ -187,21 +199,21 @@ export async function generateKETShortTalksAction(input: {
     userId = user.id;
   }
 
-  const [generationPrompt, framingText] = await Promise.all([
+  const [generationPrompt, framingTextRaw] = await Promise.all([
     getPrompt('cambridge_ket_listening_part4_a2_generation').catch(() => null),
     getPrompt('cambridge_ket_listening_part4_a2_framing').catch(
       () =>
-        'You will hear five people talking about themselves. Match each person to the correct description — A to H. There are three descriptions you do not need.'
+        'You will hear five people talking about themselves. Match each person to the correct description, A to H. There are three descriptions you do not need.'
     ),
   ]);
 
   if (!generationPrompt) return { error: 'Could not load generation prompt' };
 
   const geminiResult = await callGemini(
-    { promptKey: 'cambridge_ket_listening_part4_a2_generation', model: MODELS.FLASH_LITE_PREVIEW, userId },
+    { promptKey: 'cambridge_ket_listening_part4_a2_generation', model: MODELS.FLASH_LITE, userId },
     (ai) =>
       ai.models.generateContent({
-        model: MODELS.FLASH_LITE_PREVIEW,
+        model: MODELS.FLASH_LITE,
         contents: [{ role: 'user', parts: [{ text: generationPrompt }] }],
         config: { responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
       })
@@ -213,8 +225,19 @@ export async function generateKETShortTalksAction(input: {
   const parsed = safeParse(GenerationSchema, rawText);
   if (!parsed) return { error: 'Unexpected model response' };
 
+  const framingText = stripDashes(framingTextRaw);
+  const people: Person[] = parsed.people.map((p) => ({
+    ...p,
+    name: stripDashes(p.name),
+    monologue: stripDashes(p.monologue),
+  }));
+  const characteristics: Characteristic[] = parsed.characteristics.map((c) => ({
+    ...c,
+    text: stripDashes(c.text),
+  }));
+
   const audios = await Promise.all(
-    parsed.people.map((p) =>
+    people.map((p) =>
       generateSpeechAction(p.monologue).catch(() => ({
         data: '',
         mimeType: 'audio/L16;codec=pcm;rate=24000',
@@ -222,7 +245,7 @@ export async function generateKETShortTalksAction(input: {
     )
   );
 
-  const peopleWithAudio: PersonWithAudio[] = parsed.people.map((p, i) => ({
+  const peopleWithAudio: PersonWithAudio[] = people.map((p, i) => ({
     ...p,
     audio_b64: audios[i]?.data ?? '',
     audio_mime: audios[i]?.mimeType ?? 'audio/L16;codec=pcm;rate=24000',
@@ -230,7 +253,7 @@ export async function generateKETShortTalksAction(input: {
 
   const exercise: ShortTalksExercise = {
     people: peopleWithAudio,
-    characteristics: parsed.characteristics,
+    characteristics,
   };
 
   persistMessage({
@@ -243,8 +266,8 @@ export async function generateKETShortTalksAction(input: {
       kind: 'short_talks_plan',
       framing_text: framingText,
       exercise: {
-        people: parsed.people,
-        characteristics: parsed.characteristics,
+        people,
+        characteristics,
       },
     },
   }).catch(() => undefined);
