@@ -102,19 +102,21 @@ export async function generateKETPictureDescPlanAction(input: {
   const generationPrompt = await getPrompt('cambridge_ket_part3_a2_generation').catch(() => null);
   if (!generationPrompt) return { error: 'Could not load generation prompt' };
 
-  const geminiResult = await callGemini(
-    { promptKey: 'cambridge_ket_part3_a2_generation', model: MODELS.FLASH_LITE_PREVIEW, userId },
-    (ai) => ai.models.generateContent({
-      model: MODELS.FLASH_LITE_PREVIEW,
-      contents: [{ role: 'user', parts: [{ text: generationPrompt }] }],
-      config: { responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
-    })
-  );
+  let parsed: z.infer<typeof GenerationSchema> | null = null;
+  for (let attempt = 0; attempt < 3 && !parsed; attempt++) {
+    const geminiResult = await callGemini(
+      { promptKey: 'cambridge_ket_part3_a2_generation', model: MODELS.FLASH_LITE_PREVIEW, userId },
+      (ai) => ai.models.generateContent({
+        model: MODELS.FLASH_LITE_PREVIEW,
+        contents: [{ role: 'user', parts: [{ text: generationPrompt }] }],
+        config: { responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
+      })
+    );
+    if (!isOk(geminiResult)) continue;
+    const rawText = geminiResult.data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+    parsed = safeParse(GenerationSchema, rawText);
+  }
 
-  if (!isOk(geminiResult)) return { error: 'Could not generate exercise' };
-
-  const rawText = geminiResult.data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
-  const parsed = safeParse(GenerationSchema, rawText);
   if (!parsed) return { error: 'Unexpected model response' };
 
   persistMessage({
@@ -170,19 +172,21 @@ export async function generateKETPictureDescAction(input: {
   const generationPrompt = await getPrompt('cambridge_ket_part3_a2_generation').catch(() => null);
   if (!generationPrompt) return { error: 'Could not load generation prompt' };
 
-  const geminiResult = await callGemini(
-    { promptKey: 'cambridge_ket_part3_a2_generation', model: MODELS.FLASH_LITE_PREVIEW, userId },
-    (ai) => ai.models.generateContent({
-      model: MODELS.FLASH_LITE_PREVIEW,
-      contents: [{ role: 'user', parts: [{ text: generationPrompt }] }],
-      config: { responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
-    })
-  );
+  let parsed: z.infer<typeof GenerationSchema> | null = null;
+  for (let attempt = 0; attempt < 3 && !parsed; attempt++) {
+    const geminiResult = await callGemini(
+      { promptKey: 'cambridge_ket_part3_a2_generation', model: MODELS.FLASH_LITE_PREVIEW, userId },
+      (ai) => ai.models.generateContent({
+        model: MODELS.FLASH_LITE_PREVIEW,
+        contents: [{ role: 'user', parts: [{ text: generationPrompt }] }],
+        config: { responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
+      })
+    );
+    if (!isOk(geminiResult)) continue;
+    const rawText = geminiResult.data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+    parsed = safeParse(GenerationSchema, rawText);
+  }
 
-  if (!isOk(geminiResult)) return { error: 'Could not generate exercise' };
-
-  const rawText = geminiResult.data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
-  const parsed = safeParse(GenerationSchema, rawText);
   if (!parsed) return { error: 'Unexpected model response' };
 
   const [imageUrls, audioResult] = await Promise.all([
@@ -221,9 +225,9 @@ export async function evaluateKETPictureDescAction(input: {
     .replace('{TRANSCRIPT}', '[audio attached]');
 
   const geminiResult = await callGemini(
-    { promptKey: 'cambridge_ket_part3_a2_evaluation', model: MODELS.FLASH_LITE_PREVIEW, userId: input.userId },
+    { promptKey: 'cambridge_ket_part3_a2_evaluation', model: MODELS.FLASH_LITE, userId: input.userId },
     (ai) => ai.models.generateContent({
-      model: MODELS.FLASH_LITE_PREVIEW,
+      model: MODELS.FLASH_LITE,
       contents: [{
         role: 'user',
         parts: [

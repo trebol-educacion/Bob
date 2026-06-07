@@ -2,20 +2,32 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
-import { motion, AnimatePresence } from 'motion/react';
-import { Mic, MicOff, ChevronDown, ChevronUp } from 'lucide-react';
+import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
+import { Mic, Square, Volume2, ChevronDown, ChevronUp, RotateCcw } from 'lucide-react';
 import { KETSpeakingIcon } from '@/components/icons/KETIcons';
 import { CelebrationCard } from '@/components/practice/yl/CelebrationCard';
 import { BobMascotLoader } from '@/components/chat/BobMascotLoader';
-import { BobAvatar } from '@/components/practice/yl/_shared';
 import { pcmToWavBase64, blobToBase64 } from '@/lib/audio';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
+
+const ACCENT = '#3660AB';
+const ACCENT_DARK = '#27497F';
+const ACCENT_TINT = 'color-mix(in oklab, #3660AB 12%, white)';
+const CARD_SURFACE = '#FAFAF8';
+
+export type SpeakingRubric = {
+  task_coverage: number;
+  grammar: number;
+  vocabulary: number;
+  fluency: number;
+};
 
 export type SpeakingFeedback = {
   understood: boolean;
   highlights: string[];
   suggestions: string[];
   model_answer: string | null;
+  rubric?: SpeakingRubric;
 };
 
 export interface KETSpeakingPracticeProps {
@@ -44,44 +56,181 @@ export interface KETSpeakingPracticeProps {
   onOpenDashboard?: () => void;
 }
 
-type Phase = 'ready' | 'playing-instruction' | 'countdown' | 'recording' | 'evaluating' | 'finished';
+type Phase =
+  | 'ready'
+  | 'recording'
+  | 'review'
+  | 'evaluating'
+  | 'finished'
+  | 'mic-denied';
 
-const VERDICT_LABELS: Record<string, string> = { T: 'True', F: 'False', DS: "Doesn't Say" };
+function rubricTotal(rubric: SpeakingRubric): number {
+  return rubric.task_coverage + rubric.grammar + rubric.vocabulary + rubric.fluency;
+}
 
-function FeedbackPanel({
-  feedback,
-  animate,
-  onOpenDashboard,
-}: {
-  feedback: SpeakingFeedback;
-  animate: boolean;
-  onOpenDashboard?: () => void;
-}) {
-  const [modelOpen, setModelOpen] = useState(false);
+function InstructionAudioButton({ audioB64, audioMime }: { audioB64: string; audioMime: string }) {
+  const reduceMotion = useReducedMotion();
+  const [playing, setPlaying] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => () => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+  }, []);
+
+  function play() {
+    if (playing) {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+      setPlaying(false);
+      return;
+    }
+    const url = pcmToWavBase64(audioB64, audioMime);
+    const audio = new Audio(url);
+    audioRef.current = audio;
+    audio.onended = () => { audioRef.current = null; setPlaying(false); };
+    audio.onerror = () => { audioRef.current = null; setPlaying(false); };
+    setPlaying(true);
+    audio.play().catch(() => { audioRef.current = null; setPlaying(false); });
+  }
 
   return (
-    <motion.div
-      initial={animate ? { opacity: 0, y: 12 } : false}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3 }}
-      className="space-y-3"
+    <button
+      type="button"
+      onClick={play}
+      aria-label="Hear this"
+      className="relative shrink-0 w-9 h-9 rounded-full flex items-center justify-center text-white transition-transform active:scale-95"
+      style={{ background: ACCENT }}
     >
-      {feedback.highlights.length > 0 && (
-        <div className="rounded-2xl border border-green-200 bg-green-50 px-4 py-3 space-y-1.5">
-          <p className="text-xs font-bold text-green-800">What you did well ✓</p>
-          {feedback.highlights.map((h, i) => <p key={i} className="text-sm text-green-700 leading-snug">• {h}</p>)}
-        </div>
+      {playing && !reduceMotion && (
+        <motion.span
+          aria-hidden
+          className="absolute inset-0 rounded-full"
+          style={{ background: ACCENT }}
+          initial={{ scale: 1, opacity: 0.4 }}
+          animate={{ scale: [1, 1.6], opacity: [0.4, 0] }}
+          transition={{ duration: 1.2, ease: 'easeOut', repeat: Infinity }}
+        />
       )}
-      {feedback.suggestions.length > 0 && (
+      <Volume2 size={16} className="relative" />
+    </button>
+  );
+}
+
+function Waveform() {
+  const reduceMotion = useReducedMotion();
+  const bars = [0, 1, 2, 3, 4];
+  return (
+    <div className="flex items-end gap-1 h-6" aria-hidden>
+      {bars.map((i) => (
+        <motion.span
+          key={i}
+          className="w-1.5 rounded-full bg-red-500"
+          initial={{ height: 6 }}
+          animate={reduceMotion ? { height: 14 } : { height: [6, 22, 6] }}
+          transition={reduceMotion ? { duration: 0 } : { duration: 0.8, repeat: Infinity, ease: 'easeInOut', delay: i * 0.12 }}
+        />
+      ))}
+    </div>
+  );
+}
+
+function PlaybackPlayer({ url }: { url: string }) {
+  const reduceMotion = useReducedMotion();
+  const [playing, setPlaying] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => () => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+  }, []);
+
+  function toggle() {
+    if (playing) {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+      setPlaying(false);
+      return;
+    }
+    const audio = new Audio(url);
+    audioRef.current = audio;
+    audio.onended = () => { audioRef.current = null; setPlaying(false); };
+    audio.onerror = () => { audioRef.current = null; setPlaying(false); };
+    setPlaying(true);
+    audio.play().catch(() => { audioRef.current = null; setPlaying(false); });
+  }
+
+  return (
+    <div className="rounded-full ring-1 ring-gray-100 px-3 py-2 flex items-center gap-3 h-12" style={{ background: ACCENT_TINT }}>
+      <button
+        type="button"
+        onClick={toggle}
+        aria-label={playing ? 'Pause' : 'Listen back'}
+        className="relative shrink-0 w-9 h-9 rounded-full flex items-center justify-center text-white transition-transform active:scale-95"
+        style={{ background: ACCENT }}
+      >
+        {playing && !reduceMotion && (
+          <motion.span
+            aria-hidden
+            className="absolute inset-0 rounded-full"
+            style={{ background: ACCENT }}
+            initial={{ scale: 1, opacity: 0.4 }}
+            animate={{ scale: [1, 1.6], opacity: [0.4, 0] }}
+            transition={{ duration: 1.2, ease: 'easeOut', repeat: Infinity }}
+          />
+        )}
+        {playing ? (
+          <svg viewBox="0 0 24 24" fill="currentColor" className="relative w-4 h-4">
+            <rect x="6" y="5" width="4" height="14" rx="1" />
+            <rect x="14" y="5" width="4" height="14" rx="1" />
+          </svg>
+        ) : (
+          <svg viewBox="0 0 24 24" fill="currentColor" className="relative w-4 h-4">
+            <path d="M8 5v14l11-7z" />
+          </svg>
+        )}
+      </button>
+      <p className="flex-1 text-xs font-bold truncate" style={{ color: ACCENT_DARK }}>
+        {playing ? 'Playing your answer…' : 'Listen back to your answer'}
+      </p>
+    </div>
+  );
+}
+
+function FeedbackBlocks({ feedback }: { feedback: SpeakingFeedback }) {
+  const [modelOpen, setModelOpen] = useState(false);
+  const highlights = feedback.highlights.length > 0 ? feedback.highlights : ['You spoke up — well done!'];
+  const tip = feedback.suggestions.length > 0 ? feedback.suggestions[0] : null;
+
+  return (
+    <div className="space-y-3">
+      <div className="rounded-2xl border border-green-200 bg-green-50 px-4 py-3 space-y-1.5">
+        <p className="text-xs font-bold text-green-800">What you did well ✓</p>
+        {highlights.map((h, i) => (
+          <p key={i} className="text-sm text-green-700 leading-snug">• {h}</p>
+        ))}
+      </div>
+      {tip && (
         <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 space-y-1.5">
-          <p className="text-xs font-bold text-amber-800">To improve</p>
-          {feedback.suggestions.map((s, i) => <p key={i} className="text-sm text-amber-700 leading-snug">• {s}</p>)}
+          <p className="text-xs font-bold text-amber-800">Try next time</p>
+          <p className="text-sm text-amber-700 leading-snug">• {tip}</p>
         </div>
       )}
       {feedback.model_answer && (
         <div className="rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden">
-          <button type="button" onClick={() => setModelOpen((v) => !v)}
-            className="w-full flex items-center justify-between px-4 py-3 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors">
+          <button
+            type="button"
+            onClick={() => setModelOpen((v) => !v)}
+            className="w-full flex items-center justify-between px-4 py-3 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
+          >
             <span>Model answer</span>
             {modelOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
           </button>
@@ -89,21 +238,18 @@ function FeedbackPanel({
             {modelOpen && (
               <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2 }} className="overflow-hidden">
                 <div className="px-4 pb-4 pt-1 border-t border-gray-100">
-                  <p className="text-sm text-gray-700 leading-relaxed italic">"{feedback.model_answer}"</p>
+                  <p className="text-sm text-gray-700 leading-relaxed italic">&quot;{feedback.model_answer}&quot;</p>
                 </div>
               </motion.div>
             )}
           </AnimatePresence>
         </div>
       )}
-      <div className="flex justify-center pt-2">
-        <CelebrationCard score={feedback.understood ? 1 : 0} scoreMax={1} hideGrade feedback="Keep practising your speaking!" onAction={onOpenDashboard} actionLabel="See my progress" animate={animate} />
-      </div>
-    </motion.div>
+    </div>
   );
 }
 
-/** Shared speaking practice component for KET Parts 2 and 3. */
+/** Shared kid-first speaking practice component for KET Parts 2 and 3. */
 export function KETSpeakingPractice({
   partLabel,
   title,
@@ -119,55 +265,69 @@ export function KETSpeakingPractice({
   onBack,
   onOpenDashboard,
 }: KETSpeakingPracticeProps) {
+  const reduceMotion = useReducedMotion();
   const [phase, setPhase] = useState<Phase>('ready');
-  const [countdown, setCountdown] = useState(recordingSeconds);
+  const [secondsLeft, setSecondsLeft] = useState(recordingSeconds);
   const [feedback, setFeedback] = useState<SpeakingFeedback | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [playbackUrl, setPlaybackUrl] = useState<string | null>(null);
+  const pendingBlobRef = useRef<Blob | null>(null);
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const instructionAudioRef = useRef<HTMLAudioElement | null>(null);
-
-  const handleRecorded = useCallback(async (blob: Blob) => {
-    setPhase('evaluating');
-    const base64 = await blobToBase64(blob);
-    const result = await onSubmit({ base64, mime: blob.type || 'audio/webm;codecs=opus' });
-    if ('error' in result) { setErrorMsg(result.error); setPhase('ready'); return; }
-    setFeedback(result);
-    setPhase('finished');
-  }, [onSubmit]);
-
-  const { isRecording, startRecording, stopRecording } = useAudioRecorder({ onRecorded: handleRecorded });
 
   function stopCountdown() {
-    if (countdownRef.current) { clearInterval(countdownRef.current); countdownRef.current = null; }
+    if (countdownRef.current) {
+      clearInterval(countdownRef.current);
+      countdownRef.current = null;
+    }
   }
 
-  useEffect(() => () => { stopCountdown(); }, []);
+  const handleRecorded = useCallback((blob: Blob) => {
+    stopCountdown();
+    pendingBlobRef.current = blob;
+    setPlaybackUrl((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return URL.createObjectURL(blob);
+    });
+    setPhase('review');
+  }, []);
 
-  function playInstruction() {
-    if (!instructionAudioB64) { startCountdown(); return; }
-    setPhase('playing-instruction');
-    const url = pcmToWavBase64(instructionAudioB64, instructionAudioMime);
-    const audio = new Audio(url);
-    instructionAudioRef.current = audio;
-    audio.onended = () => { instructionAudioRef.current = null; startCountdown(); };
-    audio.onerror = () => { instructionAudioRef.current = null; startCountdown(); };
-    audio.play().catch(() => startCountdown());
-  }
+  const handleRecorderError = useCallback((error: Error) => {
+    const denied = /denied|permission|notallowed|notfound|getusermedia/i.test(error.name + error.message);
+    if (denied) {
+      setPhase('mic-denied');
+      return;
+    }
+    setErrorMsg(error.message);
+    setPhase('ready');
+  }, []);
 
-  function startCountdown() {
-    setCountdown(recordingSeconds);
-    setPhase('countdown');
+  const { startRecording, stopRecording } = useAudioRecorder({
+    onRecorded: handleRecorded,
+    onError: handleRecorderError,
+  });
+
+  useEffect(() => () => {
+    stopCountdown();
+    setPlaybackUrl((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return null;
+    });
+  }, []);
+
+  async function handleStartRecording() {
+    setErrorMsg(null);
+    setSecondsLeft(recordingSeconds);
+    setPhase('recording');
+    await startRecording();
     let remaining = recordingSeconds;
     countdownRef.current = setInterval(() => {
       remaining -= 1;
-      setCountdown(remaining);
-      if (remaining <= 0) { stopCountdown(); handleStartRecording(); }
+      setSecondsLeft(remaining);
+      if (remaining <= 0) {
+        stopCountdown();
+        stopRecording();
+      }
     }, 1000);
-  }
-
-  async function handleStartRecording() {
-    setPhase('recording');
-    await startRecording();
   }
 
   function handleStopRecording() {
@@ -175,141 +335,264 @@ export function KETSpeakingPractice({
     stopRecording();
   }
 
-  function handleStartPress() {
-    playInstruction();
+  function handleRetry() {
+    setPlaybackUrl((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return null;
+    });
+    pendingBlobRef.current = null;
+    setPhase('ready');
   }
 
-  const progressPct = Math.max(0, Math.min(100, (countdown / recordingSeconds) * 100));
+  async function handleSend() {
+    const blob = pendingBlobRef.current;
+    if (!blob) return;
+    setPhase('evaluating');
+    const base64 = await blobToBase64(blob);
+    const result = await onSubmit({ base64, mime: blob.type || 'audio/webm;codecs=opus' });
+    if ('error' in result) {
+      setErrorMsg(result.error);
+      setPhase('review');
+      return;
+    }
+    setFeedback(result);
+    setPhase('finished');
+  }
+
+  const micBlocked = imageRequired && mediaLoading;
 
   return (
     <div className="flex flex-col h-full relative">
       <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-100 bg-white shrink-0">
-        <button type="button" onClick={onBack} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-600">←</button>
-        <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style={{ background: 'color-mix(in oklab, var(--color-bob-brand) 12%, white)' }}>
-          <KETSpeakingIcon size={18} className="text-bob-brand" />
+        <button
+          type="button"
+          onClick={onBack}
+          className="w-11 h-11 flex items-center justify-center rounded-xl hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-600 text-lg"
+          aria-label="Back"
+        >
+          ←
+        </button>
+        <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style={{ background: ACCENT_TINT, color: ACCENT }}>
+          <KETSpeakingIcon size={18} />
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-bold text-gray-800 truncate">{title}</p>
           <p className="text-xs text-gray-400">Speaking · {partLabel}</p>
         </div>
-        <span className="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-widest" style={{ background: 'color-mix(in oklab, var(--color-bob-brand) 12%, white)', color: 'var(--color-bob-brand)' }}>A2</span>
+        <span className="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-widest" style={{ background: ACCENT_TINT, color: ACCENT_DARK }}>
+          A2
+        </span>
       </div>
 
-      {phase === 'evaluating' && <div className="flex-1 flex flex-col min-h-0"><BobMascotLoader message="Listening to your answer…" /></div>}
+      {phase === 'evaluating' && (
+        <div className="flex-1 flex flex-col min-h-0">
+          <BobMascotLoader message="Listening to your answer…" />
+        </div>
+      )}
 
-      {phase !== 'evaluating' && phase !== 'finished' && (
-        <>
-          <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
-            <div className="flex items-start gap-2">
-              <BobAvatar />
-              <div className="bg-gray-50 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-gray-700 leading-relaxed max-w-sm">{instructionText}</div>
+      {phase === 'mic-denied' && (
+        <div className="flex-1 overflow-y-auto px-4 py-6">
+          <div className="mx-auto w-full max-w-lg">
+            <div className="rounded-3xl border border-gray-100 shadow-sm px-6 py-8 text-center space-y-4" style={{ background: CARD_SURFACE }}>
+              <div className="mx-auto w-14 h-14 rounded-2xl flex items-center justify-center" style={{ background: ACCENT_TINT, color: ACCENT }}>
+                <Mic size={28} />
+              </div>
+              <p className="text-lg font-bold text-gray-800">We can&apos;t hear you yet</p>
+              <p className="text-sm text-gray-500 leading-relaxed">
+                Ask an adult to turn on the microphone for this page, then try again.
+              </p>
+              <button
+                type="button"
+                onClick={() => setPhase('ready')}
+                className="px-6 py-3 rounded-2xl text-white text-sm font-bold transition-transform duration-75 active:translate-y-1"
+                style={{ background: ACCENT, boxShadow: `0 4px 0 ${ACCENT_DARK}` }}
+              >
+                Try again
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {(phase === 'ready' || phase === 'recording' || phase === 'review') && (
+        <div className="flex-1 overflow-y-auto px-4 py-4">
+          <div className="mx-auto w-full max-w-lg flex flex-col gap-4">
+            <div className="flex items-start gap-3 rounded-3xl border border-gray-100 shadow-sm px-4 py-3" style={{ background: CARD_SURFACE }}>
+              <span className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: ACCENT_TINT, color: ACCENT }}>
+                <KETSpeakingIcon size={20} />
+              </span>
+              <p className="text-sm text-gray-700 leading-relaxed flex-1">{instructionText}</p>
+              {instructionAudioB64 && (
+                <InstructionAudioButton audioB64={instructionAudioB64} audioMime={instructionAudioMime} />
+              )}
             </div>
 
             {imageUrl ? (
-              <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="rounded-2xl overflow-hidden border border-gray-100 shadow-sm max-w-xl w-full mx-auto">
+              <div className="rounded-2xl overflow-hidden border border-gray-100 shadow-sm w-full">
                 <div className="relative w-full bg-gray-50" style={{ paddingBottom: '60%' }}>
-                  <Image src={imageUrl} alt="Speaking prompt" fill sizes="(max-width: 640px) 100vw, 576px" className="object-contain" unoptimized={imageUrl.startsWith('data:')} />
+                  <Image src={imageUrl} alt="Speaking prompt" fill sizes="(max-width: 640px) 100vw, 512px" className="object-contain" unoptimized={imageUrl.startsWith('data:')} />
                 </div>
-              </motion.div>
+              </div>
             ) : (imageRequired && mediaLoading) ? (
               <div className="rounded-2xl overflow-hidden border border-gray-100 bg-gray-50">
-                <div className="relative w-full flex items-center justify-center" style={{ paddingBottom: '60%' }}>
-                  <svg viewBox="0 0 24 24" fill="none" className="w-8 h-8 animate-spin absolute" style={{ color: 'var(--color-bob-brand)' }}>
-                    <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2.5" opacity="0.25" />
-                    <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
-                  </svg>
+                <div className="relative w-full" style={{ paddingBottom: '60%' }}>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
+                    <svg viewBox="0 0 24 24" fill="none" className="w-8 h-8 animate-spin" style={{ color: ACCENT }}>
+                      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2.5" opacity="0.25" />
+                      <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+                    </svg>
+                    <p className="text-xs font-semibold text-gray-400">Preparing the picture…</p>
+                  </div>
                 </div>
               </div>
             ) : null}
 
             {bulletPoints && bulletPoints.length > 0 && (
-              <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
-                className="rounded-2xl border border-gray-100 bg-white shadow-sm px-4 py-3 space-y-2">
-                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Talk about…</p>
+              <div className="rounded-3xl border border-gray-100 shadow-sm px-4 py-3 space-y-2" style={{ background: CARD_SURFACE }}>
+                <p className="text-xs font-bold uppercase tracking-wider" style={{ color: ACCENT_DARK }}>Talk about…</p>
                 {bulletPoints.map((bp, i) => (
                   <div key={i} className="flex items-start gap-2">
-                    <span className="w-5 h-5 rounded-full text-[10px] font-black flex items-center justify-center shrink-0 mt-0.5" style={{ background: 'color-mix(in oklab, var(--color-bob-brand) 14%, white)', color: 'var(--color-bob-brand)' }}>{i + 1}</span>
-                    <span className="text-sm text-gray-700">{bp}</span>
+                    <span className="w-5 h-5 rounded-full text-[10px] font-black flex items-center justify-center shrink-0 mt-0.5" style={{ background: ACCENT_TINT, color: ACCENT }}>{i + 1}</span>
+                    <span className="text-lg font-bold text-gray-800 leading-snug">{bp}</span>
                   </div>
                 ))}
-              </motion.div>
+              </div>
             )}
 
-            {(phase === 'countdown' || phase === 'recording') && (
-              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="rounded-2xl border border-gray-100 bg-white shadow-sm px-4 py-4 space-y-3">
-                {phase === 'countdown' && (
-                  <div className="text-center space-y-1">
-                    <p className="text-3xl font-black" style={{ color: 'var(--color-bob-brand)' }}>{countdown}</p>
-                    <p className="text-xs text-gray-400">Recording starts in…</p>
-                  </div>
-                )}
-                {phase === 'recording' && (
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-                        <span className="text-xs font-bold text-red-500">Recording</span>
+            <div className="flex flex-col items-center gap-3 pt-2">
+              <AnimatePresence mode="wait">
+                {phase === 'review' && playbackUrl ? (
+                  <motion.div
+                    key="review"
+                    initial={reduceMotion ? false : { opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={reduceMotion ? undefined : { opacity: 0, y: -8 }}
+                    className="w-full flex flex-col gap-3"
+                  >
+                    <PlaybackPlayer url={playbackUrl} />
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={handleRetry}
+                        className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-2xl text-sm font-bold text-gray-600 border border-gray-200 bg-white transition-colors hover:bg-gray-50"
+                      >
+                        <RotateCcw size={16} />
+                        Try again
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleSend}
+                        className="flex-1 px-4 py-3 rounded-2xl text-white text-sm font-bold transition-transform duration-75 active:translate-y-1"
+                        style={{ background: ACCENT, boxShadow: `0 4px 0 ${ACCENT_DARK}` }}
+                      >
+                        Send it!
+                      </button>
+                    </div>
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key="record"
+                    initial={reduceMotion ? false : { opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={reduceMotion ? undefined : { opacity: 0 }}
+                    className="flex flex-col items-center gap-3"
+                  >
+                    <div className="relative w-24 h-24 flex items-center justify-center">
+                      {phase === 'recording' && !reduceMotion && (
+                        <>
+                          <motion.span
+                            aria-hidden
+                            className="absolute inset-0 rounded-full bg-red-400"
+                            initial={{ scale: 1, opacity: 0.4 }}
+                            animate={{ scale: [1, 1.7], opacity: [0.4, 0] }}
+                            transition={{ duration: 1.4, ease: 'easeOut', repeat: Infinity }}
+                          />
+                          <motion.span
+                            aria-hidden
+                            className="absolute inset-0 rounded-full bg-red-400"
+                            initial={{ scale: 1, opacity: 0.3 }}
+                            animate={{ scale: [1, 1.7], opacity: [0.3, 0] }}
+                            transition={{ duration: 1.4, ease: 'easeOut', repeat: Infinity, delay: 0.7 }}
+                          />
+                        </>
+                      )}
+                      <button
+                        type="button"
+                        onClick={phase === 'recording' ? handleStopRecording : handleStartRecording}
+                        disabled={micBlocked}
+                        aria-label={phase === 'recording' ? 'Stop' : 'Tap to talk'}
+                        className="relative w-20 h-20 rounded-full flex items-center justify-center text-white transition-transform duration-75 active:translate-y-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                        style={
+                          phase === 'recording'
+                            ? { background: '#E62D2B', boxShadow: '0 6px 0 #A91E1C' }
+                            : { background: ACCENT, boxShadow: `0 6px 0 ${ACCENT_DARK}` }
+                        }
+                      >
+                        {phase === 'recording' ? <Square size={26} fill="currentColor" /> : <Mic size={30} />}
+                      </button>
+                    </div>
+
+                    {phase === 'recording' ? (
+                      <div className="flex flex-col items-center gap-2">
+                        <Waveform />
+                        <p className="text-sm font-bold text-red-500">
+                          Keep talking! {Math.max(0, secondsLeft)}s left
+                        </p>
                       </div>
-                      <span className="text-sm font-bold text-gray-600">{countdown}s left</span>
-                    </div>
-                    <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                      <div className="h-full transition-all duration-1000 rounded-full" style={{ width: `${progressPct}%`, background: 'var(--color-bob-brand)' }} />
-                    </div>
-                  </div>
+                    ) : (
+                      <p className="text-sm font-bold" style={{ color: ACCENT_DARK }}>
+                        {micBlocked ? 'Preparing picture…' : 'Tap to talk'}
+                      </p>
+                    )}
+                  </motion.div>
                 )}
-              </motion.div>
-            )}
-
-            <div className="h-20" />
-          </div>
-
-          <div className="shrink-0 border-t border-gray-100 bg-white px-4 py-4 flex items-center justify-center">
-            {phase === 'ready' && (
-              <button type="button" onClick={handleStartPress}
-                disabled={imageRequired && mediaLoading}
-                className="flex items-center gap-2 px-6 py-3 rounded-2xl text-white font-bold shadow-md transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                style={{ background: 'var(--color-bob-brand)' }}>
-                <Mic size={18} />
-                {imageRequired && mediaLoading ? 'Preparing picture…' : 'Start speaking'}
-              </button>
-            )}
-            {phase === 'playing-instruction' && (
-              <div className="flex items-center gap-2 px-6 py-3 rounded-2xl text-white font-bold opacity-80" style={{ background: 'var(--color-bob-brand)' }}>
-                <span className="animate-pulse">🔊</span>
-                Listen…
-              </div>
-            )}
-            {phase === 'countdown' && (
-              <div className="flex items-center gap-2 px-6 py-3 rounded-2xl text-white font-bold opacity-80" style={{ background: 'var(--color-bob-brand)' }}>
-                <Mic size={18} />
-                Get ready…
-              </div>
-            )}
-            {phase === 'recording' && (
-              <button type="button" onClick={handleStopRecording}
-                className="flex items-center gap-2 px-6 py-3 rounded-2xl text-white font-bold shadow-md bg-red-500 cursor-pointer transition-all">
-                <MicOff size={18} />
-                Stop recording
-              </button>
-            )}
-          </div>
-        </>
-      )}
-
-      {phase === 'finished' && feedback && (
-        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
-          {imageUrl && (
-            <div className="rounded-2xl overflow-hidden border border-gray-100 shadow-sm max-w-xl w-full mx-auto">
-              <div className="relative w-full bg-gray-50" style={{ paddingBottom: '40%' }}>
-                <Image src={imageUrl} alt="Speaking prompt" fill sizes="(max-width: 640px) 100vw, 576px" className="object-contain" unoptimized={imageUrl.startsWith('data:')} />
-              </div>
+              </AnimatePresence>
             </div>
-          )}
-          <FeedbackPanel feedback={feedback} animate={true} onOpenDashboard={onOpenDashboard} />
+
+            <div className="h-4" />
+          </div>
         </div>
       )}
 
-      {errorMsg && (
+      {phase === 'finished' && feedback && (
+        <div className="flex-1 overflow-y-auto px-4 py-4">
+          <div className="mx-auto w-full max-w-lg space-y-4">
+            {imageUrl && (
+              <div className="rounded-2xl overflow-hidden border border-gray-100 shadow-sm w-full">
+                <div className="relative w-full bg-gray-50" style={{ paddingBottom: '40%' }}>
+                  <Image src={imageUrl} alt="Speaking prompt" fill sizes="(max-width: 640px) 100vw, 512px" className="object-contain" unoptimized={imageUrl.startsWith('data:')} />
+                </div>
+              </div>
+            )}
+
+            <FeedbackBlocks feedback={feedback} />
+
+            <div className="flex justify-center pt-2">
+              {feedback.rubric ? (
+                <CelebrationCard
+                  score={rubricTotal(feedback.rubric)}
+                  scoreMax={16}
+                  feedback="Great speaking practice!"
+                  onAction={onOpenDashboard}
+                  actionLabel="See my progress"
+                  animate={true}
+                />
+              ) : (
+                <CelebrationCard
+                  score={feedback.understood ? 1 : 0}
+                  scoreMax={1}
+                  feedback="Great speaking practice!"
+                  onAction={onOpenDashboard}
+                  actionLabel="See my progress"
+                  animate={true}
+                />
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {errorMsg && phase !== 'mic-denied' && (
         <div className="absolute inset-x-4 bottom-24 bg-red-50 border border-red-200 rounded-2xl px-4 py-3 flex items-center justify-between">
           <p className="text-sm text-red-600">{errorMsg}</p>
           <button type="button" onClick={() => setErrorMsg(null)} className="text-red-400 ml-2">✕</button>

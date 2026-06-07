@@ -97,6 +97,13 @@ export async function generateA2SessionAction(sessionId: string, userId: string)
 }
 
 /** Process a student audio answer and persist the transcription as a 'user_audio' message. */
+/** Strips JSON/code the reaction helper prompt may emit, leaving a clean acknowledgement or empty. */
+function cleanReaction(raw: string): string {
+  const t = raw.replace(/```[a-z]*\s*/gi, '').replace(/```/g, '').trim();
+  if (!t || t.startsWith('{') || t.startsWith('[') || t.includes('"model_answer"')) return '';
+  return t;
+}
+
 export async function processA2AnswerAction(
   audioBase64: string,
   mimeType: string,
@@ -146,7 +153,7 @@ export async function processA2AnswerAction(
     })
   );
 
-  const reaction = reactionResult.ok ? (reactionResult.data.text ?? '').trim() : '';
+  const reaction = cleanReaction(reactionResult.ok ? (reactionResult.data.text ?? '') : '');
 
   return { transcribed, reaction };
 }
