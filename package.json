@@ -16,6 +16,8 @@
     "benchmark:activity": "bun run scripts/benchmark-activities.ts --activity="
   },
   "dependencies": {
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/utilities": "^3.2.2",
     "@google/genai": "^1.29.0",
     "@supabase/ssr": "^0.10.3",
     "@supabase/supabase-js": "^2.105.4",

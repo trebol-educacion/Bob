@@ -90,6 +90,7 @@ function safeParse<T>(schema: z.ZodType<T>, raw: string): T | null {
 export async function generateKETShortTalksPlanAction(input: {
   sessionId?: string;
 }): Promise<ShortTalksPlan | { error: string }> {
+  const t0 = Date.now();
   let sessionId = input.sessionId;
   let userId: string | undefined;
 
@@ -108,12 +109,16 @@ export async function generateKETShortTalksPlanAction(input: {
     userId = user.id;
   }
 
+  const tSession = Date.now();
+
   const [generationPrompt, framingTextRaw] = await Promise.all([
     getPrompt('cambridge_ket_listening_part4_a2_generation').catch(() => null),
     getPrompt('cambridge_ket_listening_part4_a2_framing').catch(
       () => 'You will hear five people talking about themselves. Match each person to the correct description, A to H. There are three descriptions you do not need.'
     ),
   ]);
+
+  const tPrompts = Date.now();
 
   if (!generationPrompt) return { error: 'Could not load generation prompt' };
 
@@ -132,6 +137,11 @@ export async function generateKETShortTalksPlanAction(input: {
   const rawText = geminiResult.data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
   const parsed = safeParse(GenerationSchema, rawText);
   if (!parsed) return { error: 'Unexpected model response' };
+
+  const tGemini = Date.now();
+  console.info(
+    `[ket-listening-part4] session=${tSession - t0}ms prompts=${tPrompts - tSession}ms gemini=${tGemini - tPrompts}ms total=${tGemini - t0}ms`
+  );
 
   const framingText = stripDashes(framingTextRaw);
   const people: Person[] = parsed.people.map((p) => ({
