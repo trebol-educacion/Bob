@@ -10,7 +10,7 @@ import {
 } from '@/lib/types/practice';
 import { getPrompt } from '@/lib/prompts/db-prompts';
 import { createSupabaseServer } from '@/lib/supabase/server';
-import { persistMessage, readSessionMessages } from '@/lib/persist-activity';
+import { persistMessage, readSessionMessagesForCurrentOrUser } from '@/lib/persist-activity';
 import type { PersistMessageInput } from '@/lib/persist-activity';
 import { getOrCreateCachedContent } from '@/lib/cache';
 import { callGemini, safeParseFallback } from '@/lib/gemini-client';
@@ -316,11 +316,7 @@ Return ONLY valid JSON. No score, no band, no percentage outside the rubric obje
 export async function getB1SessionMessagesAction(
   sessionId: string
 ): Promise<{ history: Part3ChatMessage[]; feedback: FormativeFeedback | null }> {
-  const supabase = await createSupabaseServer();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { history: [], feedback: null };
-
-  const rows = await readSessionMessages(sessionId, user.id);
+  const rows = await readSessionMessagesForCurrentOrUser(sessionId);
 
   const history: Part3ChatMessage[] = [];
   let feedback: FormativeFeedback | null = null;

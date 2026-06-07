@@ -129,6 +129,32 @@ export async function persistMessages(
   return { ids: (data as Array<{ id: string }>).map((r) => r.id) };
 }
 
+/**
+ * Reads all messages for a session, resolving the userId from the authenticated
+ * session when not provided. Returns an empty array on auth failure or query error.
+ */
+export async function readSessionMessagesForCurrentOrUser(
+  sessionId: string,
+  userId?: string,
+): Promise<
+  Array<{
+    id: string;
+    role: 'bob' | 'user';
+    msg_type: string;
+    content_text: string | null;
+    content_json: unknown;
+    created_at: string;
+  }>
+> {
+  if (userId) {
+    return readSessionMessages(sessionId, userId);
+  }
+  const supabase = await createSupabaseServer();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+  return readSessionMessages(sessionId, user.id);
+}
+
 /** Read all messages for a session ordered by created_at ASC; returns empty array on error. */
 export async function readSessionMessages(
   sessionId: string,

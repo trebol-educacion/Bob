@@ -4,8 +4,7 @@ import { z } from 'zod';
 import { MODELS } from '@/lib/models';
 import { CambridgeEvaluationSchema, type CambridgeEvaluation, FormativeFeedbackSchema, type FormativeFeedback } from '@/lib/types/practice';
 import { getPrompt } from '@/lib/prompts/db-prompts';
-import { persistMessage, readSessionMessages } from '@/lib/persist-activity';
-import { createSupabaseServer } from '@/lib/supabase/server';
+import { persistMessage, readSessionMessagesForCurrentOrUser } from '@/lib/persist-activity';
 import { getOrCreateCachedContent } from '@/lib/cache';
 import { callGemini, safeParseFallback } from '@/lib/gemini-client';
 
@@ -220,11 +219,7 @@ export async function getA2SessionMessagesAction(sessionId: string): Promise<{
   qas: Array<{ question: string; answer: string }>;
   feedback: FormativeFeedback | null;
 }> {
-  const supabase = await createSupabaseServer();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { plan: null, qas: [], feedback: null };
-
-  const messages = await readSessionMessages(sessionId, user.id);
+  const messages = await readSessionMessagesForCurrentOrUser(sessionId);
 
   let plan: A2SessionPlan | null = null;
   const qas: Array<{ question: string; answer: string }> = [];

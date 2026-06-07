@@ -5,7 +5,7 @@ import { Type } from '@google/genai';
 import { MODELS } from '@/lib/models';
 import { FormativeFeedbackSchema, type FormativeFeedback } from '@/lib/types/practice';
 import { getPrompt } from '@/lib/prompts/db-prompts';
-import { persistMessage, readSessionMessages } from '@/lib/persist-activity';
+import { persistMessage, readSessionMessagesForCurrentOrUser } from '@/lib/persist-activity';
 import { getOrCreateCachedContent } from '@/lib/cache';
 import { callGemini, safeParseFallback } from '@/lib/gemini-client';
 
@@ -248,5 +248,5 @@ export async function getToeflInterviewSessionMessagesAction(
   sessionId: string,
   userId: string
 ) {
-  return readSessionMessages(sessionId, userId);
+  return readSessionMessagesForCurrentOrUser(sessionId, userId);
 }

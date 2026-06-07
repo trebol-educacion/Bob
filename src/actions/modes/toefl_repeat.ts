@@ -5,7 +5,7 @@ import { Type, Part } from '@google/genai';
 import { MODELS } from '@/lib/models';
 import { RepetitionObjectiveFeedbackSchema, type RepetitionObjectiveFeedback } from '@/lib/types/practice';
 import { getPrompt } from '@/lib/prompts/db-prompts';
-import { persistMessage, readSessionMessages } from '@/lib/persist-activity';
+import { persistMessage, readSessionMessagesForCurrentOrUser } from '@/lib/persist-activity';
 import { getOrCreateCachedContent } from '@/lib/cache';
 import { callGemini, safeParseFallback } from '@/lib/gemini-client';
 
@@ -290,12 +290,10 @@ export async function saveToeflRepeatSummaryAction(
   }
 }
 
-/**
- * Reads all persisted messages for a TOEFL Listen & Repeat session.
- */
+/** Reads all persisted messages for a TOEFL Listen & Repeat session. */
 export async function getToeflRepeatSessionMessagesAction(
   sessionId: string,
   userId: string
 ) {
-  return readSessionMessages(sessionId, userId);
+  return readSessionMessagesForCurrentOrUser(sessionId, userId);
 }
