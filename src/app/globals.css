@@ -10,6 +10,7 @@
   --color-bob-brand: #3660AB;
   --font-sans: var(--font-poppins), system-ui, -apple-system, sans-serif;
   --font-nunito: var(--font-nunito), system-ui, -apple-system, sans-serif;
+  --font-kalam: var(--font-kalam), "Comic Sans MS", cursive;
 }
 
 *,

@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { motion, useReducedMotion } from 'motion/react';
-import { CheckCircle, XCircle } from 'lucide-react';
+import { XCircle } from 'lucide-react';
 import { KETListeningIcon } from '@/components/icons/KETIcons';
 import { CelebrationCard } from '@/components/practice/yl/CelebrationCard';
 import { BobMascotLoader } from '@/components/chat/BobMascotLoader';
@@ -10,6 +10,7 @@ import { BobAvatar } from '@/components/practice/yl/_shared';
 import { pcmToWavBase64 } from '@/lib/audio';
 import {
   generateKETListenCompleteAction,
+  generateKETListenCompleteAudioAction,
   submitKETListenCompleteAction,
   type ListenCompleteExercise,
   type GapResult,
@@ -77,7 +78,7 @@ function stopActiveAudio() {
 
 function PlayIcon() {
   return (
-    <svg viewBox="0 0 24 24" fill="currentColor" className="w-7 h-7">
+    <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
       <path d="M8 5v14l11-7z" />
     </svg>
   );
@@ -85,7 +86,7 @@ function PlayIcon() {
 
 function PauseIcon() {
   return (
-    <svg viewBox="0 0 24 24" fill="currentColor" className="w-7 h-7">
+    <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
       <rect x="6" y="5" width="4" height="14" rx="1" />
       <rect x="14" y="5" width="4" height="14" rx="1" />
     </svg>
@@ -94,7 +95,7 @@ function PauseIcon() {
 
 function ReplayIcon() {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
       <path d="M3 12a9 9 0 1 0 3-6.7" />
       <polyline points="3 4 3 10 9 10" />
     </svg>
@@ -110,7 +111,26 @@ function PencilIcon() {
   );
 }
 
-function AudioPlayer({ audiob64, audiomime }: { audiob64: string; audiomime: string }) {
+type AudioStatus = 'loading' | 'ready' | 'error';
+
+function Spinner() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4 animate-spin" aria-hidden>
+      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeOpacity="0.25" strokeWidth="3" />
+      <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function AudioPlayer({
+  audiob64,
+  audiomime,
+  status,
+}: {
+  audiob64: string;
+  audiomime: string;
+  status: AudioStatus;
+}) {
   const reduceMotion = useReducedMotion();
   const [playing, setPlaying] = useState(false);
   const [hasPlayed, setHasPlayed] = useState(false);
@@ -167,47 +187,69 @@ function AudioPlayer({ audiob64, audiomime }: { audiob64: string; audiomime: str
     }
   };
 
-  const label = playing ? 'Playing…' : hasPlayed ? 'Listen again' : 'Listen';
-
-  if (!audiob64) {
+  if (status === 'error') {
     return (
-      <div className="flex items-center gap-3 bg-gray-50 rounded-2xl px-4 py-3 text-sm text-gray-400">
-        Audio not available — session restored without audio.
+      <div className="sticky top-0 z-10 bg-white/95 backdrop-blur-sm pb-2 pt-4">
+        <div className="rounded-full ring-1 ring-gray-100 bg-gray-50 px-3 py-2 flex items-center gap-3 h-12">
+          <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 bg-gray-200 text-gray-400">
+            <PlayIcon />
+          </div>
+          <p className="flex-1 text-sm font-semibold text-gray-400">Audio unavailable</p>
+        </div>
       </div>
     );
   }
 
-  return (
-    <div className="flex items-center gap-4 bg-sky-50 ring-1 ring-sky-100 rounded-3xl px-4 py-4 w-full">
-      <div className="relative shrink-0">
-        {playing && (
-          <motion.div
-            aria-hidden
-            className="absolute inset-0 rounded-full"
-            style={{ background: ACCENT }}
-            initial={{ scale: 1, opacity: 0.4 }}
-            animate={reduceMotion ? { scale: 1, opacity: 0.25 } : { scale: [1, 1.6], opacity: [0.4, 0] }}
-            transition={reduceMotion ? { duration: 0 } : { duration: 1.2, ease: 'easeOut', repeat: Infinity }}
-          />
-        )}
-        <button
-          type="button"
-          onClick={handlePlay}
-          aria-label={label}
-          className="relative w-16 h-16 rounded-full flex items-center justify-center transition-transform active:scale-95 text-white"
-          style={{ background: ACCENT }}
-        >
-          {playing ? <PauseIcon /> : hasPlayed ? <ReplayIcon /> : <PlayIcon />}
-        </button>
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="h-2 bg-sky-200/70 rounded-full overflow-hidden">
+  if (status === 'loading') {
+    return (
+      <div className="sticky top-0 z-10 bg-white/95 backdrop-blur-sm pb-2 pt-4">
+        <div className="rounded-full ring-1 ring-sky-100 bg-sky-50 px-3 py-2 flex items-center gap-3 h-12">
           <div
-            className="h-full rounded-full transition-all"
+            className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 text-white opacity-60"
+            style={{ background: ACCENT }}
+            aria-hidden
+          >
+            <Spinner />
+          </div>
+          <p className="flex-1 text-xs font-semibold" style={{ color: ACCENT_TEXT }}>Preparing audio…</p>
+        </div>
+      </div>
+    );
+  }
+
+  const label = playing ? 'Playing…' : hasPlayed ? 'Listen again' : 'Listen';
+
+  return (
+    <div className="sticky top-0 z-10 bg-white/95 backdrop-blur-sm pb-2 pt-4">
+      <div className="relative rounded-full ring-1 ring-sky-100 bg-sky-50 px-3 py-2 flex items-center gap-3 h-12 overflow-hidden">
+        <div className="relative shrink-0 w-10 h-10">
+          {playing && (
+            <motion.div
+              aria-hidden
+              className="absolute inset-0 rounded-full"
+              style={{ background: ACCENT }}
+              initial={{ scale: 1, opacity: 0.4 }}
+              animate={reduceMotion ? { scale: 1, opacity: 0.25 } : { scale: [1, 1.6], opacity: [0.4, 0] }}
+              transition={reduceMotion ? { duration: 0 } : { duration: 1.2, ease: 'easeOut', repeat: Infinity }}
+            />
+          )}
+          <button
+            type="button"
+            onClick={handlePlay}
+            aria-label={label}
+            className="relative w-10 h-10 rounded-full flex items-center justify-center transition-transform active:scale-95 text-white"
+            style={{ background: ACCENT }}
+          >
+            {playing ? <PauseIcon /> : hasPlayed ? <ReplayIcon /> : <PlayIcon />}
+          </button>
+        </div>
+        <p className="flex-1 text-xs font-semibold truncate" style={{ color: ACCENT_TEXT }}>{label}</p>
+        <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-[3px] bg-sky-200/60">
+          <div
+            className="h-full transition-all"
             style={{ width: `${Math.round(progress * 100)}%`, background: ACCENT }}
           />
         </div>
-        <p className="text-xs mt-1.5 font-semibold" style={{ color: ACCENT_TEXT }}>{label}</p>
       </div>
     </div>
   );
@@ -215,105 +257,132 @@ function AudioPlayer({ audiob64, audiomime }: { audiob64: string; audiomime: str
 
 function GapInput({
   gap,
+  index,
   value,
   onChange,
-  disabled,
+  isLast,
+  registerRef,
+  onAdvance,
 }: {
   gap: { number: number; label: string };
+  index: number;
   value: string;
   onChange: (v: string) => void;
-  disabled: boolean;
+  isLast: boolean;
+  registerRef: (index: number, el: HTMLInputElement | null) => void;
+  onAdvance: (index: number) => void;
 }) {
+  const reduceMotion = useReducedMotion();
   const [focused, setFocused] = useState(false);
+  const filled = value.trim() !== '';
+  const wasFilledRef = useRef(filled);
+  const [popKey, setPopKey] = useState(0);
+
+  useEffect(() => {
+    if (filled && !wasFilledRef.current) setPopKey((k) => k + 1);
+    wasFilledRef.current = filled;
+  }, [filled]);
+
+  const badgeClass = filled ? 'bg-amber-400 text-white' : 'bg-amber-100 text-amber-300';
+  const underlineColor = filled || focused ? ACCENT : '#E5E7EB';
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if ((e.key === ' ' || e.key === 'Enter') && value.trim() !== '') {
+      e.preventDefault();
+      onAdvance(index);
+    }
+  }
 
   return (
-    <div className="flex gap-3">
-      <div
-        className="w-1.5 rounded-full shrink-0"
-        style={{ background: value.trim() !== '' ? ACCENT : ACCENT_TINT }}
-      />
-      <div className="flex-1 min-w-0 space-y-1.5">
-        <div className="flex items-center gap-2">
-          <span
-            className="w-6 h-6 rounded-full text-xs font-black flex items-center justify-center shrink-0"
-            style={{ background: ACCENT_TINT, color: ACCENT_TEXT }}
-          >
-            {gap.number}
-          </span>
-          <span className="text-sm font-bold text-gray-700">{gap.label}</span>
-        </div>
+    <>
+      <span
+        className={`w-6 h-6 rounded-full text-xs font-black flex items-center justify-center transition-colors duration-200 ${badgeClass}`}
+      >
+        {gap.number}
+      </span>
+      <span className="text-sm font-semibold text-gray-600 leading-tight">{gap.label}</span>
+      <motion.div
+        key={popKey}
+        initial={false}
+        animate={popKey > 0 && !reduceMotion ? { scale: [1, 1.05, 1] } : { scale: 1 }}
+        transition={{ type: 'spring', stiffness: 600, damping: 20 }}
+        className="min-w-0"
+      >
         <input
+          ref={(el) => registerRef(index, el)}
           type="text"
           value={value}
           onChange={(e) => onChange(e.target.value)}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
-          disabled={disabled}
+          onKeyDown={handleKeyDown}
           placeholder="…"
-          className="w-full min-h-[48px] rounded-xl border-2 bg-white px-4 py-3 text-base text-gray-800 placeholder-gray-300 outline-none transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-          style={
-            focused
-              ? { borderColor: ACCENT, boxShadow: `0 0 0 4px ${ACCENT_TINT}` }
-              : { borderColor: '#E5E7EB' }
-          }
+          autoComplete="off"
+          inputMode="text"
+          enterKeyHint={isLast ? 'done' : 'next'}
+          className="w-full bg-transparent border-0 border-b-2 px-1 py-0.5 text-base text-gray-800 placeholder-gray-300 focus:outline-none transition-colors duration-150 font-kalam"
+          style={{ borderColor: underlineColor }}
         />
-      </div>
-    </div>
+      </motion.div>
+    </>
   );
 }
 
-function GapResultRow({ result }: { result: GapResult }) {
+function ResultCheck({ animate }: { animate: boolean }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 text-green-500 shrink-0" aria-hidden>
+      <motion.path
+        d="M5 13l4 4L19 7"
+        initial={animate ? { pathLength: 0 } : false}
+        animate={{ pathLength: 1 }}
+        transition={{ duration: 0.3, ease: 'easeOut' }}
+      />
+    </svg>
+  );
+}
+
+function GapResultRow({ result, animate }: { result: GapResult; animate: boolean }) {
   const correct = result.is_correct;
+  const badgeClass = correct ? 'bg-green-400 text-white' : 'bg-rose-400 text-white';
+  const underlineColor = correct ? '#4ade80' : '#fb7185';
 
   return (
-    <div className="flex gap-3">
-      <div
-        className={[
-          'w-1.5 rounded-full shrink-0',
-          correct ? 'bg-green-300' : 'bg-red-300',
-        ].join(' ')}
-      />
-      <div className="flex-1 min-w-0 space-y-1.5">
-        <div className="flex items-center gap-2">
-          <span
-            className="w-6 h-6 rounded-full text-xs font-black flex items-center justify-center shrink-0"
-            style={{ background: ACCENT_TINT, color: ACCENT_TEXT }}
-          >
-            {result.number}
-          </span>
-          <span className="text-sm font-bold text-gray-700">{result.label}</span>
-          {correct ? (
-            <CheckCircle size={18} className="text-green-500 shrink-0 ml-auto" />
-          ) : (
-            <XCircle size={18} className="text-red-400 shrink-0 ml-auto" />
-          )}
-        </div>
-
-        <div
-          className={[
-            'rounded-xl border-2 px-4 py-2.5',
-            correct ? 'border-green-300 bg-green-50' : 'border-red-200 bg-red-50/60',
-          ].join(' ')}
+    <>
+      <span
+        className={`w-6 h-6 rounded-full text-xs font-black flex items-center justify-center transition-colors duration-200 ${badgeClass}`}
+      >
+        {result.number}
+      </span>
+      <span className="text-sm font-semibold text-gray-600 leading-tight">{result.label}</span>
+      <div className="min-w-0 flex flex-wrap items-center gap-x-2 gap-y-1">
+        <span
+          className="border-b-2 px-1 py-0.5 inline-flex items-center gap-1 font-kalam"
+          style={{ borderColor: underlineColor }}
         >
-          <p
-            className={[
-              'text-base',
-              correct ? 'text-green-800 font-semibold' : 'text-red-600 line-through font-medium',
-            ].join(' ')}
-          >
-            {result.user_input || '—'}
-          </p>
-          {!correct && (
-            <div className="mt-1.5">
-              <span className="inline-flex items-center gap-1 bg-green-50 text-green-700 rounded-full px-2 py-0.5 text-sm font-semibold ring-1 ring-green-200">
-                <span aria-hidden>✓</span>
-                {result.correct_answer}
-              </span>
-            </div>
+          {correct ? (
+            <>
+              <span className="text-base text-green-700 font-semibold">{result.user_input || '—'}</span>
+              <ResultCheck animate={animate} />
+            </>
+          ) : (
+            <span className="text-base text-rose-500 line-through">{result.user_input || '—'}</span>
           )}
-        </div>
+        </span>
+        {!correct && (
+          <>
+            <XCircle size={16} className="text-rose-400 shrink-0" />
+            <motion.span
+              initial={animate ? { x: -8, opacity: 0 } : false}
+              animate={{ x: 0, opacity: 1 }}
+              transition={{ type: 'spring', stiffness: 340, damping: 26 }}
+              className="bg-green-50 text-green-700 rounded-full px-2 py-0.5 text-sm font-semibold"
+            >
+              {result.correct_answer}
+            </motion.span>
+          </>
+        )}
       </div>
-    </div>
+    </>
   );
 }
 
@@ -336,7 +405,27 @@ export function KETListenAndCompletePractice({
   const [correctCount, setCorrectCount] = useState(0);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isNewSession, setIsNewSession] = useState(false);
+  const [audioStatus, setAudioStatus] = useState<AudioStatus>('loading');
+  const [audioB64, setAudioB64] = useState('');
+  const [audioMime, setAudioMime] = useState('audio/L16;codec=pcm;rate=24000');
   const initStartedRef = useRef(false);
+  const audioStartedRef = useRef(false);
+  const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const submitRef = useRef<HTMLButtonElement | null>(null);
+
+  function registerInputRef(index: number, el: HTMLInputElement | null) {
+    inputRefs.current[index] = el;
+  }
+
+  function focusNext(index: number) {
+    const next = inputRefs.current[index + 1];
+    if (next) {
+      next.focus();
+    } else {
+      inputRefs.current[index]?.blur();
+      submitRef.current?.focus();
+    }
+  }
 
   useEffect(() => {
     if (initStartedRef.current) return;
@@ -384,6 +473,34 @@ export function KETListenAndCompletePractice({
 
     void init();
   }, []);
+
+  useEffect(() => {
+    if (audioStartedRef.current) return;
+    const transcript = exercise?.transcript;
+    if (!transcript) return;
+    audioStartedRef.current = true;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const audio = await generateKETListenCompleteAudioAction({ transcript });
+        if (cancelled) return;
+        if (audio.data) {
+          setAudioB64(audio.data);
+          setAudioMime(audio.mimeType);
+          setAudioStatus('ready');
+        } else {
+          setAudioStatus('error');
+        }
+      } catch {
+        if (!cancelled) setAudioStatus('error');
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [exercise?.transcript]);
 
   async function handleSubmit() {
     if (!sessionId || !userId || !exercise) return;
@@ -471,11 +588,7 @@ export function KETListenAndCompletePractice({
 
       {(phase === 'loading' || phase === 'generating') && (
         <div className="flex-1 flex flex-col min-h-0">
-          <BobMascotLoader
-            message={
-              phase === 'loading' ? 'Preparing exercise…' : 'Generating audio…'
-            }
-          />
+          <BobMascotLoader message="Preparing exercise…" />
         </div>
       )}
 
@@ -487,7 +600,10 @@ export function KETListenAndCompletePractice({
 
       {phase === 'ready' && exercise && (
         <>
-          <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+          <div className="flex-1 overflow-y-auto px-4 pb-4">
+            <div className="mx-auto w-full max-w-lg space-y-4">
+            <AudioPlayer audiob64={audioB64} audiomime={audioMime} status={audioStatus} />
+
             <div className="flex items-start gap-2">
               <BobAvatar />
               <div className="bg-gray-50 rounded-2xl rounded-tl-md px-4 py-3 text-sm text-gray-700 leading-relaxed max-w-sm">
@@ -499,50 +615,53 @@ export function KETListenAndCompletePractice({
               initial={isNewSession ? { opacity: 0, y: 8 } : false}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.25 }}
-              className="space-y-4"
             >
-              <AudioPlayer audiob64={exercise.audio_b64} audiomime={exercise.audio_mime} />
-
               <div
-                className="rounded-3xl border border-gray-100 shadow-sm overflow-hidden"
+                className="rounded-3xl px-4 py-4 border border-gray-100 shadow-sm"
                 style={{ background: CARD_SURFACE }}
               >
-                <div className="px-5 pt-5 pb-3 border-b border-gray-100">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span
-                      className="w-7 h-7 rounded-xl flex items-center justify-center shrink-0"
-                      style={{ background: ACCENT_TINT, color: ACCENT_TEXT }}
-                    >
-                      <PencilIcon />
-                    </span>
-                    <p className="text-base font-bold text-gray-800">{exercise.form_title}</p>
-                  </div>
-                  <p className="text-xs text-gray-400 leading-tight">{exercise.context}</p>
+                <div className="flex items-center gap-2 mb-0.5">
+                  <span
+                    className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0"
+                    style={{ background: ACCENT_TINT, color: ACCENT_TEXT }}
+                  >
+                    <PencilIcon />
+                  </span>
+                  <p className="text-sm font-bold text-gray-800">{exercise.form_title}</p>
                 </div>
-                <div className="px-5 py-5 space-y-5">
-                  {exercise.gaps.map((gap) => (
-                    <GapInput
-                      key={gap.number}
-                      gap={gap}
-                      value={answers[gap.number] ?? ''}
-                      onChange={(v) =>
-                        setAnswers((prev) => ({ ...prev, [gap.number]: v }))
-                      }
-                      disabled={false}
-                    />
-                  ))}
+                <p className="text-xs text-gray-400 leading-tight mb-3">{exercise.context}</p>
+                <div className="border-l-[3px] pl-4" style={{ borderColor: ACCENT }}>
+                  <div className="grid grid-cols-[1.5rem_minmax(0,8.5rem)_1fr] items-center gap-x-3 gap-y-3.5">
+                    {exercise.gaps.map((gap, i) => (
+                      <GapInput
+                        key={gap.number}
+                        gap={gap}
+                        index={i}
+                        isLast={i === exercise.gaps.length - 1}
+                        value={answers[gap.number] ?? ''}
+                        onChange={(v) =>
+                          setAnswers((prev) => ({ ...prev, [gap.number]: v }))
+                        }
+                        registerRef={registerInputRef}
+                        onAdvance={focusNext}
+                      />
+                    ))}
+                  </div>
                 </div>
               </div>
             </motion.div>
 
             <div className="h-20" />
+            </div>
           </div>
 
-          <div className="shrink-0 border-t border-gray-100 bg-white px-4 py-3 flex items-center gap-3">
+          <div className="shrink-0 border-t border-gray-100 bg-white px-4 py-3">
+            <div className="mx-auto w-full max-w-lg flex items-center gap-3">
             <p className="text-xs font-semibold text-gray-500 flex-1">
               {answeredCount} of {exercise.gaps.length} answered
             </p>
             <button
+              ref={submitRef}
               type="button"
               onClick={handleSubmit}
               disabled={!allAnswered}
@@ -551,42 +670,45 @@ export function KETListenAndCompletePractice({
             >
               Check answers
             </button>
+            </div>
           </div>
         </>
       )}
 
       {phase === 'finished' && exercise && (
-        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+        <div className="flex-1 overflow-y-auto px-4 py-4">
+          <div className="mx-auto w-full max-w-lg space-y-4">
           <motion.div
             initial={isNewSession ? { opacity: 0, y: 10 } : false}
             animate={{ opacity: 1, y: 0 }}
             transition={{ type: 'spring', stiffness: 280, damping: 24 }}
-            className="rounded-3xl border border-gray-100 shadow-sm overflow-hidden"
+            className="rounded-3xl px-4 py-4 border border-gray-100 shadow-sm"
             style={{ background: CARD_SURFACE }}
           >
-            <div className="px-5 pt-5 pb-3 border-b border-gray-100">
-              <div className="flex items-center gap-2 mb-1">
-                <span
-                  className="w-7 h-7 rounded-xl flex items-center justify-center shrink-0"
-                  style={{ background: ACCENT_TINT, color: ACCENT_TEXT }}
-                >
-                  <PencilIcon />
-                </span>
-                <p className="text-base font-bold text-gray-800">{exercise.form_title}</p>
-              </div>
-              <p className="text-xs text-gray-400 leading-tight">{exercise.context}</p>
+            <div className="flex items-center gap-2 mb-0.5">
+              <span
+                className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0"
+                style={{ background: ACCENT_TINT, color: ACCENT_TEXT }}
+              >
+                <PencilIcon />
+              </span>
+              <p className="text-sm font-bold text-gray-800">{exercise.form_title}</p>
             </div>
-            <div className="px-5 py-5 space-y-5">
-              {gapResults.map((r, i) => (
-                <motion.div
-                  key={r.number}
-                  initial={isNewSession ? { opacity: 0, y: 8 } : false}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ type: 'spring', stiffness: 300, damping: 24, delay: isNewSession ? i * 0.08 : 0 }}
-                >
-                  <GapResultRow result={r} />
-                </motion.div>
-              ))}
+            <p className="text-xs text-gray-400 leading-tight mb-3">{exercise.context}</p>
+            <div className="border-l-[3px] pl-4" style={{ borderColor: ACCENT }}>
+              <div className="grid grid-cols-[1.5rem_minmax(0,8.5rem)_1fr] items-center gap-x-3 gap-y-3.5">
+                {gapResults.map((r, i) => (
+                  <motion.div
+                    key={r.number}
+                    initial={isNewSession ? { opacity: 0, x: -6 } : false}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ type: 'spring', stiffness: 340, damping: 26, delay: isNewSession ? i * 0.07 : 0 }}
+                    className="grid grid-cols-subgrid col-span-3 items-center gap-x-3"
+                  >
+                    <GapResultRow result={r} animate={isNewSession} />
+                  </motion.div>
+                ))}
+              </div>
             </div>
           </motion.div>
 
@@ -599,6 +721,7 @@ export function KETListenAndCompletePractice({
               actionLabel="See my progress"
               animate={isNewSession}
             />
+          </div>
           </div>
         </div>
       )}
