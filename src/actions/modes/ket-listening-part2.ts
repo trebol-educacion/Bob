@@ -2,6 +2,7 @@
 
 import { z } from 'zod';
 import { getPrompt } from '@/lib/prompts/db-prompts';
+import { stripDashes } from '@/lib/text';
 import { callGemini, isOk } from '@/lib/gemini-client';
 import { persistMessage, persistMessages } from '@/lib/persist-activity';
 import { createSessionAction } from '@/actions/sessions';
@@ -100,6 +101,7 @@ function safeParse<T>(schema: z.ZodType<T>, raw: string): T | null {
 export async function generateKETListenCompleteAction(input: {
   sessionId?: string;
 }): Promise<ListenCompleteResult | { error: string }> {
+  const t0 = Date.now();
   let sessionId = input.sessionId;
   let userId: string | undefined;
 
@@ -118,6 +120,8 @@ export async function generateKETListenCompleteAction(input: {
     userId = user.id;
   }
 
+  const tSession = Date.now();
+
   const [generationPrompt, framingText] = await Promise.all([
     getPrompt('cambridge_ket_listening_part2_a2_generation').catch(() => null),
     getPrompt('cambridge_ket_listening_part2_a2_framing').catch(
@@ -125,13 +129,17 @@ export async function generateKETListenCompleteAction(input: {
     ),
   ]);
 
+  const tPrompts = Date.now();
+
+  const cleanFramingText = stripDashes(framingText);
+
   if (!generationPrompt) return { error: 'Could not load generation prompt' };
 
   const geminiResult = await callGemini(
-    { promptKey: 'cambridge_ket_listening_part2_a2_generation', model: MODELS.FLASH_LITE_PREVIEW, userId },
+    { promptKey: 'cambridge_ket_listening_part2_a2_generation', model: MODELS.FLASH_LITE, userId },
     (ai) =>
       ai.models.generateContent({
-        model: MODELS.FLASH_LITE_PREVIEW,
+        model: MODELS.FLASH_LITE,
         contents: [{ role: 'user', parts: [{ text: generationPrompt }] }],
         config: { responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
       })
@@ -143,18 +151,24 @@ export async function generateKETListenCompleteAction(input: {
   const parsed = safeParse(GenerationSchema, rawText);
   if (!parsed) return { error: 'Unexpected model response' };
 
-  const audioResult = await generateSpeechAction(parsed.transcript).catch(() => ({
-    data: '',
-    mimeType: 'audio/L16;codec=pcm;rate=24000',
+  const tGemini = Date.now();
+  console.info(
+    `[ket-listening-part2] session=${tSession - t0}ms prompts=${tPrompts - tSession}ms gemini=${tGemini - tPrompts}ms total=${tGemini - t0}ms`
+  );
+
+  const cleanGaps = parsed.gaps.map((gap) => ({
+    ...gap,
+    label: stripDashes(gap.label),
+    answer: stripDashes(gap.answer),
   }));
 
   const exercise: ListenCompleteExercise = {
-    context: parsed.context,
-    form_title: parsed.form_title,
+    context: stripDashes(parsed.context),
+    form_title: stripDashes(parsed.form_title),
     transcript: parsed.transcript,
-    gaps: parsed.gaps,
-    audio_b64: audioResult.data,
-    audio_mime: audioResult.mimeType,
+    gaps: cleanGaps,
+    audio_b64: '',
+    audio_mime: 'audio/L16;codec=pcm;rate=24000',
   };
 
   persistMessage({
@@ -165,7 +179,7 @@ export async function generateKETListenCompleteAction(input: {
     contentText: null,
     contentJson: {
       kind: 'listen_complete_plan',
-      framing_text: framingText,
+      framing_text: cleanFramingText,
       exercise: {
         context: exercise.context,
         form_title: exercise.form_title,
@@ -178,9 +192,16 @@ export async function generateKETListenCompleteAction(input: {
   return {
     sessionId: sessionId!,
     userId: userId!,
-    framing_text: framingText,
+    framing_text: cleanFramingText,
     exercise,
   };
+}
+
+/** Generates the TTS audio for a Listen and Complete transcript, off the critical path. */
+export async function generateKETListenCompleteAudioAction(input: {
+  transcript: string;
+}): Promise<{ data: string; mimeType: string }> {
+  return generateSpeechAction(input.transcript);
 }
 
 export async function submitKETListenCompleteAction(input: {
@@ -193,9 +214,9 @@ export async function submitKETListenCompleteAction(input: {
     const user_input = (input.answers[gap.number] ?? '').trim();
     return {
       number: gap.number,
-      label: gap.label,
+      label: stripDashes(gap.label),
       user_input,
-      correct_answer: gap.answer,
+      correct_answer: stripDashes(gap.answer),
       is_correct: isAccepted(user_input, gap.answer),
     };
   });
