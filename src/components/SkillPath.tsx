@@ -1,10 +1,11 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { motion } from 'motion/react';
+import { AnimatePresence, motion } from 'motion/react';
 import {
   BookOpen,
   Check,
+  ChevronDown,
   ClipboardList,
   Gift,
   Headphones,
@@ -35,6 +36,7 @@ export interface SkillPathSkill {
   sessions: number;
   lastTest: string | null;
   pending: boolean;
+  history?: Array<{ level: string; avg10: number; activities: Array<{ label: string; score10: number | null; when: string }> }>;
 }
 
 const PALETTE: Record<SkillKey, { c: string; light: string; dark: string; tint: string; soft: string }> = {
@@ -163,6 +165,7 @@ export function SkillPath({
   pickableLevels,
   onTakeTest,
   onChangeLevel,
+  onLevelUp,
 }: {
   skills: SkillPathSkill[];
   title: string;
@@ -170,10 +173,13 @@ export function SkillPath({
   pickableLevels?: Array<{ value: string; label: string }>;
   onTakeTest?: (skill: SkillKey) => void;
   onChangeLevel?: (skill: SkillKey, level: string) => void | Promise<void>;
+  onLevelUp?: (skill: SkillKey) => void | Promise<void>;
 }) {
   const [active, setActive] = useState(0);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [savingLevel, setSavingLevel] = useState(false);
+  const [ascending, setAscending] = useState(false);
+  const [openLevels, setOpenLevels] = useState<Record<string, boolean>>({});
   const trackRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(760);
 
@@ -199,9 +205,25 @@ export function SkillPath({
   const lastPt = pts[pts.length - 1];
   const colHeight = lastPt.y + PAD * 2;
   const showDecor = width >= 680;
+  const reachedGoal = skill.done >= skill.total;
+  const atMax = skill.level === skill.goalLevel;
+  const canLevelUp = reachedGoal && skill.pct / 10 > 7 && !atMax && !!onLevelUp;
   const select = (i: number) => {
     setActive(i);
     setPickerOpen(false);
+  };
+
+  const handleAscend = async () => {
+    if (!onLevelUp || ascending) return;
+    setAscending(true);
+    try {
+      await Promise.all([
+        Promise.resolve(onLevelUp(skill.key)),
+        new Promise((resolve) => setTimeout(resolve, 1800)),
+      ]);
+    } finally {
+      setAscending(false);
+    }
   };
 
   return (
@@ -256,6 +278,58 @@ export function SkillPath({
           })}
         </div>
       </div>
+
+      {skill.history && skill.history.length > 0 && (
+        <div className="max-w-5xl mx-auto px-4 pt-4 space-y-2">
+          {skill.history.map((h) => {
+            const open = !!openLevels[h.level];
+            return (
+              <div key={h.level} className="rounded-2xl border border-trebol-border/40 bg-white overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => setOpenLevels((s) => ({ ...s, [h.level]: !s[h.level] }))}
+                  className="w-full flex items-center gap-2.5 px-3 py-2.5 cursor-pointer"
+                >
+                  <span className="grid place-items-center w-7 h-7 rounded-full shrink-0" style={{ background: `linear-gradient(150deg, ${p.light}, ${p.c})` }}>
+                    <Check size={15} color="#fff" strokeWidth={3.4} />
+                  </span>
+                  <span className="text-sm font-black" style={{ color: p.c }}>{h.level}</span>
+                  <span className="text-[10px] font-black uppercase tracking-wider text-trebol-text/40">Completado</span>
+                  <span className="text-[10px] font-bold text-trebol-text/35">{h.activities.length} actividades</span>
+                  <span className="ml-auto text-[11px] font-black tabular-nums" style={{ color: p.c }}>{h.avg10.toFixed(1)}/10</span>
+                  <ChevronDown size={16} className="text-trebol-text/40 transition-transform" style={{ transform: open ? 'rotate(180deg)' : 'none' }} />
+                </button>
+                <AnimatePresence initial={false}>
+                  {open && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.25 }}
+                      className="overflow-hidden"
+                    >
+                      <div className="px-3 pb-3 pt-1 grid gap-1.5 max-h-72 overflow-y-auto">
+                        {h.activities.map((a, i) => (
+                          <div key={i} className="flex items-center gap-2 rounded-xl bg-trebol-text/[0.03] px-2.5 py-1.5">
+                            <Check size={13} color={p.c} strokeWidth={3} className="shrink-0" />
+                            <span className="text-[12px] font-bold text-trebol-text/80 truncate min-w-0">{a.label}</span>
+                            <span className="ml-auto text-[10px] font-medium text-trebol-text/35 shrink-0">{a.when}</span>
+                            {a.score10 !== null && (
+                              <span className="ml-auto text-[11px] font-black tabular-nums px-1.5 py-0.5 rounded-full shrink-0" style={{ background: p.soft, color: p.c }}>
+                                {a.score10.toFixed(1)}
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       <div className="max-w-5xl mx-auto px-4 pt-4">
         <div className="flex items-center gap-4">
@@ -394,7 +468,36 @@ export function SkillPath({
           const top = pt.y + PAD;
 
           if (it.kind === 'goal') {
-            const reached = skill.done >= skill.total;
+            const gold = 'radial-gradient(120% 120% at 50% 24%, #ffe79c, #ffc73a 80%)';
+            const goldShadow = '0 7px 0 #d99300, 0 16px 22px -7px #ffc73a, 0 2px 1px rgba(255,255,255,.6) inset';
+            const content = (
+              <>
+                <Trophy size={23} color={reachedGoal ? '#fff' : '#8d85a8'} fill={reachedGoal ? '#fff' : 'none'} strokeWidth={2} />
+                <span className="text-[15px] font-black leading-none mt-0.5" style={{ color: reachedGoal ? '#fff' : '#8d85a8' }}>
+                  {skill.goalLevel}
+                </span>
+              </>
+            );
+
+            if (canLevelUp) {
+              return (
+                <button
+                  key="goal"
+                  type="button"
+                  onClick={handleAscend}
+                  disabled={ascending}
+                  className="absolute flex flex-col items-center justify-center cursor-pointer disabled:cursor-default"
+                  style={{ top, left, width: GOAL, height: GOAL, transform: 'translate(-50%, -50%)', borderRadius: '50%', background: gold, boxShadow: goldShadow, zIndex: 8 }}
+                >
+                  <span className="absolute rounded-full animate-ping" style={{ inset: -10, border: '3px solid #ffc73a', opacity: 0.6 }} />
+                  <span className="absolute -top-8 px-2.5 py-0.5 rounded-full bg-white text-[11px] font-black whitespace-nowrap shadow-md" style={{ color: '#c97f12' }}>
+                    ¡Sube a {skill.goalLevel}!
+                  </span>
+                  {content}
+                </button>
+              );
+            }
+
             return (
               <div
                 key="goal"
@@ -406,18 +509,16 @@ export function SkillPath({
                   height: GOAL,
                   transform: 'translate(-50%, -50%)',
                   borderRadius: '50%',
-                  background: reached
-                    ? 'radial-gradient(120% 120% at 50% 24%, #ffe79c, #ffc73a 80%)'
-                    : GREY_BG,
-                  boxShadow: reached
-                    ? '0 7px 0 #d99300, 0 16px 22px -7px #ffc73a, 0 2px 1px rgba(255,255,255,.6) inset'
-                    : GREY_SHADOW,
+                  background: reachedGoal ? gold : GREY_BG,
+                  boxShadow: reachedGoal ? goldShadow : GREY_SHADOW,
                 }}
               >
-                <Trophy size={23} color={reached ? '#fff' : '#8d85a8'} fill={reached ? '#fff' : 'none'} strokeWidth={2} />
-                <span className="text-[15px] font-black leading-none mt-0.5" style={{ color: reached ? '#fff' : '#8d85a8' }}>
-                  {skill.goalLevel}
-                </span>
+                {reachedGoal && !atMax && (
+                  <span className="absolute -top-8 px-2.5 py-0.5 rounded-full bg-white text-[10px] font-black whitespace-nowrap shadow-md" style={{ color: '#8d85a8' }}>
+                    Saca &gt;7 para subir
+                  </span>
+                )}
+                {content}
               </div>
             );
           }
@@ -489,6 +590,49 @@ export function SkillPath({
           );
         })}
       </div>
+
+      <AnimatePresence>
+        {ascending && (
+          <motion.div
+            className="fixed inset-0 z-50 flex items-center justify-center p-6"
+            style={{ background: 'rgba(20,12,40,.55)', backdropFilter: 'blur(4px)' }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            {Array.from({ length: 14 }).map((_, i) => (
+              <motion.span
+                key={i}
+                className="absolute"
+                style={{ left: `${(i * 37) % 100}%`, top: '50%', color: i % 2 ? '#ffc73a' : p.light }}
+                initial={{ y: 0, opacity: 0, scale: 0.4 }}
+                animate={{ y: [-20, -180 - (i % 5) * 40], opacity: [0, 1, 0], scale: [0.4, 1, 0.6], rotate: i * 40 }}
+                transition={{ duration: 1.6, delay: (i % 7) * 0.08, ease: 'easeOut' }}
+              >
+                <Star size={14 + (i % 4) * 6} fill="currentColor" strokeWidth={0} />
+              </motion.span>
+            ))}
+            <motion.div
+              className="relative flex flex-col items-center text-center bg-white rounded-3xl px-8 py-7 shadow-2xl"
+              initial={{ scale: 0.7, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.7, opacity: 0 }}
+              transition={{ type: 'spring', stiffness: 260, damping: 18 }}
+            >
+              <div
+                className="grid place-items-center w-20 h-20 rounded-full mb-3"
+                style={{ background: 'radial-gradient(120% 120% at 50% 24%, #ffe79c, #ffc73a 80%)', boxShadow: '0 7px 0 #d99300, 0 16px 22px -7px #ffc73a' }}
+              >
+                <Trophy size={36} color="#fff" fill="#fff" strokeWidth={2} />
+              </div>
+              <span className="text-xl font-black text-trebol-text">¡Lo lograste!</span>
+              <span className="text-sm font-bold text-trebol-text/60 mt-1">
+                Ahora estás en <span style={{ color: p.c }}>{skill.goalLevel}</span> 🎉
+              </span>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.section>
   );
 }

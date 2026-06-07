@@ -25,6 +25,7 @@ interface Props {
   onAfterReset: () => void;
   onTakeAssessment?: (skill: Skill) => void;
   onChangeLevel?: (skill: Skill, level: string) => Promise<void> | void;
+  onLevelUp?: (skill: Skill, level: string) => Promise<void> | void;
 }
 
 const DEFAULT_ACTIVITY_TARGET = 10;
@@ -35,6 +36,16 @@ const LEVEL_LABEL: Record<string, string> = {
   a2: 'A2',
   b1: 'B1',
   b2: 'B2',
+};
+
+const LEVEL_ORDER: Record<string, number> = {
+  'Pre-A1': 0,
+  'A1': 1,
+  'A2': 2,
+  'B1': 3,
+  'B2': 4,
+  'C1': 5,
+  'C2': 6,
 };
 
 type Skill = 'speaking' | 'reading' | 'listening' | 'writing';
@@ -80,6 +91,12 @@ function nextLevelLabel(current: string): string {
   return LEVEL_LABEL[next] ?? next;
 }
 
+function nextLevelValue(current: string): string {
+  const i = PICKABLE_LEVELS.indexOf(current as (typeof PICKABLE_LEVELS)[number]);
+  if (i < 0) return current;
+  return PICKABLE_LEVELS[Math.min(i + 1, PICKABLE_LEVELS.length - 1)];
+}
+
 const MODE_SKILL_OVERRIDE: Record<string, Skill> = {
   cambridge_starters_part1: 'listening',
   toefl_listen_repeat: 'speaking',
@@ -105,6 +122,20 @@ function inferLevel(mode: string): string {
   if (mode.includes('cpe')) return 'C2';
   if (mode.startsWith('toefl')) return 'TOEFL';
   return 'Free';
+}
+
+function prettyMode(mode: string): string {
+  return mode
+    .replace(/^cambridge_/, '')
+    .replace(/^toefl_/, 'toefl_')
+    .split('_')
+    .map((seg) => {
+      const part = seg.match(/^part(\d+)$/);
+      if (part) return `Part ${part[1]}`;
+      if (['ket', 'pet', 'fce', 'cae', 'cpe', 'toefl'].includes(seg)) return seg.toUpperCase();
+      return seg.charAt(0).toUpperCase() + seg.slice(1);
+    })
+    .join(' ');
 }
 
 function inferFramework(mode: string): string {
@@ -181,6 +212,8 @@ interface Derived {
   goldBadges: number;
   totalStars: number;
   bySkill: Record<Skill, { pct: number; sessions: number }>;
+  bySkillLevel: Record<Skill, Record<string, { pct: number; sessions: number }>>;
+  activitiesByLevel: Record<Skill, Record<string, Array<{ label: string; score10: number | null; created_at: string }>>>;
   groups: Array<{ key: string; title: string; framework: string; level: string; nodes: PathNode[] }>;
 }
 
@@ -195,21 +228,29 @@ function deriveStats(stats: StudentStatsResult): Derived {
     listening: { sum: 0, max: 0, sessions: 0 },
     writing: { sum: 0, max: 0, sessions: 0 },
   };
+  const levelAgg: Record<Skill, Record<string, { sum: number; max: number; sessions: number }>> = {
+    speaking: {}, reading: {}, listening: {}, writing: {},
+  };
   const nodes: PathNode[] = stats.rows.map<PathNode>((r: StudentStatRow) => {
     const pct = r.score_max > 0 ? (r.avg_score / r.score_max) * 100 : 0;
     const stars = starsFor(pct);
     const skill = inferSkill(r.mode);
+    const level = inferLevel(r.mode);
     totalXp += Math.round(r.avg_score * r.sessions_count);
     if (pct >= 80) goldBadges++;
     totalStars += stars;
     skillAgg[skill].sum += r.avg_score * r.sessions_count;
     skillAgg[skill].max += r.score_max * r.sessions_count;
     skillAgg[skill].sessions += r.sessions_count;
+    const la = (levelAgg[skill][level] ??= { sum: 0, max: 0, sessions: 0 });
+    la.sum += r.avg_score * r.sessions_count;
+    la.max += r.score_max * r.sessions_count;
+    la.sessions += r.sessions_count;
     return {
       mode: r.mode,
-      label: MODE_LABEL[r.mode] ?? r.mode,
+      label: MODE_LABEL[r.mode] ?? prettyMode(r.mode),
       framework: inferFramework(r.mode),
-      level: inferLevel(r.mode),
+      level,
       skill,
       pct,
       stars,
@@ -238,6 +279,36 @@ function deriveStats(stats: StudentStatsResult): Derived {
     },
   };
 
+  const bySkillLevel: Record<Skill, Record<string, { pct: number; sessions: number }>> = {
+    speaking: {}, reading: {}, listening: {}, writing: {},
+  };
+  for (const skill of ['speaking', 'reading', 'listening', 'writing'] as Skill[]) {
+    for (const [level, a] of Object.entries(levelAgg[skill])) {
+      bySkillLevel[skill][level] = {
+        pct: a.max > 0 ? (a.sum / a.max) * 100 : 0,
+        sessions: a.sessions,
+      };
+    }
+  }
+
+  const activitiesByLevel: Record<Skill, Record<string, Array<{ label: string; score10: number | null; created_at: string }>>> = {
+    speaking: {}, reading: {}, listening: {}, writing: {},
+  };
+  for (const a of stats.activities) {
+    const skill = inferSkill(a.mode);
+    const level = inferLevel(a.mode);
+    (activitiesByLevel[skill][level] ??= []).push({
+      label: MODE_LABEL[a.mode] ?? prettyMode(a.mode),
+      score10: a.score10,
+      created_at: a.created_at,
+    });
+  }
+  for (const skill of ['speaking', 'reading', 'listening', 'writing'] as Skill[]) {
+    for (const level of Object.keys(activitiesByLevel[skill])) {
+      activitiesByLevel[skill][level].sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
+    }
+  }
+
   const grouped = new Map<string, { title: string; framework: string; level: string; nodes: PathNode[] }>();
   for (const n of nodes) {
     const key = `${n.framework}::${n.level}`;
@@ -252,10 +323,10 @@ function deriveStats(stats: StudentStatsResult): Derived {
     nodes: g.nodes.slice().sort((a, b) => a.order - b.order),
   }));
 
-  return { streak, totalXp, goldBadges, totalStars, bySkill, groups };
+  return { streak, totalXp, goldBadges, totalStars, bySkill, bySkillLevel, activitiesByLevel, groups };
 }
 
-export function StudentStatsPanel({ onBack, onTakeAssessment, onChangeLevel }: Props) {
+export function StudentStatsPanel({ onBack, onTakeAssessment, onChangeLevel, onLevelUp }: Props) {
   const t = useTranslations('dashboard');
   const { skillLevels, pendingAssessments } = useOrganization();
   const [stats, setStats] = useState<StudentStatsResult | null>(null);
@@ -325,13 +396,25 @@ export function StudentStatsPanel({ onBack, onTakeAssessment, onChangeLevel }: P
     if (!derived) return [];
     return (['speaking', 'reading', 'listening', 'writing'] as Skill[]).map((skill) => {
       const current = skillLevels?.[skill]?.cefr_level ?? null;
-      const stat = derived.bySkill[skill];
+      const currentLabel = current ? LEVEL_LABEL[current] ?? current : null;
+      const stat = (currentLabel && derived.bySkillLevel[skill]?.[currentLabel]) || { pct: 0, sessions: 0 };
       const la = lastAssessments[skill];
       const target = (current && targets[skill]?.[current]) || DEFAULT_ACTIVITY_TARGET;
+      const curOrder = currentLabel ? LEVEL_ORDER[currentLabel] ?? -1 : -1;
+      const history = curOrder > 0
+        ? Object.entries(derived.activitiesByLevel[skill])
+            .filter(([level, acts]) => acts.length > 0 && (LEVEL_ORDER[level] ?? -1) >= 0 && (LEVEL_ORDER[level] ?? -1) < curOrder)
+            .sort((a, b) => (LEVEL_ORDER[a[0]] ?? 0) - (LEVEL_ORDER[b[0]] ?? 0))
+            .map(([level, acts]) => ({
+              level,
+              avg10: (derived.bySkillLevel[skill]?.[level]?.pct ?? 0) / 10,
+              activities: acts.map((a) => ({ label: a.label, score10: a.score10, when: relativeTime(a.created_at) })),
+            }))
+        : [];
       return {
         key: skill,
         label: t(SKILL_LABEL_KEY[skill]),
-        level: current ? LEVEL_LABEL[current] ?? current : '—',
+        level: currentLabel ?? '—',
         goalLevel: nextLevelLabel(current ?? 'a1'),
         cefrValue: current,
         done: Math.min(stat.sessions, target),
@@ -340,6 +423,7 @@ export function StudentStatsPanel({ onBack, onTakeAssessment, onChangeLevel }: P
         sessions: stat.sessions,
         lastTest: la ? `${la.cefr_band.replace('_', ' ')} · ${relativeTime(la.occurred_at)}` : null,
         pending: !!pendingAssessments[skill],
+        history,
       };
     });
   }, [derived, skillLevels, lastAssessments, pendingAssessments, targets, t]);
@@ -499,6 +583,17 @@ export function StudentStatsPanel({ onBack, onTakeAssessment, onChangeLevel }: P
             pickableLevels={pickableLevels}
             onTakeTest={onTakeAssessment}
             onChangeLevel={onChangeLevel}
+            onLevelUp={
+              onLevelUp
+                ? async (skill) => {
+                    const current = skillLevels?.[skill]?.cefr_level ?? 'a1';
+                    const next = nextLevelValue(current);
+                    if (next === current) return;
+                    await onLevelUp(skill, next);
+                    await load();
+                  }
+                : undefined
+            }
           />
         )}
       </div>

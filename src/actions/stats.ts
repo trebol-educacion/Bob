@@ -10,17 +10,24 @@ export interface StudentStatRow {
   last_done: string;
 }
 
+export interface StudentActivityEntry {
+  mode: string;
+  score10: number | null;
+  created_at: string;
+}
+
 export interface StudentStatsResult {
   rows: StudentStatRow[];
   total_sessions: number;
   global_avg: number | null;
   session_dates: string[];
+  activities: StudentActivityEntry[];
 }
 
 export async function getStudentStatsAction(): Promise<StudentStatsResult> {
   const supabase = await createSupabaseServer();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { rows: [], total_sessions: 0, global_avg: null, session_dates: [] };
+  if (!user) return { rows: [], total_sessions: 0, global_avg: null, session_dates: [], activities: [] };
 
   const { data: activityRows } = await supabase
     .from('bob_activity_results')
@@ -74,11 +81,18 @@ export async function getStudentStatsAction(): Promise<StudentStatsResult> {
 
   const sessionDates = results.map((r) => r.created_at as string);
 
+  const activities: StudentActivityEntry[] = results.map((r) => ({
+    mode: r.mode as string,
+    score10: (r.score_10 as number | null),
+    created_at: r.created_at as string,
+  }));
+
   return {
     rows,
     total_sessions: totalSessions,
     global_avg: globalAvg,
     session_dates: sessionDates,
+    activities,
   };
 }
 

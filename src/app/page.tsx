@@ -18,7 +18,7 @@ import { AssessmentReadingRunner } from '@/components/assessment/AssessmentReadi
 import { AssessmentWritingRunner } from '@/components/assessment/AssessmentWritingRunner';
 import { AssessmentResultCard } from '@/components/assessment/AssessmentResultCard';
 import { startAssessmentAction } from '@/actions/assessment';
-import { applyDefaultSkillLevelAction, resetOwnSkillLevelAction } from '@/actions/skills';
+import { applyDefaultSkillLevelAction, promoteSkillLevelAction, resetOwnSkillLevelAction } from '@/actions/skills';
 import { createSessionAction } from '@/actions/sessions';
 import { createSupabaseBrowser } from '@/lib/supabase/browser-client';
 import { Navbar } from '@/components/Navbar';
@@ -594,6 +594,12 @@ export default function App() {
                   }}
                   onChangeLevel={async (skill, level) => {
                     const result = await applyDefaultSkillLevelAction(skill, level as CefrLevel);
+                    if (result.ok) {
+                      await refreshSkillLevels();
+                    }
+                  }}
+                  onLevelUp={async (skill, level) => {
+                    const result = await promoteSkillLevelAction(skill, level as CefrLevel);
                     if (result.ok) {
                       await refreshSkillLevels();
                     }

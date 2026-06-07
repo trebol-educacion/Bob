@@ -408,3 +408,38 @@ export async function applyDefaultSkillLevelAction(
     return { ok: false };
   }
 }
+
+/**
+ * Performance-based level promotion (D9-15): writes the new CEFR level for the
+ * student's skill with origin 'promotion'. Caller is responsible for having
+ * verified the gate (completed target activities and average > 7). No-op if the
+ * requested level equals the current one.
+ */
+export async function promoteSkillLevelAction(
+  skill: Skill,
+  cefrLevel: CefrLevel,
+): Promise<{ ok: boolean }> {
+  try {
+    const supabase = await createSupabaseServer();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { ok: false };
+
+    const { error } = await supabase
+      .from('bob_skill_levels')
+      .upsert(
+        {
+          user_id: user.id,
+          skill,
+          cefr_level: cefrLevel,
+          origin: 'promotion',
+          confidence: null,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'user_id,skill' },
+      );
+
+    return { ok: !error };
+  } catch {
+    return { ok: false };
+  }
+}
