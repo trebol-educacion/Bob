@@ -2,6 +2,7 @@
 
 import { z } from 'zod';
 import { getPrompt } from '@/lib/prompts/db-prompts';
+import { stripDashes } from '@/lib/text';
 import { callGemini, isOk } from '@/lib/gemini-client';
 import { persistMessage, persistMessages } from '@/lib/persist-activity';
 import { createSessionAction } from '@/actions/sessions';
@@ -102,7 +103,7 @@ export async function generateKETListenAndChooseAction(input: {
   if (!sessionId) {
     const result = await createSessionAction({
       mode: 'cambridge_ket_listening_part1',
-      title: 'Listening Part 1 — Listen and Choose',
+      title: 'Listening Part 1: Listen and Choose',
     });
     if (!result.data) {
       return { error: result.error ?? 'Could not create session' };
@@ -120,13 +121,15 @@ export async function generateKETListenAndChooseAction(input: {
     getPrompt('cambridge_ket_listening_part1_a2_generation').catch(() => null),
     getPrompt('cambridge_ket_listening_part1_a2_framing').catch(
       () =>
-        'You will hear 5 short conversations. After each one, choose the picture that matches what you heard — A, B or C.'
+        'You will hear 5 short conversations. After each one, choose the picture that matches what you heard, A, B or C.'
     ),
   ]);
 
   if (!generationPrompt) {
     return { error: 'Could not load generation prompt' };
   }
+
+  const cleanFramingText = stripDashes(framingText);
 
   const geminiResult = await callGemini(
     { promptKey: 'cambridge_ket_listening_part1_a2_generation', model: MODELS.FLASH_LITE_PREVIEW, userId },
@@ -169,14 +172,15 @@ export async function generateKETListenAndChooseAction(input: {
     const imageUrls = allImageUrls.slice(sliceStart, sliceStart + 3);
     const optionsWithImages = item.options.map((opt, optIdx) => ({
       ...opt,
+      description: stripDashes(opt.description),
       image_url: imageUrls[optIdx] ?? '',
     }));
     const audio = audios[itemIdx] ?? { data: '', mimeType: 'audio/L16;codec=pcm;rate=24000' };
     return {
       number: item.number,
-      context: item.context,
+      context: stripDashes(item.context),
       dialogue: item.dialogue,
-      question: item.question,
+      question: stripDashes(item.question),
       options: optionsWithImages,
       correct_option: item.correct_option,
       audio_b64: audio.data,
@@ -186,7 +190,7 @@ export async function generateKETListenAndChooseAction(input: {
 
   const planWithoutAudio = {
     kind: 'listening_plan',
-    framing_text: framingText,
+    framing_text: cleanFramingText,
     items: resolvedItems.map((item) => ({
       number: item.number,
       context: item.context,
@@ -209,7 +213,7 @@ export async function generateKETListenAndChooseAction(input: {
   return {
     sessionId: sessionId!,
     userId: userId!,
-    framingText,
+    framingText: cleanFramingText,
     items: resolvedItems,
   };
 }

@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
-import { motion } from 'motion/react';
+import { motion, useReducedMotion } from 'motion/react';
 import { CheckCircle, XCircle } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { KETListeningIcon } from '@/components/icons/KETIcons';
@@ -17,6 +17,12 @@ import {
   type ListenAnswerResult,
 } from '@/actions/modes/ket-listening-part1';
 import type { StoredMessage } from '@/actions/messages';
+
+const ACCENT = '#F8AC37';
+const ACCENT_DARK = '#D8881C';
+const ACCENT_TEXT = '#B5710F';
+const ACCENT_TINT = 'color-mix(in oklab, #F8AC37 14%, white)';
+const CARD_SURFACE = '#FAFAF8';
 
 export interface KETListenAndChoosePracticeProps {
   onBack: () => void;
@@ -72,7 +78,7 @@ function stopActiveAudio(): void {
 
 function PlayIcon() {
   return (
-    <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+    <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
       <path d="M8 5v14l11-7z" />
     </svg>
   );
@@ -80,7 +86,7 @@ function PlayIcon() {
 
 function PauseIcon() {
   return (
-    <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+    <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
       <rect x="6" y="5" width="4" height="14" rx="1" />
       <rect x="14" y="5" width="4" height="14" rx="1" />
     </svg>
@@ -89,7 +95,7 @@ function PauseIcon() {
 
 function ReplayIcon() {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
       <path d="M3 12a9 9 0 1 0 3-6.7" />
       <polyline points="3 4 3 10 9 10" />
     </svg>
@@ -98,6 +104,7 @@ function ReplayIcon() {
 
 function AudioPlayer({ audiob64, audiomime, itemNumber }: { audiob64: string; audiomime: string; itemNumber: number }) {
   const t = useTranslations('cambridge');
+  const reduceMotion = useReducedMotion();
   const [playing, setPlaying] = useState(false);
   const [hasPlayed, setHasPlayed] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -160,27 +167,36 @@ function AudioPlayer({ audiob64, audiomime, itemNumber }: { audiob64: string; au
     : t('ket.listenAndChoose.listen');
 
   return (
-    <div className="flex items-center gap-3 bg-white ring-1 ring-gray-100 rounded-2xl px-3 py-2.5 w-full max-w-xs">
-      <button
-        type="button"
-        onClick={handlePlay}
-        aria-label={label}
-        className={[
-          'w-10 h-10 rounded-full flex items-center justify-center shrink-0 transition-all text-white',
-          playing ? 'animate-pulse' : '',
-        ].join(' ')}
-        style={{ background: 'var(--color-bob-brand)' }}
-      >
-        {playing ? <PauseIcon /> : hasPlayed ? <ReplayIcon /> : <PlayIcon />}
-      </button>
+    <div className="flex items-center gap-3 bg-sky-50 ring-1 ring-sky-100 rounded-2xl px-3 py-2.5 w-full max-w-xs">
+      <div className="relative shrink-0">
+        {playing && (
+          <motion.div
+            aria-hidden
+            className="absolute inset-0 rounded-full"
+            style={{ background: ACCENT }}
+            initial={{ scale: 1, opacity: 0.4 }}
+            animate={reduceMotion ? { scale: 1, opacity: 0.25 } : { scale: [1, 1.6], opacity: [0.4, 0] }}
+            transition={reduceMotion ? { duration: 0 } : { duration: 1.2, ease: 'easeOut', repeat: Infinity }}
+          />
+        )}
+        <button
+          type="button"
+          onClick={handlePlay}
+          aria-label={label}
+          className="relative w-14 h-14 rounded-full flex items-center justify-center transition-transform active:scale-95 text-white"
+          style={{ background: ACCENT }}
+        >
+          {playing ? <PauseIcon /> : hasPlayed ? <ReplayIcon /> : <PlayIcon />}
+        </button>
+      </div>
       <div className="flex-1 min-w-0">
-        <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+        <div className="h-2 bg-sky-200/70 rounded-full overflow-hidden">
           <div
-            className="h-full transition-all"
-            style={{ width: `${Math.round(progress * 100)}%`, background: 'var(--color-bob-brand)' }}
+            className="h-full rounded-full transition-all"
+            style={{ width: `${Math.round(progress * 100)}%`, background: ACCENT }}
           />
         </div>
-        <p className="text-[11px] text-gray-400 mt-1">{label}</p>
+        <p className="text-[11px] mt-1" style={{ color: ACCENT_TEXT }}>{label}</p>
       </div>
       <span className="text-[10px] font-bold text-gray-300 shrink-0">#{itemNumber}</span>
     </div>
@@ -194,6 +210,7 @@ function OptionCard({
   selected,
   onSelect,
   disabled,
+  reduceMotion,
 }: {
   optionId: 'A' | 'B' | 'C';
   description: string;
@@ -201,6 +218,7 @@ function OptionCard({
   selected: boolean;
   onSelect: () => void;
   disabled: boolean;
+  reduceMotion: boolean;
 }) {
   return (
     <button
@@ -208,49 +226,60 @@ function OptionCard({
       onClick={onSelect}
       disabled={disabled}
       className={[
-        'flex items-center gap-3 rounded-xl border p-2 text-left w-full transition-colors cursor-pointer',
-        selected ? '' : 'border-gray-100 bg-gray-50',
+        'flex flex-col text-left w-full cursor-pointer transition-transform active:translate-y-0.5',
+        selected ? '-translate-y-0.5' : '',
         disabled ? 'cursor-not-allowed' : '',
       ]
         .filter(Boolean)
         .join(' ')}
-      style={
-        selected
-          ? {
-              borderColor: 'color-mix(in oklab, var(--color-bob-brand) 50%, white)',
-              background: 'color-mix(in oklab, var(--color-bob-brand) 10%, white)',
-            }
-          : undefined
-      }
     >
-      <span
+      <div
         className={[
-          'shrink-0 w-7 h-7 rounded-full border text-xs font-black flex items-center justify-center',
-          selected ? 'text-white' : 'border-gray-300 bg-white text-gray-500',
+          'relative aspect-square w-full rounded-2xl overflow-hidden bg-gray-100',
+          selected ? 'border-[3px]' : 'border-2 border-gray-200',
         ].join(' ')}
         style={
           selected
-            ? { borderColor: 'var(--color-bob-brand)', background: 'var(--color-bob-brand)' }
+            ? {
+                borderColor: ACCENT,
+                boxShadow: `0 0 0 4px ${ACCENT_TINT}, 0 6px 16px -6px ${ACCENT_DARK}`,
+              }
             : undefined
         }
       >
-        {optionId}
-      </span>
-      <div className="w-14 h-14 shrink-0 rounded-lg overflow-hidden bg-gray-100 relative">
         {imageUrl ? (
           <Image
             src={imageUrl}
             alt={description}
             fill
-            sizes="56px"
+            sizes="(max-width: 640px) 33vw, 160px"
             className="object-cover"
             unoptimized={imageUrl.startsWith('data:')}
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-gray-300 text-lg">?</div>
+          <div className="w-full h-full flex items-center justify-center text-gray-300 text-2xl">?</div>
+        )}
+
+        <span className="absolute top-1 left-1 w-6 h-6 rounded-full bg-white/85 text-gray-500 text-[10px] font-black flex items-center justify-center shadow-sm">
+          {optionId}
+        </span>
+
+        {selected && (
+          <motion.div
+            className="absolute top-1 right-1"
+            initial={reduceMotion ? false : { scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ type: 'spring', stiffness: 500, damping: 22 }}
+          >
+            <span className="w-6 h-6 rounded-full bg-white flex items-center justify-center" style={{ boxShadow: `0 0 0 1px ${ACCENT}` }}>
+              <CheckCircle size={18} style={{ color: ACCENT }} />
+            </span>
+          </motion.div>
         )}
       </div>
-      <span className="text-xs text-gray-700 leading-snug flex-1">{description}</span>
+      <span className="mt-1.5 text-[13px] font-semibold text-gray-700 text-center leading-snug line-clamp-2">
+        {description}
+      </span>
     </button>
   );
 }
@@ -267,19 +296,21 @@ function ListenCard({
   disabled: boolean;
 }) {
   const t = useTranslations('cambridge');
+  const reduceMotion = useReducedMotion();
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.2, delay: item.number * 0.07 }}
-      className="rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden"
+      className="rounded-3xl border border-gray-100 shadow-sm overflow-hidden"
+      style={{ background: CARD_SURFACE }}
     >
       <div className="px-4 pt-4 pb-3 space-y-3">
         <div className="flex items-center gap-2">
           <span
-            className="w-6 h-6 rounded-full text-bob-brand text-xs font-black flex items-center justify-center shrink-0"
-            style={{ background: 'color-mix(in oklab, var(--color-bob-brand) 14%, white)' }}
+            className="w-6 h-6 rounded-full text-xs font-black flex items-center justify-center shrink-0"
+            style={{ background: ACCENT_TINT, color: ACCENT_TEXT }}
           >
             {item.number}
           </span>
@@ -295,18 +326,21 @@ function ListenCard({
         <p className="text-xs font-semibold text-gray-600">{t('ket.listenAndChoose.questionLabel')} {item.question}</p>
       </div>
 
-      <div className="px-4 pb-4 space-y-2">
-        {item.options.map((opt) => (
-          <OptionCard
-            key={opt.id}
-            optionId={opt.id}
-            description={opt.description}
-            imageUrl={opt.image_url}
-            selected={selected === opt.id}
-            onSelect={() => onSelect(opt.id)}
-            disabled={disabled}
-          />
-        ))}
+      <div className="px-4 pb-4">
+        <div className="grid grid-cols-3 gap-2.5">
+          {item.options.map((opt) => (
+            <OptionCard
+              key={opt.id}
+              optionId={opt.id}
+              description={opt.description}
+              imageUrl={opt.image_url}
+              selected={selected === opt.id}
+              onSelect={() => onSelect(opt.id)}
+              disabled={disabled}
+              reduceMotion={!!reduceMotion}
+            />
+          ))}
+        </div>
       </div>
     </motion.div>
   );
@@ -318,12 +352,14 @@ function ResultOptionRow({
   imageUrl,
   isChosen,
   isCorrectOption,
+  reduceMotion,
 }: {
   optionId: 'A' | 'B' | 'C';
   description: string;
   imageUrl: string;
   isChosen: boolean;
   isCorrectOption: boolean;
+  reduceMotion: boolean;
 }) {
   const showGreen = isCorrectOption;
   const showRed = isChosen && !isCorrectOption;
@@ -331,48 +367,70 @@ function ResultOptionRow({
   return (
     <div
       className={[
-        'flex items-center gap-3 rounded-xl border p-2 text-sm',
-        showGreen ? 'border-green-300 bg-green-50' : '',
-        showRed ? 'border-red-300 bg-red-50' : '',
-        !showGreen && !showRed ? 'border-gray-100 bg-gray-50 opacity-50' : '',
+        'flex flex-col text-left w-full',
+        !showGreen && !showRed ? 'opacity-50' : '',
       ]
         .filter(Boolean)
         .join(' ')}
     >
-      <span
+      <div
         className={[
-          'shrink-0 w-7 h-7 rounded-full border text-xs font-black flex items-center justify-center',
-          showGreen ? 'border-green-500 bg-green-500 text-white' : '',
-          showRed ? 'border-red-400 bg-red-400 text-white' : '',
-          !showGreen && !showRed ? 'border-gray-300 bg-white text-gray-400' : '',
+          'relative aspect-square w-full rounded-2xl overflow-hidden bg-gray-100 border-2',
+          showGreen ? 'border-[3px] border-green-400' : '',
+          showRed ? 'border-[3px] border-red-400' : '',
+          !showGreen && !showRed ? 'border-gray-200' : '',
         ]
           .filter(Boolean)
           .join(' ')}
       >
-        {optionId}
-      </span>
-      <div className="w-12 h-12 shrink-0 rounded-lg overflow-hidden bg-gray-100 relative">
         {imageUrl ? (
           <Image
             src={imageUrl}
             alt={description}
             fill
-            sizes="48px"
+            sizes="(max-width: 640px) 33vw, 160px"
             className="object-cover"
             unoptimized={imageUrl.startsWith('data:')}
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-gray-300">?</div>
+          <div className="w-full h-full flex items-center justify-center text-gray-300 text-2xl">?</div>
+        )}
+
+        <span className="absolute top-1 left-1 w-6 h-6 rounded-full bg-white/85 text-gray-500 text-[10px] font-black flex items-center justify-center shadow-sm">
+          {optionId}
+        </span>
+
+        {showGreen && (
+          <motion.div
+            className="absolute top-1 right-1"
+            initial={reduceMotion ? false : { scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ type: 'spring', stiffness: 500, damping: 22 }}
+          >
+            <span className="w-6 h-6 rounded-full bg-white flex items-center justify-center shadow-sm">
+              <CheckCircle size={18} className="text-green-500" />
+            </span>
+          </motion.div>
+        )}
+        {showRed && (
+          <motion.div
+            className="absolute top-1 right-1"
+            initial={reduceMotion ? false : { scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ type: 'spring', stiffness: 500, damping: 22 }}
+          >
+            <span className="w-6 h-6 rounded-full bg-white flex items-center justify-center shadow-sm">
+              <XCircle size={18} className="text-red-400" />
+            </span>
+          </motion.div>
         )}
       </div>
       <span className={[
-        'text-xs leading-snug flex-1',
+        'mt-1.5 text-[13px] font-semibold text-center leading-snug line-clamp-2',
         showGreen ? 'text-green-800' : showRed ? 'text-red-700' : 'text-gray-400',
       ].join(' ')}>
         {description}
       </span>
-      {showGreen && <CheckCircle size={15} className="text-green-500 shrink-0" />}
-      {showRed && <XCircle size={15} className="text-red-400 shrink-0" />}
     </div>
   );
 }
@@ -387,55 +445,72 @@ function ResultCard({
   animate: boolean;
 }) {
   const t = useTranslations('cambridge');
+  const reduceMotion = useReducedMotion();
   const [showTranscript, setShowTranscript] = useState(false);
+
+  const shake = animate && !reduceMotion && !result.isCorrect;
 
   return (
     <motion.div
       initial={animate ? { opacity: 0, y: 10 } : false}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.2, delay: item.number * 0.07 }}
-      className="rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden"
+      animate={
+        shake
+          ? { opacity: 1, y: 0, x: [0, -6, 6, -4, 4, 0] }
+          : { opacity: 1, y: 0 }
+      }
+      transition={
+        shake
+          ? { type: 'spring', stiffness: 280, damping: 24, delay: item.number * 0.1, x: { duration: 0.4, delay: item.number * 0.1 } }
+          : { type: 'spring', stiffness: 280, damping: 24, delay: item.number * 0.1 }
+      }
+      className="rounded-3xl border border-gray-100 shadow-sm overflow-hidden"
+      style={{ background: CARD_SURFACE }}
     >
       <div className="px-4 pt-4 pb-2 space-y-2">
         <div className="flex items-center gap-2">
           <span
-            className="w-6 h-6 rounded-full text-bob-brand text-xs font-black flex items-center justify-center shrink-0"
-            style={{ background: 'color-mix(in oklab, var(--color-bob-brand) 14%, white)' }}
+            className="w-6 h-6 rounded-full text-xs font-black flex items-center justify-center shrink-0"
+            style={{ background: ACCENT_TINT, color: ACCENT_TEXT }}
           >
             {item.number}
           </span>
           <p className="text-xs text-gray-400 leading-tight">{item.context}</p>
-          {result.isCorrect ? (
-            <span className="ml-auto text-[10px] font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded-full">
-              Correct
-            </span>
-          ) : (
-            <span className="ml-auto text-[10px] font-bold text-red-500 bg-red-50 px-2 py-0.5 rounded-full">
-              Incorrect
-            </span>
-          )}
+          <motion.span
+            initial={animate && !reduceMotion ? { scale: 0 } : false}
+            animate={{ scale: 1 }}
+            transition={{ type: 'spring', stiffness: 400, damping: 18, delay: item.number * 0.1 + 0.15 }}
+            className={[
+              'ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full',
+              result.isCorrect ? 'text-green-600 bg-green-50' : 'text-red-500 bg-red-50',
+            ].join(' ')}
+          >
+            {result.isCorrect ? 'Correct' : 'Incorrect'}
+          </motion.span>
         </div>
         <p className="text-xs font-semibold text-gray-600">{item.question}</p>
       </div>
 
-      <div className="px-4 pb-3 space-y-2">
-        {item.options.map((opt) => (
-          <ResultOptionRow
-            key={opt.id}
-            optionId={opt.id}
-            description={opt.description}
-            imageUrl={opt.image_url}
-            isChosen={result.chosen === opt.id}
-            isCorrectOption={opt.id === result.correct_option}
-          />
-        ))}
+      <div className="px-4 pb-3">
+        <div className="grid grid-cols-3 gap-2.5">
+          {item.options.map((opt) => (
+            <ResultOptionRow
+              key={opt.id}
+              optionId={opt.id}
+              description={opt.description}
+              imageUrl={opt.image_url}
+              isChosen={result.chosen === opt.id}
+              isCorrectOption={opt.id === result.correct_option}
+              reduceMotion={!!reduceMotion}
+            />
+          ))}
+        </div>
       </div>
 
       <div className="px-4 pb-4">
         <button
           type="button"
           onClick={() => setShowTranscript((v) => !v)}
-          className="text-[11px] text-bob-brand font-semibold underline underline-offset-2 transition-colors"
+          className="bg-gray-100 hover:bg-gray-200 rounded-full px-3 py-1.5 text-[11px] font-semibold text-gray-600 transition-colors"
         >
           {showTranscript
             ? t('ket.listenAndChoose.hideTranscript')
@@ -569,6 +644,7 @@ export function KETListenAndChoosePractice({
 
   const answeredCount = Object.keys(answers).length;
   const allAnswered = answeredCount === items.length && items.length > 0;
+  const progressPct = items.length > 0 ? (answeredCount / items.length) * 100 : 0;
 
   if (errorMsg) {
     return (
@@ -591,28 +667,40 @@ export function KETListenAndChoosePractice({
         <button
           type="button"
           onClick={onBack}
-          className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-600"
+          className="w-11 h-11 flex items-center justify-center rounded-xl hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-600 text-lg"
           aria-label={t('ket.listenAndChoose.back')}
         >
           ←
         </button>
         <div
           className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0"
-          style={{ background: 'color-mix(in oklab, var(--color-bob-brand) 12%, white)' }}
+          style={{ background: ACCENT_TINT, color: ACCENT }}
         >
-          <KETListeningIcon size={18} className="text-bob-brand" />
+          <KETListeningIcon size={18} />
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-bold text-gray-800 truncate">{t('ket.listenAndChoose.headerTitle')}</p>
           <p className="text-xs text-gray-400">{t('ket.listenAndChoose.headerSubtitle')}</p>
         </div>
         <span
-          className="shrink-0 px-2 py-0.5 rounded-full text-bob-brand text-[10px] font-bold uppercase tracking-widest"
-          style={{ background: 'color-mix(in oklab, var(--color-bob-brand) 12%, white)' }}
+          className="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-widest"
+          style={{ background: ACCENT_TINT, color: ACCENT_TEXT }}
         >
           {t('ket.listenAndChoose.partBadge')}
         </span>
       </div>
+
+      {phase === 'ready' && (
+        <div className="h-1.5 w-full bg-gray-100 shrink-0 overflow-hidden">
+          <motion.div
+            className="h-full rounded-full"
+            style={{ background: ACCENT }}
+            initial={false}
+            animate={{ width: `${progressPct}%` }}
+            transition={{ type: 'spring', stiffness: 200, damping: 28 }}
+          />
+        </div>
+      )}
 
       {(phase === 'loading' || phase === 'generating') && (
         <div className="flex-1 flex flex-col min-h-0">
@@ -637,7 +725,7 @@ export function KETListenAndChoosePractice({
           <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
             <div className="flex items-start gap-2">
               <BobAvatar />
-              <div className="bg-gray-50 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-gray-700 leading-relaxed max-w-sm">
+              <div className="bg-gray-50 rounded-2xl rounded-tl-md px-4 py-3 text-sm text-gray-700 leading-relaxed max-w-sm">
                 {framingText}
               </div>
             </div>
@@ -656,7 +744,7 @@ export function KETListenAndChoosePractice({
           </div>
 
           <div className="shrink-0 border-t border-gray-100 bg-white px-4 py-3 flex items-center gap-3">
-            <p className="text-xs text-gray-400 flex-1">
+            <p className="text-xs font-semibold text-gray-500 flex-1">
               {t('ket.listenAndChoose.answeredCount', {
                 answered: answeredCount,
                 total: items.length,
@@ -666,8 +754,8 @@ export function KETListenAndChoosePractice({
               type="button"
               onClick={handleSubmit}
               disabled={!allAnswered}
-              className="px-5 py-2.5 rounded-xl text-white text-sm font-bold shadow-sm disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
-              style={{ background: 'var(--color-bob-brand)' }}
+              className="px-6 py-3 rounded-2xl text-white text-sm font-bold transition-transform duration-75 cursor-pointer active:translate-y-1 active:shadow-none disabled:opacity-40 disabled:cursor-not-allowed disabled:translate-y-0 disabled:shadow-none"
+              style={{ background: ACCENT, boxShadow: allAnswered ? `0 4px 0 ${ACCENT_DARK}` : 'none' }}
             >
               {t('ket.listenAndChoose.submitAnswers')}
             </button>
