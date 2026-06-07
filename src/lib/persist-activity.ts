@@ -1,6 +1,7 @@
 'use server';
 
 import { createSupabaseServer } from '@/lib/supabase/server';
+import { inferSkillFromMode, inferModeMetadata } from '@/lib/skill-from-mode';
 
 export interface PersistMessageInput {
   sessionId: string;
@@ -62,7 +63,28 @@ export async function persistMessage(
     console.error('[persist-activity] insert failed:', error.message);
     return { error: error.message };
   }
-  return { id: (data as { id: string }).id };
+
+  const newId = (data as { id: string }).id;
+
+  if (
+    input.msgType === 'evaluation' &&
+    input.contentJson !== null &&
+    input.contentJson !== undefined &&
+    !Array.isArray(input.contentJson) &&
+    (input.contentJson as Record<string, unknown>).is_final === true
+  ) {
+    void resolveSessionMode(input.sessionId).then((mode) =>
+      persistActivityResult({
+        sessionId: input.sessionId,
+        userId: input.userId,
+        messageId: newId,
+        mode,
+        contentJson: input.contentJson as Record<string, unknown>,
+      })
+    ).catch(() => undefined);
+  }
+
+  return { id: newId };
 }
 
 /** Batch-insert multiple message rows into bob_messages; returns inserted ids or an error string. */
@@ -141,4 +163,110 @@ export async function readSessionMessages(
     content_json: unknown;
     created_at: string;
   }>;
+}
+
+async function resolveSessionMode(sessionId: string): Promise<string> {
+  try {
+    const supabase = await createSupabaseServer();
+    const { data, error } = await supabase
+      .from('bob_sessions')
+      .select('mode')
+      .eq('id', sessionId)
+      .single();
+    if (error || !data) return '';
+    return (data as { mode: string }).mode ?? '';
+  } catch {
+    return '';
+  }
+}
+
+export interface PersistActivityResultInput {
+  sessionId: string;
+  userId: string;
+  messageId: string | null;
+  mode: string;
+  contentJson: Record<string, unknown>;
+}
+
+function deriveScore10(raw: number, max: number): number | null {
+  if (max <= 0) return null;
+  return Math.round((raw / max) * 100) / 10;
+}
+
+/** Persists a graded result row in bob_activity_results. Fire-and-forget safe: never throws. */
+export async function persistActivityResult(
+  input: PersistActivityResultInput,
+): Promise<{ id: string } | { skipped: true } | { error: string }> {
+  try {
+    if (input.contentJson.is_final !== true) return { skipped: true };
+
+    const skill = inferSkillFromMode(input.mode);
+    if (!skill) return { skipped: true };
+
+    const { framework, exam_part, cefr_level } = inferModeMetadata(input.mode);
+
+    const hasScore =
+      typeof input.contentJson.score === 'number' &&
+      typeof input.contentJson.score_max === 'number';
+
+    let measure_type: 'score' | 'rubric';
+    let raw_score: number | null = null;
+    let max_score: number | null = null;
+    let score_10: number | null = null;
+    let rubric_json: Record<string, unknown> | null = null;
+
+    if (hasScore) {
+      measure_type = 'score';
+      raw_score = input.contentJson.score as number;
+      max_score = input.contentJson.score_max as number;
+      score_10 = deriveScore10(raw_score, max_score);
+    } else {
+      measure_type = 'rubric';
+      const rubric = input.contentJson.rubric as Record<string, unknown> | undefined;
+      if (
+        rubric &&
+        typeof rubric.task_coverage === 'number' &&
+        typeof rubric.grammar === 'number' &&
+        typeof rubric.vocabulary === 'number' &&
+        typeof rubric.fluency === 'number'
+      ) {
+        raw_score = rubric.task_coverage + rubric.grammar + rubric.vocabulary + rubric.fluency;
+        max_score = 16;
+        score_10 = deriveScore10(raw_score, max_score);
+        rubric_json = { ...rubric, max_per_criterion: 4 };
+      }
+    }
+
+    const supabase = await createSupabaseServer();
+    const { data, error } = await supabase
+      .from('bob_activity_results')
+      .insert({
+        user_id: input.userId,
+        session_id: input.sessionId,
+        message_id: input.messageId,
+        mode: input.mode,
+        framework,
+        exam_part,
+        cefr_level,
+        skill,
+        measure_type,
+        raw_score,
+        max_score,
+        score_10,
+        rubric_json,
+      })
+      .select('id')
+      .single();
+
+    if (error) {
+      console.error('[persist-activity] activity result insert failed:', error.message);
+      return { error: error.message };
+    }
+
+    return { id: (data as { id: string }).id };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('[persist-activity] persistActivityResult unexpected error:', msg);
+    return { error: msg };
+  }
 }

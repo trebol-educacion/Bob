@@ -170,11 +170,12 @@ Analyse this speaking interview transcript and return ONLY a JSON object with th
 - "highlights": array of 1-3 strings celebrating specific things the student did well (e.g. "Used past tense correctly", "Good vocabulary for hobbies")
 - "suggestions": array of 1-3 friendly, concrete improvement tips (e.g. "Try to give longer answers with 'because'", "Remember to use 'there is/are' for descriptions")
 - "model_answer": one short example sentence showing a strong answer to any one question
+- "rubric": an object with four integer scores 0-4 each: { "task_coverage": 0-4, "grammar": 0-4, "vocabulary": 0-4, "fluency": 0-4 }
 
 TRANSCRIPT:
 ${transcript}
 
-Return ONLY valid JSON. No score, no band, no percentage.`;
+Return ONLY valid JSON. No score, no band, no percentage outside the rubric object.`;
 
   const result = await callGemini(
     { promptKey: 'cambridge_ket_part1_a2_formative', model: MODELS.FLASH_LITE_PREVIEW, userId },
@@ -204,7 +205,7 @@ Return ONLY valid JSON. No score, no band, no percentage.`;
     userId,
     role: 'bob',
     msgType: 'evaluation',
-    contentJson: feedback as unknown as Record<string, unknown>,
+    contentJson: { ...(feedback as unknown as Record<string, unknown>), is_final: true },
   });
   if ('error' in persistResult) {
     console.error('[A2 persist] evaluation:', persistResult.error);

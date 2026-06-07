@@ -3,6 +3,7 @@
 import { createSupabaseServer } from '@/lib/supabase/server';
 import type { Skill, SkillLevel, SkillLevelMap, SkillLevelHistoryEntry } from '@/lib/types/skills';
 import type { CefrLevel } from '@/lib/types/practice';
+import { inferSkillFromMode as inferSkillFromModeBase } from '@/lib/skill-from-mode';
 
 const SESSIONS_WINDOW = 5;
 const IMPROVEMENT_THRESHOLD = 0.85;
@@ -10,15 +11,7 @@ const IMPROVEMENT_THRESHOLD = 0.85;
 const HIGH_LEVELS = new Set(['b2', 'c1', 'c2']);
 
 function inferSkillFromMode(mode: string): Skill {
-  const overrides: Record<string, Skill> = {
-    cambridge_starters_part1: 'listening',
-    toefl_listen_repeat: 'speaking',
-  };
-  if (overrides[mode]) return overrides[mode];
-  if (mode.includes('listening') || mode.includes('assessment_listening')) return 'listening';
-  if (mode.includes('reading')) return 'reading';
-  if (mode.includes('writing')) return 'writing';
-  return 'speaking';
+  return inferSkillFromModeBase(mode) ?? 'speaking';
 }
 
 /**

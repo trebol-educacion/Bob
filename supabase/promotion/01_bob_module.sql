@@ -307,6 +307,34 @@ CREATE TABLE IF NOT EXISTS public.bob_skill_level_history (
 ALTER SEQUENCE public.bob_skill_level_history_id_seq OWNED BY public.bob_skill_level_history.id;
 
 -- --------------------------------------------------------------------------
+-- bob_activity_results
+-- --------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.bob_activity_results (
+  id           uuid         NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id      uuid         NOT NULL REFERENCES auth.users(id)          ON DELETE CASCADE,
+  session_id   uuid         NULL     REFERENCES public.bob_sessions(id) ON DELETE SET NULL,
+  message_id   uuid         NULL     REFERENCES public.bob_messages(id) ON DELETE SET NULL,
+  mode         text         NOT NULL,
+  framework    text         NULL,
+  exam_part    text         NULL,
+  cefr_level   text         NULL,
+  skill        text         NOT NULL,
+  measure_type text         NOT NULL,
+  raw_score    numeric      NULL,
+  max_score    numeric      NULL,
+  score_10     numeric(4,1) NULL,
+  rubric_json  jsonb        NULL,
+  created_at   timestamptz  NOT NULL DEFAULT now(),
+
+  CONSTRAINT bob_activity_results_skill_check
+    CHECK (skill = ANY (ARRAY['reading','listening','writing','speaking'])),
+  CONSTRAINT bob_activity_results_measure_type_check
+    CHECK (measure_type = ANY (ARRAY['score','rubric'])),
+  CONSTRAINT bob_activity_results_score_10_range
+    CHECK (score_10 IS NULL OR (score_10 >= 0 AND score_10 <= 10))
+);
+
+-- --------------------------------------------------------------------------
 -- bob_app_config
 -- --------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.bob_app_config (
@@ -415,6 +443,12 @@ CREATE INDEX IF NOT EXISTS idx_bob_skill_level_history_user_skill
 CREATE INDEX IF NOT EXISTS idx_bob_assessment_queue_user_status
   ON public.bob_assessment_queue (user_id, status, created_at DESC);
 
+CREATE INDEX IF NOT EXISTS idx_bob_activity_results_user_skill
+  ON public.bob_activity_results (user_id, skill, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_bob_activity_results_user_created
+  ON public.bob_activity_results (user_id, created_at DESC);
+
 CREATE INDEX IF NOT EXISTS audit_log_org_idx
   ON public.audit_log (organization_id);
 
@@ -508,6 +542,41 @@ END;
 $$;
 
 
+-- --------------------------------------------------------------------------
+-- bob_org_activity_grades — teacher KPI aggregation (called by MIA dashboard)
+--
+-- SECURITY INVOKER: runs as the caller, so RLS policy teacher_read_activity_results
+-- continues to apply. service_role bypasses RLS at connection level and may
+-- call with any org_id for administrative purposes.
+-- --------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.bob_org_activity_grades(p_org_id uuid)
+RETURNS TABLE (
+  student_id      uuid,
+  student_name    text,
+  skill           text,
+  activities_done bigint,
+  avg_score_10    numeric
+)
+LANGUAGE sql
+STABLE
+SECURITY INVOKER
+AS $$
+  SELECT
+    bar.user_id                                     AS student_id,
+    p.full_name::text                               AS student_name,
+    bar.skill                                       AS skill,
+    count(*)                                        AS activities_done,
+    round(avg(bar.score_10) FILTER (WHERE bar.score_10 IS NOT NULL), 1) AS avg_score_10
+  FROM public.bob_activity_results bar
+  JOIN public.profiles p
+    ON p.id = bar.user_id
+   AND p.organization_id = p_org_id
+   AND p.role = 'student'
+  GROUP BY bar.user_id, p.full_name, bar.skill
+  ORDER BY p.full_name, bar.skill;
+$$;
+
+
 -- =============================================================================
 -- 7. TRIGGERS
 -- =============================================================================
@@ -563,6 +632,7 @@ ALTER TABLE public.bob_vocabulary            ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.bob_word_images           ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.bob_skill_levels          ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.bob_skill_level_history   ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.bob_activity_results      ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.bob_app_config            ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.bob_assessment_queue      ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.audit_log                 ENABLE ROW LEVEL SECURITY;
@@ -778,6 +848,31 @@ DO $$ BEGIN
           WHERE teacher.id = auth.uid()
             AND teacher.role = ANY (ARRAY['teacher'::user_role, 'school_admin'::user_role, 'super_admin'::user_role])
             AND student.id = bob_skill_level_history.user_id
+        )
+      );
+  END IF;
+END $$;
+
+-- --------------------------------------------------------------------------
+-- bob_activity_results
+-- --------------------------------------------------------------------------
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'bob_activity_results' AND policyname = 'student_rw_own_activity_results') THEN
+    CREATE POLICY student_rw_own_activity_results ON public.bob_activity_results
+      FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+  END IF;
+END $$;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'bob_activity_results' AND policyname = 'teacher_read_activity_results') THEN
+    CREATE POLICY teacher_read_activity_results ON public.bob_activity_results
+      FOR SELECT USING (
+        EXISTS (
+          SELECT 1
+          FROM (profiles teacher
+            JOIN profiles student ON student.organization_id = teacher.organization_id)
+          WHERE teacher.id = auth.uid()
+            AND teacher.role = ANY (ARRAY['teacher'::user_role, 'school_admin'::user_role, 'super_admin'::user_role])
+            AND student.id = bob_activity_results.user_id
         )
       );
   END IF;

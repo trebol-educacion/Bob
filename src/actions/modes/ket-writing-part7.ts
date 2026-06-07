@@ -20,11 +20,21 @@ const GenerationSchema = z.object({
   scenes: z.array(SceneSchema).length(3),
 });
 
+const RubricSchema = z
+  .object({
+    task_coverage: z.number().int().min(0).max(4),
+    grammar:       z.number().int().min(0).max(4),
+    vocabulary:    z.number().int().min(0).max(4),
+    fluency:       z.number().int().min(0).max(4),
+  })
+  .optional();
+
 const EvaluationSchema = z.object({
-  understood: z.boolean(),
-  highlights: z.array(z.string()),
-  suggestions: z.array(z.string()),
+  understood:   z.boolean(),
+  highlights:   z.array(z.string()),
+  suggestions:  z.array(z.string()),
   model_answer: z.string().nullable().optional(),
+  rubric:       RubricSchema,
 });
 
 export type StoryScene = z.infer<typeof SceneSchema>;
@@ -55,6 +65,7 @@ export interface PictureStoryFeedback {
   highlights: string[];
   suggestions: string[];
   model_answer: string | null;
+  rubric?: z.infer<typeof RubricSchema>;
 }
 
 function safeParse<T>(schema: z.ZodType<T>, raw: string): T | null {
@@ -252,6 +263,7 @@ export async function evaluateKETPictureStoryAction(input: {
     highlights: parsed.highlights,
     suggestions: parsed.suggestions,
     model_answer: parsed.model_answer ?? null,
+    rubric: parsed.rubric,
   };
 
   persistMessage({
@@ -262,7 +274,7 @@ export async function evaluateKETPictureStoryAction(input: {
   persistMessage({
     sessionId: input.sessionId, userId: input.userId, role: 'bob', msgType: 'evaluation',
     contentText: null,
-    contentJson: { kind: 'picture_story_feedback', ...feedback, is_final: true },
+    contentJson: { kind: 'picture_story_feedback', ...feedback, rubric: parsed.rubric ?? null, is_final: true },
   }).catch(() => undefined);
 
   return feedback;

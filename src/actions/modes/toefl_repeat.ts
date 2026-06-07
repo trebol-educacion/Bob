@@ -283,7 +283,7 @@ export async function saveToeflRepeatSummaryAction(
     role: 'bob',
     msgType: 'evaluation',
     contentText: `Session complete. Exact repetitions: ${summary.exactCount} of ${summary.totalCount}`,
-    contentJson: summary,
+    contentJson: { ...summary, is_final: true },
   });
   if ('error' in result) {
     console.error('[ToeflRepeat persist] summary failed:', result.error);

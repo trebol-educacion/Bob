@@ -269,8 +269,9 @@ Return ONLY a JSON object with these fields:
 - "highlights": array of 1-3 strings celebrating specific strengths (e.g. "Good use of linking words like 'however'", "Gave clear reasons for your choices")
 - "suggestions": array of 1-3 specific improvement tips (e.g. "Try to use comparative adjectives when comparing options", "Remember to ask the examiner's opinion too")
 - "model_answer": one example sentence demonstrating a strong way to express an opinion on this topic
+- "rubric": an object with four integer scores 0-4 each: { "task_coverage": 0-4, "grammar": 0-4, "vocabulary": 0-4, "fluency": 0-4 }
 
-Return ONLY valid JSON. No score, no band, no percentage.`;
+Return ONLY valid JSON. No score, no band, no percentage outside the rubric object.`;
 
   const result = await callGemini(
     { promptKey: 'cambridge_pet_p3_b1_formative', model: MODELS.FLASH_LITE_PREVIEW },
@@ -303,7 +304,7 @@ Return ONLY valid JSON. No score, no band, no percentage.`;
         userId,
         role: 'bob',
         msgType: 'evaluation',
-        contentJson: feedback as unknown as Record<string, unknown>,
+        contentJson: { ...(feedback as unknown as Record<string, unknown>), is_final: true },
       });
     }
   }

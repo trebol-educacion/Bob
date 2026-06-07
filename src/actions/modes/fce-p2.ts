@@ -77,22 +77,32 @@ export interface FCELongTurnResult {
   imageUrlB: string;
 }
 
+const RubricSchema = z
+  .object({
+    task_coverage: z.number().int().min(0).max(4),
+    grammar:       z.number().int().min(0).max(4),
+    vocabulary:    z.number().int().min(0).max(4),
+    fluency:       z.number().int().min(0).max(4),
+  })
+  .optional();
+
 const EvaluationSchema = z.object({
-  transcript: z.string().default(''),
-  understood: z.boolean(),
-  highlights: z.array(z.string()),
-  suggestions: z.array(z.string()),
+  transcript:     z.string().default(''),
+  understood:     z.boolean(),
+  highlights:     z.array(z.string()),
+  suggestions:    z.array(z.string()),
   coverage: z.object({
-    introduction: z.boolean(),
-    comparison: z.boolean(),
-    contrast: z.boolean(),
-    speculation: z.boolean(),
+    introduction:      z.boolean(),
+    comparison:        z.boolean(),
+    contrast:          z.boolean(),
+    speculation:       z.boolean(),
     addressed_question: z.boolean(),
-    conclusion: z.boolean(),
+    conclusion:        z.boolean(),
   }),
-  fluency_band: z.enum(['OK', 'Good', 'Excellent']),
-  language_band: z.enum(['OK', 'Good', 'Excellent']),
+  fluency_band:    z.enum(['OK', 'Good', 'Excellent']),
+  language_band:   z.enum(['OK', 'Good', 'Excellent']),
   transcript_used: z.string(),
+  rubric:          RubricSchema,
 });
 
 /** Qualitative feedback for a FCE Long Turn attempt. */
@@ -112,6 +122,7 @@ export interface FCELongTurnFeedback {
   language_band: 'OK' | 'Good' | 'Excellent';
   transcript_used: string;
   transcript: string;
+  rubric?: z.infer<typeof RubricSchema>;
 }
 
 function safeParse<T>(schema: z.ZodType<T>, raw: string): T | null {
@@ -434,6 +445,7 @@ export async function evaluateFCEPictureDescriptionAction(input: {
         fluency_band: feedback.fluency_band,
         language_band: feedback.language_band,
         transcript_used: feedback.transcript_used,
+        rubric: feedback.rubric ?? null,
         is_final: true,
       },
     },
@@ -448,7 +460,7 @@ export async function evaluateFCEPictureDescriptionAction(input: {
       error: String(err),
     })));
 
-  return { ...feedback, transcript };
+  return { ...feedback, transcript, rubric: feedback.rubric };
 }
 
 /**

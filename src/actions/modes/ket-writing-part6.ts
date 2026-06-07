@@ -22,6 +22,7 @@ export interface KETShortMessageFeedback {
   highlights: string[];
   suggestions: string[];
   modelAnswer: string | null;
+  rubric?: z.infer<typeof RubricSchema>;
 }
 
 const GenerationSchema = z.object({
@@ -31,11 +32,21 @@ const GenerationSchema = z.object({
   word_target: z.number().default(25),
 });
 
+const RubricSchema = z
+  .object({
+    task_coverage: z.number().int().min(0).max(4),
+    grammar:       z.number().int().min(0).max(4),
+    vocabulary:    z.number().int().min(0).max(4),
+    fluency:       z.number().int().min(0).max(4),
+  })
+  .optional();
+
 const EvaluationSchema = z.object({
-  understood: z.boolean(),
-  highlights: z.array(z.string()),
-  suggestions: z.array(z.string()),
-  model_answer: z.string().nullable().optional(),
+  understood:    z.boolean(),
+  highlights:    z.array(z.string()),
+  suggestions:   z.array(z.string()),
+  model_answer:  z.string().nullable().optional(),
+  rubric:        RubricSchema,
 });
 
 function safeParse<T>(schema: z.ZodType<T>, raw: string): T | null {
@@ -219,6 +230,7 @@ export async function evaluateKETShortMessageAction(input: {
     highlights: parsed.highlights,
     suggestions: parsed.suggestions,
     modelAnswer: parsed.model_answer ?? null,
+    rubric: parsed.rubric,
   };
 
   persistMessage({
@@ -226,7 +238,7 @@ export async function evaluateKETShortMessageAction(input: {
     userId: input.userId,
     role: 'bob',
     msgType: 'evaluation',
-    contentJson: { ...feedback, is_final: true },
+    contentJson: { ...feedback, rubric: parsed.rubric ?? null, is_final: true },
   }).catch(() => undefined);
 
   return feedback;

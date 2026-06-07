@@ -22,56 +22,57 @@ export async function getStudentStatsAction(): Promise<StudentStatsResult> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { rows: [], total_sessions: 0, global_avg: null, session_dates: [] };
 
-  const { data: evalRows } = await supabase
-    .from('bob_messages')
-    .select('content_json, created_at, session_id, bob_sessions!inner(mode)')
+  const { data: activityRows } = await supabase
+    .from('bob_activity_results')
+    .select('mode, score_10, created_at')
     .eq('user_id', user.id)
-    .eq('msg_type', 'evaluation')
     .order('created_at', { ascending: false });
 
-  type EvalRow = {
-    content_json: { is_final?: boolean; score?: number; score_max?: number } | null;
-    created_at: string;
-    bob_sessions: { mode: string | null } | null;
-  };
-  const finals = (evalRows ?? []).filter((r) => {
-    const cj = (r as unknown as EvalRow).content_json;
-    return cj?.is_final === true;
-  }) as unknown as EvalRow[];
+  const results = activityRows ?? [];
 
-  const byMode = new Map<string, { sum: number; max: number; count: number; last: string }>();
-  for (const r of finals) {
-    const mode = r.bob_sessions?.mode ?? null;
-    if (!mode) continue;
-    const score = Number(r.content_json?.score ?? 0);
-    const max = Number(r.content_json?.score_max ?? 100);
+  const byMode = new Map<string, { scoredSum: number; scoredCount: number; totalCount: number; last: string }>();
+  for (const r of results) {
+    const mode = r.mode as string;
+    const score10 = r.score_10 as number | null;
     const prev = byMode.get(mode);
     if (prev) {
-      prev.sum += score;
-      prev.max = max;
-      prev.count += 1;
+      prev.totalCount += 1;
+      if (score10 !== null) {
+        prev.scoredSum += score10;
+        prev.scoredCount += 1;
+      }
     } else {
-      byMode.set(mode, { sum: score, max, count: 1, last: r.created_at });
+      byMode.set(mode, {
+        scoredSum: score10 !== null ? score10 : 0,
+        scoredCount: score10 !== null ? 1 : 0,
+        totalCount: 1,
+        last: r.created_at as string,
+      });
     }
   }
 
   const rows: StudentStatRow[] = Array.from(byMode.entries()).map(([mode, v]) => ({
     mode,
-    sessions_count: v.count,
-    avg_score: Math.round((v.sum / v.count) * 10) / 10,
-    score_max: v.max,
+    sessions_count: v.totalCount,
+    avg_score: v.scoredCount > 0
+      ? Math.round((v.scoredSum / v.scoredCount) * 10) / 10
+      : 0,
+    score_max: 10,
     last_done: v.last,
   }));
 
   rows.sort((a, b) => (a.last_done < b.last_done ? 1 : -1));
 
   const totalSessions = rows.reduce((s, r) => s + r.sessions_count, 0);
-  const totalScore = finals.reduce((s, r) => s + Number(r.content_json?.score ?? 0), 0);
-  const globalAvg = finals.length > 0
-    ? Math.round((totalScore / finals.length) * 10) / 10
+
+  const scoredResults = results.filter((r) => (r.score_10 as number | null) !== null);
+  const globalAvg = scoredResults.length > 0
+    ? Math.round(
+        (scoredResults.reduce((s, r) => s + (r.score_10 as number), 0) / scoredResults.length) * 10,
+      ) / 10
     : null;
 
-  const sessionDates = finals.map((r) => r.created_at);
+  const sessionDates = results.map((r) => r.created_at as string);
 
   return {
     rows,

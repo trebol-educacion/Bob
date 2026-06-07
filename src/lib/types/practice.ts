@@ -3,6 +3,16 @@ import { z } from 'zod';
 /** CEFR proficiency level. */
 export type CefrLevel = 'pre_a1' | 'a1' | 'a2' | 'b1' | 'b2' | 'c1' | 'c2';
 
+/** Rubric criteria (0-4 each) for open speaking and writing tasks. */
+export const RubricCriteriaSchema = z.object({
+  task_coverage: z.number().int().min(0).max(4),
+  grammar:       z.number().int().min(0).max(4),
+  vocabulary:    z.number().int().min(0).max(4),
+  fluency:       z.number().int().min(0).max(4),
+});
+
+export type RubricCriteria = z.infer<typeof RubricCriteriaSchema>;
+
 /** Formative (non-graded) feedback for open speaking and writing tasks. */
 export interface FormativeFeedback {
   kind: 'formative';
@@ -10,14 +20,16 @@ export interface FormativeFeedback {
   highlights: string[];
   suggestions: string[];
   model_answer?: string;
+  rubric?: RubricCriteria;
 }
 
 export const FormativeFeedbackSchema = z.object({
-  kind: z.literal('formative'),
-  understood: z.boolean(),
-  highlights: z.array(z.string()),
-  suggestions: z.array(z.string()),
+  kind:         z.literal('formative'),
+  understood:   z.boolean(),
+  highlights:   z.array(z.string()),
+  suggestions:  z.array(z.string()),
   model_answer: z.string().optional(),
+  rubric:       RubricCriteriaSchema.optional(),
 });
 
 /** Objective feedback for Listen & Repeat: word-level metrics, no subjective score. */
@@ -203,6 +215,7 @@ export interface WritingFormativeFeedback {
   highlights: string[];
   suggestions: string[];
   model_answer?: string;
+  rubric?: RubricCriteria;
   indicators: {
     word_count: number;
     target_word_count_range: [number, number];
