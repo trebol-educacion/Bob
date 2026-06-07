@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
-import { Check } from 'lucide-react';
+import { Check, Ban, TriangleAlert, Info, Store, ClipboardList, type LucideIcon } from 'lucide-react';
 import { KETReadingIcon } from '@/components/icons/KETIcons';
 import { CelebrationCard } from '@/components/practice/yl/CelebrationCard';
 import { BobMascotLoader } from '@/components/chat/BobMascotLoader';
@@ -35,9 +35,20 @@ type Phase = 'loading' | 'ready' | 'submitting' | 'finished';
 type SignStyle = 'warning' | 'prohibition' | 'info' | 'shop' | 'default';
 
 interface SignLook {
-  style: SignStyle;
-  emoji: string;
+  Icon: LucideIcon;
   className: string;
+}
+
+const SIGN_LOOK: Record<SignStyle, SignLook> = {
+  prohibition: { Icon: Ban, className: 'bg-white text-[#37795E] border-4 border-[#469E7B]' },
+  warning: { Icon: TriangleAlert, className: 'bg-amber-100 text-amber-900 border-4 border-amber-400' },
+  info: { Icon: Info, className: 'bg-sky-100 text-sky-900 border-4 border-sky-400' },
+  shop: { Icon: Store, className: 'bg-slate-100 text-slate-800 border-4 border-slate-400' },
+  default: { Icon: ClipboardList, className: 'bg-slate-100 text-slate-700 border-4 border-slate-300' },
+};
+
+function lookFor(item: SignItem): SignLook {
+  return SIGN_LOOK[item.sign_style ?? 'default'];
 }
 
 interface RestoredState {
@@ -71,61 +82,16 @@ function tryRestore(messages: StoredMessage[]): RestoredState | null {
   return null;
 }
 
-function deriveSignLook(item: SignItem): SignLook {
-  const text = `${item.sign_text} ${item.sign_context}`.toLowerCase();
-
-  const isProhibition = /\b(no|not|don't|do not|never|forbidden|prohibit|keep out)\b/.test(text);
-  const isWarning = /\b(warning|caution|danger|careful|wet|mind|beware|slippery|attention)\b/.test(text);
-  const isShop = /\b(sale|shop|store|open|closed|buy|price|off|free|%|cafe|café|menu|restaurant)\b/.test(text);
-  const isInfo =
-    /\b(information|info|please|opening hours|hours|welcome|entrance|exit|way|toilet|reception|lost)\b/.test(text);
-
-  if (isProhibition) {
-    return {
-      style: 'prohibition',
-      emoji: '🚫',
-      className: 'bg-white text-red-600 border-4 border-red-500',
-    };
-  }
-  if (isWarning) {
-    return {
-      style: 'warning',
-      emoji: '⚠️',
-      className: 'bg-amber-300 text-gray-900 border-4 border-amber-500',
-    };
-  }
-  if (isShop) {
-    return {
-      style: 'shop',
-      emoji: '🏪',
-      className: 'bg-gray-900 text-white border-4 border-gray-900',
-    };
-  }
-  if (isInfo) {
-    return {
-      style: 'info',
-      emoji: 'ℹ️',
-      className: 'bg-sky-500 text-white border-4 border-sky-600',
-    };
-  }
-  return {
-    style: 'default',
-    emoji: '📋',
-    className: 'bg-gray-800 text-white border-4 border-gray-800',
-  };
-}
-
-function SignBoard({ item, look }: { item: SignItem; look: SignLook }) {
+function SignBoard({ item }: { item: SignItem }) {
+  const { Icon, className } = lookFor(item);
   return (
     <div
       className={[
         'relative rounded-2xl px-5 py-6 text-center shadow-md select-none',
-        look.className,
+        className,
       ].join(' ')}
     >
-      <span className="absolute top-2 left-3 text-2xl leading-none" aria-hidden>
-        {look.emoji}
-      </span>
+      <Icon className="absolute top-2 left-3 w-6 h-6" aria-hidden strokeWidth={2.5} />
       <p className="text-xl font-black uppercase tracking-wide leading-snug break-words">
         {item.sign_text}
       </p>
@@ -265,8 +231,6 @@ function ResultCard({
   reduceMotion: boolean;
   explanationLabel: string;
 }) {
-  const look = deriveSignLook(item);
-
   return (
     <motion.div
       initial={animate ? { opacity: 0, y: 8 } : false}
@@ -287,14 +251,14 @@ function ResultCard({
           <span
             className={[
               'text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0',
-              result.isCorrect ? 'text-green-600 bg-green-50' : 'text-red-500 bg-red-50',
+              result.isCorrect ? 'text-green-600 bg-green-50' : 'text-gray-500 bg-gray-100',
             ].join(' ')}
           >
             {result.isCorrect ? 'Correct' : 'Incorrect'}
           </span>
         </div>
 
-        <SignBoard item={item} look={look} />
+        <SignBoard item={item} />
       </div>
 
       <div className="px-4 pb-4 space-y-2">
@@ -302,7 +266,7 @@ function ResultCard({
           const isChosen = result.chosen === opt.id;
           const isCorrectOpt = opt.id === result.correct_option;
           const showGreen = isCorrectOpt;
-          const showRed = isChosen && !result.isCorrect;
+          const showWrongChoice = isChosen && !result.isCorrect;
 
           return (
             <div
@@ -310,12 +274,12 @@ function ResultCard({
               className={[
                 'relative rounded-2xl border p-4 pr-10 text-sm font-semibold',
                 showGreen ? 'border-green-400 bg-green-50 text-green-800' : '',
-                showRed ? 'border-red-400 bg-red-50 text-red-700' : '',
-                !showGreen && !showRed ? 'border-gray-100 text-gray-400 opacity-50' : '',
+                showWrongChoice ? 'border-gray-200 text-gray-500 line-through' : '',
+                !showGreen && !showWrongChoice ? 'border-gray-100 text-gray-400 opacity-50' : '',
               ]
                 .filter(Boolean)
                 .join(' ')}
-              style={!showGreen && !showRed ? { background: CARD_SURFACE } : undefined}
+              style={!showGreen ? { background: CARD_SURFACE } : undefined}
             >
               <span className="block leading-snug">{opt.text}</span>
               {showGreen && (
@@ -326,7 +290,7 @@ function ResultCard({
               <span
                 className={[
                   'absolute bottom-2 right-2 w-5 h-5 rounded-full text-[10px] font-black flex items-center justify-center',
-                  showGreen ? 'bg-green-500 text-white' : showRed ? 'bg-red-400 text-white' : 'bg-gray-200 text-gray-400',
+                  showGreen ? 'bg-green-500 text-white' : showWrongChoice ? 'bg-gray-300 text-gray-600' : 'bg-gray-200 text-gray-400',
                 ].join(' ')}
                 aria-hidden
               >
@@ -564,7 +528,7 @@ export function KETSignsAndNoticesPractice({
                 >
                   <p className="text-sm text-gray-500 text-center">{currentItem.sign_context}</p>
 
-                  <SignBoard item={currentItem} look={deriveSignLook(currentItem)} />
+                  <SignBoard item={currentItem} />
 
                   <p className="text-sm font-semibold text-gray-700 text-center">{currentItem.question}</p>
 

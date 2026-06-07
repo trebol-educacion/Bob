@@ -22,6 +22,7 @@ const SignItemSchema = z.object({
   options: z.array(OptionSchema).length(3),
   correct_option: z.enum(['A', 'B', 'C']),
   explanation: z.string(),
+  sign_style: z.enum(['prohibition', 'warning', 'info', 'shop', 'default']).optional(),
 });
 
 const GenerationSchema = z.object({
@@ -39,6 +40,7 @@ export interface SignItem {
   options: SignOption[];
   correct_option: 'A' | 'B' | 'C';
   explanation: string;
+  sign_style?: 'prohibition' | 'warning' | 'info' | 'shop' | 'default';
 }
 
 /** Full result of a successful generation call. */
