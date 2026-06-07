@@ -2,6 +2,7 @@
 
 import { z } from 'zod';
 import { getPrompt } from '@/lib/prompts/db-prompts';
+import { stripDashes } from '@/lib/text';
 import { callGemini, isOk } from '@/lib/gemini-client';
 import { persistMessage, persistMessages } from '@/lib/persist-activity';
 import { createSessionAction } from '@/actions/sessions';
@@ -62,7 +63,7 @@ export async function generateKETReadingTFDSAction(input: {
   let userId: string | undefined;
 
   if (!sessionId) {
-    const result = await createSessionAction({ mode: 'cambridge_ket_reading_part5', title: 'Reading Part 5 — True, False or Doesn\'t Say' });
+    const result = await createSessionAction({ mode: 'cambridge_ket_reading_part5', title: 'Reading Part 5, True, False or Doesn\'t Say' });
     if (!result.data) return { error: result.error ?? 'Could not create session' };
     sessionId = result.data.id;
     userId = result.data.user_id;
@@ -81,9 +82,9 @@ export async function generateKETReadingTFDSAction(input: {
   if (!generationPrompt) return { error: 'Could not load generation prompt' };
 
   const geminiResult = await callGemini(
-    { promptKey: 'cambridge_ket_reading_part5_a2_generation', model: MODELS.FLASH_LITE_PREVIEW, userId },
+    { promptKey: 'cambridge_ket_reading_part5_a2_generation', model: MODELS.FLASH_LITE, userId },
     (ai) => ai.models.generateContent({
-      model: MODELS.FLASH_LITE_PREVIEW,
+      model: MODELS.FLASH_LITE,
       contents: [{ role: 'user', parts: [{ text: generationPrompt }] }],
       config: { responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
     })
@@ -95,15 +96,21 @@ export async function generateKETReadingTFDSAction(input: {
   const parsed = safeParse(GenerationSchema, rawText);
   if (!parsed) return { error: 'Unexpected model response' };
 
-  const exercise: ReadingTFDSExercise = { title: parsed.title, text: parsed.text, statements: parsed.statements };
+  const exercise: ReadingTFDSExercise = {
+    title: stripDashes(parsed.title),
+    text: stripDashes(parsed.text),
+    statements: parsed.statements.map((s) => ({ ...s, text: stripDashes(s.text) })),
+  };
+
+  const cleanFramingText = stripDashes(framingText);
 
   persistMessage({
     sessionId: sessionId!, userId: userId!, role: 'bob', msgType: 'text',
     contentText: null,
-    contentJson: { kind: 'reading_tfds_plan', framing_text: framingText, exercise },
+    contentJson: { kind: 'reading_tfds_plan', framing_text: cleanFramingText, exercise },
   }).catch(() => undefined);
 
-  return { sessionId: sessionId!, userId: userId!, framing_text: framingText, exercise };
+  return { sessionId: sessionId!, userId: userId!, framing_text: cleanFramingText, exercise };
 }
 
 export async function submitKETReadingTFDSAction(input: {

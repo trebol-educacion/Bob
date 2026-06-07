@@ -1,12 +1,11 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { motion } from 'motion/react';
-import { CheckCircle, XCircle } from 'lucide-react';
+import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
+import { Check } from 'lucide-react';
 import { KETReadingIcon } from '@/components/icons/KETIcons';
 import { CelebrationCard } from '@/components/practice/yl/CelebrationCard';
 import { BobMascotLoader } from '@/components/chat/BobMascotLoader';
-import { BobAvatar } from '@/components/practice/yl/_shared';
 import {
   generateKETSignsAndNoticesAction,
   submitKETSignsAnswersAction,
@@ -15,6 +14,12 @@ import {
 } from '@/actions/modes/ket-reading-part1';
 import type { StoredMessage } from '@/actions/messages';
 import { useTranslations } from 'next-intl';
+
+const ACCENT = '#469E7B';
+const ACCENT_DARK = '#37795E';
+const ACCENT_TEXT = '#2F6B52';
+const ACCENT_TINT = 'color-mix(in oklab, #469E7B 14%, white)';
+const CARD_SURFACE = '#FAFAF8';
 
 export interface KETSignsAndNoticesPracticeProps {
   onBack: () => void;
@@ -26,6 +31,14 @@ export interface KETSignsAndNoticesPracticeProps {
 }
 
 type Phase = 'loading' | 'ready' | 'submitting' | 'finished';
+
+type SignStyle = 'warning' | 'prohibition' | 'info' | 'shop' | 'default';
+
+interface SignLook {
+  style: SignStyle;
+  emoji: string;
+  className: string;
+}
 
 interface RestoredState {
   items: SignItem[];
@@ -58,129 +71,230 @@ function tryRestore(messages: StoredMessage[]): RestoredState | null {
   return null;
 }
 
-function SignCard({
-  item,
+function deriveSignLook(item: SignItem): SignLook {
+  const text = `${item.sign_text} ${item.sign_context}`.toLowerCase();
+
+  const isProhibition = /\b(no|not|don't|do not|never|forbidden|prohibit|keep out)\b/.test(text);
+  const isWarning = /\b(warning|caution|danger|careful|wet|mind|beware|slippery|attention)\b/.test(text);
+  const isShop = /\b(sale|shop|store|open|closed|buy|price|off|free|%|cafe|café|menu|restaurant)\b/.test(text);
+  const isInfo =
+    /\b(information|info|please|opening hours|hours|welcome|entrance|exit|way|toilet|reception|lost)\b/.test(text);
+
+  if (isProhibition) {
+    return {
+      style: 'prohibition',
+      emoji: '🚫',
+      className: 'bg-white text-red-600 border-4 border-red-500',
+    };
+  }
+  if (isWarning) {
+    return {
+      style: 'warning',
+      emoji: '⚠️',
+      className: 'bg-amber-300 text-gray-900 border-4 border-amber-500',
+    };
+  }
+  if (isShop) {
+    return {
+      style: 'shop',
+      emoji: '🏪',
+      className: 'bg-gray-900 text-white border-4 border-gray-900',
+    };
+  }
+  if (isInfo) {
+    return {
+      style: 'info',
+      emoji: 'ℹ️',
+      className: 'bg-sky-500 text-white border-4 border-sky-600',
+    };
+  }
+  return {
+    style: 'default',
+    emoji: '📋',
+    className: 'bg-gray-800 text-white border-4 border-gray-800',
+  };
+}
+
+function SignBoard({ item, look }: { item: SignItem; look: SignLook }) {
+  return (
+    <div
+      className={[
+        'relative rounded-2xl px-5 py-6 text-center shadow-md select-none',
+        look.className,
+      ].join(' ')}
+    >
+      <span className="absolute top-2 left-3 text-2xl leading-none" aria-hidden>
+        {look.emoji}
+      </span>
+      <p className="text-xl font-black uppercase tracking-wide leading-snug break-words">
+        {item.sign_text}
+      </p>
+    </div>
+  );
+}
+
+function OptionCard({
+  optionId,
+  text,
   selected,
   onSelect,
   disabled,
+  reduceMotion,
 }: {
-  item: SignItem;
-  selected: 'A' | 'B' | 'C' | undefined;
-  onSelect: (id: 'A' | 'B' | 'C') => void;
+  optionId: 'A' | 'B' | 'C';
+  text: string;
+  selected: boolean;
+  onSelect: () => void;
   disabled: boolean;
+  reduceMotion: boolean;
 }) {
-  const t = useTranslations('cambridge');
-
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.2, delay: item.number * 0.06 }}
-      className="rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden"
+    <motion.button
+      type="button"
+      onClick={onSelect}
+      disabled={disabled}
+      whileTap={reduceMotion || disabled ? undefined : { scale: 0.98 }}
+      className={[
+        'relative w-full rounded-2xl border p-4 pr-10 text-left text-sm font-semibold text-gray-800 min-h-14 cursor-pointer',
+        disabled ? 'cursor-not-allowed' : '',
+      ]
+        .filter(Boolean)
+        .join(' ')}
+      style={
+        selected
+          ? {
+              background: ACCENT_TINT,
+              borderColor: ACCENT,
+              boxShadow: 'none',
+              transform: 'translateY(2px)',
+            }
+          : { background: CARD_SURFACE, borderColor: '#F3F4F6', boxShadow: '0 3px 0 #e5e7eb' }
+      }
     >
-      <div className="px-4 pt-4 pb-3 space-y-2">
-        <div className="flex items-center gap-2">
-          <span
-            className="w-6 h-6 rounded-full text-bob-brand text-xs font-black flex items-center justify-center shrink-0"
-            style={{ background: 'color-mix(in oklab, var(--color-bob-brand) 14%, white)' }}
+      <span className="block leading-snug">{text}</span>
+      {selected && (
+        <motion.span
+          initial={reduceMotion ? false : { scale: 0 }}
+          animate={{ scale: 1 }}
+          transition={{ type: 'spring', stiffness: 500, damping: 22 }}
+          className="absolute top-2 right-2 w-5 h-5 rounded-full flex items-center justify-center"
+          style={{ background: ACCENT }}
+        >
+          <Check size={12} strokeWidth={3.5} className="text-white" />
+        </motion.span>
+      )}
+      <span
+        className={[
+          'absolute bottom-2 right-2 w-5 h-5 rounded-full text-[10px] font-black flex items-center justify-center',
+          selected ? 'opacity-0' : '',
+        ].join(' ')}
+        style={{ background: ACCENT_TINT, color: ACCENT_TEXT }}
+        aria-hidden
+      >
+        {optionId}
+      </span>
+    </motion.button>
+  );
+}
+
+function ProgressDots({
+  items,
+  answers,
+  current,
+  onJump,
+  reduceMotion,
+}: {
+  items: SignItem[];
+  answers: Record<number, 'A' | 'B' | 'C'>;
+  current: number;
+  onJump: (index: number) => void;
+  reduceMotion: boolean;
+}) {
+  return (
+    <div className="flex items-center justify-center gap-2">
+      {items.map((item, i) => {
+        const answered = answers[item.number] !== undefined;
+        const isCurrent = i === current;
+        return (
+          <button
+            key={item.number}
+            type="button"
+            onClick={() => onJump(i)}
+            aria-label={`Sign ${i + 1}`}
+            className="w-7 h-7 flex items-center justify-center rounded-full"
           >
-            {item.number}
-          </span>
-          <p className="text-xs text-gray-400 leading-tight">{item.sign_context}</p>
-        </div>
-
-        <div className="rounded-xl border-2 border-gray-800 bg-gray-800 px-4 py-3 text-center">
-          <p className="text-white font-bold text-lg leading-snug tracking-wide">
-            {item.sign_text}
-          </p>
-        </div>
-
-        <p className="text-xs font-semibold text-gray-600 pt-1">{item.question}</p>
-      </div>
-
-      <div className="px-4 pb-4 space-y-2">
-        {item.options.map((opt) => {
-          const isSelected = selected === opt.id;
-          return (
-            <button
-              key={opt.id}
-              type="button"
-              disabled={disabled}
-              onClick={() => onSelect(opt.id as 'A' | 'B' | 'C')}
-              className={[
-                'w-full flex items-start gap-3 rounded-xl border px-3 py-2.5 text-left text-sm transition-colors cursor-pointer',
-                isSelected ? 'text-gray-800' : 'border-gray-100 bg-gray-50 text-gray-700',
-                disabled ? 'cursor-not-allowed' : '',
-              ]
-                .filter(Boolean)
-                .join(' ')}
-              style={
-                isSelected
-                  ? {
-                      borderColor: 'color-mix(in oklab, var(--color-bob-brand) 50%, white)',
-                      background: 'color-mix(in oklab, var(--color-bob-brand) 10%, white)',
-                    }
-                  : undefined
-              }
-            >
-              <span
-                className={[
-                  'shrink-0 w-6 h-6 rounded-full border text-xs font-bold flex items-center justify-center mt-0.5',
-                  isSelected ? 'text-white' : 'border-gray-300 bg-white text-gray-500',
-                ].join(' ')}
-                style={
-                  isSelected
-                    ? { borderColor: 'var(--color-bob-brand)', background: 'var(--color-bob-brand)' }
-                    : undefined
-                }
+            {answered ? (
+              <motion.span
+                initial={reduceMotion ? false : { scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ type: 'spring', stiffness: 500, damping: 20 }}
+                className="w-6 h-6 rounded-full flex items-center justify-center"
+                style={{ background: ACCENT }}
               >
-                {opt.id}
-              </span>
-              <span className="leading-snug">{opt.text}</span>
-            </button>
-          );
-        })}
-      </div>
-    </motion.div>
+                <Check size={13} strokeWidth={3.5} className="text-white" />
+              </motion.span>
+            ) : (
+              <span
+                className="w-3.5 h-3.5 rounded-full"
+                style={
+                  isCurrent
+                    ? { background: 'white', boxShadow: `0 0 0 2.5px ${ACCENT}` }
+                    : { background: '#E5E7EB' }
+                }
+              />
+            )}
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
 function ResultCard({
   item,
   result,
+  index,
   animate,
+  reduceMotion,
+  explanationLabel,
 }: {
   item: SignItem;
   result: SignAnswerResult;
+  index: number;
   animate: boolean;
+  reduceMotion: boolean;
+  explanationLabel: string;
 }) {
-  const t = useTranslations('cambridge');
+  const look = deriveSignLook(item);
 
   return (
     <motion.div
-      initial={animate ? { opacity: 0, y: 10 } : false}
+      initial={animate ? { opacity: 0, y: 8 } : false}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.2, delay: item.number * 0.07 }}
-      className="rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden"
+      transition={{ type: 'spring', stiffness: 280, damping: 24, delay: animate ? index * 0.07 : 0 }}
+      className="rounded-3xl border border-gray-100 shadow-sm overflow-hidden"
+      style={{ background: CARD_SURFACE }}
     >
-      <div className="px-4 pt-4 pb-2 space-y-2">
+      <div className="px-4 pt-4 pb-3 space-y-3">
         <div className="flex items-center gap-2">
           <span
-            className="w-6 h-6 rounded-full text-bob-brand text-xs font-black flex items-center justify-center shrink-0"
-            style={{ background: 'color-mix(in oklab, var(--color-bob-brand) 14%, white)' }}
+            className="w-6 h-6 rounded-full text-xs font-black flex items-center justify-center shrink-0"
+            style={{ background: ACCENT_TINT, color: ACCENT_TEXT }}
           >
             {item.number}
           </span>
-          <p className="text-xs text-gray-400 leading-tight">{item.sign_context}</p>
+          <p className="text-xs text-gray-400 leading-tight flex-1">{item.sign_context}</p>
+          <span
+            className={[
+              'text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0',
+              result.isCorrect ? 'text-green-600 bg-green-50' : 'text-red-500 bg-red-50',
+            ].join(' ')}
+          >
+            {result.isCorrect ? 'Correct' : 'Incorrect'}
+          </span>
         </div>
 
-        <div className="rounded-xl border-2 border-gray-800 bg-gray-800 px-4 py-3 text-center">
-          <p className="text-white font-bold text-lg leading-snug tracking-wide">
-            {item.sign_text}
-          </p>
-        </div>
-
-        <p className="text-xs font-semibold text-gray-600">{item.question}</p>
+        <SignBoard item={item} look={look} />
       </div>
 
       <div className="px-4 pb-4 space-y-2">
@@ -194,41 +308,36 @@ function ResultCard({
             <div
               key={opt.id}
               className={[
-                'flex items-start gap-3 rounded-xl border px-3 py-2.5 text-sm',
-                showGreen ? 'border-green-300 bg-green-50' : '',
-                showRed ? 'border-red-300 bg-red-50' : '',
-                !showGreen && !showRed ? 'border-gray-100 bg-gray-50 opacity-50' : '',
+                'relative rounded-2xl border p-4 pr-10 text-sm font-semibold',
+                showGreen ? 'border-green-400 bg-green-50 text-green-800' : '',
+                showRed ? 'border-red-400 bg-red-50 text-red-700' : '',
+                !showGreen && !showRed ? 'border-gray-100 text-gray-400 opacity-50' : '',
               ]
                 .filter(Boolean)
                 .join(' ')}
+              style={!showGreen && !showRed ? { background: CARD_SURFACE } : undefined}
             >
+              <span className="block leading-snug">{opt.text}</span>
+              {showGreen && (
+                <span className="absolute top-2 right-2 w-5 h-5 rounded-full bg-green-500 flex items-center justify-center">
+                  <Check size={12} strokeWidth={3.5} className="text-white" />
+                </span>
+              )}
               <span
                 className={[
-                  'shrink-0 w-6 h-6 rounded-full border text-xs font-bold flex items-center justify-center mt-0.5',
-                  showGreen ? 'border-green-500 bg-green-500 text-white' : '',
-                  showRed ? 'border-red-400 bg-red-400 text-white' : '',
-                  !showGreen && !showRed ? 'border-gray-300 bg-white text-gray-400' : '',
-                ]
-                  .filter(Boolean)
-                  .join(' ')}
+                  'absolute bottom-2 right-2 w-5 h-5 rounded-full text-[10px] font-black flex items-center justify-center',
+                  showGreen ? 'bg-green-500 text-white' : showRed ? 'bg-red-400 text-white' : 'bg-gray-200 text-gray-400',
+                ].join(' ')}
+                aria-hidden
               >
                 {opt.id}
               </span>
-              <span className={showGreen ? 'text-green-800' : showRed ? 'text-red-700' : 'text-gray-400'}>
-                {opt.text}
-              </span>
-              {showGreen && (
-                <CheckCircle size={15} className="text-green-500 shrink-0 ml-auto mt-0.5" />
-              )}
-              {showRed && (
-                <XCircle size={15} className="text-red-400 shrink-0 ml-auto mt-0.5" />
-              )}
             </div>
           );
         })}
 
         <div className="mt-1 px-1 text-xs text-gray-500 leading-relaxed">
-          <span className="font-semibold text-gray-700">{t('ket.signsAndNotices.explanationLabel')}</span>{' '}
+          <span className="font-semibold text-gray-700">{explanationLabel}</span>{' '}
           {result.explanation}
         </div>
       </div>
@@ -246,6 +355,7 @@ export function KETSignsAndNoticesPractice({
   onOpenDashboard,
 }: KETSignsAndNoticesPracticeProps) {
   const t = useTranslations('cambridge');
+  const reduceMotion = useReducedMotion();
 
   const [phase, setPhase] = useState<Phase>('loading');
   const [sessionId, setSessionId] = useState<string | undefined>(initialSessionId);
@@ -253,11 +363,13 @@ export function KETSignsAndNoticesPractice({
   const [items, setItems] = useState<SignItem[]>([]);
   const [framingText, setFramingText] = useState('');
   const [answers, setAnswers] = useState<Record<number, 'A' | 'B' | 'C'>>({});
+  const [current, setCurrent] = useState(0);
   const [results, setResults] = useState<SignAnswerResult[]>([]);
   const [correctCount, setCorrectCount] = useState(0);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isNewSession, setIsNewSession] = useState(false);
   const initStartedRef = useRef(false);
+  const advanceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (initStartedRef.current) return;
@@ -309,12 +421,23 @@ export function KETSignsAndNoticesPractice({
     void init();
   }, []);
 
+  useEffect(() => () => {
+    if (advanceRef.current) clearTimeout(advanceRef.current);
+  }, []);
+
   function handleSelect(itemNumber: number, optionId: 'A' | 'B' | 'C') {
     setAnswers((prev) => ({ ...prev, [itemNumber]: optionId }));
+    if (advanceRef.current) clearTimeout(advanceRef.current);
+    const isLast = current >= items.length - 1;
+    if (!isLast) {
+      const delay = reduceMotion ? 0 : 350;
+      advanceRef.current = setTimeout(() => setCurrent((c) => Math.min(c + 1, items.length - 1)), delay);
+    }
   }
 
   async function handleSubmit() {
     if (!sessionId || !userId) return;
+    if (advanceRef.current) clearTimeout(advanceRef.current);
     setPhase('submitting');
 
     const result = await submitKETSignsAnswersAction({
@@ -338,6 +461,7 @@ export function KETSignsAndNoticesPractice({
 
   const answeredCount = Object.keys(answers).length;
   const allAnswered = answeredCount === items.length && items.length > 0;
+  const currentItem = items[current];
 
   if (errorMsg) {
     return (
@@ -360,30 +484,30 @@ export function KETSignsAndNoticesPractice({
         <button
           type="button"
           onClick={onBack}
-          className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-600"
+          className="w-11 h-11 flex items-center justify-center rounded-xl hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-600 text-lg"
           aria-label={t('ket.signsAndNotices.back')}
         >
           ←
         </button>
         <div
           className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0"
-          style={{ background: 'color-mix(in oklab, var(--color-bob-brand) 12%, white)' }}
+          style={{ background: ACCENT_TINT, color: ACCENT }}
         >
-          <KETReadingIcon size={18} className="text-bob-brand" />
+          <KETReadingIcon size={18} />
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-bold text-gray-800 truncate">{t('ket.signsAndNotices.headerTitle')}</p>
           <p className="text-xs text-gray-400">{t('ket.signsAndNotices.headerSubtitle')}</p>
         </div>
         <span
-          className="shrink-0 px-2 py-0.5 rounded-full text-bob-brand text-[10px] font-bold uppercase tracking-widest"
-          style={{ background: 'color-mix(in oklab, var(--color-bob-brand) 12%, white)' }}
+          className="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-widest"
+          style={{ background: ACCENT_TINT, color: ACCENT_TEXT }}
         >
           {t('ket.signsAndNotices.partBadge')}
         </span>
       </div>
 
-      {(phase === 'loading') && (
+      {phase === 'loading' && (
         <div className="flex-1 flex flex-col min-h-0">
           <BobMascotLoader message={t('ket.signsAndNotices.preparingExercise')} />
         </div>
@@ -395,72 +519,125 @@ export function KETSignsAndNoticesPractice({
         </div>
       )}
 
-      {phase === 'ready' && (
+      {phase === 'ready' && currentItem && (
         <>
-          <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
-            <div className="flex items-start gap-2">
-              <BobAvatar />
-              <div className="bg-gray-50 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-gray-700 leading-relaxed max-w-sm">
-                {framingText}
-              </div>
-            </div>
-
-            {items.map((item) => (
-              <SignCard
-                key={item.number}
-                item={item}
-                selected={answers[item.number]}
-                onSelect={(id) => handleSelect(item.number, id)}
-                disabled={false}
+          <div className="px-4 pt-4 pb-2 shrink-0">
+            <div className="mx-auto w-full max-w-lg">
+              <ProgressDots
+                items={items}
+                answers={answers}
+                current={current}
+                onJump={(i) => {
+                  if (advanceRef.current) clearTimeout(advanceRef.current);
+                  setCurrent(i);
+                }}
+                reduceMotion={!!reduceMotion}
               />
-            ))}
-
-            <div className="h-20" />
+            </div>
           </div>
 
-          <div className="shrink-0 border-t border-gray-100 bg-white px-4 py-3 flex items-center gap-3">
-            <p className="text-xs text-gray-400 flex-1">
-              {t('ket.signsAndNotices.answeredCount', { answered: answeredCount, total: items.length })}
-            </p>
-            <button
-              type="button"
-              onClick={handleSubmit}
-              disabled={!allAnswered}
-              className="px-5 py-2.5 rounded-xl text-white text-sm font-bold shadow-sm disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
-              style={{ background: 'var(--color-bob-brand)' }}
-            >
-              {t('ket.signsAndNotices.submitAnswers')}
-            </button>
+          <div className="flex-1 overflow-y-auto px-4 pb-4">
+            <div className="mx-auto w-full max-w-lg space-y-4">
+              {current === 0 && (
+                <div
+                  className="flex items-start gap-3 rounded-3xl border border-gray-100 shadow-sm px-4 py-3"
+                  style={{ background: CARD_SURFACE }}
+                >
+                  <span
+                    className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+                    style={{ background: ACCENT_TINT, color: ACCENT }}
+                  >
+                    <KETReadingIcon size={20} />
+                  </span>
+                  <p className="text-sm text-gray-700 leading-relaxed flex-1">{framingText}</p>
+                </div>
+              )}
+
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={currentItem.number}
+                  initial={reduceMotion ? false : { opacity: 0, x: 24 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={reduceMotion ? { opacity: 0 } : { opacity: 0, x: -24 }}
+                  transition={{ type: 'spring', stiffness: 300, damping: 28 }}
+                  className="space-y-4"
+                >
+                  <p className="text-sm text-gray-500 text-center">{currentItem.sign_context}</p>
+
+                  <SignBoard item={currentItem} look={deriveSignLook(currentItem)} />
+
+                  <p className="text-sm font-semibold text-gray-700 text-center">{currentItem.question}</p>
+
+                  <div className="space-y-2.5">
+                    {currentItem.options.map((opt) => (
+                      <OptionCard
+                        key={opt.id}
+                        optionId={opt.id as 'A' | 'B' | 'C'}
+                        text={opt.text}
+                        selected={answers[currentItem.number] === opt.id}
+                        onSelect={() => handleSelect(currentItem.number, opt.id as 'A' | 'B' | 'C')}
+                        disabled={false}
+                        reduceMotion={!!reduceMotion}
+                      />
+                    ))}
+                  </div>
+                </motion.div>
+              </AnimatePresence>
+
+              <div className="h-4" />
+            </div>
+          </div>
+
+          <div className="shrink-0 border-t border-gray-100 bg-white px-4 py-3">
+            <div className="mx-auto w-full max-w-lg flex items-center gap-3">
+              <p className="text-xs font-semibold text-gray-500 flex-1">
+                {t('ket.signsAndNotices.answeredCount', { answered: answeredCount, total: items.length })}
+              </p>
+              <button
+                type="button"
+                onClick={handleSubmit}
+                disabled={!allAnswered}
+                className="px-6 py-3 rounded-2xl text-white text-sm font-bold transition-transform duration-75 cursor-pointer active:translate-y-1 active:shadow-none disabled:opacity-40 disabled:cursor-not-allowed disabled:translate-y-0 disabled:shadow-none"
+                style={{ background: ACCENT, boxShadow: allAnswered ? `0 4px 0 ${ACCENT_DARK}` : 'none' }}
+              >
+                {t('ket.signsAndNotices.submitAnswers')}
+              </button>
+            </div>
           </div>
         </>
       )}
 
       {phase === 'finished' && (
-        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
-          {results.length > 0 && items.length > 0
-            ? items.map((item) => {
-                const res = results.find((r) => r.number === item.number);
-                if (!res) return null;
-                return (
-                  <ResultCard
-                    key={item.number}
-                    item={item}
-                    result={res}
-                    animate={isNewSession}
-                  />
-                );
-              })
-            : null}
+        <div className="flex-1 overflow-y-auto px-4 py-4">
+          <div className="mx-auto w-full max-w-lg space-y-4">
+            {results.length > 0 && items.length > 0
+              ? items.map((item, i) => {
+                  const res = results.find((r) => r.number === item.number);
+                  if (!res) return null;
+                  return (
+                    <ResultCard
+                      key={item.number}
+                      item={item}
+                      result={res}
+                      index={i}
+                      animate={isNewSession}
+                      reduceMotion={!!reduceMotion}
+                      explanationLabel={t('ket.signsAndNotices.explanationLabel')}
+                    />
+                  );
+                })
+              : null}
 
-          <div className="flex justify-center pt-2">
-            <CelebrationCard
-              score={correctCount}
-              scoreMax={6}
-              feedback={t('ket.signsAndNotices.celebrationFeedback')}
-              onAction={onOpenDashboard}
-              actionLabel={t('ket.signsAndNotices.celebrationAction')}
-              animate={isNewSession}
-            />
+            <div className="flex justify-center pt-2">
+              <CelebrationCard
+                score={correctCount}
+                scoreMax={items.length || 6}
+                feedback={t('ket.signsAndNotices.celebrationFeedback')}
+                onAction={onOpenDashboard}
+                actionLabel={t('ket.signsAndNotices.celebrationAction')}
+                animate={isNewSession}
+              />
+            </div>
           </div>
         </div>
       )}
