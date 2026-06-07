@@ -3,7 +3,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import { motion, AnimatePresence } from 'motion/react';
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronDown, ChevronUp, ImageIcon, Check } from 'lucide-react';
 import { KETWritingIcon } from '@/components/icons/KETIcons';
 import { CelebrationCard } from '@/components/practice/yl/CelebrationCard';
 import { BobMascotLoader } from '@/components/chat/BobMascotLoader';
@@ -101,7 +101,7 @@ function SceneStrip({ scenes, loadingNumbers }: { scenes: StorySceneWithImage[];
                 </svg>
               </div>
             ) : (
-              <div className="w-full h-full flex items-center justify-center text-gray-300 text-2xl">📷</div>
+              <div className="w-full h-full flex items-center justify-center text-gray-300"><ImageIcon className="w-6 h-6" /></div>
             )}
             <span
               className="absolute top-1.5 left-1.5 w-5 h-5 rounded-full text-[10px] font-black flex items-center justify-center text-white"
@@ -147,7 +147,7 @@ function FeedbackPanel({
 
       {feedback.highlights.length > 0 && (
         <div className="rounded-2xl border border-green-200 bg-green-50 px-4 py-3 space-y-1.5">
-          <p className="text-xs font-bold text-green-800">What you did well ✓</p>
+          <p className="text-xs font-bold text-green-800 inline-flex items-center gap-1">What you did well <Check className="w-3.5 h-3.5" /></p>
           {feedback.highlights.map((h, i) => (
             <p key={i} className="text-sm text-green-700 leading-snug">• {h}</p>
           ))}

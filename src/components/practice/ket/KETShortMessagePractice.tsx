@@ -1,13 +1,12 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import { CheckCircle, XCircle, ChevronDown, ChevronUp } from 'lucide-react';
+import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
+import { CheckCircle, XCircle, ChevronDown, ChevronUp, Check, ArrowRight } from 'lucide-react';
 import { KETWritingIcon } from '@/components/icons/KETIcons';
 import { CelebrationCard } from '@/components/practice/yl/CelebrationCard';
 import { BobMascotLoader } from '@/components/chat/BobMascotLoader';
 import { ChatInputBar } from '@/components/chat/ChatInputBar';
-import { BobAvatar } from '@/components/practice/yl/_shared';
 import {
   generateKETShortMessageAction,
   evaluateKETShortMessageAction,
@@ -16,6 +15,12 @@ import {
 } from '@/actions/modes/ket-writing-part6';
 import type { StoredMessage } from '@/actions/messages';
 import { useTranslations } from 'next-intl';
+
+const ACCENT = '#469E7B';
+const ACCENT_DARK = '#37795E';
+const ACCENT_TEXT = '#2F6B52';
+const ACCENT_TINT = 'color-mix(in oklab, #469E7B 14%, white)';
+const CARD_SURFACE = '#FAFAF8';
 
 export interface KETShortMessagePracticeProps {
   onBack: () => void;
@@ -35,14 +40,8 @@ function countWords(text: string): number {
 function ScenarioCard({ scenario, recipient, contentPoints }: { scenario: string; recipient: string; contentPoints: string[] }) {
   const t = useTranslations('cambridge');
   return (
-    <div
-      className="rounded-2xl px-4 py-3 space-y-2"
-      style={{
-        background: 'color-mix(in oklab, var(--color-bob-brand) 6%, white)',
-        border: '1px solid color-mix(in oklab, var(--color-bob-brand) 15%, white)',
-      }}
-    >
-      <p className="text-xs font-bold uppercase tracking-widest text-bob-brand">{t('ket.shortMessage.situation')}</p>
+    <div className="rounded-3xl border border-gray-100 shadow-sm px-4 py-3 space-y-2" style={{ background: CARD_SURFACE }}>
+      <p className="text-xs font-bold uppercase tracking-widest" style={{ color: ACCENT_TEXT }}>{t('ket.shortMessage.situation')}</p>
       <p className="text-sm text-gray-800 leading-relaxed">
         Write a message to <strong>{recipient}</strong>. {scenario}
       </p>
@@ -50,8 +49,8 @@ function ScenarioCard({ scenario, recipient, contentPoints }: { scenario: string
         {contentPoints.map((point, i) => (
           <div key={i} className="flex items-start gap-2 text-sm text-gray-700">
             <span
-              className="mt-0.5 shrink-0 w-5 h-5 rounded-full text-bob-brand text-xs font-bold flex items-center justify-center"
-              style={{ background: 'color-mix(in oklab, var(--color-bob-brand) 14%, white)' }}
+              className="mt-0.5 shrink-0 w-5 h-5 rounded-full text-xs font-bold flex items-center justify-center"
+              style={{ background: ACCENT_TINT, color: ACCENT_TEXT }}
             >
               {i + 1}
             </span>
@@ -81,12 +80,12 @@ function FeedbackPanel({ feedback, userText, onOpenDashboard, animate }: {
       transition={{ duration: 0.25 }}
       className="flex flex-col gap-4"
     >
-      <div className="rounded-2xl bg-gray-50 border border-gray-100 px-4 py-3">
+      <div className="rounded-3xl border border-gray-100 shadow-sm px-4 py-3" style={{ background: CARD_SURFACE }}>
         <p className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-1">{t('ket.shortMessage.yourMessage')}</p>
         <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{userText}</p>
       </div>
 
-      <div className="rounded-2xl bg-white border border-gray-100 shadow-sm px-4 py-3 space-y-3">
+      <div className="rounded-3xl border border-gray-100 shadow-sm px-4 py-3 space-y-3" style={{ background: CARD_SURFACE }}>
         <div className="flex items-center gap-2">
           {feedback.understood
             ? <CheckCircle size={18} className="text-green-500 shrink-0" />
@@ -102,7 +101,7 @@ function FeedbackPanel({ feedback, userText, onOpenDashboard, animate }: {
             <ul className="space-y-1">
               {feedback.highlights.map((h, i) => (
                 <li key={i} className="flex items-start gap-1.5 text-sm text-gray-700">
-                  <span className="text-green-500 mt-0.5">✓</span>
+                  <Check className="w-3.5 h-3.5 text-green-500 mt-0.5 shrink-0" />
                   {h}
                 </li>
               ))}
@@ -116,7 +115,7 @@ function FeedbackPanel({ feedback, userText, onOpenDashboard, animate }: {
             <ul className="space-y-1">
               {feedback.suggestions.map((s, i) => (
                 <li key={i} className="flex items-start gap-1.5 text-sm text-gray-700">
-                  <span className="text-amber-500 mt-0.5">→</span>
+                  <ArrowRight className="w-3.5 h-3.5 text-amber-500 mt-0.5 shrink-0" />
                   {s}
                 </li>
               ))}
@@ -129,7 +128,7 @@ function FeedbackPanel({ feedback, userText, onOpenDashboard, animate }: {
             <button
               type="button"
               onClick={() => setModelOpen((v) => !v)}
-              className="flex items-center gap-1 text-xs font-bold text-gray-400 hover:text-gray-600 transition-colors"
+              className="flex items-center gap-1 text-xs font-bold text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
             >
               {modelOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
               {t('ket.shortMessage.viewModelAnswer')}
@@ -158,10 +157,9 @@ function FeedbackPanel({ feedback, userText, onOpenDashboard, animate }: {
         scoreMax={1}
         hideGrade
         feedback={feedback.understood
-          ? '¡Escribiste tu mensaje! Sigue practicando para que te salga cada vez mejor.'
-          : 'Vuelve a intentarlo — cada intento te hace más fuerte.'}
+          ? 'You wrote your message! Keep practicing to make it even better.'
+          : 'Try again, every attempt makes you stronger.'}
         onAction={onOpenDashboard}
-        actionLabel="Ver mis actividades"
         animate={animate}
       />
     </motion.div>
@@ -208,7 +206,7 @@ function tryRestoreFromMessages(messages: StoredMessage[]): {
   return { prompt, userText, feedback };
 }
 
-/** KET Writing Part 6 — Short Message practice component. */
+/** KET Writing Part 6 — Short Message focus-mode practice component. */
 export function KETShortMessagePractice({
   onBack,
   sessionId: initialSessionId,
@@ -218,6 +216,7 @@ export function KETShortMessagePractice({
   onOpenDashboard,
 }: KETShortMessagePracticeProps) {
   const t = useTranslations('cambridge');
+  const reduceMotion = useReducedMotion();
   const [phase, setPhase] = useState<Phase>('loading');
   const [prompt, setPrompt] = useState<KETShortMessagePrompt | null>(null);
   const [text, setText] = useState('');
@@ -306,7 +305,7 @@ export function KETShortMessagePractice({
         <button
           type="button"
           onClick={onBack}
-          className="px-5 py-2 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition-colors text-sm"
+          className="px-5 py-2 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition-colors text-sm cursor-pointer"
         >
           {t('ket.shortMessage.back')}
         </button>
@@ -320,24 +319,24 @@ export function KETShortMessagePractice({
         <button
           type="button"
           onClick={onBack}
-          className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-600"
+          className="w-11 h-11 flex items-center justify-center rounded-xl hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-600 text-lg"
           aria-label={t('ket.shortMessage.back')}
         >
           ←
         </button>
         <div
           className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0"
-          style={{ background: 'color-mix(in oklab, var(--color-bob-brand) 12%, white)' }}
+          style={{ background: ACCENT_TINT, color: ACCENT }}
         >
-          <KETWritingIcon size={18} className="text-bob-brand" />
+          <KETWritingIcon size={18} />
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-bold text-gray-800 truncate">{t('ket.shortMessage.headerTitle')}</p>
           <p className="text-xs text-gray-400">{t('ket.shortMessage.headerSubtitle')}</p>
         </div>
         <span
-          className="shrink-0 px-2 py-0.5 rounded-full text-bob-brand text-[10px] font-bold uppercase tracking-widest"
-          style={{ background: 'color-mix(in oklab, var(--color-bob-brand) 12%, white)' }}
+          className="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-widest"
+          style={{ background: ACCENT_TINT, color: ACCENT_TEXT }}
         >
           {t('ket.shortMessage.partBadge')}
         </span>
@@ -357,68 +356,77 @@ export function KETShortMessagePractice({
 
       {phase === 'ready' && prompt && (
         <>
-          <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
-            <motion.div
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.22 }}
-              className="flex flex-col gap-4"
-            >
-              <div className="flex items-start gap-2">
-                <BobAvatar />
-                <div className="bg-gray-50 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-gray-700 leading-relaxed max-w-sm">
-                  {prompt.framingText}
+          <div className="flex-1 overflow-y-auto px-4 py-4">
+            <div className="mx-auto w-full max-w-lg">
+              <motion.div
+                initial={reduceMotion ? false : { opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.22 }}
+                className="flex flex-col gap-4"
+              >
+                <div className="flex items-start gap-3 rounded-3xl border border-gray-100 shadow-sm px-4 py-3" style={{ background: CARD_SURFACE }}>
+                  <span
+                    className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+                    style={{ background: ACCENT_TINT, color: ACCENT }}
+                  >
+                    <KETWritingIcon size={20} />
+                  </span>
+                  <p className="text-sm text-gray-700 leading-relaxed flex-1">{prompt.framingText}</p>
                 </div>
-              </div>
-              <ScenarioCard
-                scenario={prompt.scenario}
-                recipient={prompt.recipient}
-                contentPoints={prompt.contentPoints}
-              />
-            </motion.div>
+                <ScenarioCard
+                  scenario={prompt.scenario}
+                  recipient={prompt.recipient}
+                  contentPoints={prompt.contentPoints}
+                />
+              </motion.div>
+            </div>
           </div>
 
-          <ChatInputBar
-            variant="text"
-            value={text}
-            placeholder="Write your message here…"
-            disabled={phase !== 'ready' || wordCount < MIN_WORDS}
-            onChange={setText}
-            onSend={handleSubmit}
-          />
-          <div className="shrink-0 px-4 pb-3 -mt-1 flex items-center justify-between text-xs text-gray-400 bg-white">
-            <span>
-              Words:{' '}
-              <strong
-                className={
-                  wordCount < MIN_WORDS
-                    ? 'text-amber-500'
-                    : wordCount > 40
-                    ? 'text-red-400'
-                    : 'text-green-600'
-                }
-              >
-                {wordCount}
-              </strong>{' '}
-              / target ~25
-            </span>
-            {wordCount < MIN_WORDS && (
-              <span className="text-amber-500">
-                {MIN_WORDS - wordCount} more to send
+          <div className="mx-auto w-full max-w-lg">
+            <ChatInputBar
+              variant="text"
+              value={text}
+              placeholder="Write your message here…"
+              disabled={phase !== 'ready' || wordCount < MIN_WORDS}
+              onChange={setText}
+              onSend={handleSubmit}
+            />
+            <div className="shrink-0 px-4 pb-3 -mt-1 flex items-center justify-between text-xs text-gray-400 bg-white">
+              <span>
+                Words:{' '}
+                <strong
+                  className={
+                    wordCount < MIN_WORDS
+                      ? 'text-amber-500'
+                      : wordCount > 40
+                      ? 'text-red-400'
+                      : 'text-green-600'
+                  }
+                >
+                  {wordCount}
+                </strong>{' '}
+                / target ~25
               </span>
-            )}
+              {wordCount < MIN_WORDS && (
+                <span className="text-amber-500">
+                  {MIN_WORDS - wordCount} more to send
+                </span>
+              )}
+            </div>
           </div>
         </>
       )}
 
       {phase === 'finished' && prompt && feedback && (
-        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
-          <FeedbackPanel
-            feedback={feedback}
-            userText={restoredUserText ?? text}
-            onOpenDashboard={onOpenDashboard}
-            animate={isNewSession}
-          />
+        <div className="flex-1 overflow-y-auto px-4 py-4">
+          <div className="mx-auto w-full max-w-lg">
+            <FeedbackPanel
+              feedback={feedback}
+              userText={restoredUserText ?? text}
+              onOpenDashboard={onOpenDashboard}
+              animate={isNewSession}
+            />
+          </div>
         </div>
       )}
     </div>

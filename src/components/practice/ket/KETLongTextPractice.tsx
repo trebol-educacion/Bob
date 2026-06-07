@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
-import { Check } from 'lucide-react';
+import { Check, X, FileText, ChevronDown } from 'lucide-react';
 import { KETReadingIcon } from '@/components/icons/KETIcons';
 import { CelebrationCard } from '@/components/practice/yl/CelebrationCard';
 import { BobMascotLoader } from '@/components/chat/BobMascotLoader';
@@ -229,9 +229,9 @@ function PassageSheet({
                 type="button"
                 onClick={onClose}
                 aria-label="Close"
-                className="w-9 h-9 rounded-full flex items-center justify-center text-gray-400 hover:bg-gray-100 cursor-pointer text-lg"
+                className="w-9 h-9 rounded-full flex items-center justify-center text-gray-400 hover:bg-gray-100 cursor-pointer"
               >
-                ✕
+                <X className="w-4 h-4" />
               </button>
             </div>
             <div className="px-5 pb-6 overflow-y-auto">
@@ -396,7 +396,9 @@ export function KETLongTextPractice({
                 className="self-center sticky top-2 z-10 inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold border cursor-pointer shadow-sm"
                 style={{ background: ACCENT_TINT, color: ACCENT_TEXT, borderColor: 'transparent' }}
               >
-                📄 Read the text again ▾
+                <FileText className="w-4 h-4" />
+                Read the text again
+                <ChevronDown className="w-4 h-4" />
               </button>
 
               <AnimatePresence mode="wait">

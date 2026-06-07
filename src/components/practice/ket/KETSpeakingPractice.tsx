@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
-import { Mic, Square, Volume2, ChevronDown, ChevronUp, RotateCcw } from 'lucide-react';
+import { Mic, Square, Volume2, ChevronDown, ChevronUp, RotateCcw, Check, X } from 'lucide-react';
 import { KETSpeakingIcon } from '@/components/icons/KETIcons';
 import { CelebrationCard } from '@/components/practice/yl/CelebrationCard';
 import { BobMascotLoader } from '@/components/chat/BobMascotLoader';
@@ -213,7 +213,7 @@ function FeedbackBlocks({ feedback }: { feedback: SpeakingFeedback }) {
   return (
     <div className="space-y-3">
       <div className="rounded-2xl border border-green-200 bg-green-50 px-4 py-3 space-y-1.5">
-        <p className="text-xs font-bold text-green-800">What you did well ✓</p>
+        <p className="text-xs font-bold text-green-800 inline-flex items-center gap-1">What you did well <Check className="w-3.5 h-3.5" /></p>
         {highlights.map((h, i) => (
           <p key={i} className="text-sm text-green-700 leading-snug">• {h}</p>
         ))}
@@ -595,7 +595,7 @@ export function KETSpeakingPractice({
       {errorMsg && phase !== 'mic-denied' && (
         <div className="absolute inset-x-4 bottom-24 bg-red-50 border border-red-200 rounded-2xl px-4 py-3 flex items-center justify-between">
           <p className="text-sm text-red-600">{errorMsg}</p>
-          <button type="button" onClick={() => setErrorMsg(null)} className="text-red-400 ml-2">✕</button>
+          <button type="button" onClick={() => setErrorMsg(null)} aria-label="Dismiss" className="text-red-400 ml-2"><X className="w-4 h-4" /></button>
         </div>
       )}
     </div>

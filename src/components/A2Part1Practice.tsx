@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
-import { Mic, Square, Volume2, RotateCcw, ChevronDown, ChevronUp } from 'lucide-react';
+import { Mic, Square, Volume2, RotateCcw, ChevronDown, ChevronUp, Check } from 'lucide-react';
 import { generateA2SessionAction, processA2AnswerAction, evaluateA2FinalAction } from '@/actions/modes/a2';
 import { createSessionAction } from '@/actions/sessions';
 import { blobToBase64 } from '@/lib/audio';
@@ -56,7 +56,7 @@ function FeedbackBlocks({ feedback }: { feedback: FormativeFeedback }) {
   return (
     <div className="space-y-3">
       <div className="rounded-2xl border border-green-200 bg-green-50 px-4 py-3 space-y-1.5">
-        <p className="text-xs font-bold text-green-800">What you did well ✓</p>
+        <p className="text-xs font-bold text-green-800 inline-flex items-center gap-1">What you did well <Check className="w-3.5 h-3.5" /></p>
         {highlights.map((h, i) => (
           <p key={i} className="text-sm text-green-700 leading-snug">• {h}</p>
         ))}

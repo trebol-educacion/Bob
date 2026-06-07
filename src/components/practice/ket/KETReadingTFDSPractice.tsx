@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
-import { Check, X } from 'lucide-react';
+import { Check, X, FileText, ChevronDown, ArrowRight } from 'lucide-react';
 import { KETReadingIcon } from '@/components/icons/KETIcons';
 import { CelebrationCard } from '@/components/practice/yl/CelebrationCard';
 import { BobMascotLoader } from '@/components/chat/BobMascotLoader';
@@ -392,7 +392,9 @@ export function KETReadingTFDSPractice({
                 className="self-center sticky top-2 z-10 inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold border cursor-pointer shadow-sm"
                 style={{ background: ACCENT_TINT, color: ACCENT_TEXT, borderColor: 'transparent' }}
               >
-                📄 Read the text again ▾
+                <FileText className="w-4 h-4" />
+                Read the text again
+                <ChevronDown className="w-4 h-4" />
               </button>
 
               <AnimatePresence mode="wait">
@@ -493,7 +495,7 @@ export function KETReadingTFDSPractice({
                       {r.chosen
                         ? <VerdictBadge verdict={r.chosen} struck />
                         : <span className="px-3 py-1 rounded-full text-xs font-bold border border-gray-200 bg-gray-50 text-gray-400 italic">No answer</span>}
-                      <span className="text-gray-300 text-sm" aria-hidden>→</span>
+                      <ArrowRight className="w-4 h-4 text-gray-300 shrink-0" aria-hidden />
                       <VerdictBadge verdict={r.correct_verdict} />
                       <p className="w-full text-xs text-gray-500 leading-snug mt-1">{VERDICT_META[r.correct_verdict].secondary}.</p>
                     </>
