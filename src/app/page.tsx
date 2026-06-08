@@ -496,7 +496,7 @@ export default function App() {
                       onSelect={handleModeSelect}
                       enabledModes={enabledModes}
                       availableModes={availableModes}
-                      cefrActiveLevel={cefrActiveLevel}
+                      cefrActiveLevel={(selectedSkill ? skillLevels?.[selectedSkill]?.cefr_level : null) ?? cefrActiveLevel}
                       cefrLevelLocked={cefrLevelLocked}
                       organizationName={organization?.name}
                     />
