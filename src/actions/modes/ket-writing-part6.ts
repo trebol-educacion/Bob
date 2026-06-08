@@ -105,10 +105,10 @@ export async function generateKETShortMessageAction(input: {
   let parsed: z.infer<typeof GenerationSchema> | null = null;
   for (let attempt = 0; attempt < 3 && !parsed; attempt++) {
     const result = await callGemini(
-      { promptKey: 'cambridge_ket_writing_part6_a2_generation', model: MODELS.FLASH_LITE, userId },
+      { promptKey: 'cambridge_ket_writing_part6_a2_generation', model: MODELS.FLASH_LITE_PREVIEW, userId },
       (ai) =>
         ai.models.generateContent({
-          model: MODELS.FLASH_LITE,
+          model: MODELS.FLASH_LITE_PREVIEW,
           contents: [{ role: 'user', parts: [{ text: generationPrompt }] }],
           config: { responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
         })
@@ -198,10 +198,10 @@ export async function evaluateKETShortMessageAction(input: {
   let parsed: z.infer<typeof EvaluationSchema> | null = null;
   for (let attempt = 0; attempt < 3 && !parsed; attempt++) {
     const result = await callGemini(
-      { promptKey: 'cambridge_ket_writing_part6_a2_evaluation', model: MODELS.FLASH_LITE, userId: input.userId },
+      { promptKey: 'cambridge_ket_writing_part6_a2_evaluation', model: MODELS.FLASH_LITE_PREVIEW, userId: input.userId },
       (ai) =>
         ai.models.generateContent({
-          model: MODELS.FLASH_LITE,
+          model: MODELS.FLASH_LITE_PREVIEW,
           contents: [{ role: 'user', parts: [{ text: evalPromptText }] }],
           config: { responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
         })
