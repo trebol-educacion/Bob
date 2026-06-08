@@ -273,7 +273,7 @@ export function KETShortMessagePractice({
   }, []);
 
   async function handleSubmit() {
-    if (!prompt || !text.trim()) return;
+    if (!prompt || !text.trim() || wordCount < MIN_WORDS) return;
     setPhase('evaluating');
 
     const result = await evaluateKETShortMessageAction({
@@ -387,7 +387,7 @@ export function KETShortMessagePractice({
               variant="text"
               value={text}
               placeholder="Write your message here…"
-              disabled={phase !== 'ready' || wordCount < MIN_WORDS}
+              disabled={phase !== 'ready'}
               onChange={setText}
               onSend={handleSubmit}
             />
