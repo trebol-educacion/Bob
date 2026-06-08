@@ -1,14 +1,16 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
+import Image from 'next/image';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
-import { Check, Ban, TriangleAlert, Info, Store, ClipboardList, type LucideIcon } from 'lucide-react';
+import { Check, Loader2 } from 'lucide-react';
 import { KETReadingIcon } from '@/components/icons/KETIcons';
 import { CelebrationCard } from '@/components/practice/yl/CelebrationCard';
 import { BobMascotLoader } from '@/components/chat/BobMascotLoader';
 import {
   generateKETSignsAndNoticesAction,
   submitKETSignsAnswersAction,
+  generateKETSignImagesAction,
   type SignItem,
   type SignAnswerResult,
 } from '@/actions/modes/ket-reading-part1';
@@ -34,21 +36,16 @@ type Phase = 'loading' | 'ready' | 'submitting' | 'finished';
 
 type SignStyle = 'warning' | 'prohibition' | 'info' | 'shop' | 'default';
 
-interface SignLook {
-  Icon: LucideIcon;
-  className: string;
-}
-
-const SIGN_LOOK: Record<SignStyle, SignLook> = {
-  prohibition: { Icon: Ban, className: 'bg-white text-[#37795E] border-4 border-[#469E7B]' },
-  warning: { Icon: TriangleAlert, className: 'bg-amber-100 text-amber-900 border-4 border-amber-400' },
-  info: { Icon: Info, className: 'bg-sky-100 text-sky-900 border-4 border-sky-400' },
-  shop: { Icon: Store, className: 'bg-slate-100 text-slate-800 border-4 border-slate-400' },
-  default: { Icon: ClipboardList, className: 'bg-slate-100 text-slate-700 border-4 border-slate-300' },
+const PLACEHOLDER_ACCENT: Record<SignStyle, string> = {
+  prohibition: '#469E7B',
+  warning: '#FBBF24',
+  info: '#38BDF8',
+  shop: '#A78BFA',
+  default: '#94A3B8',
 };
 
-function lookFor(item: SignItem): SignLook {
-  return SIGN_LOOK[item.sign_style ?? 'default'];
+function placeholderAccent(item: SignItem): string {
+  return PLACEHOLDER_ACCENT[item.sign_style ?? 'default'];
 }
 
 interface RestoredState {
@@ -82,19 +79,27 @@ function tryRestore(messages: StoredMessage[]): RestoredState | null {
   return null;
 }
 
-function SignBoard({ item }: { item: SignItem }) {
-  const { Icon, className } = lookFor(item);
+function SignBoard({ item, imageUrl }: { item: SignItem; imageUrl?: string }) {
+  const accent = placeholderAccent(item);
   return (
-    <div
-      className={[
-        'relative rounded-2xl px-5 py-6 text-center shadow-md select-none',
-        className,
-      ].join(' ')}
-    >
-      <Icon className="absolute top-2 left-3 w-6 h-6" aria-hidden strokeWidth={2.5} />
-      <p className="text-xl font-black uppercase tracking-wide leading-snug break-words">
-        {item.sign_text}
-      </p>
+    <div className="rounded-2xl overflow-hidden shadow-md border border-gray-100 bg-white select-none">
+      <div className="relative aspect-[16/10] w-full">
+        {imageUrl ? (
+          <Image src={imageUrl} alt={item.sign_context} fill unoptimized className="object-cover" />
+        ) : (
+          <div
+            className="absolute inset-0 flex items-center justify-center"
+            style={{ background: `linear-gradient(135deg, color-mix(in oklab, ${accent} 22%, white), color-mix(in oklab, ${accent} 8%, white))` }}
+          >
+            <Loader2 className="w-7 h-7 animate-spin" style={{ color: accent }} aria-hidden strokeWidth={2.5} />
+          </div>
+        )}
+      </div>
+      <div className="px-4 py-3 text-center border-t border-gray-100">
+        <p className="text-lg sm:text-xl font-black uppercase tracking-wide leading-snug break-words text-gray-800">
+          {item.sign_text}
+        </p>
+      </div>
     </div>
   );
 }
@@ -223,6 +228,7 @@ function ResultCard({
   animate,
   reduceMotion,
   explanationLabel,
+  imageUrl,
 }: {
   item: SignItem;
   result: SignAnswerResult;
@@ -230,6 +236,7 @@ function ResultCard({
   animate: boolean;
   reduceMotion: boolean;
   explanationLabel: string;
+  imageUrl?: string;
 }) {
   return (
     <motion.div
@@ -258,7 +265,7 @@ function ResultCard({
           </span>
         </div>
 
-        <SignBoard item={item} />
+        <SignBoard item={item} imageUrl={imageUrl} />
       </div>
 
       <div className="px-4 pb-4 space-y-2">
@@ -332,7 +339,9 @@ export function KETSignsAndNoticesPractice({
   const [correctCount, setCorrectCount] = useState(0);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isNewSession, setIsNewSession] = useState(false);
+  const [signImages, setSignImages] = useState<Record<number, string>>({});
   const initStartedRef = useRef(false);
+  const imagesStartedRef = useRef(false);
   const advanceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -388,6 +397,27 @@ export function KETSignsAndNoticesPractice({
   useEffect(() => () => {
     if (advanceRef.current) clearTimeout(advanceRef.current);
   }, []);
+
+  useEffect(() => {
+    if (imagesStartedRef.current) return;
+    if (items.length === 0) return;
+    imagesStartedRef.current = true;
+
+    async function loadImages() {
+      await Promise.all(
+        items.map(async (it) => {
+          const result = await generateKETSignImagesAction({
+            items: [{ number: it.number, sign_context: it.sign_context, sign_style: it.sign_style ?? 'default' }],
+            sessionId,
+          }).catch(() => []);
+          const url = result[0]?.image_url;
+          if (url) setSignImages((prev) => ({ ...prev, [it.number]: url }));
+        })
+      );
+    }
+
+    void loadImages();
+  }, [items, sessionId]);
 
   function handleSelect(itemNumber: number, optionId: 'A' | 'B' | 'C') {
     setAnswers((prev) => ({ ...prev, [itemNumber]: optionId }));
@@ -526,9 +556,7 @@ export function KETSignsAndNoticesPractice({
                   transition={{ type: 'spring', stiffness: 300, damping: 28 }}
                   className="space-y-4"
                 >
-                  <p className="text-sm text-gray-500 text-center">{currentItem.sign_context}</p>
-
-                  <SignBoard item={currentItem} />
+                  <SignBoard item={currentItem} imageUrl={signImages[currentItem.number]} />
 
                   <p className="text-sm font-semibold text-gray-700 text-center">{currentItem.question}</p>
 
@@ -587,6 +615,7 @@ export function KETSignsAndNoticesPractice({
                       animate={isNewSession}
                       reduceMotion={!!reduceMotion}
                       explanationLabel={t('ket.signsAndNotices.explanationLabel')}
+                      imageUrl={signImages[item.number]}
                     />
                   );
                 })

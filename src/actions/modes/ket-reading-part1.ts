@@ -7,6 +7,7 @@ import { callGemini, isOk } from '@/lib/gemini-client';
 import { persistMessage, persistMessages } from '@/lib/persist-activity';
 import { createSessionAction } from '@/actions/sessions';
 import { createSupabaseServer } from '@/lib/supabase/server';
+import { generateYLImagesParallelAction } from '@/actions/modes/yl';
 import { MODELS } from '@/lib/models';
 
 const OptionSchema = z.object({
@@ -215,4 +216,41 @@ export async function submitKETSignsAnswersAction(input: {
   }).catch(() => undefined);
 
   return { correctCount, total, results };
+}
+
+/** One generated scene illustration mapped back to its sign number. */
+export interface KETSignImage {
+  number: number;
+  image_url: string;
+}
+
+/** Generates one child-friendly scene illustration per sign, off the critical path (no text inside the image). */
+export async function generateKETSignImagesAction(input: {
+  items: { number: number; sign_context: string; sign_style: string }[];
+  sessionId?: string;
+}): Promise<KETSignImage[]> {
+  if (input.items.length === 0) return [];
+
+  const supabase = await createSupabaseServer();
+  const { data: { user } } = await supabase.auth.getUser();
+  const sessionId = input.sessionId ?? user?.id ?? 'ket-reading-part1';
+
+  const prompts = input.items.map(
+    (it) =>
+      `A bright, friendly flat illustration of a ${it.sign_context} (a place a child might visit). Cheerful, simple, colorful, for kids. IMPORTANT: absolutely no text, no words, no letters, no signs with writing in the image.`
+  );
+
+  const imageUrls = await generateYLImagesParallelAction(
+    'movers',
+    1,
+    prompts,
+    sessionId,
+    undefined,
+    'scene'
+  ).catch(() => input.items.map(() => ''));
+
+  return input.items.map((it, idx) => ({
+    number: it.number,
+    image_url: imageUrls[idx] ?? '',
+  }));
 }
