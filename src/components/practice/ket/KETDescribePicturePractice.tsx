@@ -99,7 +99,16 @@ export function KETDescribePicturePractice({
       onSessionCreated?.(result.sessionId);
       setPlan(result);
       setLoading(false);
-      void loadMedia(result);
+      if (result.image_url) {
+        setMedia({
+          instruction_audio_b64: result.instruction_audio_b64 ?? '',
+          instruction_audio_mime: result.instruction_audio_mime ?? EMPTY_MEDIA.instruction_audio_mime,
+          image_url: result.image_url,
+        });
+        setMediaLoading(false);
+      } else {
+        void loadMedia(result);
+      }
     }
     void init();
   }, []);
