@@ -105,6 +105,29 @@ async function callGeminiRaw(
   return json.candidates?.[0]?.content?.parts?.[0]?.text ?? null;
 }
 
+async function resolveCooldownUntil(
+  supabase: ReturnType<typeof createClient>,
+  userId: string,
+): Promise<string> {
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("organization_id")
+    .eq("id", userId)
+    .maybeSingle();
+
+  let cooldownDays = 7;
+  if (profile?.organization_id) {
+    const { data: org } = await supabase
+      .from("organizations")
+      .select("assessment_cooldown_days")
+      .eq("id", profile.organization_id)
+      .maybeSingle();
+    cooldownDays = org?.assessment_cooldown_days ?? 7;
+  }
+
+  return new Date(Date.now() + cooldownDays * 24 * 60 * 60 * 1000).toISOString();
+}
+
 async function processSpeaking(
   supabase: ReturnType<typeof createClient>,
   geminiKey: string,
@@ -208,7 +231,7 @@ async function processSpeaking(
     updated_at: new Date().toISOString(),
   }, { onConflict: "user_id,skill" });
 
-  const cooldownUntil = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+  const cooldownUntil = await resolveCooldownUntil(supabase, userId);
 
   await supabase
     .from("bob_messages")
@@ -306,7 +329,7 @@ async function processWriting(
     updated_at: new Date().toISOString(),
   }, { onConflict: "user_id,skill" });
 
-  const cooldownUntil = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+  const cooldownUntil = await resolveCooldownUntil(supabase, userId);
 
   await supabase
     .from("bob_messages")
