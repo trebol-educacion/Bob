@@ -18,12 +18,20 @@ interface EvaluateEmailInput {
 }
 
 const GeminiEmailFeedbackSchema = z.object({
-  understood: z.boolean(),
-  highlights: z.array(z.string()),
-  suggestions: z.array(z.string()),
-  model_answer: z.string().optional(),
+  understood:      z.boolean(),
+  highlights:      z.array(z.string()),
+  suggestions:     z.array(z.string()),
+  model_answer:    z.string().optional(),
   covered_bullets: z.array(z.string()).optional(),
   missing_bullets: z.array(z.string()).optional(),
+  rubric: z
+    .object({
+      task_coverage: z.number().int().min(0).max(4),
+      grammar:       z.number().int().min(0).max(4),
+      vocabulary:    z.number().int().min(0).max(4),
+      fluency:       z.number().int().min(0).max(4),
+    })
+    .optional(),
 });
 
 function buildFallback(wordCount: number, targetWordCount: [number, number]): WritingFormativeFeedback {
@@ -59,7 +67,7 @@ export async function evaluateEmailAction(
         userId: input.userId,
         role: 'bob',
         msgType: 'evaluation',
-        contentJson: fallback as unknown as Record<string, unknown>,
+        contentJson: { ...(fallback as unknown as Record<string, unknown>), is_final: true },
       }).catch(() => undefined);
       return fallback;
     }
@@ -68,7 +76,8 @@ export async function evaluateEmailAction(
   const systemInstruction = `You are a Cambridge/TOEFL writing examiner providing FORMATIVE feedback only.
 Never assign a numeric score. Return JSON with: understood (boolean), highlights (array of 2-3 strengths),
 suggestions (array of 2-3 improvement points), model_answer (optional short example),
-covered_bullets (optional array of task points addressed), missing_bullets (optional array of task points missed).`;
+covered_bullets (optional array of task points addressed), missing_bullets (optional array of task points missed),
+rubric (object with integer scores 0-4 for: task_coverage, grammar, vocabulary, fluency).`;
 
   const userContent = `Exam part prompt:\n${evalPromptText}\n\nStudent answer (${wordCount} words):\n${input.text}`;
 
@@ -91,7 +100,7 @@ covered_bullets (optional array of task points addressed), missing_bullets (opti
       userId: input.userId,
       role: 'bob',
       msgType: 'evaluation',
-      contentJson: fallback as unknown as Record<string, unknown>,
+      contentJson: { ...(fallback as unknown as Record<string, unknown>), is_final: true },
     }).catch(() => undefined);
     return fallback;
   }
@@ -106,7 +115,7 @@ covered_bullets (optional array of task points addressed), missing_bullets (opti
       userId: input.userId,
       role: 'bob',
       msgType: 'evaluation',
-      contentJson: fallback as unknown as Record<string, unknown>,
+      contentJson: { ...(fallback as unknown as Record<string, unknown>), is_final: true },
     }).catch(() => undefined);
     return fallback;
   }
@@ -117,6 +126,7 @@ covered_bullets (optional array of task points addressed), missing_bullets (opti
     highlights: parsed.highlights,
     suggestions: parsed.suggestions,
     model_answer: parsed.model_answer,
+    rubric: parsed.rubric,
     indicators: {
       word_count: wordCount,
       target_word_count_range: input.targetWordCount,
@@ -130,7 +140,7 @@ covered_bullets (optional array of task points addressed), missing_bullets (opti
     userId: input.userId,
     role: 'bob',
     msgType: 'evaluation',
-    contentJson: feedback as unknown as Record<string, unknown>,
+    contentJson: { ...(feedback as unknown as Record<string, unknown>), rubric: parsed.rubric ?? null, is_final: true },
   }).catch(() => undefined);
 
   return feedback;

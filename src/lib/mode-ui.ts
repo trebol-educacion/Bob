@@ -108,14 +108,14 @@ export function getModeBadge(card: DynamicCard): string {
 }
 
 /**
- * Generic cards that should render as part of a Cambridge section instead of
- * "Free practice" (e.g. Phrase Practice surfaces inside PET/FCE so the
- * student sees it next to the official parts). Keyed by `mode_key|cefr_level`
+ * Generic cards that should render inside the level section instead of
+ * "Free practice" (e.g. Phrase Practice surfaces next to the B1/B2 parts so
+ * the student sees it grouped by level). Keyed by `mode_key|cefr_level`
  * because the catalog reuses `mode_key='generic_situation'` across A1/A2/B1/B2.
  */
-const GENERIC_AS_CAMBRIDGE: Record<string, { section: string; weight: number }> = {
-  'generic_situation|b1': { section: 'Cambridge PET (B1 Preliminary)', weight: 9000 },
-  'generic_situation|b2': { section: 'Cambridge FCE (B2 First)', weight: 9000 },
+const GENERIC_AS_CAMBRIDGE: Record<string, { weight: number }> = {
+  'generic_situation|b1': { weight: 9000 },
+  'generic_situation|b2': { weight: 9000 },
 };
 
 function genericOverrideKey(card: DynamicCard): string {
@@ -129,21 +129,11 @@ export function isGenericGroupedWithCambridge(card: DynamicCard): boolean {
 
 /** Returns the section heading under which this card is grouped in ModeSelection. */
 export function getModeSection(card: DynamicCard): string {
-  const { framework, exam_part } = card;
+  const { framework } = card;
 
-  const override = GENERIC_AS_CAMBRIDGE[genericOverrideKey(card)];
-  if (override) return override.section;
-
-  if (framework === 'cambridge') {
-    if (exam_part.startsWith('starters_') || exam_part.startsWith('movers_') || exam_part.startsWith('flyers_')) {
-      return 'Cambridge Young Learners';
-    }
-    if (exam_part.startsWith('ket_')) return 'Cambridge KET (A2 Key)';
-    if (exam_part.startsWith('pet_')) return 'Cambridge PET (B1 Preliminary)';
-    if (exam_part.startsWith('fce_')) return 'Cambridge FCE (B2 First)';
-    if (exam_part.startsWith('cae_')) return 'Cambridge CAE (C1)';
-    if (exam_part.startsWith('cpe_')) return 'Cambridge CPE (C2)';
-    return 'Cambridge English';
+  if (framework === 'cambridge' || (framework === 'generic' && isGenericGroupedWithCambridge(card))) {
+    const lvl = cefrLabel(card);
+    return lvl ? `English · ${lvl}` : 'English';
   }
 
   if (framework === 'toefl') return 'TOEFL iBT';
@@ -325,35 +315,35 @@ export function getYLCardTheme(card: DynamicCard): YLCardTheme | null {
 }
 
 /**
- * Official Cambridge / TOEFL name surfaced under the kid-friendly title,
- * so teachers and parents still recognise the exam reference. Returns
- * empty string for generic modes (no official name to show).
+ * Subtitle surfaced under the kid-friendly title, describing the activity by
+ * CEFR level + skill/part without referencing any official exam brand.
+ * Returns empty string for generic modes with no level context.
  */
 export function getModeOfficialName(card: DynamicCard): string {
   const { framework, exam_part } = card;
+  const lvl = cefrLabel(card);
+
   if (framework === 'generic') {
     const key = `${card.mode_key}|${card.cefr_level ?? ''}`;
-    if (key === 'generic_situation|b1') return 'Cambridge PET · Phrase Practice';
-    if (key === 'generic_situation|b2') return 'Cambridge FCE · Phrase Practice';
+    if (key === 'generic_situation|b1' || key === 'generic_situation|b2') {
+      return lvl ? `${lvl} · Phrase Practice` : 'Phrase Practice';
+    }
     return '';
   }
   if (framework === 'cambridge') {
-    const ylMatch = exam_part.match(/^(starters|movers|flyers)_part(\d+)$/);
+    const ylMatch = exam_part.match(/^(?:starters|movers|flyers)_part(\d+)$/);
     if (ylMatch) {
-      const family = ylMatch[1].charAt(0).toUpperCase() + ylMatch[1].slice(1);
-      return `Cambridge ${family} · Part ${ylMatch[2]}`;
+      return lvl ? `${lvl} · Part ${ylMatch[1]}` : `Part ${ylMatch[1]}`;
     }
-    const skillMatch = exam_part.match(/^([a-z]+)_(reading|writing|listening|speaking)_part(\d+)$/);
+    const skillMatch = exam_part.match(/^[a-z]+_(reading|writing|listening|speaking)_part(\d+)$/);
     if (skillMatch) {
-      const exam = skillMatch[1].toUpperCase();
-      const skill = skillMatch[2].charAt(0).toUpperCase() + skillMatch[2].slice(1);
-      return `Cambridge ${exam} · ${skill} Part ${skillMatch[3]}`;
+      const skill = skillMatch[1].charAt(0).toUpperCase() + skillMatch[1].slice(1);
+      return lvl ? `${lvl} · ${skill} Part ${skillMatch[2]}` : `${skill} Part ${skillMatch[2]}`;
     }
-    const partMatch = exam_part.match(/^([a-z]+)_p?(\d+)([a-z]?)$/);
+    const partMatch = exam_part.match(/^[a-z]+_p?(\d+)([a-z]?)$/);
     if (partMatch) {
-      const exam = partMatch[1].toUpperCase();
-      const part = partMatch[2] + (partMatch[3] ? partMatch[3].toUpperCase() : '');
-      return `Cambridge ${exam} · Part ${part}`;
+      const part = partMatch[1] + (partMatch[2] ? partMatch[2].toUpperCase() : '');
+      return lvl ? `${lvl} · Part ${part}` : `Part ${part}`;
     }
   }
   if (framework === 'toefl') {

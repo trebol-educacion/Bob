@@ -82,7 +82,7 @@ export async function generatePETShortTextsAction(input: {
   if (!sessionId) {
     const result = await createSessionAction({
       mode: 'cambridge_pet_reading_part1',
-      title: 'PET Reading Part 1 — Short Texts',
+      title: 'Reading Part 1 — Short Texts',
     });
     if (!result.data) {
       return { error: result.error ?? 'Could not create session' };
@@ -113,7 +113,7 @@ export async function generatePETShortTextsAction(input: {
       ai.models.generateContent({
         model: MODELS.FLASH_LITE_PREVIEW,
         contents: [{ role: 'user', parts: [{ text: generationPrompt }] }],
-        config: { responseMimeType: 'application/json' },
+        config: { responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
       })
   );
 

@@ -72,23 +72,33 @@ export interface PETPictureDescriptionResult {
   imageUrl: string;
 }
 
+const RubricSchema = z
+  .object({
+    task_coverage: z.number().int().min(0).max(4),
+    grammar:       z.number().int().min(0).max(4),
+    vocabulary:    z.number().int().min(0).max(4),
+    fluency:       z.number().int().min(0).max(4),
+  })
+  .optional();
+
 const EvaluationSchema = z.object({
-  transcript: z.string().default(''),
-  understood: z.boolean(),
-  highlights: z.array(z.string()),
-  suggestions: z.array(z.string()),
+  transcript:     z.string().default(''),
+  understood:     z.boolean(),
+  highlights:     z.array(z.string()),
+  suggestions:    z.array(z.string()),
   coverage: z.object({
-    place: z.boolean(),
-    people: z.boolean(),
-    activity: z.boolean(),
-    objects: z.boolean(),
-    emotions: z.boolean(),
+    place:           z.boolean(),
+    people:          z.boolean(),
+    activity:        z.boolean(),
+    objects:         z.boolean(),
+    emotions:        z.boolean(),
     weather_setting: z.boolean(),
-    clothes: z.boolean(),
-    background: z.boolean(),
+    clothes:         z.boolean(),
+    background:      z.boolean(),
   }),
-  fluency_band: z.enum(['OK', 'Good', 'Excellent']),
+  fluency_band:   z.enum(['OK', 'Good', 'Excellent']),
   transcript_used: z.string(),
+  rubric:         RubricSchema,
 });
 
 /** Qualitative feedback for a picture description attempt. */
@@ -109,6 +119,7 @@ export interface PETPictureDescriptionFeedback {
   fluency_band: 'OK' | 'Good' | 'Excellent';
   transcript_used: string;
   transcript: string;
+  rubric?: z.infer<typeof RubricSchema>;
 }
 
 function safeParse<T>(schema: z.ZodType<T>, raw: string): T | null {
@@ -138,7 +149,7 @@ export async function generatePETPictureDescriptionAction(input: {
   if (!sessionId) {
     const result = await createSessionAction({
       mode: 'cambridge_pet_p2',
-      title: 'PET Speaking Part 2 — Picture Description',
+      title: 'Speaking Part 2 — Picture Description',
     });
     if (!result.data) {
       console.error(JSON.stringify({
@@ -185,7 +196,7 @@ export async function generatePETPictureDescriptionAction(input: {
       ai.models.generateContent({
         model: MODELS.FLASH_LITE_PREVIEW,
         contents: [{ role: 'user', parts: [{ text: generationPromptText }] }],
-        config: { responseMimeType: 'application/json' },
+        config: { responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
       })
   );
 
@@ -341,7 +352,7 @@ export async function evaluatePETPictureDescriptionAction(input: {
             ],
           },
         ],
-        config: { responseMimeType: 'application/json' },
+        config: { responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
       })
   );
 
@@ -416,6 +427,7 @@ export async function evaluatePETPictureDescriptionAction(input: {
         coverage: feedback.coverage,
         fluency_band: feedback.fluency_band,
         transcript_used: feedback.transcript_used,
+        rubric: feedback.rubric ?? null,
         is_final: true,
       },
     },
@@ -430,7 +442,7 @@ export async function evaluatePETPictureDescriptionAction(input: {
       error: String(err),
     })));
 
-  return { ...feedback, transcript };
+  return { ...feedback, transcript, rubric: feedback.rubric };
 }
 
 /**
@@ -466,7 +478,7 @@ export async function getPETPictureDescriptionModelAnswerAction(input: {
       ai.models.generateContent({
         model: MODELS.FLASH_LITE_PREVIEW,
         contents: [{ role: 'user', parts: [{ text: promptText }] }],
-        config: { responseMimeType: 'application/json' },
+        config: { responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
       })
   );
 

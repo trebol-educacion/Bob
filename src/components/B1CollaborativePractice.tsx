@@ -16,8 +16,8 @@ import {
   MessageSquare,
 } from 'lucide-react';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
-import { blobToBase64, pcmToWavBase64 } from '@/lib/audio';
-import { generateSpeechAction } from '@/actions/gemini';
+import { blobToBase64 } from '@/lib/audio';
+import { useTTS } from '@/hooks/useTTS';
 import { createSessionAction } from '@/actions/sessions';
 import {
   generatePart3ScenarioAction,
@@ -171,18 +171,17 @@ export function B1CollaborativePractice({ onBack, sessionId: initialSessionId }:
 
   const userTurns = history.filter((m) => m.role === 'user').length;
 
+  const { start: startTTS } = useTTS();
+
   const playExaminerTts = useCallback(async (text: string) => {
     try {
       setTtsLoading(true);
-      const { data, mimeType } = await generateSpeechAction(text);
-      const src = pcmToWavBase64(data, mimeType);
-      const audio = new Audio(src);
-      audio.play();
+      await startTTS(text);
     } catch {
     } finally {
       setTtsLoading(false);
     }
-  }, []);
+  }, [startTTS]);
 
   const handleSelectPreset = useCallback((preset: Part3Scenario) => {
     setScenario(preset);

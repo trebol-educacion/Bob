@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Poppins, Nunito } from "next/font/google";
+import { Poppins, Nunito, Kalam } from "next/font/google";
 import "./globals.css";
 import { OrganizationProvider } from '@/contexts/OrganizationContext';
 import { BrandingProvider } from '@/components/BrandingProvider';
@@ -20,6 +20,13 @@ const nunito = Nunito({
   variable: '--font-nunito',
 });
 
+const kalam = Kalam({
+  weight: ['400', '700'],
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-kalam',
+});
+
 export const metadata: Metadata = {
   title: "Bob",
   description: "Mejora tu pronunciación en inglés con la ayuda de la IA de Gemini.",
@@ -34,7 +41,7 @@ export default async function RootLayout({
   const messages = await getMessages();
 
   return (
-    <html lang={locale} className={`${poppins.variable} ${nunito.variable} h-full`} suppressHydrationWarning>
+    <html lang={locale} className={`${poppins.variable} ${nunito.variable} ${kalam.variable} h-full`} suppressHydrationWarning>
       <head>
         <script
           dangerouslySetInnerHTML={{

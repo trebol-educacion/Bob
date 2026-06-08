@@ -6,6 +6,7 @@ import { callGemini, isOk } from '@/lib/gemini-client';
 import { persistMessage } from '@/lib/persist-activity';
 import { createSessionAction } from '@/actions/sessions';
 import { MODELS } from '@/lib/models';
+import { stripDashes } from '@/lib/text';
 
 export interface KETShortMessagePrompt {
   sessionId: string;
@@ -22,6 +23,7 @@ export interface KETShortMessageFeedback {
   highlights: string[];
   suggestions: string[];
   modelAnswer: string | null;
+  rubric?: z.infer<typeof RubricSchema>;
 }
 
 const GenerationSchema = z.object({
@@ -31,11 +33,21 @@ const GenerationSchema = z.object({
   word_target: z.number().default(25),
 });
 
+const RubricSchema = z
+  .object({
+    task_coverage: z.number().int().min(0).max(4),
+    grammar:       z.number().int().min(0).max(4),
+    vocabulary:    z.number().int().min(0).max(4),
+    fluency:       z.number().int().min(0).max(4),
+  })
+  .optional();
+
 const EvaluationSchema = z.object({
-  understood: z.boolean(),
-  highlights: z.array(z.string()),
-  suggestions: z.array(z.string()),
-  model_answer: z.string().nullable().optional(),
+  understood:    z.boolean(),
+  highlights:    z.array(z.string()),
+  suggestions:   z.array(z.string()),
+  model_answer:  z.string().nullable().optional(),
+  rubric:        RubricSchema,
 });
 
 function safeParse<T>(schema: z.ZodType<T>, raw: string): T | null {
@@ -66,7 +78,7 @@ export async function generateKETShortMessageAction(input: {
   if (!sessionId) {
     const result = await createSessionAction({
       mode: 'cambridge_ket_writing_part6',
-      title: 'KET Writing Part 6 — Short Message',
+      title: 'Writing Part 6, Short Message',
     });
     if (!result.data) {
       return { error: result.error ?? 'No se pudo crear la sesión' };
@@ -90,26 +102,30 @@ export async function generateKETShortMessageAction(input: {
     return { error: 'No se pudo cargar el prompt de generación' };
   }
 
-  const result = await callGemini(
-    { promptKey: 'cambridge_ket_writing_part6_a2_generation', model: MODELS.FLASH_LITE_PREVIEW, userId },
-    (ai) =>
-      ai.models.generateContent({
-        model: MODELS.FLASH_LITE_PREVIEW,
-        contents: [{ role: 'user', parts: [{ text: generationPrompt }] }],
-        config: { responseMimeType: 'application/json' },
-      })
-  );
+  let parsed: z.infer<typeof GenerationSchema> | null = null;
+  for (let attempt = 0; attempt < 3 && !parsed; attempt++) {
+    const result = await callGemini(
+      { promptKey: 'cambridge_ket_writing_part6_a2_generation', model: MODELS.FLASH_LITE_PREVIEW, userId },
+      (ai) =>
+        ai.models.generateContent({
+          model: MODELS.FLASH_LITE_PREVIEW,
+          contents: [{ role: 'user', parts: [{ text: generationPrompt }] }],
+          config: { responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
+        })
+    );
+    if (!isOk(result)) continue;
+    const rawText = result.data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+    parsed = safeParse(GenerationSchema, rawText);
+  }
 
-  if (!isOk(result)) {
+  if (!parsed) {
     return { error: 'No se pudo generar la consigna' };
   }
 
-  const rawText = result.data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
-  const parsed = safeParse(GenerationSchema, rawText);
-
-  if (!parsed) {
-    return { error: 'Respuesta inesperada del modelo' };
-  }
+  const cleanScenario = stripDashes(parsed.scenario);
+  const cleanRecipient = stripDashes(parsed.recipient);
+  const cleanContentPoints = parsed.content_points.map((p) => stripDashes(p));
+  const cleanFramingText = stripDashes(framingText);
 
   persistMessage({
     sessionId,
@@ -119,22 +135,22 @@ export async function generateKETShortMessageAction(input: {
     contentText: null,
     contentJson: {
       kind: 'writing_prompt',
-      scenario: parsed.scenario,
-      recipient: parsed.recipient,
-      content_points: parsed.content_points,
+      scenario: cleanScenario,
+      recipient: cleanRecipient,
+      content_points: cleanContentPoints,
       word_target: parsed.word_target,
-      framing_text: framingText,
+      framing_text: cleanFramingText,
     },
   }).catch(() => undefined);
 
   return {
     sessionId,
     userId,
-    scenario: parsed.scenario,
-    recipient: parsed.recipient,
-    contentPoints: parsed.content_points,
+    scenario: cleanScenario,
+    recipient: cleanRecipient,
+    contentPoints: cleanContentPoints,
     wordTarget: parsed.word_target,
-    framingText,
+    framingText: cleanFramingText,
   };
 }
 
@@ -179,29 +195,21 @@ export async function evaluateKETShortMessageAction(input: {
     contentJson: { kind: 'writing_submission', text: input.userText },
   }).catch(() => undefined);
 
-  const result = await callGemini(
-    { promptKey: 'cambridge_ket_writing_part6_a2_evaluation', model: MODELS.FLASH_LITE_PREVIEW, userId: input.userId },
-    (ai) =>
-      ai.models.generateContent({
-        model: MODELS.FLASH_LITE_PREVIEW,
-        contents: [{ role: 'user', parts: [{ text: evalPromptText }] }],
-        config: { responseMimeType: 'application/json' },
-      })
-  );
-
-  if (!isOk(result)) {
-    persistMessage({
-      sessionId: input.sessionId,
-      userId: input.userId,
-      role: 'bob',
-      msgType: 'evaluation',
-      contentJson: { ...fallback, is_final: true },
-    }).catch(() => undefined);
-    return fallback;
+  let parsed: z.infer<typeof EvaluationSchema> | null = null;
+  for (let attempt = 0; attempt < 3 && !parsed; attempt++) {
+    const result = await callGemini(
+      { promptKey: 'cambridge_ket_writing_part6_a2_evaluation', model: MODELS.FLASH_LITE_PREVIEW, userId: input.userId },
+      (ai) =>
+        ai.models.generateContent({
+          model: MODELS.FLASH_LITE_PREVIEW,
+          contents: [{ role: 'user', parts: [{ text: evalPromptText }] }],
+          config: { responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
+        })
+    );
+    if (!isOk(result)) continue;
+    const rawText = result.data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+    parsed = safeParse(EvaluationSchema, rawText);
   }
-
-  const rawText = result.data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
-  const parsed = safeParse(EvaluationSchema, rawText);
 
   if (!parsed) {
     persistMessage({
@@ -216,9 +224,10 @@ export async function evaluateKETShortMessageAction(input: {
 
   const feedback: KETShortMessageFeedback = {
     understood: parsed.understood,
-    highlights: parsed.highlights,
-    suggestions: parsed.suggestions,
-    modelAnswer: parsed.model_answer ?? null,
+    highlights: parsed.highlights.map((h) => stripDashes(h)),
+    suggestions: parsed.suggestions.map((s) => stripDashes(s)),
+    modelAnswer: parsed.model_answer ? stripDashes(parsed.model_answer) : null,
+    rubric: parsed.rubric,
   };
 
   persistMessage({
@@ -226,7 +235,7 @@ export async function evaluateKETShortMessageAction(input: {
     userId: input.userId,
     role: 'bob',
     msgType: 'evaluation',
-    contentJson: { ...feedback, is_final: true },
+    contentJson: { ...feedback, rubric: parsed.rubric ?? null, is_final: true },
   }).catch(() => undefined);
 
   return feedback;

@@ -88,6 +88,12 @@ const SKILL_THEMES: SkillTheme[] = [
   },
 ];
 
+/** Formats a raw CEFR key for display: 'pre_a1' → 'Pre-A1', 'a2' → 'A2'. */
+function formatCefrLevel(level: string): string {
+  if (level === 'pre_a1') return 'Pre-A1';
+  return level.toUpperCase();
+}
+
 interface SkillCardProps {
   theme: SkillTheme;
   cefrLevel: string | null;
@@ -132,8 +138,8 @@ function SkillCard({ theme, cefrLevel, index, onClick }: SkillCardProps) {
 
           <div className="min-h-[1.5rem] flex items-center justify-center">
             {cefrLevel ? (
-              <span className={`text-xs font-bold uppercase tracking-wide ${theme.color}`}>
-                Level {cefrLevel}
+              <span className={`text-xs font-bold tracking-wide ${theme.color}`}>
+                Level {formatCefrLevel(cefrLevel)}
               </span>
             ) : (
               <span className="text-xs text-gray-400 font-medium">No level yet</span>

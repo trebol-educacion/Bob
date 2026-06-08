@@ -86,8 +86,8 @@ export function BobPracticeChat(props: UsePracticeChatProps) {
           title: 'Phrase Practice',
           subtitle:
             props.level === 'b1'
-              ? 'Cambridge PET · 10 phrases out loud'
-              : 'Cambridge FCE · 10 phrases out loud',
+              ? 'B1 · 10 phrases out loud'
+              : 'B2 · 10 phrases out loud',
           accentColor: (props.level === 'b1' ? 'emerald' : 'sky') as 'emerald' | 'sky',
         }
       : null;
@@ -175,7 +175,7 @@ export function BobPracticeChat(props: UsePracticeChatProps) {
       headerConfig={{ ...headerConfig, leftSlot: backButton, rightSlot }}
       footerConfig={{
         modeLabel: situationLevelHeader
-          ? props.level === 'b1' ? 'CAMBRIDGE PET · PHRASE PRACTICE' : 'CAMBRIDGE FCE · PHRASE PRACTICE'
+          ? props.level === 'b1' ? 'B1 · PHRASE PRACTICE' : 'B2 · PHRASE PRACTICE'
           : isImageMode ? t('footerModeImage') : t('footerModeSituation'),
         modelName: ACTIVE_MODEL_LABEL,
       }}

@@ -74,7 +74,7 @@ export async function startPETListeningPart2Action(): Promise<
 
   const sessionResult = await createSessionAction({
     mode: 'cambridge_pet_listening_part2',
-    title: 'PET Listening Part 2 — Multiple Choice',
+    title: 'Listening Part 2 — Multiple Choice',
   });
 
   if (!sessionResult.data) {

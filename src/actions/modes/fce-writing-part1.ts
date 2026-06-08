@@ -34,6 +34,7 @@ export interface FCEEssayFeedback {
   organization: 'OK' | 'Good' | 'Excellent';
   register: 'OK' | 'Good' | 'Excellent';
   modelAnswer: string | null;
+  rubric?: z.infer<typeof RubricSchema>;
 }
 
 const GenerationSchema = z.object({
@@ -53,14 +54,24 @@ const GenerationSchema = z.object({
   word_target_max: z.number().default(190),
 });
 
+const RubricSchema = z
+  .object({
+    task_coverage: z.number().int().min(0).max(4),
+    grammar:       z.number().int().min(0).max(4),
+    vocabulary:    z.number().int().min(0).max(4),
+    fluency:       z.number().int().min(0).max(4),
+  })
+  .optional();
+
 const EvaluationSchema = z.object({
-  understood: z.boolean(),
-  highlights: z.array(z.string()),
-  suggestions: z.array(z.string()),
+  understood:    z.boolean(),
+  highlights:    z.array(z.string()),
+  suggestions:   z.array(z.string()),
   notes_covered: z.array(z.boolean()).length(3),
-  organization: z.enum(['OK', 'Good', 'Excellent']),
-  register: z.enum(['OK', 'Good', 'Excellent']),
-  model_answer: z.string().nullable().optional(),
+  organization:  z.enum(['OK', 'Good', 'Excellent']),
+  register:      z.enum(['OK', 'Good', 'Excellent']),
+  model_answer:  z.string().nullable().optional(),
+  rubric:        RubricSchema,
 });
 
 function safeParse<T>(schema: z.ZodType<T>, raw: string): T | null {
@@ -101,7 +112,7 @@ export async function generateFCEEssayAction(input: {
   if (!sessionId) {
     const result = await createSessionAction({
       mode: 'cambridge_fce_writing_part1',
-      title: 'FCE Writing Part 1 — Essay',
+      title: 'Writing Part 1 — Essay',
     });
     if (!result.data) {
       return { error: result.error ?? 'Could not create session' };
@@ -139,7 +150,7 @@ export async function generateFCEEssayAction(input: {
       ai.models.generateContent({
         model: MODELS.FLASH_LITE_PREVIEW,
         contents: [{ role: 'user', parts: [{ text: generationPrompt }] }],
-        config: { responseMimeType: 'application/json' },
+        config: { responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
       })
   );
 
@@ -254,7 +265,7 @@ export async function evaluateFCEEssayAction(input: {
       ai.models.generateContent({
         model: MODELS.FLASH_LITE_PREVIEW,
         contents: [{ role: 'user', parts: [{ text: evalPromptText }] }],
-        config: { responseMimeType: 'application/json' },
+        config: { responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
       })
   );
 
@@ -292,6 +303,7 @@ export async function evaluateFCEEssayAction(input: {
     organization: parsed.organization,
     register: parsed.register,
     modelAnswer: parsed.model_answer ?? null,
+    rubric: parsed.rubric,
   };
 
   persistMessage({
@@ -299,7 +311,7 @@ export async function evaluateFCEEssayAction(input: {
     userId: input.userId,
     role: 'bob',
     msgType: 'evaluation',
-    contentJson: { ...feedback, is_final: true },
+    contentJson: { ...feedback, rubric: parsed.rubric ?? null, is_final: true },
   }).catch(() => undefined);
 
   return feedback;

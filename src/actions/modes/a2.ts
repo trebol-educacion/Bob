@@ -4,8 +4,7 @@ import { z } from 'zod';
 import { MODELS } from '@/lib/models';
 import { CambridgeEvaluationSchema, type CambridgeEvaluation, FormativeFeedbackSchema, type FormativeFeedback } from '@/lib/types/practice';
 import { getPrompt } from '@/lib/prompts/db-prompts';
-import { persistMessage, readSessionMessages } from '@/lib/persist-activity';
-import { createSupabaseServer } from '@/lib/supabase/server';
+import { persistMessage, readSessionMessagesForCurrentOrUser } from '@/lib/persist-activity';
 import { getOrCreateCachedContent } from '@/lib/cache';
 import { callGemini, safeParseFallback } from '@/lib/gemini-client';
 
@@ -57,7 +56,7 @@ export async function generateA2SessionAction(sessionId: string, userId: string)
         (ai) => ai.models.generateContent({
           model: MODELS.FLASH_LITE_PREVIEW,
           contents: [{ role: 'user', parts: [{ text: planPromptText }] }],
-          config: { responseMimeType: 'application/json' },
+          config: { responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
         })
       );
 
@@ -98,6 +97,13 @@ export async function generateA2SessionAction(sessionId: string, userId: string)
 }
 
 /** Process a student audio answer and persist the transcription as a 'user_audio' message. */
+/** Strips JSON/code the reaction helper prompt may emit, leaving a clean acknowledgement or empty. */
+function cleanReaction(raw: string): string {
+  const t = raw.replace(/```[a-z]*\s*/gi, '').replace(/```/g, '').trim();
+  if (!t || t.startsWith('{') || t.startsWith('[') || t.includes('"model_answer"')) return '';
+  return t;
+}
+
 export async function processA2AnswerAction(
   audioBase64: string,
   mimeType: string,
@@ -147,7 +153,7 @@ export async function processA2AnswerAction(
     })
   );
 
-  const reaction = reactionResult.ok ? (reactionResult.data.text ?? '').trim() : '';
+  const reaction = cleanReaction(reactionResult.ok ? (reactionResult.data.text ?? '') : '');
 
   return { transcribed, reaction };
 }
@@ -170,18 +176,19 @@ Analyse this speaking interview transcript and return ONLY a JSON object with th
 - "highlights": array of 1-3 strings celebrating specific things the student did well (e.g. "Used past tense correctly", "Good vocabulary for hobbies")
 - "suggestions": array of 1-3 friendly, concrete improvement tips (e.g. "Try to give longer answers with 'because'", "Remember to use 'there is/are' for descriptions")
 - "model_answer": one short example sentence showing a strong answer to any one question
+- "rubric": an object with four integer scores 0-4 each: { "task_coverage": 0-4, "grammar": 0-4, "vocabulary": 0-4, "fluency": 0-4 }
 
 TRANSCRIPT:
 ${transcript}
 
-Return ONLY valid JSON. No score, no band, no percentage.`;
+Return ONLY valid JSON. No score, no band, no percentage outside the rubric object.`;
 
   const result = await callGemini(
     { promptKey: 'cambridge_ket_part1_a2_formative', model: MODELS.FLASH_LITE_PREVIEW, userId },
     (ai) => ai.models.generateContent({
       model: MODELS.FLASH_LITE_PREVIEW,
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      config: { responseMimeType: 'application/json' },
+      config: { responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
     })
   );
 
@@ -204,7 +211,7 @@ Return ONLY valid JSON. No score, no band, no percentage.`;
     userId,
     role: 'bob',
     msgType: 'evaluation',
-    contentJson: feedback as unknown as Record<string, unknown>,
+    contentJson: { ...(feedback as unknown as Record<string, unknown>), is_final: true },
   });
   if ('error' in persistResult) {
     console.error('[A2 persist] evaluation:', persistResult.error);
@@ -219,11 +226,7 @@ export async function getA2SessionMessagesAction(sessionId: string): Promise<{
   qas: Array<{ question: string; answer: string }>;
   feedback: FormativeFeedback | null;
 }> {
-  const supabase = await createSupabaseServer();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { plan: null, qas: [], feedback: null };
-
-  const messages = await readSessionMessages(sessionId, user.id);
+  const messages = await readSessionMessagesForCurrentOrUser(sessionId);
 
   let plan: A2SessionPlan | null = null;
   const qas: Array<{ question: string; answer: string }> = [];

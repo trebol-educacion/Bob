@@ -2,36 +2,33 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
-import { motion, useReducedMotion } from 'motion/react';
+import { motion } from 'motion/react';
 import {
   ArrowLeft,
-  BarChart3,
-  ClipboardList,
-  Flame,
-  Lock,
   RefreshCw,
   Sparkles,
-  Star,
-  Trash2,
-  Trophy,
 } from 'lucide-react';
 import { createSupabaseBrowser } from '@/lib/supabase/browser-client';
 import { useTranslations } from 'next-intl';
 import {
   getStudentStatsAction,
-  resetStudentHistoryAction,
+  getActivityTargetsAction,
+  type ActivityTargets,
   type StudentStatRow,
   type StudentStatsResult,
 } from '@/actions/stats';
 import { useOrganization } from '@/hooks/useOrganization';
+import { SkillPath, type SkillPathSkill } from './SkillPath';
 
 interface Props {
   onBack: () => void;
   onAfterReset: () => void;
   onTakeAssessment?: (skill: Skill) => void;
   onChangeLevel?: (skill: Skill, level: string) => Promise<void> | void;
+  onLevelUp?: (skill: Skill, level: string) => Promise<void> | void;
 }
 
+const DEFAULT_ACTIVITY_TARGET = 10;
 const PICKABLE_LEVELS = ['pre_a1', 'a1', 'a2', 'b1', 'b2'] as const;
 const LEVEL_LABEL: Record<string, string> = {
   pre_a1: 'Pre-A1',
@@ -41,21 +38,31 @@ const LEVEL_LABEL: Record<string, string> = {
   b2: 'B2',
 };
 
+const LEVEL_ORDER: Record<string, number> = {
+  'Pre-A1': 0,
+  'A1': 1,
+  'A2': 2,
+  'B1': 3,
+  'B2': 4,
+  'C1': 5,
+  'C2': 6,
+};
+
 type Skill = 'speaking' | 'reading' | 'listening' | 'writing';
 
 const MODE_LABEL: Record<string, string> = {
-  cambridge_starters_part1: 'Starters · Point to the picture',
-  cambridge_starters_part2: 'Starters · Scene questions',
-  cambridge_starters_part3: 'Starters · Story',
-  cambridge_starters_part4: 'Starters · Personal questions',
-  cambridge_movers_part1: 'Movers · Spot the differences',
-  cambridge_movers_part2: 'Movers · Information exchange',
-  cambridge_movers_part3: 'Movers · Picture story',
-  cambridge_movers_part4: 'Movers · Personal questions',
-  cambridge_movers_part5: 'Movers · Picture description',
-  cambridge_ket_part1: 'KET · Part 1',
-  cambridge_pet_p3: 'PET · Collaborative Task',
-  cambridge_fce_p1: 'FCE · Speaking',
+  cambridge_starters_part1: 'Point to the picture',
+  cambridge_starters_part2: 'Scene questions',
+  cambridge_starters_part3: 'Story',
+  cambridge_starters_part4: 'Personal questions',
+  cambridge_movers_part1: 'Spot the differences',
+  cambridge_movers_part2: 'Information exchange',
+  cambridge_movers_part3: 'Picture story',
+  cambridge_movers_part4: 'Personal questions',
+  cambridge_movers_part5: 'Picture description',
+  cambridge_ket_part1: 'Part 1',
+  cambridge_pet_p3: 'Collaborative Task',
+  cambridge_fce_p1: 'Speaking',
   toefl_listen_repeat: 'TOEFL · Listen & Repeat',
   toefl_interview: 'TOEFL · Take an Interview',
   generic_conversation: 'Free Practice · Conversation',
@@ -67,8 +74,28 @@ const SKILL_META: Record<Skill, { color: string; soft: string; ring: string }> =
   speaking: { color: '#3660AB', soft: '#dde4f2', ring: 'shadow-blue-200' },
   reading: { color: '#469E7B', soft: '#dcebe3', ring: 'shadow-emerald-200' },
   listening: { color: '#F8AC37', soft: '#fde9c8', ring: 'shadow-amber-200' },
-  writing: { color: '#E62D2B', soft: '#fad6d5', ring: 'shadow-rose-200' },
+  writing: { color: '#9333EA', soft: '#f3e8ff', ring: 'shadow-purple-200' },
 };
+
+const SKILL_LABEL_KEY: Record<Skill, string> = {
+  speaking: 'skillSpeaking',
+  reading: 'skillReading',
+  listening: 'skillListening',
+  writing: 'skillWriting',
+};
+
+function nextLevelLabel(current: string): string {
+  const i = PICKABLE_LEVELS.indexOf(current as (typeof PICKABLE_LEVELS)[number]);
+  if (i < 0) return LEVEL_LABEL[current] ?? current;
+  const next = PICKABLE_LEVELS[Math.min(i + 1, PICKABLE_LEVELS.length - 1)];
+  return LEVEL_LABEL[next] ?? next;
+}
+
+function nextLevelValue(current: string): string {
+  const i = PICKABLE_LEVELS.indexOf(current as (typeof PICKABLE_LEVELS)[number]);
+  if (i < 0) return current;
+  return PICKABLE_LEVELS[Math.min(i + 1, PICKABLE_LEVELS.length - 1)];
+}
 
 const MODE_SKILL_OVERRIDE: Record<string, Skill> = {
   cambridge_starters_part1: 'listening',
@@ -85,20 +112,34 @@ function inferSkill(mode: string): Skill {
 }
 
 function inferLevel(mode: string): string {
-  if (mode.includes('starters')) return 'A1 Starters';
-  if (mode.includes('movers')) return 'A1 Movers';
-  if (mode.includes('flyers')) return 'A2 Flyers';
-  if (mode.includes('ket')) return 'A2 KET';
-  if (mode.includes('pet')) return 'B1 PET';
-  if (mode.includes('fce')) return 'B2 FCE';
-  if (mode.includes('cae')) return 'C1 CAE';
-  if (mode.includes('cpe')) return 'C2 CPE';
+  if (mode.includes('starters')) return 'Pre-A1';
+  if (mode.includes('movers')) return 'A1';
+  if (mode.includes('flyers')) return 'A2';
+  if (mode.includes('ket')) return 'A2';
+  if (mode.includes('pet')) return 'B1';
+  if (mode.includes('fce')) return 'B2';
+  if (mode.includes('cae')) return 'C1';
+  if (mode.includes('cpe')) return 'C2';
   if (mode.startsWith('toefl')) return 'TOEFL';
   return 'Free';
 }
 
+function prettyMode(mode: string): string {
+  return mode
+    .replace(/^cambridge_/, '')
+    .replace(/^toefl_/, 'toefl_')
+    .split('_')
+    .map((seg) => {
+      const part = seg.match(/^part(\d+)$/);
+      if (part) return `Part ${part[1]}`;
+      if (['ket', 'pet', 'fce', 'cae', 'cpe', 'toefl'].includes(seg)) return seg.toUpperCase();
+      return seg.charAt(0).toUpperCase() + seg.slice(1);
+    })
+    .join(' ');
+}
+
 function inferFramework(mode: string): string {
-  if (mode.startsWith('cambridge_')) return 'Cambridge';
+  if (mode.startsWith('cambridge_')) return 'English';
   if (mode.startsWith('toefl_')) return 'TOEFL';
   return 'Free';
 }
@@ -116,17 +157,6 @@ function starsFor(pct: number): 0 | 1 | 2 | 3 {
   if (pct >= 60) return 2;
   if (pct >= 40) return 1;
   return 0;
-}
-
-function formatRelative(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime();
-  const mins = Math.floor(diff / 60_000);
-  if (mins < 1) return 'now';
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  const days = Math.floor(hrs / 24);
-  return `${days}d ago`;
 }
 
 function calcStreak(dates: string[]): number {
@@ -147,28 +177,6 @@ function calcStreak(dates: string[]): number {
   return streak;
 }
 
-function CountUp({ value, duration = 900 }: { value: number; duration?: number }) {
-  const [n, setN] = useState(0);
-  const reduce = useReducedMotion();
-  useEffect(() => {
-    if (reduce) {
-      setN(value);
-      return;
-    }
-    const start = performance.now();
-    let raf = 0;
-    const tick = (t: number) => {
-      const p = Math.min(1, (t - start) / duration);
-      const eased = 1 - Math.pow(1 - p, 3);
-      setN(Math.round(eased * value));
-      if (p < 1) raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [value, duration, reduce]);
-  return <>{n.toLocaleString()}</>;
-}
-
 function relativeTime(iso: string): string {
   const diffMs = Date.now() - new Date(iso).getTime();
   const mins = Math.floor(diffMs / 60000);
@@ -185,218 +193,6 @@ function relativeTime(iso: string): string {
 
 type LastAssessment = { cefr_band: string; occurred_at: string };
 
-function SkillRing({
-  skill,
-  pct,
-  sessions,
-  cefrLevel,
-  lastAssessment,
-  index,
-  isPending,
-  onTakeAssessment,
-  onChangeLevel,
-}: {
-  skill: Skill;
-  pct: number;
-  sessions: number;
-  cefrLevel: string | null;
-  lastAssessment: LastAssessment | null;
-  index: number;
-  isPending?: boolean;
-  onTakeAssessment?: (skill: Skill) => void;
-  onChangeLevel?: (skill: Skill, level: string) => Promise<void> | void;
-}) {
-  const [showPicker, setShowPicker] = useState(false);
-  const [savingLevel, setSavingLevel] = useState(false);
-  const t = useTranslations('dashboard');
-  const meta = SKILL_META[skill];
-  const radius = 34;
-  const circumference = 2 * Math.PI * radius;
-  const offset = circumference * (1 - pct / 100);
-  const active = sessions > 0;
-
-  const skillLabelKey = `skill${skill.charAt(0).toUpperCase()}${skill.slice(1)}` as
-    | 'skillSpeaking'
-    | 'skillReading'
-    | 'skillListening'
-    | 'skillWriting';
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 12, scale: 0.92 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={{ delay: 0.15 + index * 0.07, type: 'spring', stiffness: 260, damping: 22 }}
-      className="relative flex flex-col items-center gap-1.5"
-    >
-      <div className="relative">
-        <svg width="92" height="92" viewBox="0 0 92 92" className="-rotate-90">
-          <circle
-            cx="46"
-            cy="46"
-            r={radius}
-            fill="none"
-            stroke={meta.soft}
-            strokeWidth="9"
-          />
-          <motion.circle
-            cx="46"
-            cy="46"
-            r={radius}
-            fill="none"
-            stroke={meta.color}
-            strokeWidth="9"
-            strokeLinecap="round"
-            strokeDasharray={circumference}
-            initial={{ strokeDashoffset: circumference }}
-            animate={{ strokeDashoffset: active ? offset : circumference }}
-            transition={{ delay: 0.4 + index * 0.07, duration: 1.1, ease: [0.22, 1, 0.36, 1] }}
-          />
-        </svg>
-        <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span
-            className="text-xl font-black tabular-nums"
-            style={{ color: active ? meta.color : '#cbd5e1' }}
-          >
-            {active ? Math.round(pct) : '—'}
-          </span>
-          {active && (
-            <span className="text-[8px] font-bold uppercase tracking-widest text-trebol-text/40">
-              {t('avg')}
-            </span>
-          )}
-        </div>
-      </div>
-      <span
-        className="text-[11px] font-black uppercase tracking-wider"
-        style={{ color: active ? meta.color : '#94a3b8' }}
-      >
-        {t(skillLabelKey)}
-      </span>
-      <span
-        className="px-1.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider"
-        style={
-          cefrLevel
-            ? { background: meta.soft, color: meta.color }
-            : { background: '#f1f5f9', color: '#94a3b8' }
-        }
-      >
-        {cefrLevel ? cefrLevel.replace('_', ' ') : '—'}
-      </span>
-      <span className="text-[10px] font-semibold text-trebol-text/40">
-        {t('sessionCount', { n: sessions })}
-      </span>
-      {isPending && (
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="mt-1 flex items-center gap-1 px-2 py-1 rounded-full"
-          style={{ background: meta.soft, border: `1px solid ${meta.color}50` }}
-        >
-          <span
-            className="inline-block w-2 h-2 rounded-full animate-pulse"
-            style={{ background: meta.color }}
-          />
-          <span className="text-[9px] font-black uppercase tracking-wider" style={{ color: meta.color }}>
-            Evaluating
-          </span>
-        </motion.div>
-      )}
-      {lastAssessment ? (
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: 0.5 + index * 0.07, duration: 0.3 }}
-          className="mt-1 flex items-center gap-1 px-2 py-1 rounded-full shadow-sm"
-          style={{ background: meta.soft, border: `1px solid ${meta.color}30` }}
-        >
-          <ClipboardList size={9} style={{ color: meta.color }} />
-          <span className="text-[9px] font-black uppercase tracking-wider" style={{ color: meta.color }}>
-            {lastAssessment.cefr_band.replace('_', ' ')}
-          </span>
-          <span className="text-[8px] font-semibold text-trebol-text/40 ml-0.5">
-            {relativeTime(lastAssessment.occurred_at)}
-          </span>
-        </motion.div>
-      ) : (
-        <span className="mt-1 text-[8px] font-semibold uppercase tracking-wider text-trebol-text/30">
-          No test yet
-        </span>
-      )}
-
-      {(onTakeAssessment || onChangeLevel) && (
-        <div className="mt-2 flex flex-col items-center gap-1.5 w-full">
-          <div className="flex items-center justify-center gap-3 text-[10px] font-bold">
-            {onChangeLevel && (
-              <button
-                type="button"
-                onClick={() => setShowPicker((v) => !v)}
-                disabled={savingLevel}
-                title="Change level"
-                aria-label="Change level"
-                className="flex items-center gap-1 text-trebol-text/50 hover:text-trebol-text transition-colors cursor-pointer disabled:opacity-50"
-              >
-                <RefreshCw size={11} />
-                <span>Change</span>
-              </button>
-            )}
-            {onTakeAssessment && (
-              <button
-                type="button"
-                onClick={() => onTakeAssessment(skill)}
-                title="Take assessment"
-                aria-label="Take assessment"
-                className="flex items-center gap-1 transition-colors cursor-pointer"
-                style={{ color: meta.color }}
-              >
-                <ClipboardList size={11} />
-                <span>Take test</span>
-              </button>
-            )}
-          </div>
-          {showPicker && onChangeLevel && (
-            <motion.div
-              initial={{ opacity: 0, y: -4 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="flex items-center gap-0.5"
-            >
-              {PICKABLE_LEVELS.map((lvl) => {
-                const isCurrent = cefrLevel === lvl;
-                return (
-                  <button
-                    key={lvl}
-                    type="button"
-                    disabled={savingLevel || isCurrent}
-                    onClick={async () => {
-                      setSavingLevel(true);
-                      try {
-                        await onChangeLevel(skill, lvl);
-                        setShowPicker(false);
-                      } finally {
-                        setSavingLevel(false);
-                      }
-                    }}
-                    className="rounded font-black uppercase tracking-tight whitespace-nowrap border transition-all cursor-pointer disabled:cursor-default hover:scale-110"
-                    style={{
-                      fontSize: '8px',
-                      lineHeight: 1,
-                      padding: '3px 4px',
-                      ...(isCurrent
-                        ? { background: meta.color, color: 'white', borderColor: meta.color }
-                        : { background: 'white', color: meta.color, borderColor: `${meta.color}33` }),
-                    }}
-                  >
-                    {LEVEL_LABEL[lvl]}
-                  </button>
-                );
-              })}
-            </motion.div>
-          )}
-        </div>
-      )}
-    </motion.div>
-  );
-}
-
 interface PathNode {
   mode: string;
   label: string;
@@ -410,168 +206,14 @@ interface PathNode {
   order: number;
 }
 
-function PathNodeCard({ node, index }: { node: PathNode; index: number }) {
-  const t = useTranslations('dashboard');
-  const meta = SKILL_META[node.skill];
-  const completed = node.pct >= 80;
-  const inProgress = node.sessions > 0 && !completed;
-  const side = index % 2 === 0 ? 'left' : 'right';
-  const skillLabelKey = `skill${node.skill.charAt(0).toUpperCase()}${node.skill.slice(1)}` as
-    | 'skillSpeaking'
-    | 'skillReading'
-    | 'skillListening'
-    | 'skillWriting';
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, x: side === 'left' ? -24 : 24 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ delay: 0.5 + index * 0.08, type: 'spring', stiffness: 220, damping: 24 }}
-      className={`relative flex items-center gap-4 ${
-        side === 'left' ? 'justify-start' : 'justify-end flex-row-reverse'
-      }`}
-    >
-      <div className="relative shrink-0">
-        <motion.div
-          whileHover={{ scale: 1.06, rotate: side === 'left' ? -3 : 3 }}
-          transition={{ type: 'spring', stiffness: 400, damping: 15 }}
-          className="relative w-20 h-20 rounded-full flex items-center justify-center font-black text-2xl shadow-lg"
-          style={{
-            background: completed
-              ? `linear-gradient(135deg, ${meta.color}, ${meta.color}dd)`
-              : inProgress
-                ? `linear-gradient(135deg, #fff, ${meta.soft})`
-                : 'linear-gradient(135deg, #f1f5f9, #e2e8f0)',
-            color: completed ? '#fff' : inProgress ? meta.color : '#94a3b8',
-            border: inProgress ? `3px solid ${meta.color}` : '3px solid transparent',
-            boxShadow: completed
-              ? `0 10px 24px -8px ${meta.color}80, inset 0 -4px 0 0 ${meta.color}cc`
-              : inProgress
-                ? `0 6px 16px -4px ${meta.color}40`
-                : '0 4px 10px -4px rgba(0,0,0,0.08), inset 0 -3px 0 0 #cbd5e1',
-          }}
-        >
-          {completed ? (
-            <Trophy size={28} strokeWidth={2.5} />
-          ) : inProgress ? (
-            <span className="tabular-nums">{node.order}</span>
-          ) : (
-            <Lock size={22} strokeWidth={2.5} />
-          )}
-        </motion.div>
-        <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 flex gap-0.5">
-          {[1, 2, 3].map((s) => (
-            <Star
-              key={s}
-              size={12}
-              strokeWidth={2}
-              className={s <= node.stars ? 'fill-[#F8AC37] stroke-[#d98e1d]' : 'fill-white stroke-slate-300'}
-            />
-          ))}
-        </div>
-      </div>
-
-      <div
-        className={`flex-1 max-w-[260px] ${side === 'left' ? 'text-left' : 'text-right'}`}
-      >
-        <div className={`flex items-center gap-1.5 mb-1 ${side === 'right' ? 'justify-end' : ''}`}>
-          <span
-            className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest"
-            style={{ background: meta.soft, color: meta.color }}
-          >
-            {t(skillLabelKey)}
-          </span>
-          {node.sessions > 0 && (
-            <span className="text-[10px] font-semibold text-trebol-text/40">
-              {formatRelative(node.last_done)}
-            </span>
-          )}
-        </div>
-        <p className="text-sm font-black text-trebol-text leading-tight">{node.label}</p>
-        {node.sessions > 0 ? (
-          <p className="text-xs font-semibold text-trebol-text/50 mt-1">
-            <span className="tabular-nums" style={{ color: meta.color }}>
-              {Math.round(node.pct)}%
-            </span>{' '}
-            · {t('attemptCount', { n: node.sessions })}
-          </p>
-        ) : (
-          <p className="text-xs font-semibold text-trebol-text/30 mt-1 italic">{t('notStarted')}</p>
-        )}
-      </div>
-    </motion.div>
-  );
-}
-
-function PathGroup({ title, level, framework, nodes }: { title: string; level: string; framework: string; nodes: PathNode[] }) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: 0.45, duration: 0.5 }}
-      className="relative"
-    >
-      <div className="sticky top-0 z-10 bg-gradient-to-b from-white via-white to-transparent pt-2 pb-3 mb-2">
-        <div className="flex items-baseline gap-2">
-          <h3 className="text-lg font-black text-trebol-text tracking-tight">{title}</h3>
-          <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-trebol-text/5 text-trebol-text/60">
-            {framework} · {level}
-          </span>
-        </div>
-      </div>
-      <div className="relative pl-2 pr-2">
-        <div
-          aria-hidden
-          className="absolute left-1/2 -translate-x-1/2 top-0 bottom-0 w-1 bg-[repeating-linear-gradient(to_bottom,#e2e8f0_0,#e2e8f0_6px,transparent_6px,transparent_12px)] rounded-full"
-        />
-        <div className="space-y-6 relative">
-          {nodes.map((n, i) => (
-            <PathNodeCard key={n.mode} node={n} index={i} />
-          ))}
-        </div>
-      </div>
-    </motion.div>
-  );
-}
-
-function HeroChip({
-  icon,
-  label,
-  value,
-  bg,
-  fg,
-  delay,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: React.ReactNode;
-  bg: string;
-  fg: string;
-  delay: number;
-}) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 10, scale: 0.9 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={{ delay, type: 'spring', stiffness: 300, damping: 18 }}
-      className="flex items-center gap-2.5 px-4 py-2.5 rounded-2xl shadow-sm"
-      style={{ background: bg, color: fg }}
-    >
-      <span className="shrink-0">{icon}</span>
-      <div className="flex flex-col leading-none">
-        <span className="text-[9px] font-black uppercase tracking-widest opacity-70">{label}</span>
-        <span className="text-xl font-black tabular-nums mt-0.5">{value}</span>
-      </div>
-    </motion.div>
-  );
-}
-
 interface Derived {
   streak: number;
   totalXp: number;
   goldBadges: number;
   totalStars: number;
   bySkill: Record<Skill, { pct: number; sessions: number }>;
+  bySkillLevel: Record<Skill, Record<string, { pct: number; sessions: number }>>;
+  activitiesByLevel: Record<Skill, Record<string, Array<{ label: string; score10: number | null; created_at: string }>>>;
   groups: Array<{ key: string; title: string; framework: string; level: string; nodes: PathNode[] }>;
 }
 
@@ -586,21 +228,29 @@ function deriveStats(stats: StudentStatsResult): Derived {
     listening: { sum: 0, max: 0, sessions: 0 },
     writing: { sum: 0, max: 0, sessions: 0 },
   };
+  const levelAgg: Record<Skill, Record<string, { sum: number; max: number; sessions: number }>> = {
+    speaking: {}, reading: {}, listening: {}, writing: {},
+  };
   const nodes: PathNode[] = stats.rows.map<PathNode>((r: StudentStatRow) => {
     const pct = r.score_max > 0 ? (r.avg_score / r.score_max) * 100 : 0;
     const stars = starsFor(pct);
     const skill = inferSkill(r.mode);
+    const level = inferLevel(r.mode);
     totalXp += Math.round(r.avg_score * r.sessions_count);
     if (pct >= 80) goldBadges++;
     totalStars += stars;
     skillAgg[skill].sum += r.avg_score * r.sessions_count;
     skillAgg[skill].max += r.score_max * r.sessions_count;
     skillAgg[skill].sessions += r.sessions_count;
+    const la = (levelAgg[skill][level] ??= { sum: 0, max: 0, sessions: 0 });
+    la.sum += r.avg_score * r.sessions_count;
+    la.max += r.score_max * r.sessions_count;
+    la.sessions += r.sessions_count;
     return {
       mode: r.mode,
-      label: MODE_LABEL[r.mode] ?? r.mode,
+      label: MODE_LABEL[r.mode] ?? prettyMode(r.mode),
       framework: inferFramework(r.mode),
-      level: inferLevel(r.mode),
+      level,
       skill,
       pct,
       stars,
@@ -629,6 +279,36 @@ function deriveStats(stats: StudentStatsResult): Derived {
     },
   };
 
+  const bySkillLevel: Record<Skill, Record<string, { pct: number; sessions: number }>> = {
+    speaking: {}, reading: {}, listening: {}, writing: {},
+  };
+  for (const skill of ['speaking', 'reading', 'listening', 'writing'] as Skill[]) {
+    for (const [level, a] of Object.entries(levelAgg[skill])) {
+      bySkillLevel[skill][level] = {
+        pct: a.max > 0 ? (a.sum / a.max) * 100 : 0,
+        sessions: a.sessions,
+      };
+    }
+  }
+
+  const activitiesByLevel: Record<Skill, Record<string, Array<{ label: string; score10: number | null; created_at: string }>>> = {
+    speaking: {}, reading: {}, listening: {}, writing: {},
+  };
+  for (const a of stats.activities) {
+    const skill = inferSkill(a.mode);
+    const level = inferLevel(a.mode);
+    (activitiesByLevel[skill][level] ??= []).push({
+      label: MODE_LABEL[a.mode] ?? prettyMode(a.mode),
+      score10: a.score10,
+      created_at: a.created_at,
+    });
+  }
+  for (const skill of ['speaking', 'reading', 'listening', 'writing'] as Skill[]) {
+    for (const level of Object.keys(activitiesByLevel[skill])) {
+      activitiesByLevel[skill][level].sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
+    }
+  }
+
   const grouped = new Map<string, { title: string; framework: string; level: string; nodes: PathNode[] }>();
   for (const n of nodes) {
     const key = `${n.framework}::${n.level}`;
@@ -643,16 +323,15 @@ function deriveStats(stats: StudentStatsResult): Derived {
     nodes: g.nodes.slice().sort((a, b) => a.order - b.order),
   }));
 
-  return { streak, totalXp, goldBadges, totalStars, bySkill, groups };
+  return { streak, totalXp, goldBadges, totalStars, bySkill, bySkillLevel, activitiesByLevel, groups };
 }
 
-export function StudentStatsPanel({ onBack, onAfterReset, onTakeAssessment, onChangeLevel }: Props) {
+export function StudentStatsPanel({ onBack, onTakeAssessment, onChangeLevel, onLevelUp }: Props) {
   const t = useTranslations('dashboard');
   const { skillLevels, pendingAssessments } = useOrganization();
   const [stats, setStats] = useState<StudentStatsResult | null>(null);
+  const [targets, setTargets] = useState<ActivityTargets>({});
   const [loading, setLoading] = useState(true);
-  const [resetting, setResetting] = useState(false);
-  const [confirmOpen, setConfirmOpen] = useState(false);
   const [lastAssessments, setLastAssessments] = useState<Record<Skill, LastAssessment | null>>({
     speaking: null, reading: null, listening: null, writing: null,
   });
@@ -660,8 +339,12 @@ export function StudentStatsPanel({ onBack, onAfterReset, onTakeAssessment, onCh
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await getStudentStatsAction();
+      const [data, targetData] = await Promise.all([
+        getStudentStatsAction(),
+        getActivityTargetsAction(),
+      ]);
       setStats(data);
+      setTargets(targetData);
     } finally {
       setLoading(false);
     }
@@ -707,21 +390,48 @@ export function StudentStatsPanel({ onBack, onAfterReset, onTakeAssessment, onCh
     return t('greetingFirst');
   }, [derived, stats, t]);
 
-  const handleReset = async () => {
-    setResetting(true);
-    try {
-      await resetStudentHistoryAction();
-      setConfirmOpen(false);
-      await load();
-      onAfterReset();
-    } catch (err) {
-      console.error('[stats] reset failed:', err);
-    } finally {
-      setResetting(false);
-    }
-  };
-
   const hasData = !!stats && stats.total_sessions > 0 && !!derived;
+
+  const pathSkills = useMemo<SkillPathSkill[]>(() => {
+    if (!derived) return [];
+    return (['speaking', 'reading', 'listening', 'writing'] as Skill[]).map((skill) => {
+      const current = skillLevels?.[skill]?.cefr_level ?? null;
+      const currentLabel = current ? LEVEL_LABEL[current] ?? current : null;
+      const stat = (currentLabel && derived.bySkillLevel[skill]?.[currentLabel]) || { pct: 0, sessions: 0 };
+      const la = lastAssessments[skill];
+      const target = (current && targets[skill]?.[current]) || DEFAULT_ACTIVITY_TARGET;
+      const curOrder = currentLabel ? LEVEL_ORDER[currentLabel] ?? -1 : -1;
+      const history = curOrder > 0
+        ? Object.entries(derived.activitiesByLevel[skill])
+            .filter(([level, acts]) => acts.length > 0 && (LEVEL_ORDER[level] ?? -1) >= 0 && (LEVEL_ORDER[level] ?? -1) < curOrder)
+            .sort((a, b) => (LEVEL_ORDER[a[0]] ?? 0) - (LEVEL_ORDER[b[0]] ?? 0))
+            .map(([level, acts]) => ({
+              level,
+              avg10: (derived.bySkillLevel[skill]?.[level]?.pct ?? 0) / 10,
+              activities: acts.map((a) => ({ label: a.label, score10: a.score10, when: relativeTime(a.created_at) })),
+            }))
+        : [];
+      return {
+        key: skill,
+        label: t(SKILL_LABEL_KEY[skill]),
+        level: currentLabel ?? '—',
+        goalLevel: nextLevelLabel(current ?? 'a1'),
+        cefrValue: current,
+        done: Math.min(stat.sessions, target),
+        total: target,
+        pct: stat.pct,
+        sessions: stat.sessions,
+        lastTest: la ? `${la.cefr_band.replace('_', ' ')} · ${relativeTime(la.occurred_at)}` : null,
+        pending: !!pendingAssessments[skill],
+        history,
+      };
+    });
+  }, [derived, skillLevels, lastAssessments, pendingAssessments, targets, t]);
+
+  const pickableLevels = useMemo(
+    () => PICKABLE_LEVELS.map((value) => ({ value, label: LEVEL_LABEL[value] })),
+    [],
+  );
 
   return (
     <div className="flex-1 flex flex-col min-h-0 relative overflow-hidden bg-white">
@@ -767,7 +477,7 @@ export function StudentStatsPanel({ onBack, onAfterReset, onTakeAssessment, onCh
       </div>
 
       <div className="relative z-10 flex-1 overflow-y-auto">
-        <div className="px-4 sm:px-6 py-6 max-w-3xl mx-auto w-full">
+        <div className="px-4 sm:px-6 py-6 max-w-5xl mx-auto w-full">
         {loading && !stats && (
           <div className="text-center text-sm text-trebol-text/50 py-20 font-semibold">
             {t('loadingAdventure')}
@@ -803,33 +513,6 @@ export function StudentStatsPanel({ onBack, onAfterReset, onTakeAssessment, onCh
                 {t('emptyBody')}
               </p>
             </motion.div>
-
-            <motion.section
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.15, duration: 0.5 }}
-              className="relative bg-white/80 backdrop-blur-sm border border-white shadow-lg rounded-[28px] p-5 mb-6"
-            >
-              <div className="flex items-baseline justify-between mb-4">
-                <h3 className="text-base font-black text-trebol-text tracking-tight">{t('skills')}</h3>
-              </div>
-              <div className="grid grid-cols-4 gap-2">
-                {(['speaking', 'reading', 'listening', 'writing'] as Skill[]).map((skill, i) => (
-                  <SkillRing
-                    key={skill}
-                    skill={skill}
-                    pct={0}
-                    sessions={0}
-                    cefrLevel={skillLevels?.[skill]?.cefr_level ?? null}
-                    lastAssessment={lastAssessments[skill]}
-                    index={i}
-                    isPending={!!pendingAssessments[skill]}
-                    onTakeAssessment={onTakeAssessment}
-                    onChangeLevel={onChangeLevel}
-                  />
-                ))}
-              </div>
-            </motion.section>
           </>
         )}
 
@@ -885,135 +568,35 @@ export function StudentStatsPanel({ onBack, onAfterReset, onTakeAssessment, onCh
                   >
                     {greeting}
                   </motion.h2>
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: 0.35 }}
-                    className="flex flex-wrap items-center gap-2 mt-3 justify-center sm:justify-start"
-                  >
-                    <HeroChip
-                      icon={<Flame size={18} fill="#fff" strokeWidth={0} />}
-                      label={t('streak')}
-                      value={<CountUp value={derived.streak} />}
-                      bg="linear-gradient(135deg, #E62D2B, #b8201f)"
-                      fg="#fff"
-                      delay={0.4}
-                    />
-                    <HeroChip
-                      icon={<Sparkles size={18} fill="#fffbe8" strokeWidth={1.5} className="text-white" />}
-                      label="XP"
-                      value={<CountUp value={derived.totalXp} />}
-                      bg="linear-gradient(135deg, #F8AC37, #d98e1d)"
-                      fg="#fff"
-                      delay={0.5}
-                    />
-                    <HeroChip
-                      icon={<Trophy size={18} strokeWidth={2.2} />}
-                      label={t('trophies')}
-                      value={<CountUp value={derived.goldBadges} />}
-                      bg="linear-gradient(135deg, #1E1E1C, #3a3a36)"
-                      fg="#fff"
-                      delay={0.6}
-                    />
-                  </motion.div>
                 </div>
               </div>
             </motion.section>
-
-            <motion.section
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.15, duration: 0.5 }}
-              className="relative bg-white/80 backdrop-blur-sm border border-white shadow-lg rounded-[28px] p-5 mb-6"
-            >
-              <div className="flex items-baseline justify-between mb-4">
-                <h3 className="text-base font-black text-trebol-text tracking-tight">{t('skills')}</h3>
-                <div className="flex items-center gap-1 text-[#F8AC37]">
-                  {Array.from({ length: Math.min(5, derived.totalStars) }).map((_, i) => (
-                    <Star key={i} size={12} className="fill-[#F8AC37] stroke-[#d98e1d]" />
-                  ))}
-                  <span className="text-xs font-black tabular-nums text-trebol-text/60 ml-1">
-                    {derived.totalStars}
-                  </span>
-                </div>
-              </div>
-              <div className="grid grid-cols-4 gap-2">
-                {(['speaking', 'reading', 'listening', 'writing'] as Skill[]).map((skill, i) => (
-                  <SkillRing
-                    key={skill}
-                    skill={skill}
-                    pct={derived.bySkill[skill].pct}
-                    sessions={derived.bySkill[skill].sessions}
-                    cefrLevel={skillLevels?.[skill]?.cefr_level ?? null}
-                    lastAssessment={lastAssessments[skill]}
-                    index={i}
-                    isPending={!!pendingAssessments[skill]}
-                    onTakeAssessment={onTakeAssessment}
-                    onChangeLevel={onChangeLevel}
-                  />
-                ))}
-              </div>
-            </motion.section>
-
-            <section className="space-y-8 pb-12">
-              {derived.groups.map((g) => (
-                <PathGroup
-                  key={g.key}
-                  title={g.title}
-                  level={g.level}
-                  framework={g.framework}
-                  nodes={g.nodes}
-                />
-              ))}
-            </section>
-
-            <div className="flex justify-center pb-8">
-              <button
-                type="button"
-                onClick={() => setConfirmOpen(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded-full text-trebol-text/40 hover:text-red-500 hover:bg-red-50 transition-colors"
-              >
-                <Trash2 size={11} />
-                {t('deleteHistory')}
-              </button>
-            </div>
           </>
         )}
         </div>
-      </div>
 
-      {confirmOpen && (
-        <div className="fixed inset-0 z-50 bg-trebol-text/40 backdrop-blur-sm flex items-center justify-center p-6">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.92 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ type: 'spring', stiffness: 280, damping: 22 }}
-            className="bg-white rounded-3xl p-6 max-w-sm w-full space-y-4 shadow-2xl border border-white"
-          >
-            <h3 className="text-lg font-black text-trebol-text tracking-tight">{t('confirmDeleteTitle')}</h3>
-            <p className="text-sm text-trebol-text/70 font-semibold leading-relaxed">
-              {t('confirmDeleteBody')}
-            </p>
-            <div className="flex gap-2 justify-end">
-              <button
-                onClick={() => setConfirmOpen(false)}
-                disabled={resetting}
-                className="px-4 py-2 rounded-xl text-sm font-black text-trebol-text/70 hover:bg-trebol-secondary/30 transition-colors disabled:opacity-50"
-              >
-                {t('cancel')}
-              </button>
-              <button
-                onClick={handleReset}
-                disabled={resetting}
-                className="px-4 py-2 rounded-xl text-sm font-black bg-red-500 text-white hover:bg-red-600 transition-colors disabled:opacity-60 flex items-center gap-2 shadow-md"
-              >
-                {resetting && <RefreshCw size={14} className="animate-spin" />}
-                {t('confirmDelete')}
-              </button>
-            </div>
-          </motion.div>
-        </div>
-      )}
+        {stats && derived && pathSkills.length > 0 && (
+          <SkillPath
+            skills={pathSkills}
+            title={t('pathTitle')}
+            startLabel={t('pathStart')}
+            pickableLevels={pickableLevels}
+            onTakeTest={onTakeAssessment}
+            onChangeLevel={onChangeLevel}
+            onLevelUp={
+              onLevelUp
+                ? async (skill) => {
+                    const current = skillLevels?.[skill]?.cefr_level ?? 'a1';
+                    const next = nextLevelValue(current);
+                    if (next === current) return;
+                    await onLevelUp(skill, next);
+                    await load();
+                  }
+                : undefined
+            }
+          />
+        )}
+      </div>
     </div>
   );
 }

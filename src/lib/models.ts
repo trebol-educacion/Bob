@@ -23,6 +23,13 @@ export const MODELS = {
    */
   FLASH_LITE_LATEST: 'gemini-2.5-flash',
 
+  /**
+   * Genuinely low-latency text model for simple structured exercise generation.
+   * Used to keep activity generation off the critical path; do NOT use for
+   * grading or pronunciation where full Flash accuracy matters.
+   */
+  FLASH_LITE: 'gemini-2.5-flash-lite',
+
   /** Image generation via generateContent + IMAGE modality. */
   IMAGE: 'gemini-2.5-flash-image',
 } as const;

@@ -5,7 +5,7 @@ import { Type, Part } from '@google/genai';
 import { MODELS } from '@/lib/models';
 import { RepetitionObjectiveFeedbackSchema, type RepetitionObjectiveFeedback } from '@/lib/types/practice';
 import { getPrompt } from '@/lib/prompts/db-prompts';
-import { persistMessage, readSessionMessages } from '@/lib/persist-activity';
+import { persistMessage, readSessionMessagesForCurrentOrUser } from '@/lib/persist-activity';
 import { getOrCreateCachedContent } from '@/lib/cache';
 import { callGemini, safeParseFallback } from '@/lib/gemini-client';
 
@@ -225,7 +225,7 @@ Return ONLY valid JSON. No score, no pronunciation rating, no subjective assessm
           ],
         },
       ],
-      config: { responseMimeType: 'application/json' },
+      config: { responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
     })
   );
 
@@ -283,19 +283,17 @@ export async function saveToeflRepeatSummaryAction(
     role: 'bob',
     msgType: 'evaluation',
     contentText: `Session complete. Exact repetitions: ${summary.exactCount} of ${summary.totalCount}`,
-    contentJson: summary,
+    contentJson: { ...summary, is_final: true },
   });
   if ('error' in result) {
     console.error('[ToeflRepeat persist] summary failed:', result.error);
   }
 }
 
-/**
- * Reads all persisted messages for a TOEFL Listen & Repeat session.
- */
+/** Reads all persisted messages for a TOEFL Listen & Repeat session. */
 export async function getToeflRepeatSessionMessagesAction(
   sessionId: string,
   userId: string
 ) {
-  return readSessionMessages(sessionId, userId);
+  return readSessionMessagesForCurrentOrUser(sessionId, userId);
 }

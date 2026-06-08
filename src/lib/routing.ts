@@ -21,6 +21,17 @@ import {
   KETShortMessagePractice,
   KETSignsAndNoticesPractice,
   KETListenAndChoosePractice,
+  KETListenAndCompletePractice,
+  KETListenAndDecidePractice,
+  KETShortTalksPractice,
+  KETTrueFalseDoesntSayPractice,
+  KETMatchQuestionPractice,
+  KETLongTextPractice,
+  KETVocabGapPractice,
+  KETReadingTFDSPractice,
+  KETStoryWritingPractice,
+  KETHobbyTalkPractice,
+  KETDescribePicturePractice,
 } from '@/components/practice/ket';
 import {
   PETPictureDescriptionPractice,
@@ -147,6 +158,16 @@ export const EXAM_PART_COMPONENT_MAP: Record<ModeKey, RouteEntry> = {
     kind: 'exam',
     render: (p) => React.createElement(A2Part1Practice, { onBack: (p as ExamRenderProps).onBack }),
   },
+  cambridge_ket_part2: {
+    appState: 'exam-practicing',
+    kind: 'yl',
+    render: (p) => React.createElement(KETHobbyTalkPractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
+  },
+  cambridge_ket_part3: {
+    appState: 'exam-practicing',
+    kind: 'yl',
+    render: (p) => React.createElement(KETDescribePicturePractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
+  },
   toefl_listen_repeat: {
     appState: 'exam-practicing',
     kind: 'exam',
@@ -192,6 +213,11 @@ export const EXAM_PART_COMPONENT_MAP: Record<ModeKey, RouteEntry> = {
     kind: 'yl',
     render: (p) => React.createElement(KETShortMessagePractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
   },
+  cambridge_ket_writing_part7: {
+    appState: 'exam-practicing',
+    kind: 'yl',
+    render: (p) => React.createElement(KETStoryWritingPractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
+  },
   cambridge_pet_reading_part1: {
     appState: 'exam-practicing',
     kind: 'yl',
@@ -202,10 +228,50 @@ export const EXAM_PART_COMPONENT_MAP: Record<ModeKey, RouteEntry> = {
     kind: 'yl',
     render: (p) => React.createElement(KETSignsAndNoticesPractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
   },
+  cambridge_ket_reading_part2: {
+    appState: 'exam-practicing',
+    kind: 'yl',
+    render: (p) => React.createElement(KETMatchQuestionPractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
+  },
+  cambridge_ket_reading_part3: {
+    appState: 'exam-practicing',
+    kind: 'yl',
+    render: (p) => React.createElement(KETLongTextPractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
+  },
+  cambridge_ket_reading_part4: {
+    appState: 'exam-practicing',
+    kind: 'yl',
+    render: (p) => React.createElement(KETVocabGapPractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
+  },
+  cambridge_ket_reading_part5: {
+    appState: 'exam-practicing',
+    kind: 'yl',
+    render: (p) => React.createElement(KETReadingTFDSPractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
+  },
   cambridge_ket_listening_part1: {
     appState: 'exam-practicing',
     kind: 'yl',
     render: (p) => React.createElement(KETListenAndChoosePractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
+  },
+  cambridge_ket_listening_part2: {
+    appState: 'exam-practicing',
+    kind: 'yl',
+    render: (p) => React.createElement(KETListenAndCompletePractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
+  },
+  cambridge_ket_listening_part3: {
+    appState: 'exam-practicing',
+    kind: 'yl',
+    render: (p) => React.createElement(KETListenAndDecidePractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
+  },
+  cambridge_ket_listening_part4: {
+    appState: 'exam-practicing',
+    kind: 'yl',
+    render: (p) => React.createElement(KETShortTalksPractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
+  },
+  cambridge_ket_listening_part5: {
+    appState: 'exam-practicing',
+    kind: 'yl',
+    render: (p) => React.createElement(KETTrueFalseDoesntSayPractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
   },
   cambridge_pet_listening_part2: {
     appState: 'exam-practicing',

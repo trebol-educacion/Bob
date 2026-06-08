@@ -6,6 +6,33 @@ import { mapListeningScoreToCefr } from '@/lib/assessment/cefr-mapping';
 import type { Skill } from '@/lib/types/skills';
 import type { AssessmentCefrBand, AssessmentConfidence, AssessmentResultSpeaking, AssessmentResultListening, AssessmentResultReading, AssessmentResultWriting, AssessmentWritingFeedback } from '@/lib/types/skills';
 
+/**
+ * Computes the next-available timestamp for re-taking an Assessment, honoring the
+ * tenant's configured `assessment_cooldown_days` (falls back to 7 when unset).
+ */
+async function resolveCooldownUntil(
+  supabase: Awaited<ReturnType<typeof createSupabaseServer>>,
+  userId: string,
+): Promise<string> {
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('organization_id')
+    .eq('id', userId)
+    .maybeSingle();
+
+  let cooldownDays = 7;
+  if (profile?.organization_id) {
+    const { data: org } = await supabase
+      .from('organizations')
+      .select('assessment_cooldown_days')
+      .eq('id', profile.organization_id)
+      .maybeSingle();
+    cooldownDays = org?.assessment_cooldown_days ?? 7;
+  }
+
+  return new Date(Date.now() + cooldownDays * 24 * 60 * 60 * 1000).toISOString();
+}
+
 export interface AssessmentPrompt {
   turn_number: number;
   prompt_text: string;
@@ -465,7 +492,7 @@ export async function submitAssessmentListeningAction(
     });
   }
 
-  const cooldownUntil = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+  const cooldownUntil = await resolveCooldownUntil(supabase, user.id);
 
   const result: AssessmentResultListening = {
     assessment_id,
@@ -531,7 +558,7 @@ export async function pollAssessmentSpeakingResultAction(
   }
 
   if (msgStatus === 'done') {
-    const cooldownUntil = (content.cooldown_until as string) ?? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    const cooldownUntil = (content.cooldown_until as string) ?? await resolveCooldownUntil(supabase, user.id);
     return {
       status: 'done',
       result: {
@@ -654,7 +681,7 @@ export async function submitAssessmentReadingAction(
     });
   }
 
-  const cooldownUntil = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+  const cooldownUntil = await resolveCooldownUntil(supabase, user.id);
 
   const result: AssessmentResultReading = {
     assessment_id,
@@ -800,7 +827,7 @@ export async function pollAssessmentWritingResultAction(
   }
 
   if (msgStatus === 'done') {
-    const cooldownUntil = (content.cooldown_until as string) ?? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    const cooldownUntil = (content.cooldown_until as string) ?? await resolveCooldownUntil(supabase, user.id);
     return {
       status: 'done',
       result: {

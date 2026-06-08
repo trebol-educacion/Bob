@@ -2,10 +2,12 @@
 
 import { z } from 'zod';
 import { getPrompt } from '@/lib/prompts/db-prompts';
+import { stripDashes } from '@/lib/text';
 import { callGemini, isOk } from '@/lib/gemini-client';
 import { persistMessage, persistMessages } from '@/lib/persist-activity';
 import { createSessionAction } from '@/actions/sessions';
 import { createSupabaseServer } from '@/lib/supabase/server';
+import { generateYLImagesParallelAction } from '@/actions/modes/yl';
 import { MODELS } from '@/lib/models';
 
 const OptionSchema = z.object({
@@ -21,6 +23,7 @@ const SignItemSchema = z.object({
   options: z.array(OptionSchema).length(3),
   correct_option: z.enum(['A', 'B', 'C']),
   explanation: z.string(),
+  sign_style: z.enum(['prohibition', 'warning', 'info', 'shop', 'default']).optional(),
 });
 
 const GenerationSchema = z.object({
@@ -38,6 +41,7 @@ export interface SignItem {
   options: SignOption[];
   correct_option: 'A' | 'B' | 'C';
   explanation: string;
+  sign_style?: 'prohibition' | 'warning' | 'info' | 'shop' | 'default';
 }
 
 /** Full result of a successful generation call. */
@@ -82,7 +86,7 @@ export async function generateKETSignsAndNoticesAction(input: {
   if (!sessionId) {
     const result = await createSessionAction({
       mode: 'cambridge_ket_reading_part1',
-      title: 'KET Reading Part 1 — Signs and Notices',
+      title: 'Reading Part 1, Signs and Notices',
     });
     if (!result.data) {
       return { error: result.error ?? 'Could not create session' };
@@ -108,12 +112,12 @@ export async function generateKETSignsAndNoticesAction(input: {
   }
 
   const geminiResult = await callGemini(
-    { promptKey: 'cambridge_ket_reading_part1_a2_generation', model: MODELS.FLASH_LITE_PREVIEW, userId },
+    { promptKey: 'cambridge_ket_reading_part1_a2_generation', model: MODELS.FLASH_LITE, userId },
     (ai) =>
       ai.models.generateContent({
-        model: MODELS.FLASH_LITE_PREVIEW,
+        model: MODELS.FLASH_LITE,
         contents: [{ role: 'user', parts: [{ text: generationPrompt }] }],
-        config: { responseMimeType: 'application/json' },
+        config: { responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
       })
   );
 
@@ -128,6 +132,16 @@ export async function generateKETSignsAndNoticesAction(input: {
     return { error: 'Unexpected model response' };
   }
 
+  const items: SignItem[] = parsed.items.map((item) => ({
+    ...item,
+    sign_text: stripDashes(item.sign_text),
+    sign_context: stripDashes(item.sign_context),
+    question: stripDashes(item.question),
+    options: item.options.map((opt) => ({ ...opt, text: stripDashes(opt.text) })),
+    explanation: stripDashes(item.explanation),
+  }));
+  const cleanFraming = stripDashes(framingText);
+
   persistMessage({
     sessionId,
     userId,
@@ -136,16 +150,16 @@ export async function generateKETSignsAndNoticesAction(input: {
     contentText: null,
     contentJson: {
       kind: 'reading_prompt',
-      items: parsed.items,
-      framing_text: framingText,
+      items,
+      framing_text: cleanFraming,
     },
   }).catch(() => undefined);
 
   return {
     sessionId,
     userId,
-    items: parsed.items,
-    framingText,
+    items,
+    framingText: cleanFraming,
   };
 }
 
@@ -202,4 +216,41 @@ export async function submitKETSignsAnswersAction(input: {
   }).catch(() => undefined);
 
   return { correctCount, total, results };
+}
+
+/** One generated scene illustration mapped back to its sign number. */
+export interface KETSignImage {
+  number: number;
+  image_url: string;
+}
+
+/** Generates one child-friendly scene illustration per sign, off the critical path (no text inside the image). */
+export async function generateKETSignImagesAction(input: {
+  items: { number: number; sign_context: string; sign_style: string }[];
+  sessionId?: string;
+}): Promise<KETSignImage[]> {
+  if (input.items.length === 0) return [];
+
+  const supabase = await createSupabaseServer();
+  const { data: { user } } = await supabase.auth.getUser();
+  const sessionId = input.sessionId ?? user?.id ?? 'ket-reading-part1';
+
+  const prompts = input.items.map(
+    (it) =>
+      `A bright, friendly flat illustration of a ${it.sign_context} (a place a child might visit). Cheerful, simple, colorful, for kids. IMPORTANT: absolutely no text, no words, no letters, no signs with writing in the image.`
+  );
+
+  const imageUrls = await generateYLImagesParallelAction(
+    'movers',
+    1,
+    prompts,
+    sessionId,
+    undefined,
+    'scene'
+  ).catch(() => input.items.map(() => ''));
+
+  return input.items.map((it, idx) => ({
+    number: it.number,
+    image_url: imageUrls[idx] ?? '',
+  }));
 }
