@@ -56,7 +56,9 @@ export type AppState =
   | 'practicing'
   | 'conversation-practicing'
   | 'exam-practicing'
-  | 'dashboard';
+  | 'dashboard'
+  | 'challenge'
+  | 'challenge-running';
 
 export interface YLRenderProps {
   onBack: () => void;
