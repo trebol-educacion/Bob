@@ -44,5 +44,15 @@
   "skillListening": "Listening",
   "skillWriting": "Writing",
   "pathTitle": "Your path",
-  "pathStart": "Start"
+  "pathStart": "Start",
+  "overviewActivityTitle": "Your activity",
+  "overviewActivitySubtitle": "Activities you've completed over time",
+  "overviewWeek": "Week",
+  "overviewMonth": "Month",
+  "overviewYear": "Year",
+  "overviewThisWeek": "This week",
+  "overviewBySkill": "Progress by skill",
+  "overviewStars": "Stars earned",
+  "overviewLevels": "Levels completed",
+  "overviewNoData": "Practise a little to see your activity here."
 }

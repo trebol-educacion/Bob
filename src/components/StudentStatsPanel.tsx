@@ -19,6 +19,7 @@ import {
 } from '@/actions/stats';
 import { useOrganization } from '@/hooks/useOrganization';
 import { SkillPath, type SkillPathSkill } from './SkillPath';
+import { ProgressOverview, type OverviewSkill } from './ProgressOverview';
 
 interface Props {
   onBack: () => void;
@@ -433,6 +434,25 @@ export function StudentStatsPanel({ onBack, onTakeAssessment, onChangeLevel, onL
     [],
   );
 
+  const overviewSkills = useMemo<OverviewSkill[]>(
+    () =>
+      pathSkills.map((s) => ({
+        key: s.key,
+        label: s.label,
+        cefr: s.cefrValue,
+        done: s.done,
+        total: s.total,
+        pct: s.pct,
+        sessions: s.sessions,
+      })),
+    [pathSkills],
+  );
+
+  const levelsCompleted = useMemo(
+    () => pathSkills.reduce((sum, s) => sum + (s.history?.length ?? 0), 0),
+    [pathSkills],
+  );
+
   return (
     <div className="flex-1 flex flex-col min-h-0 relative overflow-hidden bg-white">
       <div className="relative z-10 shrink-0">
@@ -574,6 +594,16 @@ export function StudentStatsPanel({ onBack, onTakeAssessment, onChangeLevel, onL
           </>
         )}
         </div>
+
+        {hasData && derived && (
+          <ProgressOverview
+            sessionDates={stats!.session_dates}
+            totalStars={derived.totalStars}
+            goldBadges={derived.goldBadges}
+            levelsCompleted={levelsCompleted}
+            skills={overviewSkills}
+          />
+        )}
 
         {stats && derived && pathSkills.length > 0 && (
           <SkillPath
