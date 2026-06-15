@@ -845,26 +845,32 @@ const SAMPLE_EXAM: ChallengeExam = {
  * Stable slot keys for every pre-generated image in the exam. Shared by the
  * pre-generation script and the read-time merge so both agree on the mapping.
  */
-export const CHALLENGE_IMAGE_SLOTS: { key: string; description: string }[] = SAMPLE_EXAM.parts
-  .flatMap((part): { key: string; description: string }[] => {
+export type ChallengeImageSlotKind = 'picture' | 'notice' | 'story' | 'collaborative';
+
+export const CHALLENGE_IMAGE_SLOTS: { key: string; description: string; kind: ChallengeImageSlotKind }[] =
+  SAMPLE_EXAM.parts.flatMap((part): { key: string; description: string; kind: ChallengeImageSlotKind }[] => {
     if (part.format === 'listening_picture_mc') {
       return part.questions.flatMap((q) =>
-        q.options.map((o) => ({ key: `${q.id}:${o.key}`, description: o.caption }))
+        q.options.map((o) => ({ key: `${q.id}:${o.key}`, description: o.caption, kind: 'picture' as const }))
       );
     }
     if (part.format === 'reading_notices_mc') {
-      return part.questions.map((q) => ({ key: q.id, description: q.noticeText }));
+      return part.questions.map((q) => ({ key: q.id, description: q.noticeText, kind: 'notice' as const }));
     }
     if (part.format === 'writing_picture_story') {
-      return part.pictures.map((p) => ({ key: `${part.id}:${p.key}`, description: p.caption }));
+      return part.pictures.map((p) => ({
+        key: `${part.id}:${p.key}`,
+        description: p.caption,
+        kind: 'story' as const,
+      }));
     }
     if (part.format === 'speaking_collaborative') {
-      return [{ key: `${part.id}:${part.visual.key}`, description: part.visual.caption }];
+      return [{ key: `${part.id}:${part.visual.key}`, description: part.visual.caption, kind: 'collaborative' as const }];
     }
     return [];
   });
 
-type ImageMap = Record<string, string>;
+export type ImageMap = Record<string, string>;
 
 function mergeImageUrls(exam: ChallengeExam, images: ImageMap): ChallengeExam {
   return {
@@ -911,9 +917,9 @@ function mergeImageUrls(exam: ChallengeExam, images: ImageMap): ChallengeExam {
 
 /**
  * Returns the active Cambridge A2 Key challenge exam with pre-generated image
- * URLs merged in from `cambridge-a2-images.json`. Slots with no entry keep
- * `imageUrl` undefined so the component falls back to its placeholder.
+ * URLs merged in. Pass `overrideImages` (e.g. from the DB) to use fresh URLs;
+ * falls back to the static JSON seed when not provided.
  */
-export function getCambridgeA2Exam(): ChallengeExam {
-  return mergeImageUrls(SAMPLE_EXAM, challengeImages as ImageMap);
+export function getCambridgeA2Exam(overrideImages?: ImageMap): ChallengeExam {
+  return mergeImageUrls(SAMPLE_EXAM, overrideImages ?? (challengeImages as ImageMap));
 }

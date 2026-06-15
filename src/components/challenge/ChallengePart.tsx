@@ -4,6 +4,7 @@ import React from 'react';
 import { CheckCircle2 } from 'lucide-react';
 import type { ChallengePart as ChallengePartData } from '@/lib/challenge/cambridge-a2';
 import { ChallengeAudio } from './ChallengeAudio';
+import { ChallengeNotice } from './ChallengeNotice';
 import { ChallengePicture } from './ChallengePicture';
 
 /** Per-part answer map: itemId → chosen option key, typed word, or free text. */
@@ -219,13 +220,8 @@ export function ChallengePart({ part, answers, onChange }: Props) {
         <>
           {part.questions.map((q, i) => (
             <div key={q.id} className="rounded-2xl border border-trebol-border p-4 space-y-3">
-              {q.noticeImageUrl && (
-                <div className="max-w-[260px]">
-                  <ChallengePicture caption={q.noticeText} imageUrl={q.noticeImageUrl} />
-                </div>
-              )}
-              <div className="rounded-xl bg-[#fde9c8]/50 border border-[#F8AC37]/40 p-3 text-sm font-bold text-trebol-text">
-                {q.noticeText}
+              <div className="flex justify-center">
+                <ChallengeNotice text={q.noticeText} />
               </div>
               <p className="text-sm font-black text-trebol-text">
                 {i + 1}. {q.question}

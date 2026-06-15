@@ -21,6 +21,7 @@ import {
 import { useOrganization } from '@/hooks/useOrganization';
 import { SkillPath, type SkillPathSkill } from './SkillPath';
 import { ProgressOverview, type OverviewSkill } from './ProgressOverview';
+import { ChallengeAttemptsList } from './challenge/ChallengeAttemptsList';
 
 interface Props {
   onBack: () => void;
@@ -608,6 +609,8 @@ export function StudentStatsPanel({ onBack, onTakeAssessment, onChangeLevel, onL
           </>
         )}
         </div>
+
+        <ChallengeAttemptsList />
 
         {hasData && derived && (
           <ProgressOverview

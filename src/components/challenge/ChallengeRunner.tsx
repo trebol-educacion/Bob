@@ -1,9 +1,11 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { ArrowLeft, ArrowRight, BookOpen, Headphones, Mic, PenLine, Trophy, X } from 'lucide-react';
-import { getCambridgeA2Exam, type ChallengeSkill } from '@/lib/challenge/cambridge-a2';
+import { getCambridgeA2Exam, type ChallengeSkill, type ImageMap } from '@/lib/challenge/cambridge-a2';
+import { getChallengeImagesAction } from '@/actions/challenge/images';
+import { saveChallengeAttemptAction } from '@/actions/challenge/attempts';
 import { scoreExam, type ExamSummary } from '@/lib/challenge/scoring';
 import { ChallengePart, type PartAnswers } from './ChallengePart';
 
@@ -27,10 +29,16 @@ const SKILL_COLOR: Record<ChallengeSkill, string> = {
 
 /** Sequential runner for the full A2 Key challenge: one part at a time + summary. */
 export function ChallengeRunner({ onExit }: Props) {
-  const exam = useMemo(() => getCambridgeA2Exam(), []);
+  const [images, setImages] = useState<ImageMap>({});
   const [index, setIndex] = useState(0);
   const [answersByPart, setAnswersByPart] = useState<Record<string, PartAnswers>>({});
   const [summary, setSummary] = useState<ExamSummary | null>(null);
+
+  useEffect(() => {
+    getChallengeImagesAction().then(setImages).catch(() => {});
+  }, []);
+
+  const exam = useMemo(() => getCambridgeA2Exam(images), [images]);
 
   const total = exam.parts.length;
   const part = exam.parts[index];
@@ -47,7 +55,17 @@ export function ChallengeRunner({ onExit }: Props) {
     if (index < total - 1) {
       setIndex((i) => i + 1);
     } else {
-      setSummary(scoreExam(exam.parts, answersByPart));
+      const s = scoreExam(exam.parts, answersByPart);
+      setSummary(s);
+      void saveChallengeAttemptAction({
+        framework: 'cambridge_a2',
+        examId: 'cambridge-a2-key',
+        examTitle: exam.title,
+        objectiveCorrect: s.objectiveCorrect,
+        objectiveTotal: s.objectiveTotal,
+        answers: answersByPart,
+        results: s.results,
+      }).catch(() => {});
     }
   };
 
