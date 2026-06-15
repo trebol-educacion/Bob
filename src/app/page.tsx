@@ -10,6 +10,8 @@ import { BobPracticeChat } from '@/components/BobPracticeChat';
 import { CefrCtaBanner } from '@/components/CefrCtaBanner';
 import { BobAccessDenied } from '@/components/BobAccessDenied';
 import { StudentStatsPanel } from '@/components/StudentStatsPanel';
+import { ChallengeHome } from '@/components/challenge/ChallengeHome';
+import { ChallengeRunner } from '@/components/challenge/ChallengeRunner';
 import { SkillSelector } from '@/components/assessment/SkillSelector';
 import { AssessmentInvite } from '@/components/assessment/AssessmentInvite';
 import { AssessmentSpeakingRunner } from '@/components/assessment/AssessmentSpeakingRunner';
@@ -604,7 +606,35 @@ export default function App() {
                       await refreshSkillLevels();
                     }
                   }}
+                  onOpenChallenge={() => setAppState('challenge')}
                 />
+              </motion.div>
+            )}
+
+            {appState === 'challenge' && (
+              <motion.div
+                key="challenge"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="flex-1 flex flex-col min-h-0"
+              >
+                <ChallengeHome
+                  onSelectFramework={() => setAppState('challenge-running')}
+                  onBack={() => setAppState('dashboard')}
+                />
+              </motion.div>
+            )}
+
+            {appState === 'challenge-running' && (
+              <motion.div
+                key="challenge-running"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="flex-1 flex flex-col min-h-0"
+              >
+                <ChallengeRunner onExit={() => setAppState('dashboard')} />
               </motion.div>
             )}
 

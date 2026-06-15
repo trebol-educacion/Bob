@@ -7,6 +7,7 @@ import {
   ArrowLeft,
   RefreshCw,
   Sparkles,
+  Trophy,
 } from 'lucide-react';
 import { createSupabaseBrowser } from '@/lib/supabase/browser-client';
 import { useTranslations } from 'next-intl';
@@ -20,6 +21,7 @@ import {
 import { useOrganization } from '@/hooks/useOrganization';
 import { SkillPath, type SkillPathSkill } from './SkillPath';
 import { ProgressOverview, type OverviewSkill } from './ProgressOverview';
+import { ChallengeAttemptsList } from './challenge/ChallengeAttemptsList';
 
 interface Props {
   onBack: () => void;
@@ -27,6 +29,7 @@ interface Props {
   onTakeAssessment?: (skill: Skill) => void;
   onChangeLevel?: (skill: Skill, level: string) => Promise<void> | void;
   onLevelUp?: (skill: Skill, level: string) => Promise<void> | void;
+  onOpenChallenge?: () => void;
 }
 
 const DEFAULT_ACTIVITY_TARGET = 10;
@@ -327,7 +330,7 @@ function deriveStats(stats: StudentStatsResult): Derived {
   return { streak, totalXp, goldBadges, totalStars, bySkill, bySkillLevel, activitiesByLevel, groups };
 }
 
-export function StudentStatsPanel({ onBack, onTakeAssessment, onChangeLevel, onLevelUp }: Props) {
+export function StudentStatsPanel({ onBack, onTakeAssessment, onChangeLevel, onLevelUp, onOpenChallenge }: Props) {
   const t = useTranslations('dashboard');
   const { skillLevels, pendingAssessments } = useOrganization();
   const [stats, setStats] = useState<StudentStatsResult | null>(null);
@@ -480,6 +483,18 @@ export function StudentStatsPanel({ onBack, onTakeAssessment, onChangeLevel, onL
             </p>
           </div>
 
+          {onOpenChallenge && (
+            <button
+              onClick={onOpenChallenge}
+              className="inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-white text-xs font-black shadow-md hover:brightness-105 active:scale-95 transition-all"
+              style={{ background: 'linear-gradient(135deg, #3660AB, #F8AC37)' }}
+              aria-label="Open Challenge"
+            >
+              <Trophy size={15} strokeWidth={2.5} fill="currentColor" />
+              <span className="hidden sm:inline">Challenge</span>
+            </button>
+          )}
+
           <button
             onClick={load}
             disabled={loading}
@@ -594,6 +609,8 @@ export function StudentStatsPanel({ onBack, onTakeAssessment, onChangeLevel, onL
           </>
         )}
         </div>
+
+        <ChallengeAttemptsList />
 
         {hasData && derived && (
           <ProgressOverview
