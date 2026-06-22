@@ -39,6 +39,7 @@ import {
   PETPictureDescriptionPractice,
   PETShortTextsPractice,
   PETEmailWritingPractice,
+  PETWritingChallengePractice,
   PETMultipleChoicePractice,
   PETListeningSituationalPractice,
   PETListeningGapFillPractice,
@@ -216,6 +217,11 @@ export const EXAM_PART_COMPONENT_MAP: Record<ModeKey, RouteEntry> = {
     appState: 'exam-practicing',
     kind: 'yl',
     render: (p) => React.createElement(PETEmailWritingPractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
+  },
+  cambridge_pet_writing_challenge: {
+    appState: 'exam-practicing',
+    kind: 'yl',
+    render: (p) => React.createElement(PETWritingChallengePractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
   },
   toefl_writing_academic_discussion: {
     appState: 'exam-practicing',

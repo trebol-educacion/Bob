@@ -40,6 +40,7 @@ export function getModeIcon(card: DynamicCard): string {
     pet_reading_comprehension: 'PETReading',
     pet_writing_part1: 'PETWriting',
     pet_writing_part2: 'PETWriting',
+    pet_writing_challenge: 'PETWriting',
     pet_p1: 'PETSpeaking',
     pet_p2: 'PETSpeaking',
     pet_p3: 'PETSpeaking',

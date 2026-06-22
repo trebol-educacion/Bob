@@ -2,6 +2,8 @@ export { PETPictureDescriptionPractice } from './PETPictureDescriptionPractice';
 export { PETShortTextsPractice } from './PETShortTextsPractice';
 export type { PETShortTextsPracticeProps } from './PETShortTextsPractice';
 export { PETEmailWritingPractice } from './PETEmailWritingPractice';
+export { PETWritingChallengePractice } from './PETWritingChallengePractice';
+export type { PETWritingChallengePracticeProps } from './PETWritingChallengePractice';
 export { PETMultipleChoicePractice } from './PETMultipleChoicePractice';
 export type { PETMultipleChoicePracticeProps } from './PETMultipleChoicePractice';
 export { PETListeningSituationalPractice } from './PETListeningSituationalPractice';
