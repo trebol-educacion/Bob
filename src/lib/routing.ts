@@ -38,6 +38,10 @@ import {
   PETShortTextsPractice,
   PETEmailWritingPractice,
   PETMultipleChoicePractice,
+  PETListeningSituationalPractice,
+  PETListeningGapFillPractice,
+  PETListeningAttitudePractice,
+  PETListeningTrueFalseJustifyPractice,
 } from '@/components/practice/pet';
 import {
   FCEMultipleChoiceClozePractice,
@@ -275,10 +279,30 @@ export const EXAM_PART_COMPONENT_MAP: Record<ModeKey, RouteEntry> = {
     kind: 'yl',
     render: (p) => React.createElement(KETTrueFalseDoesntSayPractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
   },
+  cambridge_pet_listening_part1: {
+    appState: 'exam-practicing',
+    kind: 'yl',
+    render: (p) => React.createElement(PETListeningSituationalPractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
+  },
   cambridge_pet_listening_part2: {
     appState: 'exam-practicing',
     kind: 'yl',
     render: (p) => React.createElement(PETMultipleChoicePractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
+  },
+  cambridge_pet_listening_part3: {
+    appState: 'exam-practicing',
+    kind: 'yl',
+    render: (p) => React.createElement(PETListeningGapFillPractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
+  },
+  cambridge_pet_listening_part4: {
+    appState: 'exam-practicing',
+    kind: 'yl',
+    render: (p) => React.createElement(PETListeningAttitudePractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
+  },
+  cambridge_pet_listening_part5: {
+    appState: 'exam-practicing',
+    kind: 'yl',
+    render: (p) => React.createElement(PETListeningTrueFalseJustifyPractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
   },
   cambridge_fce_reading_part1: {
     appState: 'exam-practicing',
