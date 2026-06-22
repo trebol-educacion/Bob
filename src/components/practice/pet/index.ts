@@ -11,3 +11,5 @@ export type { PETListeningGapFillPracticeProps } from './PETListeningGapFillPrac
 export { PETListeningAttitudePractice } from './PETListeningAttitudePractice';
 export type { PETListeningAttitudePracticeProps } from './PETListeningAttitudePractice';
 export { PETListeningTrueFalseJustifyPractice } from './PETListeningTrueFalseJustifyPractice';
+export { PETReadingComprehensionPractice } from './PETReadingComprehensionPractice';
+export type { PETReadingComprehensionPracticeProps } from './PETReadingComprehensionPractice';

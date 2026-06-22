@@ -42,6 +42,7 @@ import {
   PETListeningGapFillPractice,
   PETListeningAttitudePractice,
   PETListeningTrueFalseJustifyPractice,
+  PETReadingComprehensionPractice,
 } from '@/components/practice/pet';
 import {
   FCEMultipleChoiceClozePractice,
@@ -228,6 +229,11 @@ export const EXAM_PART_COMPONENT_MAP: Record<ModeKey, RouteEntry> = {
     appState: 'exam-practicing',
     kind: 'yl',
     render: (p) => React.createElement(PETShortTextsPractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
+  },
+  cambridge_pet_reading_comprehension: {
+    appState: 'exam-practicing',
+    kind: 'yl',
+    render: (p) => React.createElement(PETReadingComprehensionPractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
   },
   cambridge_ket_reading_part1: {
     appState: 'exam-practicing',
