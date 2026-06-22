@@ -11,6 +11,8 @@ import {
 } from '@/components/practice/yl';
 import { B1CollaborativePractice } from '@/components/B1CollaborativePractice';
 import { A2Part1Practice } from '@/components/A2Part1Practice';
+import { PETInterviewPractice } from '@/components/PETInterviewPractice';
+import { PETDiscussionPractice } from '@/components/PETDiscussionPractice';
 import { ToeflListenRepeatPractice } from '@/components/ToeflListenRepeatPractice';
 import { ToeflInterviewPractice } from '@/components/ToeflInterviewPractice';
 import { ListenChooseResponsePractice } from '@/components/practice/ListenChooseResponsePractice';
@@ -155,10 +157,20 @@ export const EXAM_PART_COMPONENT_MAP: Record<ModeKey, RouteEntry> = {
     kind: 'yl',
     render: (p) => React.createElement(PETPictureDescriptionPractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
   },
+  cambridge_pet_p1: {
+    appState: 'exam-practicing',
+    kind: 'exam',
+    render: (p) => React.createElement(PETInterviewPractice, { onBack: (p as ExamRenderProps).onBack }),
+  },
   cambridge_pet_p3: {
     appState: 'exam-practicing',
     kind: 'exam',
     render: (p) => React.createElement(B1CollaborativePractice, { onBack: (p as ExamRenderProps).onBack }),
+  },
+  cambridge_pet_p4: {
+    appState: 'exam-practicing',
+    kind: 'exam',
+    render: (p) => React.createElement(PETDiscussionPractice, { onBack: (p as ExamRenderProps).onBack }),
   },
   cambridge_ket_part1: {
     appState: 'exam-practicing',
