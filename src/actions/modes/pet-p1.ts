@@ -40,17 +40,6 @@ const FormativeFeedbackFallback: FormativeFeedback = {
   suggestions: ['Try again — we could not process your response.'],
 };
 
-/** Flattens a plan into the ordered list of questions the examiner asks. */
-export function petInterviewQuestions(plan: PETInterviewPlan): string[] {
-  return [
-    ...plan.phase1_questions,
-    ...plan.topicA_questions,
-    plan.topicA_followup,
-    ...plan.topicBC_questions,
-    plan.topicBC_followup,
-  ];
-}
-
 /** Generate a B1 PET Part 1 interview plan and persist it as a 'phrase' message. */
 export async function generatePETInterviewAction(sessionId: string, userId: string): Promise<PETInterviewPlan> {
   const cached = await getOrCreateCachedContent<PETInterviewPlan>(

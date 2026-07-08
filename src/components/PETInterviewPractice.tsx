@@ -7,7 +7,6 @@ import {
   generatePETInterviewAction,
   processPETInterviewAnswerAction,
   evaluatePETInterviewAction,
-  petInterviewQuestions,
   type PETInterviewPlan,
 } from '@/actions/modes/pet-p1';
 import { createSessionAction } from '@/actions/sessions';
@@ -25,6 +24,17 @@ const ACCENT_TINT = 'color-mix(in oklab, #3660AB 12%, white)';
 const CARD_SURFACE = '#FAFAF8';
 const RECORDING_MAX_SECONDS = 45;
 const REACTION_PAUSE_MS = 900;
+
+/** Flattens a plan into the ordered list of questions the examiner asks. */
+function petInterviewQuestions(plan: PETInterviewPlan): string[] {
+  return [
+    ...plan.phase1_questions,
+    ...plan.topicA_questions,
+    plan.topicA_followup,
+    ...plan.topicBC_questions,
+    plan.topicBC_followup,
+  ];
+}
 
 type Step = 'answer' | 'recording' | 'review' | 'processing' | 'transition';
 
