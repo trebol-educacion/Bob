@@ -4,6 +4,7 @@ import React, { createContext, useContext, useEffect, useState, useCallback, use
 import { Organization, getOrganizationForUser } from '@/lib/organization';
 import { createSupabaseBrowser } from '@/lib/supabase/browser-client';
 import { resolveEnabledModes } from '@/lib/modes';
+import { resolveBobAccessDenial } from '@/lib/access-gate';
 import { detectSustainedImprovementAction } from '@/actions/skills';
 import { getPendingAssessmentsAction, type PendingAssessmentsMap } from '@/actions/assessment';
 import type { ModeKey, ModeFramework, CefrLevel, DynamicCard, ResolvedCard } from '@/lib/types/practice';
@@ -32,7 +33,8 @@ export type BobAccessDenialReason =
   | 'no_profile'
   | 'not_student'
   | 'no_organization'
-  | 'bob_not_enabled';
+  | 'bob_not_enabled'
+  | 'no_license';
 
 interface OrganizationContextValue {
   organization: Organization | null;
@@ -180,7 +182,7 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
         setOrganization(org);
         setCachedOrg(org);
 
-        const [profileResult, studentFwResult, orgFwResult, availableModesResult, allCardsResult, skillLevelsResult, cooldownResult] = await Promise.all([
+        const [profileResult, studentFwResult, orgFwResult, availableModesResult, allCardsResult, skillLevelsResult, cooldownResult, licenseResult] = await Promise.all([
           supabase
             .from('profiles')
             .select('role, cefr_active_level, cefr_level_locked')
@@ -223,6 +225,7 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
                 .eq('id', org.id)
                 .maybeSingle()
             : Promise.resolve({ data: null, error: null }),
+          supabase.rpc('has_product_access', { p_user_id: userId, p_product_code: 'bob' }),
         ]);
 
         if (profileResult.error) {
@@ -283,22 +286,21 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
         const cooldown = cooldownResult.data?.assessment_cooldown_days ?? 7;
         setAssessmentCooldownDays(cooldown);
 
-        if (profileResult.error) {
-          console.warn('[Bob access gate] profile query errored, deferring denial', profileResult.error);
-          setAccessDenialReason(null);
-        } else if (!profileResult.data) {
-          console.warn('[Bob access gate] no profile data for user', userId);
-          setAccessDenialReason('no_profile');
-        } else if (role !== 'student') {
-          console.warn('[Bob access gate] role is not student:', role);
-          setAccessDenialReason('not_student');
-        } else if (!org) {
-          setAccessDenialReason('no_organization');
-        } else if (!org.is_bob_enabled) {
-          setAccessDenialReason('bob_not_enabled');
-        } else {
-          setAccessDenialReason(null);
+        if (licenseResult.error) {
+          console.warn('[Bob access gate] has_product_access errored, fail-open', licenseResult.error);
         }
+        const denialReason = resolveBobAccessDenial({
+          profileErrored: !!profileResult.error,
+          hasProfile: !!profileResult.data,
+          role,
+          orgFound: !!org,
+          bobEnabled: org?.is_bob_enabled,
+          licenseResult: licenseResult.error ? null : (licenseResult.data as boolean | null),
+        });
+        if (denialReason) {
+          console.warn('[Bob access gate] access denied:', denialReason, 'user:', userId);
+        }
+        setAccessDenialReason(denialReason);
 
         const studentFrameworks: ModeFramework[] = (studentFwResult.data ?? [])
           .map((r: any) => {
