@@ -41,6 +41,10 @@
       "bob_not_enabled": {
         "title": "Bob is not available at your school",
         "body": "Your school has not activated Bob yet. Talk to your institution's administrator to request access."
+      },
+      "no_license": {
+        "title": "Your Bob license is not active",
+        "body": "Your school manages Bob licenses individually and yours is not active right now. Talk to your school administrator to get access."
       }
     }
   }
