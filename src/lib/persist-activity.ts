@@ -16,7 +16,7 @@ export interface PersistMessageInput {
 async function isVoiceStorageAllowed(userId: string): Promise<boolean> {
   const supabase = await createSupabaseServer();
   const { data: profile, error: profileError } = await supabase
-    .from('profiles')
+    .schema('public').from('profiles')
     .select('organization_id')
     .eq('id', userId)
     .single();
@@ -24,7 +24,7 @@ async function isVoiceStorageAllowed(userId: string): Promise<boolean> {
   if (profileError || !profile?.organization_id) return false;
 
   const { data: org, error: orgError } = await supabase
-    .from('organizations')
+    .schema('public').from('organizations')
     .select('allow_voice_storage')
     .eq('id', profile.organization_id)
     .single();
@@ -47,7 +47,7 @@ export async function persistMessage(
 
   const supabase = await createSupabaseServer();
   const { data, error } = await supabase
-    .from('bob_messages')
+    .from('messages')
     .insert({
       session_id: input.sessionId,
       user_id: input.userId,
@@ -118,7 +118,7 @@ export async function persistMessages(
   }));
 
   const { data, error } = await supabase
-    .from('bob_messages')
+    .from('messages')
     .insert(rows)
     .select('id');
 
@@ -171,7 +171,7 @@ export async function readSessionMessages(
 > {
   const supabase = await createSupabaseServer();
   const { data, error } = await supabase
-    .from('bob_messages')
+    .from('messages')
     .select('id, role, msg_type, content_text, content_json, created_at')
     .eq('session_id', sessionId)
     .eq('user_id', userId)
@@ -195,7 +195,7 @@ async function resolveSessionMode(sessionId: string): Promise<string> {
   try {
     const supabase = await createSupabaseServer();
     const { data, error } = await supabase
-      .from('bob_sessions')
+      .from('sessions')
       .select('mode')
       .eq('id', sessionId)
       .single();
@@ -265,7 +265,7 @@ export async function persistActivityResult(
 
     const supabase = await createSupabaseServer();
     const { data, error } = await supabase
-      .from('bob_activity_results')
+      .from('activity_results')
       .insert({
         user_id: input.userId,
         session_id: input.sessionId,

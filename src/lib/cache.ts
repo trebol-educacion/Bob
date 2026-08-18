@@ -36,7 +36,7 @@ export async function getCachedContentIfExists<T>(
   const cacheKey = hashCacheKey(key);
   const supabase = await createSupabaseServer();
   const { data, error } = await supabase
-    .from('bob_generation_cache')
+    .from('generation_cache')
     .select('output_text, output_json, output_blob_url, hit_count')
     .eq('cache_key', cacheKey)
     .maybeSingle();
@@ -59,7 +59,7 @@ export async function getOrCreateCachedContent<T>(
   const supabase = await createSupabaseServer();
 
   const { data: existing } = await supabase
-    .from('bob_generation_cache')
+    .from('generation_cache')
     .select('output_text, output_json, output_blob_url, hit_count')
     .eq('cache_key', cacheKey)
     .maybeSingle();
@@ -70,12 +70,12 @@ export async function getOrCreateCachedContent<T>(
     if (hit !== null) {
       if (!options?.validate || options.validate(hit)) {
         void supabase
-          .from('bob_generation_cache')
+          .from('generation_cache')
           .update({ hit_count: row.hit_count + 1, last_hit_at: new Date().toISOString() })
           .eq('cache_key', cacheKey);
         return hit;
       }
-      void supabase.from('bob_generation_cache').delete().eq('cache_key', cacheKey);
+      void supabase.from('generation_cache').delete().eq('cache_key', cacheKey);
     }
   }
 
@@ -88,7 +88,7 @@ export async function getOrCreateCachedContent<T>(
   }
 
   const payload = buildInsertPayload(key, cacheKey, produced, storeAs);
-  await supabase.from('bob_generation_cache').upsert(payload, { onConflict: 'cache_key' });
+  await supabase.from('generation_cache').upsert(payload, { onConflict: 'cache_key' });
 
   return produced;
 }
@@ -97,5 +97,5 @@ export async function getOrCreateCachedContent<T>(
 export async function invalidateCacheKey(key: CacheKey): Promise<void> {
   const cacheKey = hashCacheKey(key);
   const supabase = await createSupabaseServer();
-  await supabase.from('bob_generation_cache').delete().eq('cache_key', cacheKey);
+  await supabase.from('generation_cache').delete().eq('cache_key', cacheKey);
 }

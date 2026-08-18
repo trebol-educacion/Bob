@@ -26,7 +26,7 @@ export async function getBuildSentenceItemsAction(): Promise<
     const supabase = await createSupabaseServer();
 
     const { data, error } = await supabase
-      .from('bob_closed_items')
+      .from('closed_items')
       .select('id, stimulus_text, options, correct_key')
       .eq('framework', 'toefl')
       .eq('exam_part', 'toefl_writing_build_sentence');

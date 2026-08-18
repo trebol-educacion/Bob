@@ -18,7 +18,7 @@ export async function getClosedItemsAction(
     const supabase = await createSupabaseServer();
 
     let query = supabase
-      .from('bob_closed_items')
+      .from('closed_items')
       .select('*')
       .eq('framework', input.framework)
       .eq('exam_part', input.exam_part);

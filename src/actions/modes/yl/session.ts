@@ -37,7 +37,7 @@ export async function startYLSessionAction(input: {
   const title = partTitles[titleKey] ?? `Cambridge ${exam} Part ${part}`;
 
   const { data: session, error: sessionErr } = await supabase
-    .from('bob_sessions')
+    .from('sessions')
     .insert({
       user_id: user.id,
       mode: input.mode,
@@ -53,7 +53,7 @@ export async function startYLSessionAction(input: {
   }
 
   const { data: recent } = await supabase
-    .from('bob_sessions')
+    .from('sessions')
     .select('plan_json')
     .eq('user_id', user.id)
     .eq('mode', input.mode)
@@ -79,7 +79,7 @@ export async function startYLSessionAction(input: {
   const plan = await generateYLContentAction(exam, part, { avoidList });
   console.log(`[YL][${input.mode}] plan ready in ${Date.now() - t1}ms (cues=${plan.cues?.length ?? 0}, images=${plan.image_prompts?.length ?? 0})`);
 
-  await supabase.from('bob_sessions').update({ plan_json: plan }).eq('id', session.id);
+  await supabase.from('sessions').update({ plan_json: plan }).eq('id', session.id);
 
   return { sessionId: session.id as string, plan };
 }
@@ -91,7 +91,7 @@ export async function getSessionMessagesAction(sessionId: string) {
 export async function getYLSessionPlanAction(sessionId: string): Promise<YLPlan | null> {
   const supabase = await createSupabaseServer();
   const { data, error } = await supabase
-    .from('bob_sessions')
+    .from('sessions')
     .select('plan_json')
     .eq('id', sessionId)
     .maybeSingle();

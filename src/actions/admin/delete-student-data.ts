@@ -15,7 +15,7 @@ export async function deleteStudentDataAction(
   if (authError || !user) return { ok: false, error: 'unauthenticated' };
 
   const { data: actorProfile, error: profileError } = await supabase
-    .from('profiles')
+    .schema('public').from('profiles')
     .select('role, organization_id')
     .eq('id', user.id)
     .single();
@@ -28,7 +28,7 @@ export async function deleteStudentDataAction(
   }
 
   const { data: targetProfile, error: targetError } = await supabase
-    .from('profiles')
+    .schema('public').from('profiles')
     .select('organization_id')
     .eq('id', targetStudentUserId)
     .single();
@@ -43,14 +43,14 @@ export async function deleteStudentDataAction(
   }
 
   const { count: deletedMessages, error: msgError } = await supabase
-    .from('bob_messages')
+    .from('messages')
     .delete({ count: 'exact' })
     .eq('user_id', targetStudentUserId);
 
   if (msgError) return { ok: false, error: msgError.message };
 
   const { count: deletedSessions, error: sessError } = await supabase
-    .from('bob_sessions')
+    .from('sessions')
     .delete({ count: 'exact' })
     .eq('user_id', targetStudentUserId);
 
