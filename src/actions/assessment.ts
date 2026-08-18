@@ -15,7 +15,7 @@ async function resolveCooldownUntil(
   userId: string,
 ): Promise<string> {
   const { data: profile } = await supabase
-    .from('profiles')
+    .schema('public').from('profiles')
     .select('organization_id')
     .eq('id', userId)
     .maybeSingle();
@@ -23,7 +23,7 @@ async function resolveCooldownUntil(
   let cooldownDays = 7;
   if (profile?.organization_id) {
     const { data: org } = await supabase
-      .from('organizations')
+      .schema('public').from('organizations')
       .select('assessment_cooldown_days')
       .eq('id', profile.organization_id)
       .maybeSingle();
@@ -90,9 +90,9 @@ export async function startAssessmentAction(skill: Skill): Promise<StartAssessme
   if (!user) return { status: 'error', code: 'unauthenticated' };
 
   const [profileResult, historyResult] = await Promise.all([
-    supabase.from('profiles').select('organization_id, cefr_active_level').eq('id', user.id).single(),
+    supabase.schema('public').from('profiles').select('organization_id, cefr_active_level').eq('id', user.id).single(),
     supabase
-      .from('bob_skill_level_history')
+      .from('skill_level_history')
       .select('occurred_at')
       .eq('user_id', user.id)
       .eq('skill', skill)
@@ -105,7 +105,7 @@ export async function startAssessmentAction(skill: Skill): Promise<StartAssessme
   const profile = profileResult.data;
 
   const { data: org } = await supabase
-    .from('organizations')
+    .schema('public').from('organizations')
     .select('assessment_cooldown_days')
     .eq('id', profile.organization_id)
     .maybeSingle();
@@ -128,7 +128,7 @@ export async function startAssessmentAction(skill: Skill): Promise<StartAssessme
   }
 
   const { data: skillLevel } = await supabase
-    .from('bob_skill_levels')
+    .from('skill_levels')
     .select('cefr_level')
     .eq('user_id', user.id)
     .eq('skill', skill)
@@ -138,7 +138,7 @@ export async function startAssessmentAction(skill: Skill): Promise<StartAssessme
 
   if (skill === 'listening') {
     const { data: rawItems, error: itemsError } = await supabase
-      .from('bob_closed_items')
+      .from('closed_items')
       .select('id, stimulus_audio_url, transcript, question, options')
       .eq('skill', 'listening')
       .eq('status', 'enabled')
@@ -171,7 +171,7 @@ export async function startAssessmentAction(skill: Skill): Promise<StartAssessme
 
   if (skill === 'reading') {
     const { data: rawItems, error: itemsError } = await supabase
-      .from('bob_closed_items')
+      .from('closed_items')
       .select('id, stimulus_text, question, options')
       .eq('skill', 'reading')
       .eq('status', 'enabled')
@@ -217,7 +217,7 @@ export async function startAssessmentAction(skill: Skill): Promise<StartAssessme
   const currentLevel = skillLevel?.cefr_level ?? profile.cefr_active_level ?? 'a2';
 
   const { data: studentFwRows } = await supabase
-    .from('student_english_frameworks')
+    .schema('public').from('student_english_frameworks')
     .select('framework_id, pedagogical_frameworks(name)')
     .eq('student_id', user.id);
 
@@ -299,16 +299,16 @@ export async function submitAssessmentSpeakingAction(
   }
 
   const [profileResult, skillLevelResult, studentFwResult] = await Promise.all([
-    supabase.from('profiles').select('organization_id, cefr_active_level').eq('id', user.id).single(),
-    supabase.from('bob_skill_levels').select('cefr_level').eq('user_id', user.id).eq('skill', 'speaking').maybeSingle(),
-    supabase.from('student_english_frameworks').select('framework_id, pedagogical_frameworks(name)').eq('student_id', user.id),
+    supabase.schema('public').from('profiles').select('organization_id, cefr_active_level').eq('id', user.id).single(),
+    supabase.from('skill_levels').select('cefr_level').eq('user_id', user.id).eq('skill', 'speaking').maybeSingle(),
+    supabase.schema('public').from('student_english_frameworks').select('framework_id, pedagogical_frameworks(name)').eq('student_id', user.id),
   ]);
 
   const profile = profileResult.data;
 
   const { data: org } = profile?.organization_id
     ? await supabase
-        .from('organizations')
+        .schema('public').from('organizations')
         .select('allow_voice_storage')
         .eq('id', profile.organization_id)
         .maybeSingle()
@@ -324,7 +324,7 @@ export async function submitAssessmentSpeakingAction(
   const isYl = fwNames.some((n: string) => n === 'Cambridge English') && (speakingLevel === 'pre_a1' || speakingLevel === 'a1');
 
   const { data: session, error: sessionError } = await supabase
-    .from('bob_sessions')
+    .from('sessions')
     .insert({
       user_id: user.id,
       mode: 'assessment_speaking',
@@ -352,11 +352,11 @@ export async function submitAssessmentSpeakingAction(
         ...(allowVoiceStorage ? { audio_base64: turn.audio_base64, mime_type: turn.mime_type } : {}),
       },
     };
-    await supabase.from('bob_messages').insert(msgInsert);
+    await supabase.from('messages').insert(msgInsert);
   }
 
   await supabase
-    .from('bob_messages')
+    .from('messages')
     .insert({
       session_id: sessionId,
       user_id: user.id,
@@ -367,7 +367,7 @@ export async function submitAssessmentSpeakingAction(
     });
 
   const { error: queueError } = await supabase
-    .from('bob_assessment_queue')
+    .from('assessment_queue')
     .insert({
       user_id: user.id,
       assessment_id,
@@ -415,7 +415,7 @@ export async function submitAssessmentListeningAction(
 
   const itemIds = answers.map(a => a.item_id);
   const { data: items, error: itemsError } = await supabase
-    .from('bob_closed_items')
+    .from('closed_items')
     .select('id, correct_key, explanation')
     .in('id', itemIds);
 
@@ -445,11 +445,11 @@ export async function submitAssessmentListeningAction(
     : 0.9;
 
   try {
-    await supabase.rpc('set_config', { setting: 'bob.assessment_id', value: assessment_id, is_local: true });
+    await supabase.schema('public').rpc('set_config', { setting: 'bob.assessment_id', value: assessment_id, is_local: true });
   } catch { /* non-critical */ }
 
   const { error: upsertError } = await supabase
-    .from('bob_skill_levels')
+    .from('skill_levels')
     .upsert({
       user_id: user.id,
       skill: 'listening',
@@ -463,7 +463,7 @@ export async function submitAssessmentListeningAction(
   if (upsertError) return { status: 'error', code: 'db_error' };
 
   const { data: sessionData, error: sessionError } = await supabase
-    .from('bob_sessions')
+    .from('sessions')
     .insert({
       user_id: user.id,
       mode: 'assessment_listening',
@@ -474,7 +474,7 @@ export async function submitAssessmentListeningAction(
     .single();
 
   if (!sessionError && sessionData) {
-    await supabase.from('bob_messages').insert({
+    await supabase.from('messages').insert({
       session_id: sessionData.id,
       user_id: user.id,
       role: 'bob',
@@ -535,7 +535,7 @@ export async function pollAssessmentSpeakingResultAction(
   if (!user) return { status: 'error', code: 'unauthenticated' };
 
   const { data: messages } = await supabase
-    .from('bob_messages')
+    .from('messages')
     .select('content_json')
     .eq('user_id', user.id)
     .eq('role', 'bob')
@@ -604,7 +604,7 @@ export async function submitAssessmentReadingAction(
 
   const itemIds = answers.map(a => a.item_id);
   const { data: items, error: itemsError } = await supabase
-    .from('bob_closed_items')
+    .from('closed_items')
     .select('id, correct_key, explanation')
     .in('id', itemIds);
 
@@ -634,11 +634,11 @@ export async function submitAssessmentReadingAction(
     : 0.9;
 
   try {
-    await supabase.rpc('set_config', { setting: 'bob.assessment_id', value: assessment_id, is_local: true });
+    await supabase.schema('public').rpc('set_config', { setting: 'bob.assessment_id', value: assessment_id, is_local: true });
   } catch { /* non-critical */ }
 
   const { error: upsertError } = await supabase
-    .from('bob_skill_levels')
+    .from('skill_levels')
     .upsert({
       user_id: user.id,
       skill: 'reading',
@@ -652,7 +652,7 @@ export async function submitAssessmentReadingAction(
   if (upsertError) return { status: 'error', code: 'db_error' };
 
   const { data: sessionData, error: sessionError } = await supabase
-    .from('bob_sessions')
+    .from('sessions')
     .insert({
       user_id: user.id,
       mode: 'assessment_reading',
@@ -663,7 +663,7 @@ export async function submitAssessmentReadingAction(
     .single();
 
   if (!sessionError && sessionData) {
-    await supabase.from('bob_messages').insert({
+    await supabase.from('messages').insert({
       session_id: sessionData.id,
       user_id: user.id,
       role: 'bob',
@@ -727,15 +727,15 @@ export async function submitAssessmentWritingAction(
   if (wordCount < 10) return { status: 'error', code: 'text_too_short' };
 
   const [profileResult, skillLevelResult] = await Promise.all([
-    supabase.from('profiles').select('cefr_active_level').eq('id', user.id).single(),
-    supabase.from('bob_skill_levels').select('cefr_level').eq('user_id', user.id).eq('skill', 'writing').maybeSingle(),
+    supabase.schema('public').from('profiles').select('cefr_active_level').eq('id', user.id).single(),
+    supabase.from('skill_levels').select('cefr_level').eq('user_id', user.id).eq('skill', 'writing').maybeSingle(),
   ]);
 
   const profile = profileResult.data;
   const writingLevel = skillLevelResult.data?.cefr_level ?? profile?.cefr_active_level ?? 'a1';
 
   const { data: session, error: sessionError } = await supabase
-    .from('bob_sessions')
+    .from('sessions')
     .insert({
       user_id: user.id,
       mode: 'assessment_writing',
@@ -748,7 +748,7 @@ export async function submitAssessmentWritingAction(
   if (sessionError || !session) return { status: 'error', code: 'db_error' };
   const sessionId = session.id;
 
-  await supabase.from('bob_messages').insert({
+  await supabase.from('messages').insert({
     session_id: sessionId,
     user_id: user.id,
     role: 'user',
@@ -757,7 +757,7 @@ export async function submitAssessmentWritingAction(
     content_json: { assessment_id, word_count: wordCount },
   });
 
-  await supabase.from('bob_messages').insert({
+  await supabase.from('messages').insert({
     session_id: sessionId,
     user_id: user.id,
     role: 'bob',
@@ -767,7 +767,7 @@ export async function submitAssessmentWritingAction(
   });
 
   const { error: queueError } = await supabase
-    .from('bob_assessment_queue')
+    .from('assessment_queue')
     .insert({
       user_id: user.id,
       assessment_id,
@@ -804,7 +804,7 @@ export async function pollAssessmentWritingResultAction(
   if (!user) return { status: 'error', code: 'unauthenticated' };
 
   const { data: messages } = await supabase
-    .from('bob_messages')
+    .from('messages')
     .select('content_json')
     .eq('user_id', user.id)
     .eq('role', 'bob')
@@ -860,7 +860,7 @@ export async function getPendingAssessmentsAction(): Promise<PendingAssessmentsM
   if (!user) return empty;
 
   const { data } = await supabase
-    .from('bob_assessment_queue')
+    .from('assessment_queue')
     .select('skill, assessment_id, started_at')
     .eq('user_id', user.id)
     .in('status', ['pending', 'processing'])

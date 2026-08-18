@@ -29,7 +29,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const admin = createSupabaseAdmin();
 
   const { data: existingRows } = await admin
-    .from('bob_challenge_images')
+    .from('challenge_images')
     .select('slot_key, version')
     .in('slot_key', slots.map((s) => s.key));
 
@@ -78,7 +78,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           }
           const { data: pub } = admin.storage.from('bob-images').getPublicUrl(path);
           const { error: insertErr } = await admin
-            .from('bob_challenge_images')
+            .from('challenge_images')
             .insert({ slot_key: slot.key, version, image_url: pub.publicUrl });
           if (insertErr && !insertErr.message.includes('unique')) {
             failed++;

@@ -34,7 +34,7 @@ export async function createSessionAction(input: {
     if (!user) return { data: null, error: 'unauthenticated' };
 
     const { data, error } = await supabase
-      .from('bob_sessions')
+      .from('sessions')
       .insert({ user_id: user.id, mode: input.mode, topic: input.topic ?? null, title: input.title })
       .select()
       .single();
@@ -53,7 +53,7 @@ export async function getSessionsAction(): Promise<ActionResult<BobSession[]>> {
     if (!user) return { data: [], error: null };
 
     const { data, error } = await supabase
-      .from('bob_sessions')
+      .from('sessions')
       .select('*')
       .eq('user_id', user.id)
       .not('mode', 'like', 'assessment_%')
@@ -65,7 +65,7 @@ export async function getSessionsAction(): Promise<ActionResult<BobSession[]>> {
 
     const ids = sessions.map((s) => s.id);
     const { data: evals } = await supabase
-      .from('bob_messages')
+      .from('messages')
       .select('session_id, content_json')
       .in('session_id', ids)
       .eq('msg_type', 'evaluation');
@@ -102,7 +102,7 @@ export async function deleteSessionAction(id: string): Promise<ActionResult<null
     if (!user) return { data: null, error: 'unauthenticated' };
 
     const { error } = await supabase
-      .from('bob_sessions')
+      .from('sessions')
       .delete()
       .eq('id', id)
       .eq('user_id', user.id);

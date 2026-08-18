@@ -16,7 +16,7 @@ export async function getOrCreateCueAudioAction(
   }
 
   const { data: existing } = await supabase
-    .from('bob_messages')
+    .from('messages')
     .select('content_json')
     .eq('session_id', sessionId)
     .eq('msg_type', 'yl_tts')

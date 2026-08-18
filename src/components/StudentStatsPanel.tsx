@@ -364,7 +364,7 @@ export function StudentStatsPanel({ onBack, onTakeAssessment, onChangeLevel, onL
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
       const { data } = await supabase
-        .from('bob_skill_level_history')
+        .from('skill_level_history')
         .select('skill, new_level, occurred_at')
         .eq('user_id', user.id)
         .eq('origin', 'assessment')

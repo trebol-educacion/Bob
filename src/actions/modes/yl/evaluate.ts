@@ -129,7 +129,7 @@ export async function evaluateYLFinalAction(input: {
   }
 
   const { data: messages } = await supabase
-    .from('bob_messages')
+    .from('messages')
     .select('content_text, content_json, role, msg_type')
     .eq('session_id', input.sessionId)
     .eq('role', 'user')

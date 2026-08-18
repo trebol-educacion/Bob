@@ -28,7 +28,7 @@ export async function saveChallengeAttemptAction(input: {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return { ok: false };
 
-    const { error } = await supabase.from('bob_challenge_attempts').insert({
+    const { error } = await supabase.from('challenge_attempts').insert({
       user_id: user.id,
       framework: input.framework,
       exam_id: input.examId,
@@ -58,7 +58,7 @@ export async function getChallengeAttemptsAction(): Promise<ChallengeAttempt[]> 
     if (!user) return [];
 
     const { data, error } = await supabase
-      .from('bob_challenge_attempts')
+      .from('challenge_attempts')
       .select('id, framework, exam_id, exam_title, objective_correct, objective_total, created_at')
       .order('created_at', { ascending: false });
 

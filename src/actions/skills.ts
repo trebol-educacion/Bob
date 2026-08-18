@@ -27,13 +27,13 @@ export async function detectSustainedImprovementAction(skill: Skill): Promise<bo
 
     const [skillLevelResult, profileResult] = await Promise.all([
       supabase
-        .from('bob_skill_levels')
+        .from('skill_levels')
         .select('cefr_level')
         .eq('user_id', user.id)
         .eq('skill', skill)
         .maybeSingle(),
       supabase
-        .from('profiles')
+        .schema('public').from('profiles')
         .select('organization_id')
         .eq('id', user.id)
         .maybeSingle(),
@@ -46,7 +46,7 @@ export async function detectSustainedImprovementAction(skill: Skill): Promise<bo
 
     const [historyResult, cooldownResult] = await Promise.all([
       supabase
-        .from('bob_skill_level_history')
+        .from('skill_level_history')
         .select('occurred_at')
         .eq('user_id', user.id)
         .eq('skill', skill)
@@ -55,7 +55,7 @@ export async function detectSustainedImprovementAction(skill: Skill): Promise<bo
         .limit(1),
       profileResult.data?.organization_id
         ? supabase
-            .from('organizations')
+            .schema('public').from('organizations')
             .select('assessment_cooldown_days')
             .eq('id', profileResult.data.organization_id)
             .maybeSingle()
@@ -72,7 +72,7 @@ export async function detectSustainedImprovementAction(skill: Skill): Promise<bo
     }
 
     const { data: recentSessions } = await supabase
-      .from('bob_sessions')
+      .from('sessions')
       .select('id, mode')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
@@ -88,7 +88,7 @@ export async function detectSustainedImprovementAction(skill: Skill): Promise<bo
     const recentIds = skillSessions.slice(0, SESSIONS_WINDOW * 3).map((s) => s.id);
 
     const { data: evals } = await supabase
-      .from('bob_messages')
+      .from('messages')
       .select('session_id, content_json')
       .in('session_id', recentIds)
       .eq('msg_type', 'evaluation');
@@ -133,7 +133,7 @@ async function resolveCallerContext(supabase: Awaited<ReturnType<typeof createSu
   if (!user) return null;
 
   const { data: profile } = await supabase
-    .from('profiles')
+    .schema('public').from('profiles')
     .select('role, organization_id')
     .eq('id', user.id)
     .maybeSingle();
@@ -159,7 +159,7 @@ export async function getSkillLevelsAction(userId: string): Promise<SkillLevelMa
 
     if (!isSelf && isTeacher) {
       const { data: studentProfile } = await supabase
-        .from('profiles')
+        .schema('public').from('profiles')
         .select('organization_id')
         .eq('id', userId)
         .maybeSingle();
@@ -168,7 +168,7 @@ export async function getSkillLevelsAction(userId: string): Promise<SkillLevelMa
     }
 
     const { data, error } = await supabase
-      .from('bob_skill_levels')
+      .from('skill_levels')
       .select('skill, cefr_level, origin, confidence, last_assessment_at, updated_at')
       .eq('user_id', userId);
 
@@ -211,7 +211,7 @@ export async function getSkillLevelHistoryAction(
 
     if (!isSelf && isTeacher) {
       const { data: studentProfile } = await supabase
-        .from('profiles')
+        .schema('public').from('profiles')
         .select('organization_id')
         .eq('id', userId)
         .maybeSingle();
@@ -220,7 +220,7 @@ export async function getSkillLevelHistoryAction(
     }
 
     let query = supabase
-      .from('bob_skill_level_history')
+      .from('skill_level_history')
       .select('id, user_id, skill, previous_level, new_level, origin, assessment_id, occurred_at')
       .eq('user_id', userId)
       .order('occurred_at', { ascending: false })
@@ -270,7 +270,7 @@ export async function getStudentsOverview(
     }
 
     const { data: studentProfiles, error: profilesError } = await supabase
-      .from('profiles')
+      .schema('public').from('profiles')
       .select('id')
       .eq('organization_id', orgId)
       .eq('role', 'student');
@@ -281,7 +281,7 @@ export async function getStudentsOverview(
     if (studentIds.length === 0) return { ok: true, students: [] };
 
     const { data: levels, error: levelsError } = await supabase
-      .from('bob_skill_levels')
+      .from('skill_levels')
       .select('user_id, skill, cefr_level, origin, confidence, last_assessment_at, updated_at')
       .in('user_id', studentIds);
 
@@ -325,7 +325,7 @@ export async function setSkillLevelManualAction(
     if (!caller || !TEACHER_ROLES.has(caller.role)) return { ok: false };
 
     const { data: studentProfile } = await supabase
-      .from('profiles')
+      .schema('public').from('profiles')
       .select('organization_id')
       .eq('id', userId)
       .maybeSingle();
@@ -333,7 +333,7 @@ export async function setSkillLevelManualAction(
     if (!studentProfile || studentProfile.organization_id !== caller.orgId) return { ok: false };
 
     const { error } = await supabase
-      .from('bob_skill_levels')
+      .from('skill_levels')
       .upsert(
         {
           user_id: userId,
@@ -364,7 +364,7 @@ export async function resetOwnSkillLevelAction(skill: Skill): Promise<{ ok: bool
     if (!user) return { ok: false };
 
     const { error } = await supabase
-      .from('bob_skill_levels')
+      .from('skill_levels')
       .delete()
       .eq('user_id', user.id)
       .eq('skill', skill);
@@ -390,7 +390,7 @@ export async function applyDefaultSkillLevelAction(
     if (!user) return { ok: false };
 
     const { error } = await supabase
-      .from('bob_skill_levels')
+      .from('skill_levels')
       .upsert(
         {
           user_id: user.id,
@@ -425,7 +425,7 @@ export async function promoteSkillLevelAction(
     if (!user) return { ok: false };
 
     const { error } = await supabase
-      .from('bob_skill_levels')
+      .from('skill_levels')
       .upsert(
         {
           user_id: user.id,

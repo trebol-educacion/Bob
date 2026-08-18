@@ -25,7 +25,7 @@ async function loadCache(): Promise<void> {
   try {
     const supabase = await createSupabaseServer()
     const { data, error } = await supabase
-      .from('bob_prompts')
+      .from('prompts')
       .select('prompt_key, prompt_current, variables')
 
     if (error) {

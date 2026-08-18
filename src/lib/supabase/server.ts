@@ -22,6 +22,7 @@ export async function createSupabaseServer() {
           }
         },
       },
+      db: { schema: 'bob' },
     }
   )
 }

@@ -10,7 +10,7 @@ export async function getChallengeImagesAction(): Promise<ImageMap> {
   try {
     const admin = createSupabaseAdmin();
     const { data: rows, error } = await admin
-      .from('bob_challenge_images')
+      .from('challenge_images')
       .select('slot_key, version, image_url')
       .in('slot_key', SLOT_KEYS);
 

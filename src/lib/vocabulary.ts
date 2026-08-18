@@ -34,7 +34,7 @@ export async function pickVocabulary(opts: PickOptions): Promise<VocabPick[]> {
 
   const supabase = await createSupabaseServer();
   let query = supabase
-    .from('bob_vocabulary')
+    .from('vocabulary')
     .select('word, category')
     .eq('framework', framework)
     .eq('cefr_level', cefr_level);

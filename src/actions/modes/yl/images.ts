@@ -25,7 +25,7 @@ async function tryPickFromImagePool(opts: {
   if (Math.random() >= POOL_REUSE_PROBABILITY) return null;
   const supabase = await createSupabaseServer();
   const { data } = await supabase
-    .from('bob_word_images')
+    .from('word_images')
     .select('id, image_url')
     .eq('framework', opts.framework)
     .eq('cefr_level', opts.cefr_level)
@@ -36,7 +36,7 @@ async function tryPickFromImagePool(opts: {
   if (rows.length === 0) return null;
   const pick = rows[Math.floor(Math.random() * rows.length)];
   void supabase
-    .from('bob_word_images')
+    .from('word_images')
     .update({ last_used_at: new Date().toISOString() })
     .eq('id', pick.id)
     .then(() => undefined, () => undefined);
@@ -53,7 +53,7 @@ async function addImageToPool(opts: {
 }): Promise<void> {
   const supabase = await createSupabaseServer();
   await supabase
-    .from('bob_word_images')
+    .from('word_images')
     .insert({
       framework: opts.framework,
       cefr_level: opts.cefr_level,

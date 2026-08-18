@@ -20,7 +20,7 @@ async function pickVocabularyForActivity(opts: {
   const { framework, cefr_level, count, distinctCategories = true, objectCardFriendlyOnly = false } = opts;
   const supabase = await createSupabaseServer();
   let query = supabase
-    .from('bob_vocabulary')
+    .from('vocabulary')
     .select('word, category')
     .eq('framework', framework)
     .eq('cefr_level', cefr_level)

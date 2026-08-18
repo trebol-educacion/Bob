@@ -28,7 +28,7 @@ export async function saveMessageAction(input: {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { data: null, error: 'Not authenticated' };
   const { data, error } = await supabase
-    .from('bob_messages')
+    .from('messages')
     .insert({ ...input, user_id: user.id })
     .select()
     .single();
@@ -39,7 +39,7 @@ export async function saveMessageAction(input: {
 export async function getMessagesAction(session_id: string): Promise<ActionResult<StoredMessage[]>> {
   const supabase = await createSupabaseServer();
   const { data, error } = await supabase
-    .from('bob_messages')
+    .from('messages')
     .select('*')
     .eq('session_id', session_id)
     .order('created_at', { ascending: true });

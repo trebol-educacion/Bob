@@ -30,7 +30,7 @@ export async function getStudentStatsAction(): Promise<StudentStatsResult> {
   if (!user) return { rows: [], total_sessions: 0, global_avg: null, session_dates: [], activities: [] };
 
   const { data: activityRows } = await supabase
-    .from('bob_activity_results')
+    .from('activity_results')
     .select('mode, score_10, created_at')
     .eq('user_id', user.id)
     .order('created_at', { ascending: false });
@@ -106,7 +106,7 @@ export type ActivityTargets = Record<string, Record<string, number>>;
 export async function getActivityTargetsAction(): Promise<ActivityTargets> {
   const supabase = await createSupabaseServer();
   const { data } = await supabase
-    .from('bob_activity_targets')
+    .from('activity_targets')
     .select('skill, cefr_level, target_count');
 
   const targets: ActivityTargets = {};
@@ -127,7 +127,7 @@ export async function resetStudentHistoryAction(): Promise<{ deleted: number }> 
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { deleted: 0 };
   const { data, error } = await supabase
-    .from('bob_sessions')
+    .from('sessions')
     .delete()
     .eq('user_id', user.id)
     .select('id');

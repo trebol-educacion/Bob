@@ -58,7 +58,7 @@ export async function startPETListeningPart2Action(): Promise<
   if (!user) return { error: 'Not authenticated' };
 
   const { data: rows, error: fetchError } = await supabase
-    .from('bob_closed_items')
+    .from('closed_items')
     .select('id, variant_id, stimulus_audio_url, question, options, correct_key')
     .eq('framework', 'cambridge')
     .eq('exam_part', 'pet_listening_part2')
@@ -132,7 +132,7 @@ export async function submitPETListeningAnswerAction(
   if (!user) return { error: 'Not authenticated' };
 
   const { data: item, error: itemError } = await supabase
-    .from('bob_closed_items')
+    .from('closed_items')
     .select('correct_key')
     .eq('id', item_id)
     .single();

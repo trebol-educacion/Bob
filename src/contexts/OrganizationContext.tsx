@@ -184,22 +184,22 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
 
         const [profileResult, studentFwResult, orgFwResult, availableModesResult, allCardsResult, skillLevelsResult, cooldownResult, licenseResult] = await Promise.all([
           supabase
-            .from('profiles')
+            .schema('public').from('profiles')
             .select('role, cefr_active_level, cefr_level_locked')
             .eq('id', userId)
             .maybeSingle(),
           supabase
-            .from('student_english_frameworks')
+            .schema('public').from('student_english_frameworks')
             .select('framework_id, pedagogical_frameworks(name, type)')
             .eq('user_id', userId),
           org?.id
             ? supabase
-                .from('organization_frameworks')
+                .schema('public').from('organization_frameworks')
                 .select('framework_id, pedagogical_frameworks(name, type)')
                 .eq('organization_id', org.id)
             : Promise.resolve({ data: [], error: null } as { data: never[]; error: null }),
           supabase
-            .from('bob_prompts')
+            .from('prompts')
             .select('framework, exam_part, cefr_level, label, description')
             .eq('activity_type', 'generation')
             .neq('framework', 'generic')
@@ -207,7 +207,7 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
             .order('cefr_level', { ascending: true, nullsFirst: false })
             .order('exam_part'),
           supabase
-            .from('bob_prompts')
+            .from('prompts')
             .select('framework, exam_part, cefr_level, label, description, status, skill')
             .eq('activity_type', 'generation')
             .neq('status', 'hidden')
@@ -215,17 +215,17 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
             .order('cefr_level', { ascending: true, nullsFirst: false })
             .order('exam_part'),
           supabase
-            .from('bob_skill_levels')
+            .from('skill_levels')
             .select('skill, cefr_level, origin, confidence, last_assessment_at, updated_at')
             .eq('user_id', userId),
           org?.id
             ? supabase
-                .from('organizations')
+                .schema('public').from('organizations')
                 .select('assessment_cooldown_days')
                 .eq('id', org.id)
                 .maybeSingle()
             : Promise.resolve({ data: null, error: null }),
-          supabase.rpc('has_product_access', { p_user_id: userId, p_product_code: 'bob' }),
+          supabase.schema('public').rpc('has_product_access', { p_user_id: userId, p_product_code: 'bob' }),
         ]);
 
         if (profileResult.error) {
@@ -421,7 +421,7 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
         void getPendingAssessmentsAction().then(setPendingAssessments);
         void (async () => {
           const { data: rows } = await supabase
-            .from('bob_skill_levels')
+            .from('skill_levels')
             .select('skill, cefr_level, origin, confidence, last_assessment_at, updated_at')
             .eq('user_id', userId!);
           const ALL_SKILLS: Skill[] = ['reading', 'listening', 'writing', 'speaking'];
@@ -479,7 +479,7 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
     if (!user) throw new Error('No autenticado.');
 
     const { error } = await supabase
-      .from('profiles')
+      .schema('public').from('profiles')
       .update({ cefr_active_level: level })
       .eq('id', user.id);
 
@@ -519,7 +519,7 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
     if (!cachedUserId) return;
     const supabase = createSupabaseBrowser();
     const { data, error } = await supabase
-      .from('bob_skill_levels')
+      .from('skill_levels')
       .select('skill, cefr_level, origin, confidence, last_assessment_at, updated_at')
       .eq('user_id', cachedUserId);
     if (error) {
