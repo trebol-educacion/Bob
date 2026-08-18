@@ -60,7 +60,7 @@ async function fetchPrompt(
   vars: Record<string, string> = {}
 ): Promise<string | null> {
   const { data, error } = await supabase
-    .from("bob_prompts")
+    .from("prompts")
     .select("prompt_current")
     .eq("prompt_key", promptKey)
     .maybeSingle();
@@ -110,7 +110,7 @@ async function resolveCooldownUntil(
   userId: string,
 ): Promise<string> {
   const { data: profile } = await supabase
-    .from("profiles")
+    .schema("public").from("profiles")
     .select("organization_id")
     .eq("id", userId)
     .maybeSingle();
@@ -118,7 +118,7 @@ async function resolveCooldownUntil(
   let cooldownDays = 7;
   if (profile?.organization_id) {
     const { data: org } = await supabase
-      .from("organizations")
+      .schema("public").from("organizations")
       .select("assessment_cooldown_days")
       .eq("id", profile.organization_id)
       .maybeSingle();
@@ -141,7 +141,7 @@ async function processSpeaking(
   const isYl = (payload.is_yl as boolean) ?? false;
 
   const { data: audioMessages } = await supabase
-    .from("bob_messages")
+    .from("messages")
     .select("content_json, content_text")
     .eq("session_id", sessionId)
     .eq("role", "user")
@@ -214,14 +214,14 @@ async function processSpeaking(
   const confidenceNumeric = confidenceToNumeric(parsed.confidence);
 
   try {
-    await supabase.rpc("set_config", {
+    await supabase.schema("public").rpc("set_config", {
       setting: "bob.assessment_id",
       value: assessmentId,
       is_local: true,
     });
   } catch { /* non-critical, trigger uses NULL */ }
 
-  await supabase.from("bob_skill_levels").upsert({
+  await supabase.from("skill_levels").upsert({
     user_id: userId,
     skill: "speaking",
     cefr_level: parsed.cefr_band,
@@ -234,7 +234,7 @@ async function processSpeaking(
   const cooldownUntil = await resolveCooldownUntil(supabase, userId);
 
   await supabase
-    .from("bob_messages")
+    .from("messages")
     .update({
       content_json: {
         assessment_id: assessmentId,
@@ -250,7 +250,7 @@ async function processSpeaking(
     .filter("content_json->>status", "eq", "pending");
 
   await supabase
-    .from("bob_assessment_queue")
+    .from("assessment_queue")
     .update({
       status: "done",
       result: { cefr_band: parsed.cefr_band, confidence: parsed.confidence, feedback: parsed.feedback },
@@ -312,14 +312,14 @@ async function processWriting(
   const confidenceNumeric = confidenceToNumeric(parsed.confidence);
 
   try {
-    await supabase.rpc("set_config", {
+    await supabase.schema("public").rpc("set_config", {
       setting: "bob.assessment_id",
       value: assessmentId,
       is_local: true,
     });
   } catch { /* non-critical, trigger uses NULL */ }
 
-  await supabase.from("bob_skill_levels").upsert({
+  await supabase.from("skill_levels").upsert({
     user_id: userId,
     skill: "writing",
     cefr_level: parsed.cefr_band,
@@ -332,7 +332,7 @@ async function processWriting(
   const cooldownUntil = await resolveCooldownUntil(supabase, userId);
 
   await supabase
-    .from("bob_messages")
+    .from("messages")
     .update({
       content_json: {
         assessment_id: assessmentId,
@@ -349,7 +349,7 @@ async function processWriting(
     .filter("content_json->>status", "eq", "pending");
 
   await supabase
-    .from("bob_assessment_queue")
+    .from("assessment_queue")
     .update({
       status: "done",
       result: {
@@ -368,12 +368,13 @@ Deno.serve(async (req: Request) => {
   const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
   const supabase = createClient(supabaseUrl, serviceRoleKey, {
     auth: { persistSession: false },
+    db: { schema: "bob" },
   });
 
   const authHeader = req.headers.get("Authorization") ?? "";
   const token = authHeader.replace(/^Bearer\s+/i, "");
   const { data: authConfig } = await supabase
-    .from("bob_app_config")
+    .from("app_config")
     .select("value")
     .eq("key", "worker_auth")
     .maybeSingle();
@@ -404,7 +405,7 @@ Deno.serve(async (req: Request) => {
   }
 
   const { data: queueRow, error: queueErr } = await supabase
-    .from("bob_assessment_queue")
+    .from("assessment_queue")
     .select("*")
     .eq("id", queueId)
     .maybeSingle();
@@ -434,14 +435,14 @@ Deno.serve(async (req: Request) => {
   }
 
   await supabase
-    .from("bob_assessment_queue")
+    .from("assessment_queue")
     .update({ status: "processing", started_at: new Date().toISOString() })
     .eq("id", queueId);
 
   const geminiKey = Deno.env.get("GEMINI_API_KEY") ?? "";
   if (!geminiKey) {
     await supabase
-      .from("bob_assessment_queue")
+      .from("assessment_queue")
       .update({ status: "failed", error: "GEMINI_API_KEY not configured", completed_at: new Date().toISOString() })
       .eq("id", queueId);
 
@@ -475,12 +476,12 @@ Deno.serve(async (req: Request) => {
     console.error(JSON.stringify({ event: "eval_worker_error", queue_id: queueId, error: message }));
 
     await supabase
-      .from("bob_assessment_queue")
+      .from("assessment_queue")
       .update({ status: "failed", error: message, completed_at: new Date().toISOString() })
       .eq("id", queueId);
 
     await supabase
-      .from("bob_messages")
+      .from("messages")
       .update({
         content_json: {
           assessment_id: row.assessment_id,

@@ -26,7 +26,9 @@ if (!SUPABASE_URL || !SUPABASE_KEY || !GEMINI_KEY) {
   process.exit(1);
 }
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
+  db: { schema: 'bob' },
+});
 const ai = new GoogleGenAI({ apiKey: GEMINI_KEY });
 
 const MODEL_TEXT  = 'gemini-2.5-flash';
@@ -52,7 +54,7 @@ async function time<T>(step: string, fn: () => Promise<T>): Promise<{ result: T;
 
 async function fetchPrompt(promptKey: string): Promise<string | null> {
   const { data, error } = await supabase
-    .from('bob_prompts')
+    .from('prompts')
     .select('prompt_current')
     .eq('prompt_key', promptKey)
     .single();
