@@ -9,6 +9,11 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next({ request })
   }
 
+  // Magic-link confirmation is what creates the session; it must be reachable pre-auth.
+  if (pathname.startsWith('/auth/confirm')) {
+    return NextResponse.next({ request })
+  }
+
   const response = NextResponse.next({ request })
 
   const supabase = createServerClient(

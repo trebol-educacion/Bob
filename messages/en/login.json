@@ -11,5 +11,12 @@
   "errorCredentials": "Incorrect credentials. Please try again.",
   "comingSoon": "Coming soon:",
   "trustCenter": "Trust Center",
-  "studentProtection": "Student Protection"
+  "studentProtection": "Student Protection",
+  "magicLinkToggle": "Sign in with an email link",
+  "passwordToggle": "Sign in with a password instead",
+  "magicLinkEmailErrorEmpty": "Please enter your email.",
+  "magicLinkSubmitIdle": "Send me a link",
+  "magicLinkSubmitLoading": "Sending…",
+  "magicLinkSentNeutral": "If an account exists with that email, we've sent you a sign-in link. It expires in one hour.",
+  "magicLinkExpired": "This link has expired or was already used. Request a new one."
 }
