@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import { Mail, Lock, Loader2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
@@ -16,6 +16,18 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [mode, setMode] = useState<'password' | 'magiclink'>('password');
+  const [magicLinkSent, setMagicLinkSent] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('error') === 'enlace') {
+      setMode('magiclink');
+      setError(t('magicLinkExpired'));
+      const paramEmail = params.get('email');
+      if (paramEmail) setEmail(paramEmail);
+    }
+  }, [t]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,6 +48,33 @@ export default function LoginPage() {
       return;
     }
     window.location.assign('/');
+  };
+
+  const handleMagicLinkSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setMagicLinkSent(false);
+    if (!email) {
+      setError(t('magicLinkEmailErrorEmpty'));
+      return;
+    }
+    setLoading(true);
+    const supabase = createSupabaseBrowser();
+    await supabase.auth.signInWithOtp({
+      email,
+      options: {
+        shouldCreateUser: false,
+        emailRedirectTo: `${window.location.origin}/auth/confirm?next=/`,
+      },
+    });
+    setLoading(false);
+    setMagicLinkSent(true);
+  };
+
+  const toggleMode = () => {
+    setError('');
+    setMagicLinkSent(false);
+    setMode((m) => (m === 'password' ? 'magiclink' : 'password'));
   };
 
   return (
@@ -86,84 +125,157 @@ export default function LoginPage() {
           </div>
 
           <div className="p-6">
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <label htmlFor="email" className="text-sm font-semibold text-gray-700 block">
-                  {t('emailLabel')}
-                </label>
-                <div className="relative">
-                  <Mail
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-                    size={16}
-                  />
-                  <input
-                    id="email"
-                    name="email"
-                    type="text"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder={t('emailPlaceholder')}
-                    autoComplete="email"
-                    className="w-full h-10 pl-10 pr-3 rounded-md border border-gray-200 text-sm outline-none transition-colors focus:border-blue-400 focus:ring-1 focus:ring-blue-400"
-                    style={{ backgroundColor: '#E7EFFE' }}
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <label htmlFor="password" className="text-sm font-semibold text-gray-700">
-                    {t('passwordLabel')}
+            {mode === 'password' ? (
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="space-y-2">
+                  <label htmlFor="email" className="text-sm font-semibold text-gray-700 block">
+                    {t('emailLabel')}
                   </label>
-                  <button
-                    type="button"
-                    className="text-xs font-medium hover:underline"
-                    style={{ color: BG }}
-                  >
-                    {t('forgotPassword')}
-                  </button>
+                  <div className="relative">
+                    <Mail
+                      className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                      size={16}
+                    />
+                    <input
+                      id="email"
+                      name="email"
+                      type="text"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder={t('emailPlaceholder')}
+                      autoComplete="email"
+                      className="w-full h-10 pl-10 pr-3 rounded-md border border-gray-200 text-sm outline-none transition-colors focus:border-blue-400 focus:ring-1 focus:ring-blue-400"
+                      style={{ backgroundColor: '#E7EFFE' }}
+                    />
+                  </div>
                 </div>
-                <div className="relative">
-                  <Lock
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-                    size={16}
-                  />
-                  <input
-                    id="password"
-                    name="password"
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••"
-                    autoComplete="current-password"
-                    className="w-full h-10 pl-10 pr-3 rounded-md border border-gray-200 text-sm outline-none transition-colors focus:border-blue-400 focus:ring-1 focus:ring-blue-400"
-                    style={{ backgroundColor: '#E7EFFE' }}
-                  />
-                </div>
-              </div>
 
-              {error && (
-                <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-md px-3 py-2">
-                  {error}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label htmlFor="password" className="text-sm font-semibold text-gray-700">
+                      {t('passwordLabel')}
+                    </label>
+                    <button
+                      type="button"
+                      className="text-xs font-medium hover:underline"
+                      style={{ color: BG }}
+                    >
+                      {t('forgotPassword')}
+                    </button>
+                  </div>
+                  <div className="relative">
+                    <Lock
+                      className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                      size={16}
+                    />
+                    <input
+                      id="password"
+                      name="password"
+                      type="password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="••••••••"
+                      autoComplete="current-password"
+                      className="w-full h-10 pl-10 pr-3 rounded-md border border-gray-200 text-sm outline-none transition-colors focus:border-blue-400 focus:ring-1 focus:ring-blue-400"
+                      style={{ backgroundColor: '#E7EFFE' }}
+                    />
+                  </div>
                 </div>
-              )}
 
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full h-10 rounded-md px-4 py-2 text-sm font-medium text-white transition-colors hover:opacity-90 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
-                style={{ backgroundColor: BG }}
-              >
-                {loading ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <Loader2 size={16} className="animate-spin" />
-                    {t('submitLoading')}
-                  </span>
-                ) : (
-                  t('submitIdle')
+                {error && (
+                  <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-md px-3 py-2">
+                    {error}
+                  </div>
                 )}
-              </button>
-            </form>
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full h-10 rounded-md px-4 py-2 text-sm font-medium text-white transition-colors hover:opacity-90 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={{ backgroundColor: BG }}
+                >
+                  {loading ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <Loader2 size={16} className="animate-spin" />
+                      {t('submitLoading')}
+                    </span>
+                  ) : (
+                    t('submitIdle')
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={toggleMode}
+                  className="w-full text-center text-xs font-medium hover:underline"
+                  style={{ color: BG }}
+                >
+                  {t('magicLinkToggle')}
+                </button>
+              </form>
+            ) : (
+              <form onSubmit={handleMagicLinkSubmit} className="space-y-4">
+                <div className="space-y-2">
+                  <label htmlFor="magiclink-email" className="text-sm font-semibold text-gray-700 block">
+                    {t('emailLabel')}
+                  </label>
+                  <div className="relative">
+                    <Mail
+                      className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                      size={16}
+                    />
+                    <input
+                      id="magiclink-email"
+                      name="email"
+                      type="text"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder={t('emailPlaceholder')}
+                      autoComplete="email"
+                      className="w-full h-10 pl-10 pr-3 rounded-md border border-gray-200 text-sm outline-none transition-colors focus:border-blue-400 focus:ring-1 focus:ring-blue-400"
+                      style={{ backgroundColor: '#E7EFFE' }}
+                    />
+                  </div>
+                </div>
+
+                {error && (
+                  <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-md px-3 py-2">
+                    {error}
+                  </div>
+                )}
+
+                {magicLinkSent && !error && (
+                  <div className="text-sm text-green-700 bg-green-50 border border-green-200 rounded-md px-3 py-2">
+                    {t('magicLinkSentNeutral')}
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full h-10 rounded-md px-4 py-2 text-sm font-medium text-white transition-colors hover:opacity-90 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={{ backgroundColor: BG }}
+                >
+                  {loading ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <Loader2 size={16} className="animate-spin" />
+                      {t('magicLinkSubmitLoading')}
+                    </span>
+                  ) : (
+                    t('magicLinkSubmitIdle')
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={toggleMode}
+                  className="w-full text-center text-xs font-medium hover:underline"
+                  style={{ color: BG }}
+                >
+                  {t('passwordToggle')}
+                </button>
+              </form>
+            )}
           </div>
 
           <div className="px-6 pb-6 flex flex-col space-y-4">
