@@ -11,6 +11,8 @@ import {
 } from '@/components/practice/yl';
 import { B1CollaborativePractice } from '@/components/B1CollaborativePractice';
 import { A2Part1Practice } from '@/components/A2Part1Practice';
+import { PETInterviewPractice } from '@/components/PETInterviewPractice';
+import { PETDiscussionPractice } from '@/components/PETDiscussionPractice';
 import { ToeflListenRepeatPractice } from '@/components/ToeflListenRepeatPractice';
 import { ToeflInterviewPractice } from '@/components/ToeflInterviewPractice';
 import { ListenChooseResponsePractice } from '@/components/practice/ListenChooseResponsePractice';
@@ -37,7 +39,13 @@ import {
   PETPictureDescriptionPractice,
   PETShortTextsPractice,
   PETEmailWritingPractice,
+  PETWritingChallengePractice,
   PETMultipleChoicePractice,
+  PETListeningSituationalPractice,
+  PETListeningGapFillPractice,
+  PETListeningAttitudePractice,
+  PETListeningTrueFalseJustifyPractice,
+  PETReadingComprehensionPractice,
 } from '@/components/practice/pet';
 import {
   FCEMultipleChoiceClozePractice,
@@ -150,10 +158,20 @@ export const EXAM_PART_COMPONENT_MAP: Record<ModeKey, RouteEntry> = {
     kind: 'yl',
     render: (p) => React.createElement(PETPictureDescriptionPractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
   },
+  cambridge_pet_p1: {
+    appState: 'exam-practicing',
+    kind: 'exam',
+    render: (p) => React.createElement(PETInterviewPractice, { onBack: (p as ExamRenderProps).onBack }),
+  },
   cambridge_pet_p3: {
     appState: 'exam-practicing',
     kind: 'exam',
     render: (p) => React.createElement(B1CollaborativePractice, { onBack: (p as ExamRenderProps).onBack }),
+  },
+  cambridge_pet_p4: {
+    appState: 'exam-practicing',
+    kind: 'exam',
+    render: (p) => React.createElement(PETDiscussionPractice, { onBack: (p as ExamRenderProps).onBack }),
   },
   cambridge_ket_part1: {
     appState: 'exam-practicing',
@@ -200,6 +218,11 @@ export const EXAM_PART_COMPONENT_MAP: Record<ModeKey, RouteEntry> = {
     kind: 'yl',
     render: (p) => React.createElement(PETEmailWritingPractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
   },
+  cambridge_pet_writing_challenge: {
+    appState: 'exam-practicing',
+    kind: 'yl',
+    render: (p) => React.createElement(PETWritingChallengePractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
+  },
   toefl_writing_academic_discussion: {
     appState: 'exam-practicing',
     kind: 'exam',
@@ -224,6 +247,11 @@ export const EXAM_PART_COMPONENT_MAP: Record<ModeKey, RouteEntry> = {
     appState: 'exam-practicing',
     kind: 'yl',
     render: (p) => React.createElement(PETShortTextsPractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
+  },
+  cambridge_pet_reading_comprehension: {
+    appState: 'exam-practicing',
+    kind: 'yl',
+    render: (p) => React.createElement(PETReadingComprehensionPractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
   },
   cambridge_ket_reading_part1: {
     appState: 'exam-practicing',
@@ -275,10 +303,30 @@ export const EXAM_PART_COMPONENT_MAP: Record<ModeKey, RouteEntry> = {
     kind: 'yl',
     render: (p) => React.createElement(KETTrueFalseDoesntSayPractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
   },
+  cambridge_pet_listening_part1: {
+    appState: 'exam-practicing',
+    kind: 'yl',
+    render: (p) => React.createElement(PETListeningSituationalPractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
+  },
   cambridge_pet_listening_part2: {
     appState: 'exam-practicing',
     kind: 'yl',
     render: (p) => React.createElement(PETMultipleChoicePractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
+  },
+  cambridge_pet_listening_part3: {
+    appState: 'exam-practicing',
+    kind: 'yl',
+    render: (p) => React.createElement(PETListeningGapFillPractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
+  },
+  cambridge_pet_listening_part4: {
+    appState: 'exam-practicing',
+    kind: 'yl',
+    render: (p) => React.createElement(PETListeningAttitudePractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
+  },
+  cambridge_pet_listening_part5: {
+    appState: 'exam-practicing',
+    kind: 'yl',
+    render: (p) => React.createElement(PETListeningTrueFalseJustifyPractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
   },
   cambridge_fce_reading_part1: {
     appState: 'exam-practicing',
