@@ -1,129 +1,31 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Loader2, Mic, Volume2 } from 'lucide-react';
-import { ImageConfigSelection, SceneConfig, Difficulty } from '@/components/ImageConfigSelection';
+import { Loader2, Mic } from 'lucide-react';
+import { ImageConfigSelection, SceneConfig } from '@/components/ImageConfigSelection';
 import {
   generateTopicPhrasesAction,
   generateImageSceneAction,
   generateImageAction,
-  generateSpeechAction,
   evaluatePronunciationAction,
   evaluateImageDescriptionAction,
   EvaluationResult,
   ImageScene,
 } from '@/actions/gemini';
 import { pregenerateYLCueAudiosAction } from '@/actions/modes/yl';
-import { saveMessageAction, StoredMessage } from '@/actions/messages';
-import { blobToBase64, pcmToWavBase64 } from '@/lib/audio';
-import { createSupabaseBrowser } from '@/lib/supabase/browser-client';
+import { StoredMessage } from '@/actions/messages';
+import { blobToBase64 } from '@/lib/audio';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
-import { getScoreColor } from '@/lib/score';
+import { renderEvaluationContent, renderPhrase, renderScene, restoreMessages } from './practice-chat/render';
+import { deriveChatHistory } from './practice-chat/history';
+import { uploadImageToStorage } from './practice-chat/storage';
+import { playSpeech } from './practice-chat/speech';
+import { useChatMessaging } from './practice-chat/useChatMessaging';
+import { useInitialGreeting } from './practice-chat/useInitialGreeting';
+import type { ChatMsg, ChatPhase } from './practice-chat/types';
 
-export type ChatPhase =
-  | 'topic-input'
-  | 'image-config'
-  | 'generating'
-  | 'phrase-ready'
-  | 'recording'
-  | 'evaluating'
-  | 'result'
-  | 'finished';
-
-export type ChatMsg = {
-  id: string;
-  role: 'bob' | 'user';
-  content: React.ReactNode;
-};
-
-export function renderEvaluationContent(
-  score: number,
-  feedback: string,
-  transcribed_text?: string,
-  modelAnswer?: string,
-): React.ReactNode {
-  const roundedScore = Math.round(score);
-  const scoreColor = getScoreColor(roundedScore);
-  return (
-    <div className="space-y-3">
-      <div className="flex items-center gap-3">
-        <span className={`text-4xl font-black ${scoreColor}`}>{roundedScore}</span>
-        <span className="text-trebol-text/60 text-sm font-medium">/ 100</span>
-      </div>
-      {transcribed_text && (
-        <div className="bg-trebol-bg rounded-lg px-3 py-2 text-sm text-trebol-text/80 italic">
-          &quot;{transcribed_text}&quot;
-        </div>
-      )}
-      <p className="text-sm text-trebol-text/80">{feedback}</p>
-      {modelAnswer && (
-        <div className="bg-trebol-primary/10 border border-trebol-primary/30 rounded-lg px-3 py-2 space-y-1">
-          <p className="text-xs font-black uppercase tracking-widest text-trebol-primary">Sample answer</p>
-          <p className="text-sm text-trebol-text/80 italic">{modelAnswer}</p>
-        </div>
-      )}
-    </div>
-  );
-}
-
-export function restoreMessages(stored: StoredMessage[]): ChatMsg[] {
-  return stored
-    .filter((m) => m.msg_type !== 'phrase_plan' && m.msg_type !== 'yl_tts')
-    .map((m) => {
-    let content: React.ReactNode;
-
-    if (m.msg_type === 'phrase') {
-      const j = m.content_json as { phrase: string; index: number; total: number } | null;
-      content = j ? (
-        <div className="space-y-3">
-          <p className="text-xs font-black uppercase tracking-widest text-trebol-text/50">
-            Phrase {j.index + 1} of {j.total}
-          </p>
-          <div className="bg-trebol-bg border-2 border-trebol-primary/30 rounded-xl p-4">
-            <p className="text-xl font-extrabold text-trebol-text leading-relaxed">{j.phrase}</p>
-          </div>
-          <p className="text-sm text-trebol-text/60">Listen to the phrase, then record yourself saying it.</p>
-        </div>
-      ) : <span>{m.content_text}</span>;
-    } else if (m.msg_type === 'image_scene') {
-      const j = m.content_json as { description: string } | null;
-      content = (
-        <div className="space-y-3">
-          <p className="text-sm text-trebol-text/60">
-            Describe what you see in this image in English. You have 60 seconds.
-          </p>
-          {m.content_text ? (
-            <img
-              src={m.content_text}
-              alt="Scene to describe"
-              className="w-full rounded-xl border-2 border-trebol-border shadow-md"
-            />
-          ) : j?.description ? (
-            <p className="text-xs text-trebol-text/50 italic">{j.description}</p>
-          ) : null}
-        </div>
-      );
-    } else if (m.msg_type === 'evaluation') {
-      const j = m.content_json as { score: number; feedback: string; transcribed_text?: string; model_answer?: string } | null;
-      content = j
-        ? renderEvaluationContent(j.score, j.feedback, j.transcribed_text, j?.model_answer)
-        : <span>{m.content_text}</span>;
-    } else if (m.msg_type === 'user_audio') {
-      const text = m.content_text && m.content_text !== 'Audio recorded' ? m.content_text : null;
-      content = text ? (
-        <span>{text}</span>
-      ) : (
-        <span className="flex items-center gap-2 text-sm">
-          <Mic size={14} /> Audio recorded
-        </span>
-      );
-    } else {
-      content = <span>{m.content_text}</span>;
-    }
-
-    return { id: m.id, role: m.role, content };
-  });
-}
+export type { ChatMsg, ChatPhase };
+export { renderEvaluationContent, restoreMessages };
 
 export interface UsePracticeChatProps {
   mode: 'situation' | 'image';
@@ -171,94 +73,22 @@ export function usePracticeChat({
   level = 'b1',
   onSessionFinished,
 }: UsePracticeChatProps): UsePracticeChatReturn {
-  const isHistory = !!initialMessages && initialMessages.length > 0;
+  const [init] = useState(() => deriveChatHistory(mode, initialMessages));
+  const isHistory = init.isHistory;
 
-  const inferPhaseFromHistory = (msgs: StoredMessage[]): ChatPhase => {
-    if (!msgs.length) return mode === 'image' ? 'image-config' : 'topic-input';
-    if (mode === 'situation') {
-      const plan = msgs.find(m => m.msg_type === 'phrase_plan');
-      const planLen = (plan?.content_json as { phrases?: string[] } | null)?.phrases?.length ?? 0;
-      const evals = msgs.filter(m => m.role === 'bob' && m.msg_type === 'evaluation').length;
-      const total = planLen > 0 ? planLen : 10;
-      if (evals >= total) return 'finished';
-      const last = msgs[msgs.length - 1];
-      if (last.role === 'bob' && last.msg_type === 'evaluation') return 'result';
-      return 'phrase-ready';
-    }
-    const last = msgs[msgs.length - 1];
-    if (last.role === 'bob') {
-      if (last.msg_type === 'image_scene') return 'phrase-ready';
-      if (last.msg_type === 'phrase') return 'phrase-ready';
-      if (last.msg_type === 'evaluation') return 'result';
-    }
-    if (last.role === 'user' && last.msg_type === 'user_audio') return 'phrase-ready';
-    return 'finished';
-  };
-
-  const [messages, setMessages] = useState<ChatMsg[]>(() =>
-    isHistory ? restoreMessages(initialMessages) : []
-  );
-  const [phase, setPhase] = useState<ChatPhase>(() => {
-    if (isHistory) return inferPhaseFromHistory(initialMessages ?? []);
-    return mode === 'image' ? 'image-config' : 'topic-input';
-  });
-  const [topic, setTopic] = useState(() => {
-    if (!isHistory || !initialMessages) return '';
-    const firstUser = initialMessages.find(m => m.role === 'user' && m.msg_type === 'text');
-    return firstUser?.content_text ?? '';
-  });
+  const [messages, setMessages] = useState<ChatMsg[]>(init.messages);
+  const [phase, setPhase] = useState<ChatPhase>(init.phase);
+  const [topic, setTopic] = useState(init.topic);
   const [inputText, setInputText] = useState('');
-  const [dynamicPhrases, setDynamicPhrases] = useState<string[]>(() => {
-    if (!isHistory || !initialMessages) return [];
-    const plan = initialMessages.find(m => m.msg_type === 'phrase_plan');
-    if (plan) {
-      const j = plan.content_json as { phrases?: string[] } | null;
-      if (j?.phrases && j.phrases.length > 0) return j.phrases;
-    }
-    const phraseMsgs = initialMessages
-      .filter(m => m.msg_type === 'phrase')
-      .map(m => m.content_json as { phrase: string; index: number } | null)
-      .filter((j): j is { phrase: string; index: number } => !!j?.phrase)
-      .sort((a, b) => a.index - b.index)
-      .map(j => j.phrase);
-    return phraseMsgs;
-  });
-  const [currentIndex, setCurrentIndex] = useState<number>(() => {
-    if (!isHistory || !initialMessages) return 0;
-    const evals = initialMessages.filter(m => m.role === 'bob' && m.msg_type === 'evaluation').length;
-    return Math.max(0, evals - 1);
-  });
-  const [currentScene, setCurrentScene] = useState<(ImageScene & { image_data?: string }) | null>(() => {
-    if (!isHistory || !initialMessages) return null;
-    const lastImg = [...initialMessages].reverse().find(m => m.msg_type === 'image_scene');
-    if (!lastImg) return null;
-    const j = lastImg.content_json as { description: string } | null;
-    return { topic: '', description: j?.description ?? '', image_prompt: '', image_data: lastImg.content_text ?? undefined };
-  });
-  const [currentSceneConfig, setCurrentSceneConfig] = useState<SceneConfig | null>(() => {
-    if (!isHistory || !initialMessages) return null;
-    const configMsg = initialMessages.find(m => m.role === 'user' && m.msg_type === 'text');
-    if (!configMsg?.content_json) return null;
-    const j = configMsg.content_json as { topic?: string; difficulty?: string } | null;
-    if (!j?.topic || !j?.difficulty) return null;
-    if (!(['basic', 'intermediate', 'advanced'] as string[]).includes(j.difficulty)) return null;
-    return { topic: j.topic, difficulty: j.difficulty as Difficulty };
-  });
+  const [dynamicPhrases, setDynamicPhrases] = useState<string[]>(init.dynamicPhrases);
+  const [currentIndex, setCurrentIndex] = useState<number>(init.currentIndex);
+  const [currentScene, setCurrentScene] = useState<(ImageScene & { image_data?: string }) | null>(init.currentScene);
+  const [currentSceneConfig, setCurrentSceneConfig] = useState<SceneConfig | null>(init.currentSceneConfig);
   const [currentResult, setCurrentResult] = useState<EvaluationResult | null>(null);
-  const [phraseScores, setPhraseScores] = useState<number[]>(() => {
-    if (!isHistory || !initialMessages) return [];
-    return initialMessages
-      .filter((m) => m.role === 'bob' && m.msg_type === 'evaluation')
-      .map((m) => {
-        const j = m.content_json as { score?: number } | null;
-        return typeof j?.score === 'number' ? j.score : 0;
-      });
-  });
-  const [saveError, setSaveError] = useState<string | null>(null);
+  const [phraseScores, setPhraseScores] = useState<number[]>(init.phraseScores);
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const sessionStartedRef = useRef(isHistory);
-  const greetingAddedRef = useRef(false);
   const sessionIdRef = useRef<string | null>(sessionId ?? null);
 
   useEffect(() => {
@@ -269,7 +99,6 @@ export function usePracticeChat({
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Stable ref so useAudioRecorder never captures a stale handleAudioRecorded closure.
   const onRecordedRef = useRef<(blob: Blob) => void>(() => {});
 
   const { isRecording, startRecording: startRecordingHook, stopRecording } = useAudioRecorder({
@@ -286,104 +115,10 @@ export function usePracticeChat({
     }, []),
   });
 
-  const addBobMessage = (content: React.ReactNode) => {
-    setMessages(prev => [...prev, { id: crypto.randomUUID(), role: 'bob', content }]);
-  };
-
-  const addUserMessage = (content: React.ReactNode) => {
-    setMessages(prev => [...prev, { id: crypto.randomUUID(), role: 'user', content }]);
-  };
-
-  const saveMsg = async (input: Omit<Parameters<typeof saveMessageAction>[0], 'session_id'>) => {
-    const sid = sessionIdRef.current;
-    if (!sid) return;
-    const { error } = await saveMessageAction({ ...input, session_id: sid });
-    if (error) {
-      console.error('[saveMsg] failed:', error, 'msg_type:', input.msg_type);
-      setSaveError(`Error saving message (${input.msg_type})`);
-      setTimeout(() => setSaveError(null), 4000);
-    }
-  };
-
-  const renderPhrase = (phrase: string, index: number, total: number) => (
-    <div className="space-y-3">
-      <p className="text-xs font-black uppercase tracking-widest text-trebol-text/50">
-        Phrase {index + 1} of {total}
-      </p>
-      <div className="bg-trebol-bg border-2 border-trebol-primary/30 rounded-xl p-4">
-        <p className="text-xl font-extrabold text-trebol-text leading-relaxed">{phrase}</p>
-      </div>
-      <p className="text-sm text-trebol-text/60">Listen to the phrase, then record yourself saying it.</p>
-      <button
-        type="button"
-        onClick={() => handleListen(phrase)}
-        className="flex items-center gap-2 text-sm font-bold text-trebol-primary hover:opacity-75 transition-opacity"
-      >
-        <Volume2 size={16} /> Listen to pronunciation
-      </button>
-    </div>
-  );
-
-  const renderScene = (scene: ImageScene & { image_data?: string }) => (
-    <div className="space-y-3">
-      <p className="text-sm text-trebol-text/60">
-        Describe what you see in this image in English. You have 60 seconds.
-      </p>
-      {scene.image_data && (
-        <img
-          src={scene.image_data}
-          alt="Scene to describe"
-          className="w-full rounded-xl border-2 border-trebol-border shadow-md"
-        />
-      )}
-    </div>
-  );
-
-  useEffect(() => {
-    if (isHistory || greetingAddedRef.current) return;
-    greetingAddedRef.current = true;
-    if (mode === 'situation') {
-      addBobMessage(
-        <p>
-          Hi! I&apos;m <strong>BOB</strong>, your pronunciation coach. What situation would you like to practice today?
-          <br />
-          <span className="text-trebol-text/60 text-sm">
-            E.g. &quot;In a job interview&quot; or &quot;Asking for directions on the street&quot;.
-          </span>
-        </p>
-      );
-      saveMsg({
-        role: 'bob',
-        msg_type: 'text',
-        content_text: "Hi! I'm BOB, your pronunciation coach. What situation would you like to practice today?",
-      });
-    } else {
-      addBobMessage(
-        <div className="space-y-3">
-          <p>Let&apos;s practice image description! Configure your scene:</p>
-          <ImageConfigSelection onConfirm={handleImageConfig} />
-        </div>
-      );
-      saveMsg({
-        role: 'bob',
-        msg_type: 'text',
-        content_text: "Let's practice image description! Configure your scene:",
-      });
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const { saveError, addBobMessage, addUserMessage, saveMsg } = useChatMessaging({ sessionIdRef, setMessages });
 
   const handleListen = async (text: string) => {
-    try {
-      const { data, mimeType } = await generateSpeechAction(text);
-      const audioUrl = pcmToWavBase64(data, mimeType);
-      const audio = new Audio(audioUrl);
-      audio.play();
-    } catch {
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = 'en-US';
-      speechSynthesis.speak(utterance);
-    }
+    await playSpeech(text);
   };
 
   const handleTopicSubmit = async () => {
@@ -410,7 +145,7 @@ export function usePracticeChat({
       setCurrentIndex(0);
       setMessages(prev => prev.slice(0, -1));
       saveMsg({ role: 'bob', msg_type: 'phrase_plan', content_json: { phrases: generated, topic: t } });
-      addBobMessage(renderPhrase(generated[0], 0, generated.length));
+      addBobMessage(renderPhrase(generated[0], 0, generated.length, handleListen));
       saveMsg({ role: 'bob', msg_type: 'phrase', content_json: { phrase: generated[0], index: 0, total: generated.length } });
       const sidForPregen = sessionIdRef.current;
       if (sidForPregen && generated.length > 0) {
@@ -426,17 +161,16 @@ export function usePracticeChat({
     }
   };
 
-  const uploadImageToStorage = async (imageDataUrl: string): Promise<string> => {
-    const supabase = createSupabaseBrowser();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('Not authenticated');
-    const res = await fetch(imageDataUrl);
-    const blob = await res.blob();
-    const ext = blob.type.includes('png') ? 'png' : 'jpg';
-    const filename = `${user.id}/${crypto.randomUUID()}.${ext}`;
-    const { error } = await supabase.storage.from('bob-images').upload(filename, blob, { contentType: blob.type });
-    if (error) throw error;
-    return supabase.storage.from('bob-images').getPublicUrl(filename).data.publicUrl;
+  const handleImageConfig = async (config: SceneConfig) => {
+    setCurrentSceneConfig(config);
+    addUserMessage(<span>{config.topic} · {config.difficulty}</span>);
+    saveMsg({ role: 'user', msg_type: 'text', content_text: `${config.topic} · ${config.difficulty}`, content_json: { topic: config.topic, difficulty: config.difficulty } });
+    if (!sessionStartedRef.current) {
+      sessionStartedRef.current = true;
+      const id = await onSessionStart(config.topic.slice(0, 60) || 'Describe the scene');
+      if (id) sessionIdRef.current = id;
+    }
+    await handleNextImage(config);
   };
 
   const handleNextImage = async (config?: SceneConfig) => {
@@ -476,17 +210,7 @@ export function usePracticeChat({
     }
   };
 
-  const handleImageConfig = async (config: SceneConfig) => {
-    setCurrentSceneConfig(config);
-    addUserMessage(<span>{config.topic} · {config.difficulty}</span>);
-    saveMsg({ role: 'user', msg_type: 'text', content_text: `${config.topic} · ${config.difficulty}`, content_json: { topic: config.topic, difficulty: config.difficulty } });
-    if (!sessionStartedRef.current) {
-      sessionStartedRef.current = true;
-      const id = await onSessionStart(config.topic.slice(0, 60) || 'Describe the scene');
-      if (id) sessionIdRef.current = id;
-    }
-    await handleNextImage(config);
-  };
+  useInitialGreeting({ mode, isHistory, addBobMessage, saveMsg, onImageConfig: handleImageConfig });
 
   const handleAudioRecorded = async (audioBlob: Blob) => {
     if (!audioBlob || audioBlob.size === 0) {
@@ -564,7 +288,7 @@ export function usePracticeChat({
       if (currentIndex < dynamicPhrases.length - 1) {
         const nextIndex = currentIndex + 1;
         setCurrentIndex(nextIndex);
-        addBobMessage(renderPhrase(dynamicPhrases[nextIndex], nextIndex, dynamicPhrases.length));
+        addBobMessage(renderPhrase(dynamicPhrases[nextIndex], nextIndex, dynamicPhrases.length, handleListen));
         saveMsg({
           role: 'bob',
           msg_type: 'phrase',
