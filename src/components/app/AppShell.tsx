@@ -20,6 +20,7 @@ import type { StoredMessage } from '@/actions/messages';
 import type { AssessmentPrompt, AssessmentListeningItem, AssessmentReadingItem, AssessmentWritingTask } from '@/actions/assessment';
 import type { AppState, YLRenderProps, ExamRenderProps } from '@/lib/routing';
 import { getRouteForMode, isConversationMode } from '@/lib/routing';
+import { resolveEffectiveLevel } from '@/lib/levels/effective-level';
 import { useOrganization, type AvailableMode } from '@/contexts/OrganizationContext';
 import type { Organization } from '@/lib/organization';
 import type { PracticeMode, CefrLevel, ModeKey } from '@/lib/types/practice';
@@ -260,11 +261,9 @@ export function AppShell({
                   selectedSkill={selectedSkill}
                   cefrSelectorRef={cefrSelectorRef}
                   handleModeSelect={handleModeSelect}
-                  enabledModes={enabledModes}
-                  availableModes={availableModes}
+                  enabledModes={enabledModes} availableModes={availableModes}
                   skillLevels={skillLevels}
-                  cefrActiveLevel={cefrActiveLevel}
-                  cefrLevelLocked={cefrLevelLocked}
+                  cefrActiveLevel={cefrActiveLevel} cefrLevelLocked={cefrLevelLocked}
                   organization={organization}
                   track={track} setTrack={setTrack}
                 />
@@ -329,6 +328,7 @@ export function AppShell({
                   onFinish={onFinish}
                   noFrame={true}
                   onSessionStart={onConversationSessionStart}
+                  level={resolveEffectiveLevel(skillLevels, cefrActiveLevel, 'speaking').level ?? undefined}
                 />
               </motion.div>
             )}

@@ -9,6 +9,7 @@ import {
   simulateConversationAction,
 } from '@/actions/gemini';
 import { pcmToWavBase64, blobToBase64 } from '@/lib/audio';
+import type { CefrLevel } from '@/lib/types/practice';
 import type { UseConversationStateReturn } from './useConversationState';
 import type { UseQuestionsFlowReturn } from './useQuestionsFlow';
 
@@ -16,6 +17,7 @@ export interface UseConversationHandlersArgs {
   conv: UseConversationStateReturn;
   qf: UseQuestionsFlowReturn;
   maxTurns: number;
+  level: CefrLevel;
   onSessionStart?: (topic: string) => void;
   onError: (message: string) => void;
 }
@@ -35,6 +37,7 @@ export function useConversationHandlers({
   conv,
   qf,
   maxTurns,
+  level,
   onSessionStart,
   onError,
 }: UseConversationHandlersArgs): UseConversationHandlersReturn {
@@ -65,7 +68,7 @@ export function useConversationHandlers({
       const base64Audio = await blobToBase64(audioBlob);
       const mimeType = (audioBlob.type || 'audio/webm').split(';')[0];
 
-      const result = await chatConversationAction(base64Audio, mimeType, conv.messages, conv.internalTopic);
+      const result = await chatConversationAction(base64Audio, mimeType, conv.messages, conv.internalTopic, level);
 
       const userMsg: ChatMessage = { role: 'user', text: result.evaluation.transcribed_text };
       const modelMsg: ChatMessage = { role: 'model', text: result.ai_response };
@@ -93,7 +96,7 @@ export function useConversationHandlers({
     conv.setInputText('');
 
     try {
-      const result = await chatTextConversationAction(textToSend, conv.messages, conv.internalTopic);
+      const result = await chatTextConversationAction(textToSend, conv.messages, conv.internalTopic, level);
 
       const userMsg: ChatMessage = { role: 'user', text: textToSend };
       const modelMsg: ChatMessage = { role: 'model', text: result.ai_response };
@@ -118,8 +121,8 @@ export function useConversationHandlers({
     conv.setIsProcessing(true);
 
     try {
-      const simulatedText = await simulateUserResponseAction(conv.messages, conv.internalTopic);
-      const result = await chatTextConversationAction(simulatedText, conv.messages, conv.internalTopic);
+      const simulatedText = await simulateUserResponseAction(conv.messages, conv.internalTopic, level);
+      const result = await chatTextConversationAction(simulatedText, conv.messages, conv.internalTopic, level);
 
       const userMsg: ChatMessage = { role: 'user', text: simulatedText };
       const modelMsg: ChatMessage = { role: 'model', text: result.ai_response };
@@ -143,11 +146,11 @@ export function useConversationHandlers({
     try {
       let finalHistory = conv.messages;
       if (conv.messages.length < maxTurns) {
-        finalHistory = await simulateConversationAction(conv.messages, conv.internalTopic);
+        finalHistory = await simulateConversationAction(conv.messages, conv.internalTopic, level);
         conv.setMessages(finalHistory);
       }
 
-      const aiQuestions = await generateQuestionsAction(finalHistory, conv.internalTopic);
+      const aiQuestions = await generateQuestionsAction(finalHistory, conv.internalTopic, level);
       qf.setQuestions(aiQuestions);
       conv.setPhase('questions');
     } catch (error) {
@@ -169,7 +172,8 @@ export function useConversationHandlers({
         base64Audio,
         mimeType,
         conv.messages,
-        `Evaluating answer to: ${currentQuestion.question}. Correct info: ${currentQuestion.correct_answer}`
+        `Evaluating answer to: ${currentQuestion.question}. Correct info: ${currentQuestion.correct_answer}`,
+        level
       );
 
       qf.recordAnswer(qf.currentQuestionIndex, result.evaluation);

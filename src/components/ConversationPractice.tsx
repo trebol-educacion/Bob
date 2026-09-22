@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef } from 'react';
 import { Loader2, Mic, MessageSquare } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { generateInitialChatAction } from '@/actions/gemini';
+import type { CefrLevel } from '@/lib/types/practice';
 import { ACTIVE_MODEL_LABEL } from '@/lib/models';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
 import { useConversationState } from '@/hooks/useConversationState';
@@ -21,11 +22,12 @@ interface ConversationPracticeProps {
   noFrame?: boolean;
   onPhaseChange?: (label: string, iter?: string) => void;
   onSessionStart?: (topic: string) => void;
+  level?: CefrLevel;
 }
 
 const MAX_TURNS = 12;
 
-export function ConversationPractice({ topic: topicProp = '', onFinish, noFrame, onPhaseChange, onSessionStart }: ConversationPracticeProps) {
+export function ConversationPractice({ topic: topicProp = '', onFinish, noFrame, onPhaseChange, onSessionStart, level = 'b1' }: ConversationPracticeProps) {
   const t = useTranslations('chat.conversation');
   const conv = useConversationState(topicProp);
   const qf = useQuestionsFlow();
@@ -41,7 +43,7 @@ export function ConversationPractice({ topic: topicProp = '', onFinish, noFrame,
     handleSimulateResponse,
     handleGoToQuestions,
     handleTopicConfirm,
-  } = useConversationHandlers({ conv, qf, maxTurns: MAX_TURNS, onSessionStart, onError: handleError });
+  } = useConversationHandlers({ conv, qf, maxTurns: MAX_TURNS, level, onSessionStart, onError: handleError });
 
   const { isRecording, startRecording, stopRecording } = useAudioRecorder({
     onRecorded: useCallback((blob: Blob) => onRecordedRef.current(blob), [onRecordedRef]),
@@ -66,7 +68,7 @@ export function ConversationPractice({ topic: topicProp = '', onFinish, noFrame,
     const initChat = async () => {
       conv.setIsProcessing(true);
       try {
-        const result = await generateInitialChatAction(conv.internalTopic);
+        const result = await generateInitialChatAction(conv.internalTopic, level);
         conv.setFraming(result.framing);
         conv.setMessages([{ role: 'model', text: result.message }]);
         setTimeout(() => handleListen(result.message, 0), 500);
