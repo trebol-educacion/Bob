@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { resolveLevelPolicy, isLevelSelectorTesterEnabled, mustTakePlacement } from '@/lib/levels/level-policy';
+import { resolveLevelPolicy, isLevelSelectorTesterEnabled, mustTakePlacement, requiresPlacementGate } from '@/lib/levels/level-policy';
 import type { SkillLevelMap } from '@/lib/types/skills';
 
 describe('resolveLevelPolicy', () => {
@@ -80,5 +80,30 @@ describe('mustTakePlacement', () => {
     };
     expect(mustTakePlacement(skillLevels, 'listening')).toBe(false);
     expect(mustTakePlacement(skillLevels, 'reading')).toBe(true);
+  });
+});
+
+describe('requiresPlacementGate', () => {
+  it('modo cambridge a2/b1/b2 devuelve la destreza a exigir', () => {
+    expect(requiresPlacementGate('cambridge_ket_listening_part1')).toBe('listening');
+    expect(requiresPlacementGate('cambridge_pet_reading_comprehension')).toBe('reading');
+    expect(requiresPlacementGate('cambridge_fce_reading_part1')).toBe('reading');
+  });
+
+  it('modo cambridge starters (pre_a1, YL) no se bloquea por este motor', () => {
+    expect(requiresPlacementGate('cambridge_starters_p1')).toBeNull();
+  });
+
+  it('modo assessment/placement queda exento (no se autobloquea)', () => {
+    expect(requiresPlacementGate('assessment_listening')).toBeNull();
+    expect(requiresPlacementGate('placement_reading_a2')).toBeNull();
+  });
+
+  it('modo generico de practica libre no se bloquea', () => {
+    expect(requiresPlacementGate('generic_conversation')).toBeNull();
+  });
+
+  it('modo toefl (b2) exige la destreza inferida', () => {
+    expect(requiresPlacementGate('toefl_listen_repeat')).toBe('speaking');
   });
 });
