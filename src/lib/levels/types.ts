@@ -5,4 +5,5 @@ export type EffectiveLevelSource = 'skill' | 'tenant' | 'none';
 export interface EffectiveLevelResult {
   level: CefrLevel | null;
   source: EffectiveLevelSource;
+  placementPending: boolean;
 }
