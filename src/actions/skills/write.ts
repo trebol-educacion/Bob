@@ -1,6 +1,7 @@
 'use server';
 
 import { createSupabaseServer } from '@/lib/supabase/server';
+import { hasPendingAssessment } from '@/actions/assessment/queue-guard';
 import type { Skill } from '@/lib/types/skills';
 import type { CefrLevel } from '@/lib/types/practice';
 import { resolveCallerContext, TEACHER_ROLES } from './shared';
@@ -64,11 +65,15 @@ export async function resetOwnSkillLevelAction(skill: Skill): Promise<{ ok: bool
 export async function applyDefaultSkillLevelAction(
   skill: Skill,
   cefrLevel: CefrLevel = 'a1',
-): Promise<{ ok: boolean }> {
+): Promise<{ ok: boolean; code?: 'assessment_pending' }> {
   try {
     const supabase = await createSupabaseServer();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return { ok: false };
+
+    if (await hasPendingAssessment(supabase, user.id, skill)) {
+      return { ok: false, code: 'assessment_pending' };
+    }
 
     const { error } = await supabase
       .from('skill_levels')
