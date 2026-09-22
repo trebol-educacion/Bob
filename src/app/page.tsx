@@ -7,6 +7,7 @@ import { createSupabaseBrowser } from '@/lib/supabase/browser-client';
 import { useSessionState } from '@/hooks/useSessionState';
 import { useOrganization } from '@/hooks/useOrganization';
 import { useAssessmentFlow } from '@/hooks/useAssessmentFlow';
+import { useUsageHeartbeat } from '@/hooks/useUsageHeartbeat';
 import { isConversationMode, isExamMode, type AppState } from '@/lib/routing';
 import type { PracticeMode } from '@/lib/types/practice';
 
@@ -42,6 +43,8 @@ export default function App() {
   const [mode, setMode] = useState<PracticeMode>(null);
   const [topic, setTopic] = useState('');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  useUsageHeartbeat(mode);
 
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 767px)');
