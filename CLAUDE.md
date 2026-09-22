@@ -90,9 +90,11 @@ estas, **para y avisa a la desarrolladora**. No "interpretes" alrededor.
 
 1. **Prompts pedagógicos en `bob_prompts` (BD).** Nunca hardcodear uno nuevo
    en `.ts`. Los `.ts` existentes son fallback.
-2. **Speaking abierto → feedback formativo cualitativo, NUNCA nota tipo
-   examen** (ni 0-100 ni 0-5). Aplica a A2 Part1, B1 Collaborative, TOEFL
-   Interview, B2. (Decisión D-D2.)
+2. **Toda actividad emite nota 0-10, derivada de rúbrica estructurada.**
+   En Speaking y Writing abiertos la nota nunca es un número libre del
+   LLM: es la agregación ponderada de criterios objetivables, y siempre va
+   acompañada de feedback formativo cualitativo. (D9-14, que supersede la
+   prohibición numérica de D-D2.)
 3. **LLM y TTS NUNCA en el camino crítico.** El usuario nunca espera mirando
    una pantalla mientras se llama a Gemini/TTS. Pre-generar o diferir.
    (D-A1.)
@@ -130,14 +132,11 @@ estas, **para y avisa a la desarrolladora**. No "interpretes" alrededor.
       Si algo necesita una frase para entenderse, se renombra o se extrae.
     - El contenido de los prompts pedagógicos en `bob_prompts` no es
       código y no aplica.
-14. **Nombres de migraciones Supabase: `NN_<funcionalidad>.sql`** con
-    correlativo de dos dígitos empezando en `01_` y un slug en
-    `snake_case` que describa la funcionalidad. Ejemplos válidos:
-    `01_create_bob_sessions.sql`, `02_create_bob_messages.sql`,
-    `03_extend_bob_sessions_mode.sql`, `04_seed_bob_a1_yl.sql`. Prohibido
-    usar timestamps (`20260512000000_...`) o nombres sin correlativo. El
-    siguiente número es **el inmediatamente posterior al mayor existente**
-    en `supabase/migrations/`; no saltar números, no reutilizar.
+14. **Migraciones Supabase: nunca en Bob.** Viven en
+    `noobe-hub/supabase/migrations/` (único dueño del esquema compartido),
+    creadas con `supabase migration new bob_<descripcion>`, con prefijo
+    `bob_` obligatorio. `Bob/supabase/migrations/` es histórico y no
+    recibe ficheros nuevos. Ver `supabase/MIGRACIONES.md`.
 15. **CERO código acoplado.** Cada módulo depende de contratos (tipos,
     interfaces, props), no de detalles internos de otro. UI no habla con
     Supabase ni con Gemini directamente: pasa por `actions/` o servicios.
