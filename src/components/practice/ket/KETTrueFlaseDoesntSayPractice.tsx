@@ -18,6 +18,7 @@ import {
   type TFDSExercise,
 } from '@/actions/modes/ket-listening-part5';
 import type { StoredMessage } from '@/actions/messages';
+import { resolveActivityBoot } from '@/lib/activity/boot';
 
 const ACCENT = '#F8AC37';
 const ACCENT_DARK = '#D8881C';
@@ -452,27 +453,26 @@ export function KETTrueFalseDoesntSayPractice({
     initStartedRef.current = true;
 
     async function init() {
-      if (initialMessages && initialMessages.length > 0) {
-        const restored = tryRestore(initialMessages);
-        if (restored) {
-          setExercise(restored.exercise);
-          setFramingText(restored.framingText);
-          setAudio(restored.audio);
-          if (restored.statementResults) {
-            setStatementResults(restored.statementResults);
-            setCorrectCount(restored.correctCount);
-            setPhase('finished');
-          } else {
-            const { createSupabaseBrowser } = await import('@/lib/supabase/browser-client');
-            const { data: { user } } = await createSupabaseBrowser().auth.getUser();
-            if (user) setUserId(user.id);
-            setPhase('ready');
-          }
-          return;
+      const boot = resolveActivityBoot({ initialMessages, sessionId: initialSessionId, tryRestore });
+      if (boot.kind === 'restore') {
+        const restored = boot.data;
+        setExercise(restored.exercise);
+        setFramingText(restored.framingText);
+        setAudio(restored.audio);
+        if (restored.statementResults) {
+          setStatementResults(restored.statementResults);
+          setCorrectCount(restored.correctCount);
+          setPhase('finished');
+        } else {
+          const { createSupabaseBrowser } = await import('@/lib/supabase/browser-client');
+          const { data: { user } } = await createSupabaseBrowser().auth.getUser();
+          if (user) setUserId(user.id);
+          setPhase('ready');
         }
+        return;
       }
 
-      if (initialSessionId) return;
+      if (boot.kind === 'restore-failed') { setErrorMsg('Could not restore session. Please start a new one.'); return; }
 
       setIsNewSession(true);
       setPhase('generating');

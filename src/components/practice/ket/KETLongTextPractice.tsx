@@ -14,6 +14,7 @@ import {
   type LongTextItemResult,
 } from '@/actions/modes/ket-reading-part3';
 import type { StoredMessage } from '@/actions/messages';
+import { resolveActivityBoot } from '@/lib/activity/boot';
 
 const ACCENT = '#469E7B';
 const ACCENT_DARK = '#37795E';
@@ -268,16 +269,15 @@ export function KETLongTextPractice({
     if (initRef.current) return;
     initRef.current = true;
     async function init() {
-      if (initialMessages?.length) {
-        const r = tryRestore(initialMessages);
-        if (r) {
-          setExercise(r.exercise); setFramingText(r.framingText);
-          if (r.results) { setResults(r.results); setCorrectCount(r.correctCount); setPhase('finished'); }
-          else { const { createSupabaseBrowser } = await import('@/lib/supabase/browser-client'); const { data: { user } } = await createSupabaseBrowser().auth.getUser(); if (user) setUserId(user.id); setPhase('reading'); }
-          return;
-        }
+      const boot = resolveActivityBoot({ initialMessages, sessionId: initialSessionId, tryRestore });
+      if (boot.kind === 'restore') {
+        const r = boot.data;
+        setExercise(r.exercise); setFramingText(r.framingText);
+        if (r.results) { setResults(r.results); setCorrectCount(r.correctCount); setPhase('finished'); }
+        else { const { createSupabaseBrowser } = await import('@/lib/supabase/browser-client'); const { data: { user } } = await createSupabaseBrowser().auth.getUser(); if (user) setUserId(user.id); setPhase('reading'); }
+        return;
       }
-      if (initialSessionId) return;
+      if (boot.kind === 'restore-failed') { setErrorMsg('Could not restore session. Please start a new one.'); return; }
       setIsNewSession(true); setPhase('generating');
       const result = await generateKETLongTextAction({ sessionId: initialSessionId });
       if ('error' in result) { setErrorMsg(result.error); return; }

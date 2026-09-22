@@ -72,14 +72,18 @@ export default function App() {
     selectedMessages,
     setSessions,
     setActiveSessionId,
-    setSelectedMessages,
-    setSelectedSession,
+    clearActiveSession,
     handleNewSession,
     handleSelectSession,
     handleDeleteSession,
     handleConversationSessionStart,
     refreshSessions,
   } = useSessionState(userEmail);
+
+  const leavePractice = useCallback((target: AppState) => {
+    clearActiveSession();
+    setAppState(target);
+  }, [clearActiveSession]);
 
   const onNewSession = useCallback(() => {
     handleNewSession(resetToSkillSelection);
@@ -120,10 +124,11 @@ export default function App() {
   }, [handleConversationSessionStart]);
 
   const onFinish = useCallback(() => {
-    setSelectedMessages([]);
-    setSelectedSession(null);
-    resetToSkillSelection();
-  }, [resetToSkillSelection, setSelectedMessages, setSelectedSession]);
+    leavePractice('skill-selection');
+    setSelectedSkill(null);
+    setMode(null);
+    setTopic('');
+  }, [leavePractice, setSelectedSkill]);
 
   const assessment = useAssessmentFlow({
     selectedSkill,
@@ -163,6 +168,7 @@ export default function App() {
       onNewSession={onNewSession}
       onDeleteSession={onDeleteSession}
       onFinish={onFinish}
+      leavePractice={leavePractice}
       handleSkillSelect={assessment.handleSkillSelect}
       handleModeSelect={handleModeSelect}
       handleAssessmentStart={assessment.handleAssessmentStart}

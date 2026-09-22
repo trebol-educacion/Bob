@@ -17,6 +17,7 @@ import {
   type PictureStoryFeedback,
 } from '@/actions/modes/ket-writing-part7';
 import type { StoredMessage } from '@/actions/messages';
+import { resolveActivityBoot } from '@/lib/activity/boot';
 
 export interface KETStoryWritingPracticeProps {
   onBack: () => void;
@@ -258,28 +259,27 @@ export function KETStoryWritingPractice({
     initRef.current = true;
 
     async function init() {
-      if (initialMessages?.length) {
-        const r = tryRestore(initialMessages);
-        if (r) {
-          setStoryPremise(r.story_premise);
-          setScenes(r.scenes);
-          setFramingText(r.framingText);
-          setText(r.userText);
-          if (r.feedback) { setFeedback(r.feedback); setPhase('finished'); }
-          else {
-            const { createSupabaseBrowser } = await import('@/lib/supabase/browser-client');
-            const { data: { user } } = await createSupabaseBrowser().auth.getUser();
-            if (user) setUserId(user.id);
-            setPhase('ready');
-            const missing = r.scenes.filter((s) => !s.image_url);
-            if (missing.length > 0 && initialSessionId) {
-              void loadSceneImagesInBackground(initialSessionId, missing.map(({ image_url: _i, ...s }) => s));
-            }
+      const boot = resolveActivityBoot({ initialMessages, sessionId: initialSessionId, tryRestore });
+      if (boot.kind === 'restore') {
+        const r = boot.data;
+        setStoryPremise(r.story_premise);
+        setScenes(r.scenes);
+        setFramingText(r.framingText);
+        setText(r.userText);
+        if (r.feedback) { setFeedback(r.feedback); setPhase('finished'); }
+        else {
+          const { createSupabaseBrowser } = await import('@/lib/supabase/browser-client');
+          const { data: { user } } = await createSupabaseBrowser().auth.getUser();
+          if (user) setUserId(user.id);
+          setPhase('ready');
+          const missing = r.scenes.filter((s) => !s.image_url);
+          if (missing.length > 0 && initialSessionId) {
+            void loadSceneImagesInBackground(initialSessionId, missing.map(({ image_url: _i, ...s }) => s));
           }
-          return;
         }
+        return;
       }
-      if (initialSessionId) return;
+      if (boot.kind === 'restore-failed') { setErrorMsg('Could not restore session. Please start a new one.'); return; }
       setIsNewSession(true); setPhase('generating');
       const plan = await generateKETPictureStoryPlanAction({ sessionId: initialSessionId });
       if ('error' in plan) { setErrorMsg(plan.error); return; }

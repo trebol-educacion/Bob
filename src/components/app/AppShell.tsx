@@ -6,12 +6,6 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Navbar } from '@/components/Navbar';
 import { SessionSidebar } from '@/components/SessionSidebar';
 import { SkillSelector } from '@/components/assessment/SkillSelector';
-import { AssessmentInvite } from '@/components/assessment/AssessmentInvite';
-import { AssessmentSpeakingRunner } from '@/components/assessment/AssessmentSpeakingRunner';
-import { AssessmentListeningRunner } from '@/components/assessment/AssessmentListeningRunner';
-import { AssessmentReadingRunner } from '@/components/assessment/AssessmentReadingRunner';
-import { AssessmentWritingRunner } from '@/components/assessment/AssessmentWritingRunner';
-import { AssessmentResultCard } from '@/components/assessment/AssessmentResultCard';
 import { ConversationPractice } from '@/components/ConversationPractice';
 import { ChallengeHome } from '@/components/challenge/ChallengeHome';
 import { ChallengeRunner } from '@/components/challenge/ChallengeRunner';
@@ -19,6 +13,7 @@ import { CatalogView } from './views/CatalogView';
 import { ModeSelectorView } from './views/ModeSelectorView';
 import { PracticeView } from './views/PracticeView';
 import { DashboardView } from './views/DashboardView';
+import { AssessmentView } from './views/AssessmentView';
 import type { BobSession } from '@/actions/sessions';
 import type { StoredMessage } from '@/actions/messages';
 import type { AssessmentPrompt, AssessmentListeningItem, AssessmentReadingItem, AssessmentWritingTask } from '@/actions/assessment';
@@ -54,6 +49,7 @@ export interface AppShellProps {
   onNewSession: () => void;
   onDeleteSession: (id: string) => void;
   onFinish: () => void;
+  leavePractice: (target: AppState) => void;
   handleSkillSelect: (skill: Skill) => void;
   setSelectedSkill: (skill: Skill | null) => void;
   handleModeSelect: (m: PracticeMode) => void;
@@ -99,6 +95,7 @@ export function AppShell({
   onNewSession,
   onDeleteSession,
   onFinish,
+  leavePractice,
   handleSkillSelect,
   setSelectedSkill,
   handleModeSelect,
@@ -130,7 +127,7 @@ export function AppShell({
 
   const ylProps: YLRenderProps = {
     onBack: onFinish,
-    sessionId: activeSessionId ?? undefined,
+    sessionId: selectedMessages.length > 0 ? activeSessionId ?? undefined : undefined,
     initialMessages: selectedMessages.length > 0 ? selectedMessages : undefined,
     onSessionCreated: handleYLSessionCreated,
     onSessionFinished: refreshSessions,
@@ -138,7 +135,7 @@ export function AppShell({
   };
 
   const examProps: ExamRenderProps = {
-    onBack: () => setAppState('catalog-filtered'),
+    onBack: () => leavePractice('catalog-filtered'),
   };
 
   return (
@@ -187,111 +184,30 @@ export function AppShell({
               </motion.div>
             )}
 
-            {appState === 'assessment-invite' && selectedSkill && (
+            {(appState === 'assessment-invite' || appState === 'assessment-running' || appState === 'assessment-result') && (
               <motion.div
-                key="assessment-invite"
+                key={`assessment-${appState}`}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -20 }}
-                className="w-full flex-1 overflow-y-auto"
+                className="w-full flex-1 overflow-y-auto flex flex-col"
               >
-                <AssessmentInvite
-                  skill={selectedSkill}
-                  onStartAssessment={handleAssessmentStart}
-                  onPickLevel={handlePickLevel}
-                  onBack={() => setAppState('skill-selection')}
-                />
-              </motion.div>
-            )}
-
-            {appState === 'assessment-running' && assessmentId && assessmentPrompts.length > 0 && (
-              <motion.div
-                key="assessment-running-speaking"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="w-full flex-1 flex flex-col"
-              >
-                <AssessmentSpeakingRunner
-                  assessment_id={assessmentId}
-                  prompts={assessmentPrompts}
-                  is_yl={assessmentIsYl}
-                  onQueued={() => setAppState('dashboard')}
-                  onCancel={() => setAppState('assessment-invite')}
-                />
-              </motion.div>
-            )}
-
-            {appState === 'assessment-running' && assessmentId && assessmentListeningItems.length > 0 && (
-              <motion.div
-                key="assessment-running-listening"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="w-full flex-1 flex flex-col"
-              >
-                <AssessmentListeningRunner
-                  assessment_id={assessmentId}
-                  items={assessmentListeningItems}
-                  onResult={async (result) => {
-                    setAssessmentResult(result);
-                    await refreshSkillLevels();
-                    setAppState('assessment-result');
-                  }}
-                  onCancel={() => setAppState('assessment-invite')}
-                />
-              </motion.div>
-            )}
-
-            {appState === 'assessment-running' && assessmentId && assessmentReadingItems.length > 0 && (
-              <motion.div
-                key="assessment-running-reading"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="w-full flex-1 flex flex-col"
-              >
-                <AssessmentReadingRunner
-                  assessment_id={assessmentId}
-                  items={assessmentReadingItems}
-                  onResult={async (result) => {
-                    setAssessmentResult(result);
-                    await refreshSkillLevels();
-                    setAppState('assessment-result');
-                  }}
-                  onCancel={() => setAppState('assessment-invite')}
-                />
-              </motion.div>
-            )}
-
-            {appState === 'assessment-running' && assessmentId && assessmentWritingTask && (
-              <motion.div
-                key="assessment-running-writing"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="w-full flex-1 flex flex-col"
-              >
-                <AssessmentWritingRunner
-                  assessment_id={assessmentId}
-                  task={assessmentWritingTask}
-                  onQueued={() => setAppState('dashboard')}
-                  onCancel={() => setAppState('assessment-invite')}
-                />
-              </motion.div>
-            )}
-
-            {appState === 'assessment-result' && assessmentResult && (
-              <motion.div
-                key="assessment-result"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                className="w-full flex-1 flex flex-col"
-              >
-                <AssessmentResultCard
-                  result={assessmentResult}
-                  onPracticeNow={() => setAppState('catalog-filtered')}
+                <AssessmentView
+                  appState={appState}
+                  setAppState={setAppState}
+                  leavePractice={leavePractice}
+                  selectedSkill={selectedSkill}
+                  handleAssessmentStart={handleAssessmentStart}
+                  handlePickLevel={handlePickLevel}
+                  refreshSkillLevels={refreshSkillLevels}
+                  assessmentId={assessmentId}
+                  assessmentPrompts={assessmentPrompts}
+                  assessmentIsYl={assessmentIsYl}
+                  assessmentListeningItems={assessmentListeningItems}
+                  assessmentReadingItems={assessmentReadingItems}
+                  assessmentWritingTask={assessmentWritingTask}
+                  assessmentResult={assessmentResult}
+                  setAssessmentResult={setAssessmentResult}
                 />
               </motion.div>
             )}

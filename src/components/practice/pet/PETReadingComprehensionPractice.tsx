@@ -15,6 +15,7 @@ import {
   type PETReadingAnswer,
 } from '@/actions/modes/pet-reading-comprehension';
 import type { StoredMessage } from '@/actions/messages';
+import { resolveActivityBoot } from '@/lib/activity/boot';
 
 const ACCENT_RING = 'border-emerald-200';
 
@@ -269,30 +270,29 @@ export function PETReadingComprehensionPractice({
     initStartedRef.current = true;
 
     async function init() {
-      if (initialMessages && initialMessages.length > 0) {
-        const restored = tryRestore(initialMessages);
-        if (restored) {
-          setTitle(restored.title);
-          setTopics(restored.topics);
-          setText(restored.text);
-          setQuestions(restored.questions);
-          setFramingText(restored.framingText);
-          if (restored.results) {
-            setResults(restored.results);
-            setCorrectCount(restored.correctCount);
-            setPhase('finished');
-          } else {
-            const { createSupabaseBrowser } = await import('@/lib/supabase/browser-client');
-            const supabase = createSupabaseBrowser();
-            const { data: { user } } = await supabase.auth.getUser();
-            if (user) setUserId(user.id);
-            setPhase('ready');
-          }
-          return;
+      const boot = resolveActivityBoot({ initialMessages, sessionId: initialSessionId, tryRestore });
+      if (boot.kind === 'restore') {
+        const restored = boot.data;
+        setTitle(restored.title);
+        setTopics(restored.topics);
+        setText(restored.text);
+        setQuestions(restored.questions);
+        setFramingText(restored.framingText);
+        if (restored.results) {
+          setResults(restored.results);
+          setCorrectCount(restored.correctCount);
+          setPhase('finished');
+        } else {
+          const { createSupabaseBrowser } = await import('@/lib/supabase/browser-client');
+          const supabase = createSupabaseBrowser();
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) setUserId(user.id);
+          setPhase('ready');
         }
+        return;
       }
 
-      if (initialSessionId) return;
+      if (boot.kind === 'restore-failed') { setErrorMsg('Could not restore session. Please start a new one.'); return; }
 
       setIsNewSession(true);
       const result = await generatePETReadingComprehensionAction({ sessionId: initialSessionId });

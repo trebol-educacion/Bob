@@ -22,6 +22,7 @@ import {
   type PictureDescriptionReferenceVocabulary,
 } from '@/actions/modes/pet-p2';
 import type { StoredMessage } from '@/actions/messages';
+import { resolveActivityBoot } from '@/lib/activity/boot';
 
 export interface PETPictureDescriptionPracticeProps {
   onBack: () => void;
@@ -432,30 +433,27 @@ export function PETPictureDescriptionPractice({
     initStartedRef.current = true;
 
     async function init() {
-      if (initialMessages && initialMessages.length > 0) {
-        const restored = tryRestore(initialMessages);
-        if (restored) {
-          setTopic(restored.plan.topic);
-          setFramingText(restored.plan.framingText);
-          setScenePrompt(restored.plan.scenePrompt);
-          setReferenceVocabulary(restored.plan.referenceVocabulary);
-          setLanguageBank(restored.plan.languageBank);
-          setImageUrl(restored.plan.imageUrl);
+      const boot = resolveActivityBoot({ initialMessages, sessionId: initialSessionId, tryRestore });
+      if (boot.kind === 'restore') {
+        const restored = boot.data;
+        setTopic(restored.plan.topic);
+        setFramingText(restored.plan.framingText);
+        setScenePrompt(restored.plan.scenePrompt);
+        setReferenceVocabulary(restored.plan.referenceVocabulary);
+        setLanguageBank(restored.plan.languageBank);
+        setImageUrl(restored.plan.imageUrl);
 
-          if (restored.feedback) {
-            setFeedback(restored.feedback);
-            setTranscript(restored.transcript);
-            setPhase('finished');
-          } else {
-            setPhase('ready');
-          }
-          return;
+        if (restored.feedback) {
+          setFeedback(restored.feedback);
+          setTranscript(restored.transcript);
+          setPhase('finished');
+        } else {
+          setPhase('ready');
         }
-      }
-
-      if (initialSessionId) {
         return;
       }
+
+      if (boot.kind === 'restore-failed') { setErrorMsg('Could not restore session. Please start a new one.'); return; }
 
       setIsNewSession(true);
       const result = await generatePETPictureDescriptionAction({ sessionId: initialSessionId });
