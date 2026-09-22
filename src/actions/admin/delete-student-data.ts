@@ -2,11 +2,32 @@
 
 import { createSupabaseServer } from '@/lib/supabase/server';
 
+type DeletableTable =
+  | 'messages'
+  | 'sessions'
+  | 'activity_results'
+  | 'usage_daily'
+  | 'skill_levels'
+  | 'skill_level_history'
+  | 'challenge_attempts'
+  | 'assessment_queue';
+
+export interface DeleteStudentDataCounts {
+  deletedMessages: number;
+  deletedSessions: number;
+  deletedActivityResults: number;
+  deletedUsageDaily: number;
+  deletedSkillLevels: number;
+  deletedSkillLevelHistory: number;
+  deletedChallengeAttempts: number;
+  deletedAssessmentQueue: number;
+}
+
 /** Borra todos los datos de práctica de un alumno y registra la acción en audit_log. */
 export async function deleteStudentDataAction(
   targetStudentUserId: string
 ): Promise<
-  | { ok: true; deletedSessions: number; deletedMessages: number }
+  | ({ ok: true } & DeleteStudentDataCounts)
   | { ok: false; error: string }
 > {
   const supabase = await createSupabaseServer();
@@ -42,22 +63,37 @@ export async function deleteStudentDataAction(
     return { ok: false, error: 'forbidden' };
   }
 
-  const { count: deletedMessages, error: msgError } = await supabase
-    .from('messages')
-    .delete({ count: 'exact' })
-    .eq('user_id', targetStudentUserId);
+  const tables: DeletableTable[] = [
+    'messages',
+    'sessions',
+    'activity_results',
+    'usage_daily',
+    'skill_levels',
+    'skill_level_history',
+    'challenge_attempts',
+    'assessment_queue',
+  ];
 
-  if (msgError) return { ok: false, error: msgError.message };
+  const counts: Record<DeletableTable, number> = {
+    messages: 0,
+    sessions: 0,
+    activity_results: 0,
+    usage_daily: 0,
+    skill_levels: 0,
+    skill_level_history: 0,
+    challenge_attempts: 0,
+    assessment_queue: 0,
+  };
 
-  const { count: deletedSessions, error: sessError } = await supabase
-    .from('sessions')
-    .delete({ count: 'exact' })
-    .eq('user_id', targetStudentUserId);
+  for (const table of tables) {
+    const { count, error } = await supabase
+      .from(table)
+      .delete({ count: 'exact' })
+      .eq('user_id', targetStudentUserId);
 
-  if (sessError) return { ok: false, error: sessError.message };
-
-  const msgs = deletedMessages ?? 0;
-  const sess = deletedSessions ?? 0;
+    if (error) return { ok: false, error: error.message };
+    counts[table] = count ?? 0;
+  }
 
   const { error: auditError } = await supabase
     .from('audit_log')
@@ -66,10 +102,20 @@ export async function deleteStudentDataAction(
       actor_user_id: user.id,
       target_user_id: targetStudentUserId,
       organization_id: actorProfile.organization_id,
-      details: { deletedSessions: sess, deletedMessages: msgs },
+      details: counts,
     });
 
   if (auditError) return { ok: false, error: auditError.message };
 
-  return { ok: true, deletedSessions: sess, deletedMessages: msgs };
+  return {
+    ok: true,
+    deletedMessages: counts.messages,
+    deletedSessions: counts.sessions,
+    deletedActivityResults: counts.activity_results,
+    deletedUsageDaily: counts.usage_daily,
+    deletedSkillLevels: counts.skill_levels,
+    deletedSkillLevelHistory: counts.skill_level_history,
+    deletedChallengeAttempts: counts.challenge_attempts,
+    deletedAssessmentQueue: counts.assessment_queue,
+  };
 }
