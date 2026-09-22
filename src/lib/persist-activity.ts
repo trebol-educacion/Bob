@@ -1,7 +1,9 @@
 'use server';
 
+import { after } from 'next/server';
 import { createSupabaseServer } from '@/lib/supabase/server';
 import { inferSkillFromMode, inferModeMetadata } from '@/lib/skill-from-mode';
+import { getProfileSnapshot, type ProfileSnapshotSupabase } from '@/lib/activity/profile-snapshot';
 
 export interface PersistMessageInput {
   sessionId: string;
@@ -13,39 +15,25 @@ export interface PersistMessageInput {
 }
 
 /** Returns true only when the user's org has allow_voice_storage=true; defaults to false on any error. */
-async function isVoiceStorageAllowed(userId: string): Promise<boolean> {
-  const supabase = await createSupabaseServer();
-  const { data: profile, error: profileError } = await supabase
-    .schema('public').from('profiles')
-    .select('organization_id')
-    .eq('id', userId)
-    .single();
-
-  if (profileError || !profile?.organization_id) return false;
-
-  const { data: org, error: orgError } = await supabase
-    .schema('public').from('organizations')
-    .select('allow_voice_storage')
-    .eq('id', profile.organization_id)
-    .single();
-
-  if (orgError || !org) return false;
-  return org.allow_voice_storage === true;
+async function isVoiceStorageAllowed(supabase: ProfileSnapshotSupabase, userId: string): Promise<boolean> {
+  const snapshot = await getProfileSnapshot(supabase, userId);
+  return snapshot.allowVoiceStorage;
 }
 
 /** Insert a single message row into bob_messages; returns the new id or an error string. */
 export async function persistMessage(
   input: PersistMessageInput
 ): Promise<{ id: string } | { skipped: true } | { error: string }> {
+  const supabase = await createSupabaseServer();
+
   if (input.msgType === 'user_audio') {
-    const allowed = await isVoiceStorageAllowed(input.userId);
+    const allowed = await isVoiceStorageAllowed(supabase, input.userId);
     if (!allowed) {
       console.log(JSON.stringify({ event: 'audio_persist_skipped', userId: input.userId, reason: 'allow_voice_storage=false' }));
       return { skipped: true };
     }
   }
 
-  const supabase = await createSupabaseServer();
   const { data, error } = await supabase
     .from('messages')
     .insert({
@@ -73,15 +61,17 @@ export async function persistMessage(
     !Array.isArray(input.contentJson) &&
     (input.contentJson as Record<string, unknown>).is_final === true
   ) {
-    void resolveSessionMode(input.sessionId).then((mode) =>
-      persistActivityResult({
+    const evaluationJson = input.contentJson as Record<string, unknown>;
+    after(async () => {
+      const mode = await resolveSessionMode(input.sessionId);
+      await persistActivityResult({
         sessionId: input.sessionId,
         userId: input.userId,
         messageId: newId,
         mode,
-        contentJson: input.contentJson as Record<string, unknown>,
-      })
-    ).catch(() => undefined);
+        contentJson: evaluationJson,
+      });
+    });
   }
 
   return { id: newId };
@@ -93,12 +83,13 @@ export async function persistMessages(
 ): Promise<{ ids: string[] } | { error: string }> {
   if (inputs.length === 0) return { ids: [] };
 
+  const supabase = await createSupabaseServer();
   const audioInputs = inputs.filter((i) => i.msgType === 'user_audio');
   let filteredInputs = inputs;
 
   if (audioInputs.length > 0) {
     const firstAudioUserId = audioInputs[0].userId;
-    const allowed = await isVoiceStorageAllowed(firstAudioUserId);
+    const allowed = await isVoiceStorageAllowed(supabase, firstAudioUserId);
     if (!allowed) {
       console.log(JSON.stringify({ event: 'audio_persist_skipped', userId: firstAudioUserId, reason: 'allow_voice_storage=false', count: audioInputs.length }));
       filteredInputs = inputs.filter((i) => i.msgType !== 'user_audio');
@@ -107,7 +98,6 @@ export async function persistMessages(
 
   if (filteredInputs.length === 0) return { ids: [] };
 
-  const supabase = await createSupabaseServer();
   const rows = filteredInputs.map((input) => ({
     session_id: input.sessionId,
     user_id: input.userId,
@@ -219,6 +209,48 @@ function deriveScore10(raw: number, max: number): number | null {
   return Math.round((raw / max) * 100) / 10;
 }
 
+async function resolveStartedAt(
+  supabase: ProfileSnapshotSupabase,
+  sessionId: string,
+): Promise<string | null> {
+  const { data: firstMessage } = await supabase
+    .from('messages')
+    .select('created_at')
+    .eq('session_id', sessionId)
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  if (firstMessage?.created_at) return firstMessage.created_at as string;
+
+  const { data: session } = await supabase
+    .from('sessions')
+    .select('created_at')
+    .eq('id', sessionId)
+    .maybeSingle();
+
+  return (session?.created_at as string | undefined) ?? null;
+}
+
+async function resolveCefrLevel(
+  supabase: ProfileSnapshotSupabase,
+  userId: string,
+  skill: ReturnType<typeof inferSkillFromMode>,
+  cefrLevelFromMode: string | null,
+): Promise<string | null> {
+  if (cefrLevelFromMode || !skill) return cefrLevelFromMode;
+
+  const { data, error } = await supabase
+    .from('skill_levels')
+    .select('cefr_level')
+    .eq('user_id', userId)
+    .eq('skill', skill)
+    .maybeSingle();
+
+  if (error || !data) return null;
+  return (data.cefr_level as string | undefined) ?? null;
+}
+
 /** Persists a graded result row in bob_activity_results. Fire-and-forget safe: never throws. */
 export async function persistActivityResult(
   input: PersistActivityResultInput,
@@ -227,9 +259,12 @@ export async function persistActivityResult(
     if (input.contentJson.is_final !== true) return { skipped: true };
 
     const skill = inferSkillFromMode(input.mode);
-    if (!skill) return { skipped: true };
+    if (!skill) {
+      console.log(JSON.stringify({ event: 'activity_result_skipped', reason: 'unknown_skill', mode: input.mode }));
+      return { skipped: true };
+    }
 
-    const { framework, exam_part, cefr_level } = inferModeMetadata(input.mode);
+    const { framework, exam_part, cefr_level: cefrLevelFromMode } = inferModeMetadata(input.mode);
 
     const hasScore =
       typeof input.contentJson.score === 'number' &&
@@ -264,6 +299,17 @@ export async function persistActivityResult(
     }
 
     const supabase = await createSupabaseServer();
+    const [cefr_level, started_at, snapshot] = await Promise.all([
+      resolveCefrLevel(supabase, input.userId, skill, cefrLevelFromMode),
+      resolveStartedAt(supabase, input.sessionId),
+      getProfileSnapshot(supabase, input.userId),
+    ]);
+
+    const finishedAt = Date.now();
+    const duration_seconds = started_at
+      ? Math.max(0, Math.round((finishedAt - new Date(started_at).getTime()) / 1000))
+      : null;
+
     const { data, error } = await supabase
       .from('activity_results')
       .insert({
@@ -280,6 +326,9 @@ export async function persistActivityResult(
         max_score,
         score_10,
         rubric_json,
+        started_at,
+        duration_seconds,
+        organization_id: snapshot.organizationId,
       })
       .select('id')
       .single();
