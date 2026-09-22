@@ -119,26 +119,17 @@ estas, **para y avisa a la desarrolladora**. No "interpretes" alrededor.
     NO se regenera con LLM si existe versión oficial. Aplicable a Cambridge
     (specs `.docx`, vocabulary list, sample tests) y TOEFL (audios `.ogg`
     pre-generados, Practice Test 1 con keys, rúbricas PDF oficiales).
-13. **Sin comentarios inline en el código.** Documentación solo vía:
-    - **JSDoc** (`/** ... */`) encima de funciones, clases, tipos,
-      interfaces o constantes **exportadas**. Una o dos líneas; nada de
-      novelas.
-    - **Bloque corto y digno** (`//` o `/* */`) **solo si explica un WHY
-      no-obvio** (constraint oculto, workaround, decisión arquitectónica
-      que no se deduce del código). Máximo 1-2 líneas.
-
-    Prohibidos sin excepción:
-    - Comentarios al final de la línea de código (`const x = 5; // ...`).
-    - `//` que reformulan QUÉ hace el código (eso ya lo dice el código).
-    - Bloques de banner `// ----------------------- SECCIÓN --------------------`.
-    - Comentarios "checkpoint" tipo `// TODO without ticket`, `// FIXME`,
-      `// NOTE` sueltos sin contexto.
-    - Cualquier comentario en español dentro de código TS/TSX
-      (excepción: prompts pedagógicos en `bob_prompts` que sí van en
-      español/inglés según el idioma del alumno).
-
-    Si dudás, no lo escribas. Si lo escribiste y no añade información que
-    el código no transmite por sí mismo, borralo.
+13. **NINGÚN comentario en lenguaje natural en el código.** Ni `//`, ni
+    `/* */`, ni banners, ni `TODO`/`FIXME`/`NOTE`, ni comentarios al
+    final de línea, ni frases descriptivas dentro de JSDoc.
+    - **JSDoc sí, pero solo con etiquetas**: `@param`, `@returns`,
+      `@throws`, `@template`, `@deprecated`. Cada etiqueta lleva el nombre
+      y, como mucho, unas pocas palabras técnicas. Sin línea de resumen ni
+      párrafos explicativos.
+    - El resto se explica con nombres claros, funciones pequeñas y tipos.
+      Si algo necesita una frase para entenderse, se renombra o se extrae.
+    - El contenido de los prompts pedagógicos en `bob_prompts` no es
+      código y no aplica.
 14. **Nombres de migraciones Supabase: `NN_<funcionalidad>.sql`** con
     correlativo de dos dígitos empezando en `01_` y un slug en
     `snake_case` que describa la funcionalidad. Ejemplos válidos:
@@ -147,6 +138,32 @@ estas, **para y avisa a la desarrolladora**. No "interpretes" alrededor.
     usar timestamps (`20260512000000_...`) o nombres sin correlativo. El
     siguiente número es **el inmediatamente posterior al mayor existente**
     en `supabase/migrations/`; no saltar números, no reutilizar.
+15. **CERO código acoplado.** Cada módulo depende de contratos (tipos,
+    interfaces, props), no de detalles internos de otro. UI no habla con
+    Supabase ni con Gemini directamente: pasa por `actions/` o servicios.
+    Nada de importar entre componentes de modos distintos ni de
+    compartir estado global para atajar.
+16. **Responsabilidad única.** Un fichero, un componente, una función:
+    una sola razón para cambiar. Datos, lógica y presentación separados
+    (container / presentational). Si una función hace "X y además Y",
+    se parte.
+17. **Código óptimo.** Sin consultas duplicadas ni N+1, sin renders
+    innecesarios, sin llamadas repetidas a LLM/TTS ni a BD que se puedan
+    cachear o agrupar. Sin código muerto ni duplicado: se reutiliza lo
+    que existe antes de crear algo nuevo.
+18. **Ningún fichero nuevo supera las 400 líneas.** Si se acerca, se
+    divide en módulos desde el diseño, no al final. Un fichero existente
+    que se toque no puede crecer por encima de 400; si ya las supera, el
+    cambio no lo agranda.
+19. **Se piensa en el sistema entero, no en hechos aislados.** Antes de
+    tocar algo: quién más lo usa, qué tickets o piezas comparten esa
+    parte (placement, banco de preguntas, trazabilidad, sesiones), qué
+    pasa en todos los niveles y frameworks, y en producción (Vercel,
+    RLS, tenant). Una pieza compartida se diseña una vez.
+20. **No se rompe nada antiguo.** Todo lo que funciona hoy (YL, práctica
+    libre, histórico, auth, placement, catálogo, RLS) sigue funcionando
+    tras cada cambio. Cada tarea incluye comprobar la regresión de lo
+    que toca y de lo que depende de ello.
 
 ---
 
