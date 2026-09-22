@@ -270,6 +270,8 @@ export function AppShell({
                   mode={mode}
                   onFinish={onFinish}
                   cefrActiveLevel={cefrActiveLevel}
+                  skillLevels={skillLevels}
+                  selectedSkill={selectedSkill}
                   activeSessionId={activeSessionId}
                   selectedMessages={selectedMessages}
                   setActiveSessionId={setActiveSessionId}
