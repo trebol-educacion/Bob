@@ -186,6 +186,8 @@ export const ClosedItemSchema = z.object({
   correct_key: z.string(),
   explanation: z.string().nullable(),
   source: z.enum(['curated', 'official', 'generated_then_curated']),
+  group_id: z.string().nullable().optional(),
+  group_order: z.number().int().nullable().optional(),
 });
 
 /** Single row from bob_closed_items; shape mirrors the Zod schema above. */
