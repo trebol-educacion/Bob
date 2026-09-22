@@ -35,6 +35,7 @@ export type StartAssessmentResult =
   | { status: 'ok'; skill: 'reading'; assessment_id: string; items: AssessmentReadingItem[] }
   | { status: 'ok'; skill: 'writing'; assessment_id: string; task: AssessmentWritingTask }
   | { status: 'cooldown'; days_remaining: number; available_at: string }
+  | { status: 'pending' }
   | { status: 'error'; code: 'unauthenticated' | 'db_error' | 'no_prompts' | 'no_items' };
 
 export interface SubmitSpeakingTurn {

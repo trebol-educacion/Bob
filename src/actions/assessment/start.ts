@@ -2,6 +2,7 @@
 
 import { createSupabaseServer } from '@/lib/supabase/server';
 import { getPrompt } from '@/lib/prompts/db-prompts';
+import { hasPendingAssessment } from './queue-guard';
 import type { Skill } from '@/lib/types/skills';
 import type { AssessmentPrompt, AssessmentListeningItem, AssessmentReadingItem, AssessmentWritingTask, StartAssessmentResult } from './types';
 
@@ -14,6 +15,10 @@ export async function startAssessmentAction(skill: Skill): Promise<StartAssessme
   const supabase = await createSupabaseServer();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { status: 'error', code: 'unauthenticated' };
+
+  if (await hasPendingAssessment(supabase, user.id, skill)) {
+    return { status: 'pending' };
+  }
 
   const [profileResult, historyResult] = await Promise.all([
     supabase.schema('public').from('profiles').select('organization_id, cefr_active_level').eq('id', user.id).single(),
