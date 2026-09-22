@@ -199,14 +199,12 @@ export const ModeSelection = forwardRef<HTMLDivElement, ModeSelectionProps>(func
   const { allDynamicCards, resolvedCards } = useOrganization();
   const t = useTranslations('home.modeSelection');
 
-  const HIDDEN_MODES = new Set<string>(['cambridge_flyers_part1']);
   const resolvedCardMap = new Map(resolvedCards.map(rc => [rc.mode_key, rc]));
 
   const visibleCards = allDynamicCards.filter(card => {
     const resolved = resolvedCardMap.get(card.mode_key);
     if (!resolved) return false;
     if (resolved.visibility !== 'enabled') return false;
-    if (HIDDEN_MODES.has(card.mode_key)) return false;
     if (card.framework === 'generic' && card.cefr_level !== null) {
       if (card.cefr_level !== cefrActiveLevel) return false;
     }
