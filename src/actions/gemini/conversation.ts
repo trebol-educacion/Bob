@@ -7,7 +7,6 @@ import { callGemini } from '@/lib/gemini-client';
 import { ChatTurnSchema, InitialChatResponse, SimulatedConversationResponse, QuestionsResponse } from '@/lib/types/gemini';
 import type { ChatMessage, ChatTurnResult, InitialChatResult, Question } from './types';
 import type { CefrLevel } from '@/lib/types/practice';
-import { generateSpeechAction } from './speech';
 
 /**
  * Generates a structured initial framing and first message for the simulation.
@@ -243,12 +242,9 @@ export async function chatTextConversationAction(
   const validated = ChatTurnSchema.safeParse(parsed);
   if (!validated.success) return fallback;
 
-  const speech = await generateSpeechAction(validated.data.ai_response);
-
   return {
     evaluation: { ...validated.data.evaluation, transcribed_text: userText },
     ai_response: validated.data.ai_response,
-    ai_audio: speech.data ? speech : undefined,
   };
 }
 
@@ -320,12 +316,9 @@ export async function chatConversationAction(
   const validated = ChatTurnSchema.safeParse(parsed);
   if (!validated.success) return fallback;
 
-  const speech = await generateSpeechAction(validated.data.ai_response);
-
   return {
     evaluation: validated.data.evaluation,
     ai_response: validated.data.ai_response,
-    ai_audio: speech.data ? speech : undefined,
   };
 }
 
