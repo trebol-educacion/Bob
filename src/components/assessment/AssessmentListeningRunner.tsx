@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { ChevronRight, RotateCcw, Volume2 } from 'lucide-react';
 import { submitAssessmentListeningAction } from '@/actions/assessment';
 import { BobMascotLoader } from '@/components/chat/BobMascotLoader';
@@ -26,6 +26,15 @@ export function AssessmentListeningRunner({ assessment_id, items, onResult, onCa
   const [failMessage, setFailMessage] = useState<string | null>(null);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+    };
+  }, []);
 
   const currentItem = items[currentIdx];
   const isLastItem = currentIdx === items.length - 1;

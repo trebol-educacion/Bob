@@ -41,6 +41,7 @@ export function AssessmentSpeakingRunner({ assessment_id, prompts, is_yl = false
   const chunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startTimeRef = useRef<number>(0);
+  const queuedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const clearTimer = useCallback(() => {
     if (timerRef.current) {
@@ -52,6 +53,10 @@ export function AssessmentSpeakingRunner({ assessment_id, prompts, is_yl = false
   useEffect(() => {
     return () => {
       clearTimer();
+      if (queuedTimeoutRef.current) {
+        clearTimeout(queuedTimeoutRef.current);
+        queuedTimeoutRef.current = null;
+      }
       if (mediaRecorderRef.current?.state === 'recording') {
         mediaRecorderRef.current.stop();
       }
@@ -146,7 +151,10 @@ export function AssessmentSpeakingRunner({ assessment_id, prompts, is_yl = false
     }
 
     setPhase('sent');
-    setTimeout(() => onQueued(), 2_000);
+    queuedTimeoutRef.current = setTimeout(() => {
+      queuedTimeoutRef.current = null;
+      onQueued();
+    }, 2_000);
   }, [assessment_id, recordedTurns, prompts.length, onQueued]);
 
   const handleRetry = useCallback(() => {

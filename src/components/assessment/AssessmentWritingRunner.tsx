@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { RotateCcw, ChevronRight } from 'lucide-react';
 import { submitAssessmentWritingAction } from '@/actions/assessment';
 import { BobMascotLoader } from '@/components/chat/BobMascotLoader';
@@ -23,6 +23,16 @@ export function AssessmentWritingRunner({ assessment_id, task, onQueued, onCance
   const [text, setText] = useState('');
   const [phase, setPhase] = useState<'writing' | 'submitting' | 'sent' | 'failed'>('writing');
   const [failMessage, setFailMessage] = useState<string | null>(null);
+  const queuedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (queuedTimeoutRef.current) {
+        clearTimeout(queuedTimeoutRef.current);
+        queuedTimeoutRef.current = null;
+      }
+    };
+  }, []);
 
   const wordCount = countWords(text);
   const canSubmit = wordCount >= MIN_WORDS;
@@ -40,7 +50,10 @@ export function AssessmentWritingRunner({ assessment_id, task, onQueued, onCance
     }
 
     setPhase('sent');
-    setTimeout(() => onQueued(), 2_000);
+    queuedTimeoutRef.current = setTimeout(() => {
+      queuedTimeoutRef.current = null;
+      onQueued();
+    }, 2_000);
   }, [canSubmit, assessment_id, text, onQueued]);
 
   const handleRetry = useCallback(() => {
