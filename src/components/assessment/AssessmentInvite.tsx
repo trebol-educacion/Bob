@@ -6,6 +6,7 @@ import { useTranslations } from 'next-intl';
 import { ArrowLeft, Headphones, Mic2, BookOpen, PenLine, Hourglass } from 'lucide-react';
 import { useOrganization } from '@/hooks/useOrganization';
 import { resolveEffectiveLevel } from '@/lib/levels/effective-level';
+import { resolveLevelPolicy } from '@/lib/levels/level-policy';
 import type { Skill } from '@/lib/types/skills';
 import type { CefrLevel } from '@/lib/types/practice';
 
@@ -90,12 +91,14 @@ const SKILL_LABEL: Record<Skill, string> = {
 
 /** Invitation screen shown when a student has no level (or is re-evaluating) for a skill. */
 export function AssessmentInvite({ skill, onStartAssessment, onPickLevel, onBack }: Props) {
-  const { skillLevels, assessmentCooldownDays, pendingAssessments, cefrActiveLevel } = useOrganization();
+  const { skillLevels, assessmentCooldownDays, pendingAssessments, cefrActiveLevel, cefrLevelLocked } = useOrganization();
   const t = useTranslations('home.assessmentInvite');
 
-  const { placementPending } = resolveEffectiveLevel(
-    skillLevels, cefrActiveLevel, skill, pendingAssessments,
+  const levelPolicy = resolveLevelPolicy({ cefrLevelLocked, cefrActiveLevel, testerOverrideEnabled: false });
+  const { placementPending, locked } = resolveEffectiveLevel(
+    skillLevels, cefrActiveLevel, skill, pendingAssessments, levelPolicy,
   );
+  const allowManualSelection = !locked || levelPolicy.allowManualSelection;
 
   const existingLevel = skillLevels?.[skill];
   const hasExistingLevel = Boolean(existingLevel?.cefr_level);
@@ -190,32 +193,34 @@ export function AssessmentInvite({ skill, onStartAssessment, onPickLevel, onBack
                     : 'Start Assessment'}
                 </motion.button>
 
-                {hasExistingLevel ? (
-                  <button
-                    onClick={() => onPickLevel(existingLevel!.cefr_level as CefrLevel)}
-                    className={`w-full py-2.5 px-5 rounded-2xl font-semibold text-sm text-gray-600 ${theme.buttonHover} ${theme.textHover} transition-colors border border-gray-200 ${theme.borderHover}`}
-                  >
-                    Keep current level ({existingLevel!.cefr_level.toUpperCase()})
-                  </button>
-                ) : (
-                  <div className="space-y-2">
-                    <p className="text-xs font-bold text-gray-400 text-center uppercase tracking-wide">
-                      or start at a level
-                    </p>
-                    <div className="grid grid-cols-5 gap-2">
-                      {PICKABLE_LEVELS.map((lvl) => (
-                        <motion.button
-                          key={lvl}
-                          whileHover={{ scale: 1.04 }}
-                          whileTap={{ scale: 0.96 }}
-                          onClick={() => onPickLevel(lvl)}
-                          className={`py-2 rounded-xl font-bold text-xs text-gray-700 bg-white ${theme.buttonHover} ${theme.textHover} border border-gray-200 ${theme.borderHover} transition-colors`}
-                        >
-                          {LEVEL_LABEL[lvl]}
-                        </motion.button>
-                      ))}
+                {allowManualSelection && (
+                  hasExistingLevel ? (
+                    <button
+                      onClick={() => onPickLevel(existingLevel!.cefr_level as CefrLevel)}
+                      className={`w-full py-2.5 px-5 rounded-2xl font-semibold text-sm text-gray-600 ${theme.buttonHover} ${theme.textHover} transition-colors border border-gray-200 ${theme.borderHover}`}
+                    >
+                      Keep current level ({existingLevel!.cefr_level.toUpperCase()})
+                    </button>
+                  ) : (
+                    <div className="space-y-2">
+                      <p className="text-xs font-bold text-gray-400 text-center uppercase tracking-wide">
+                        or start at a level
+                      </p>
+                      <div className="grid grid-cols-5 gap-2">
+                        {PICKABLE_LEVELS.map((lvl) => (
+                          <motion.button
+                            key={lvl}
+                            whileHover={{ scale: 1.04 }}
+                            whileTap={{ scale: 0.96 }}
+                            onClick={() => onPickLevel(lvl)}
+                            className={`py-2 rounded-xl font-bold text-xs text-gray-700 bg-white ${theme.buttonHover} ${theme.textHover} border border-gray-200 ${theme.borderHover} transition-colors`}
+                          >
+                            {LEVEL_LABEL[lvl]}
+                          </motion.button>
+                        ))}
+                      </div>
                     </div>
-                  </div>
+                  )
                 )}
               </>
             )}

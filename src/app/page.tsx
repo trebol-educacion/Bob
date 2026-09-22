@@ -143,6 +143,8 @@ export default function App() {
     skillLevels,
     refreshSkillLevels,
     setAppState,
+    cefrLevelLocked,
+    cefrActiveLevel,
   });
 
   if (!orgLoading && accessDenialReason) {
