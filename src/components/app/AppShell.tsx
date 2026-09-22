@@ -7,7 +7,7 @@ import { Navbar } from '@/components/Navbar';
 import { SessionSidebar } from '@/components/SessionSidebar';
 import { SkillSelector } from '@/components/assessment/SkillSelector';
 import { ConfirmLeaveDialog } from '@/components/assessment/ConfirmLeaveDialog';
-import { ConversationPractice } from '@/components/ConversationPractice';
+import { ConversationPracticeView } from './views/ConversationPracticeView';
 import { ChallengeHome } from '@/components/challenge/ChallengeHome';
 import { ChallengeRunner } from '@/components/challenge/ChallengeRunner';
 import { CatalogView } from './views/CatalogView';
@@ -20,7 +20,6 @@ import type { StoredMessage } from '@/actions/messages';
 import type { AssessmentPrompt, AssessmentListeningItem, AssessmentReadingItem, AssessmentWritingTask } from '@/actions/assessment';
 import type { AppState, YLRenderProps, ExamRenderProps } from '@/lib/routing';
 import { getRouteForMode, isConversationMode } from '@/lib/routing';
-import { resolveEffectiveLevel } from '@/lib/levels/effective-level';
 import { useOrganization, type AvailableMode } from '@/contexts/OrganizationContext';
 import type { Organization } from '@/lib/organization';
 import type { PracticeMode, CefrLevel, ModeKey } from '@/lib/types/practice';
@@ -317,18 +316,18 @@ export function AppShell({
 
             {appState === 'conversation-practicing' && (
               <motion.div
-                key="conversation-practicing"
+                key={`conversation-practicing-${selectedMessages.length > 0 ? activeSessionId : 'new'}`}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 className="flex-1 flex flex-col min-h-0"
               >
-                <ConversationPractice
-                  topic={selectedMessages.length > 0 ? topic : ''}
+                <ConversationPracticeView
+                  topic={topic}
+                  selectedMessages={selectedMessages} activeSessionId={activeSessionId}
+                  skillLevels={skillLevels} cefrActiveLevel={cefrActiveLevel}
                   onFinish={onFinish}
-                  noFrame={true}
-                  onSessionStart={onConversationSessionStart}
-                  level={resolveEffectiveLevel(skillLevels, cefrActiveLevel, 'speaking').level ?? undefined}
+                  onConversationSessionStart={onConversationSessionStart}
                 />
               </motion.div>
             )}

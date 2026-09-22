@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef } from 'react';
 import { Loader2, Mic, MessageSquare } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
-import { generateInitialChatAction } from '@/actions/gemini';
+import { generateInitialChatAction, type ChatMessage } from '@/actions/gemini';
 import type { CefrLevel } from '@/lib/types/practice';
 import { ACTIVE_MODEL_LABEL } from '@/lib/models';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
@@ -23,13 +23,24 @@ interface ConversationPracticeProps {
   onPhaseChange?: (label: string, iter?: string) => void;
   onSessionStart?: (topic: string) => void;
   level?: CefrLevel;
+  sessionId?: string;
+  initialMessages?: ChatMessage[];
 }
 
 const MAX_TURNS = 12;
 
-export function ConversationPractice({ topic: topicProp = '', onFinish, noFrame, onPhaseChange, onSessionStart, level = 'b1' }: ConversationPracticeProps) {
+export function ConversationPractice({
+  topic: topicProp = '',
+  onFinish,
+  noFrame,
+  onPhaseChange,
+  onSessionStart,
+  level = 'b1',
+  sessionId,
+  initialMessages = [],
+}: ConversationPracticeProps) {
   const t = useTranslations('chat.conversation');
-  const conv = useConversationState(topicProp);
+  const conv = useConversationState(topicProp, initialMessages);
   const qf = useQuestionsFlow();
 
   const handleError = useCallback((key: string) => {
@@ -38,12 +49,13 @@ export function ConversationPractice({ topic: topicProp = '', onFinish, noFrame,
 
   const {
     onRecordedRef,
+    persistTurn,
     handleListen,
     handleSendTextMessage,
     handleSimulateResponse,
     handleGoToQuestions,
     handleTopicConfirm,
-  } = useConversationHandlers({ conv, qf, maxTurns: MAX_TURNS, level, onSessionStart, onError: handleError });
+  } = useConversationHandlers({ conv, qf, maxTurns: MAX_TURNS, level, sessionId, onSessionStart, onError: handleError });
 
   const { isRecording, startRecording, stopRecording } = useAudioRecorder({
     onRecorded: useCallback((blob: Blob) => onRecordedRef.current(blob), [onRecordedRef]),
@@ -62,7 +74,7 @@ export function ConversationPractice({ topic: topicProp = '', onFinish, noFrame,
 
   const initDoneRef = useRef(false);
   useEffect(() => {
-    if (initDoneRef.current || !conv.internalTopic) return;
+    if (initDoneRef.current || !conv.internalTopic || initialMessages.length > 0) return;
     initDoneRef.current = true;
 
     const initChat = async () => {
@@ -71,6 +83,7 @@ export function ConversationPractice({ topic: topicProp = '', onFinish, noFrame,
         const result = await generateInitialChatAction(conv.internalTopic, level);
         conv.setFraming(result.framing);
         conv.setMessages([{ role: 'model', text: result.message }]);
+        persistTurn('model', result.message);
         setTimeout(() => handleListen(result.message, 0), 500);
       } catch (error) {
         console.error('Failed to init chat:', error);
