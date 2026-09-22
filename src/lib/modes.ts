@@ -1,6 +1,8 @@
 import type { CardVisibility, DynamicCard, ModeFramework, ModeKey, ResolvedCard } from './types/practice';
 import type { Skill, SkillLevelMap } from './types/skills';
 
+export type PracticeTrack = 'official' | 'free';
+
 export interface ResolveModesArgs {
   isBobEnabled: boolean;
   selectedSkill: Skill;
@@ -8,6 +10,7 @@ export interface ResolveModesArgs {
   studentFrameworks: ModeFramework[];
   orgFrameworks: ModeFramework[];
   allDynamicCards: DynamicCard[];
+  track?: PracticeTrack;
 }
 
 /**
@@ -21,6 +24,11 @@ export interface ResolveModesArgs {
  *
  * Cards whose framework is not in the effective intersection are excluded entirely.
  * Generic cards follow the same level-match logic unless cefr_level is null (universal).
+ *
+ * `track` (D9-18) governs generic-card visibility once the student has assigned
+ * frameworks: `official` (default) hides `generic_*` except
+ * `GENERIC_ALWAYS_VISIBLE_WITH_FRAMEWORK`; `free` keeps evaluating every generic
+ * card by level match regardless of assigned frameworks.
  */
 export function resolveEnabledModes({
   isBobEnabled,
@@ -29,6 +37,7 @@ export function resolveEnabledModes({
   studentFrameworks,
   orgFrameworks,
   allDynamicCards,
+  track = 'official',
 }: ResolveModesArgs): ResolvedCard[] {
   if (!isBobEnabled) return [];
 
@@ -57,7 +66,7 @@ export function resolveEnabledModes({
         continue;
       }
 
-      if (hasAssignedFrameworks) continue;
+      if (track === 'official' && hasAssignedFrameworks) continue;
 
       if (card.cefr_level === null) {
         resolved.push({ ...card, visibility: 'enabled', reason: 'level_match' });
