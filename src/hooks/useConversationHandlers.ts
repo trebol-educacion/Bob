@@ -7,6 +7,7 @@ import {
   generateSpeechAction,
   generateQuestionsAction,
   simulateConversationAction,
+  checkTopicIsAppropriateAction,
 } from '@/actions/gemini';
 import { pcmToWavBase64, blobToBase64 } from '@/lib/audio';
 import { saveMessageAction } from '@/actions/messages';
@@ -33,7 +34,7 @@ export interface UseConversationHandlersReturn {
   handleSimulateResponse: () => Promise<void>;
   handleGoToQuestions: () => Promise<void>;
   handleAnswerQuestion: (audioBlob: Blob) => Promise<void>;
-  handleTopicConfirm: () => void;
+  handleTopicConfirm: () => Promise<void>;
 }
 
 export function useConversationHandlers({
@@ -217,9 +218,23 @@ export function useConversationHandlers({
     }
   };
 
-  const handleTopicConfirm = () => {
+  const handleTopicConfirm = async () => {
     const topic = conv.topicInput.trim();
     if (!topic) return;
+
+    conv.setIsProcessing(true);
+    try {
+      const guard = await checkTopicIsAppropriateAction(topic);
+      if (!guard.appropriate) {
+        onError('topicNotAppropriate');
+        return;
+      }
+    } catch (error) {
+      console.error('Topic guard failed:', error);
+    } finally {
+      conv.setIsProcessing(false);
+    }
+
     conv.setInternalTopic(topic);
     onSessionStart?.(topic);
     conv.setPhase('conversation');

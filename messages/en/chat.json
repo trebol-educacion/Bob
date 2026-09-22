@@ -38,7 +38,8 @@
     "errors": {
       "microphoneAccess": "Please allow microphone access.",
       "conversationError": "Conversation error. Please try again.",
-      "sendMessageError": "Error sending the message. Please try again."
+      "sendMessageError": "Error sending the message. Please try again.",
+      "topicNotAppropriate": "Let's pick a different topic for our conversation."
     }
   },
   "tipsModal": {

@@ -4,3 +4,4 @@ export * from './gemini/phrases';
 export * from './gemini/image';
 export * from './gemini/evaluation';
 export * from './gemini/conversation';
+export * from './gemini/topic-guard';
