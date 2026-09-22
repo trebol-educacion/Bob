@@ -20,7 +20,6 @@ export type ItemBankStatus = 'draft' | 'published' | 'retired';
 
 export type ItemBankDifficulty = 1 | 2 | 3;
 
-/** Row from bob.item_groups. */
 export interface ItemGroup {
   id: string;
   exam: ItemBankExam;
@@ -40,16 +39,12 @@ export interface ItemGroup {
   created_at: string;
 }
 
-/** Row from bob.closed_items, optionally attached to an item_groups group. */
 export type BankItem = ClosedItem;
 
-/** {@link BankItem} without answer-key fields — the only shape allowed on the client. */
 export type PublicBankItem = Omit<BankItem, 'correct_key' | 'explanation'>;
 
-/** {@link ItemGroup} without reviewer/source fields not needed by the client. */
 export type PublicItemGroup = Omit<ItemGroup, 'reviewed_by' | 'reviewed_at' | 'source_ref'>;
 
-/** Row from bob.open_tasks — official Writing/Speaking tasks, replaces hardcoded prompts. */
 export interface OpenTask {
   id: string;
   skill: Extract<ItemBankSkill, 'writing' | 'speaking'>;
@@ -64,7 +59,6 @@ export interface OpenTask {
   created_at: string;
 }
 
-/** Row from bob.test_configs — thresholds and bands kept out of code. */
 export interface TestConfig {
   code: string;
   kind: 'placement' | 'adaptive_exam';
