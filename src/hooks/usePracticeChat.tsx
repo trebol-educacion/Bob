@@ -141,6 +141,14 @@ export function usePracticeChat({
     }
     try {
       const generated = await generateTopicPhrasesAction(t, level);
+      if (generated.length === 0) {
+        setMessages(prev => prev.slice(0, -1));
+        addBobMessage(
+          <span className="text-red-500">Could not generate phrases. Want to try a different topic?</span>
+        );
+        setPhase('topic-input');
+        return;
+      }
       setDynamicPhrases(generated);
       setCurrentIndex(0);
       setMessages(prev => prev.slice(0, -1));
