@@ -18,7 +18,7 @@ interface ConversationState {
   inputText: string;
 }
 
-interface UseConversationStateReturn extends ConversationState {
+export interface UseConversationStateReturn extends ConversationState {
   setPhase: (phase: Phase) => void;
   setInternalTopic: (topic: string) => void;
   setTopicInput: (input: string) => void;
