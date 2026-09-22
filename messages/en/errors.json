@@ -3,5 +3,6 @@
   "tryAgain": "{message} — please try again.",
   "couldNotLoadItems": "Could not load items. Please try again.",
   "noItemsAvailable": "No items available yet. Please check back soon.",
-  "failedCreateSession": "Failed to create session"
+  "failedCreateSession": "Failed to create session",
+  "retry": "Try again"
 }

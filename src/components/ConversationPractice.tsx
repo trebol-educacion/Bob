@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Loader2, Mic, MessageSquare } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { generateInitialChatAction, type ChatMessage } from '@/actions/gemini';
@@ -14,6 +14,7 @@ import { ConversationFinished } from '@/components/conversation/ConversationFini
 import { ConversationMessages } from '@/components/conversation/ConversationMessages';
 import { ConversationQuestions } from '@/components/conversation/ConversationQuestions';
 import { ConversationControls } from '@/components/conversation/ConversationControls';
+import { ConversationErrorBanner } from '@/components/conversation/ConversationErrorBanner';
 import { useTranslations } from 'next-intl';
 
 interface ConversationPracticeProps {
@@ -40,12 +41,15 @@ export function ConversationPractice({
   initialMessages = [],
 }: ConversationPracticeProps) {
   const t = useTranslations('chat.conversation');
+  const tErrors = useTranslations('errors');
   const conv = useConversationState(topicProp, initialMessages);
   const qf = useQuestionsFlow();
 
+  const [errorKey, setErrorKey] = useState<string | null>(null);
   const handleError = useCallback((key: string) => {
-    alert(t(`errors.${key}` as Parameters<typeof t>[0]));
-  }, [t]);
+    setErrorKey(key);
+  }, []);
+  const dismissError = useCallback(() => setErrorKey(null), []);
 
   const {
     onRecordedRef,
@@ -112,6 +116,16 @@ export function ConversationPractice({
   }
 
   const controlsSlot = (
+    <>
+      {errorKey && (
+        <div className="px-4 pt-3">
+          <ConversationErrorBanner
+            message={t(`errors.${errorKey}` as Parameters<typeof t>[0])}
+            retryLabel={tErrors('retry')}
+            onRetry={dismissError}
+          />
+        </div>
+      )}
     <ConversationControls
       phase={conv.phase}
       labels={{
@@ -141,6 +155,7 @@ export function ConversationPractice({
       messagesCount={conv.messages.length}
       maxTurns={MAX_TURNS}
     />
+    </>
   );
 
   const bodyContent = (
