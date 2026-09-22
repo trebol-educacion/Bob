@@ -1,3 +1,4 @@
+import type { Skill, SkillLevelMap } from '@/lib/types/skills';
 import type { LevelPolicyInput, LevelPolicyResult } from './types';
 
 /**
@@ -18,4 +19,13 @@ export function resolveLevelPolicy(input: LevelPolicyInput): LevelPolicyResult {
  */
 export function isLevelSelectorTesterEnabled(envValue: string | undefined): boolean {
   return envValue === 'true';
+}
+
+/**
+ * @param skillLevels SkillLevelMap
+ * @param skill Skill
+ * @returns boolean
+ */
+export function mustTakePlacement(skillLevels: SkillLevelMap | null, skill: Skill): boolean {
+  return !skillLevels?.[skill];
 }

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { resolveLevelPolicy, isLevelSelectorTesterEnabled } from '@/lib/levels/level-policy';
+import { resolveLevelPolicy, isLevelSelectorTesterEnabled, mustTakePlacement } from '@/lib/levels/level-policy';
+import type { SkillLevelMap } from '@/lib/types/skills';
 
 describe('resolveLevelPolicy', () => {
   it('nivel bloqueado con nivel de tenant asignado → salta el placement', () => {
@@ -45,5 +46,39 @@ describe('isLevelSelectorTesterEnabled', () => {
     expect(isLevelSelectorTesterEnabled('1')).toBe(false);
     expect(isLevelSelectorTesterEnabled(undefined)).toBe(false);
     expect(isLevelSelectorTesterEnabled('')).toBe(false);
+  });
+});
+
+describe('mustTakePlacement', () => {
+  it('destreza sin nivel asignado → exige placement', () => {
+    expect(mustTakePlacement(null, 'listening')).toBe(true);
+    expect(mustTakePlacement({}, 'listening')).toBe(true);
+  });
+
+  it('destreza con nivel asignado → no exige placement', () => {
+    const skillLevels: SkillLevelMap = {
+      listening: {
+        cefr_level: 'b1',
+        origin: 'assessment',
+        confidence: null,
+        last_assessment_at: null,
+        updated_at: '2026-01-01T00:00:00.000Z',
+      },
+    };
+    expect(mustTakePlacement(skillLevels, 'listening')).toBe(false);
+  });
+
+  it('solo exige placement para la destreza elegida, no para todas (Q5)', () => {
+    const skillLevels: SkillLevelMap = {
+      listening: {
+        cefr_level: 'b1',
+        origin: 'assessment',
+        confidence: null,
+        last_assessment_at: null,
+        updated_at: '2026-01-01T00:00:00.000Z',
+      },
+    };
+    expect(mustTakePlacement(skillLevels, 'listening')).toBe(false);
+    expect(mustTakePlacement(skillLevels, 'reading')).toBe(true);
   });
 });
