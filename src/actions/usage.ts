@@ -3,7 +3,11 @@
 import { createSupabaseServer } from '@/lib/supabase/server';
 import { inferSkillFromMode, inferModeMetadata } from '@/lib/skill-from-mode';
 
-/** Reports active usage seconds for the current mode. Never throws — returns `{ ok: false }` on any failure. */
+/**
+ * @param mode string
+ * @param seconds number
+ * @returns Promise<{ ok: boolean }>
+ */
 export async function trackUsageAction(mode: string, seconds: number): Promise<{ ok: boolean }> {
   try {
     const supabase = await createSupabaseServer();

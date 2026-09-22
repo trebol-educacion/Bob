@@ -15,7 +15,10 @@ export type ChallengeAttempt = {
   created_at: string;
 };
 
-/** Derives the CEFR level tag encoded at the end of a challenge framework id, e.g. `cambridge_a2` → `a2`. */
+/**
+ * @param framework string
+ * @returns string | null
+ */
 function cefrLevelFromFramework(framework: string): string | null {
   const match = framework.match(/(pre_a1|a1|a2|b1|b2|c1|c2)$/);
   return match ? match[1] : null;

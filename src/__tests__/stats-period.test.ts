@@ -3,8 +3,17 @@ vi.mock('server-only', () => ({}));
 const gte = vi.fn().mockReturnThis();
 const lte = vi.fn().mockReturnThis();
 
-function makeBuilder() {
-  const builder: Record<string, ReturnType<typeof vi.fn>> = {};
+type Builder = {
+  select: ReturnType<typeof vi.fn>;
+  eq: ReturnType<typeof vi.fn>;
+  order: ReturnType<typeof vi.fn>;
+  gte: ReturnType<typeof vi.fn>;
+  lte: ReturnType<typeof vi.fn>;
+  then: (resolve: (value: { data: unknown[] }) => void) => void;
+};
+
+function makeBuilder(): Builder {
+  const builder = {} as Builder;
   builder.select = vi.fn(() => builder);
   builder.eq = vi.fn(() => builder);
   builder.order = vi.fn(() => builder);
@@ -16,7 +25,7 @@ function makeBuilder() {
     lte(...args);
     return builder;
   });
-  builder.then = (resolve: (value: { data: unknown[] }) => void) => resolve({ data: [] });
+  builder.then = (resolve) => resolve({ data: [] });
   return builder;
 }
 
