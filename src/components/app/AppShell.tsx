@@ -1,11 +1,12 @@
 'use client';
 
-import React, { useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { motion, AnimatePresence } from 'motion/react';
 import { Navbar } from '@/components/Navbar';
 import { SessionSidebar } from '@/components/SessionSidebar';
 import { SkillSelector } from '@/components/assessment/SkillSelector';
+import { ConfirmLeaveDialog } from '@/components/assessment/ConfirmLeaveDialog';
 import { ConversationPractice } from '@/components/ConversationPractice';
 import { ChallengeHome } from '@/components/challenge/ChallengeHome';
 import { ChallengeRunner } from '@/components/challenge/ChallengeRunner';
@@ -58,6 +59,7 @@ export interface AppShellProps {
   onConversationSessionStart: (topic: string) => void;
   refreshSessions: () => void;
   refreshSkillLevels: () => Promise<void>;
+  refreshPendingAssessments: () => Promise<void>;
   setActiveSessionId: (id: string | null) => void;
   setSessions: React.Dispatch<React.SetStateAction<BobSession[]>>;
   cefrSelectorRef: React.RefObject<HTMLDivElement | null>;
@@ -104,6 +106,7 @@ export function AppShell({
   onConversationSessionStart,
   refreshSessions,
   refreshSkillLevels,
+  refreshPendingAssessments,
   setActiveSessionId,
   setSessions,
   cefrSelectorRef,
@@ -118,15 +121,38 @@ export function AppShell({
 }: AppShellProps) {
   const t = useTranslations('home.bobUnavailable');
 
+  const [pendingLeaveAction, setPendingLeaveAction] = useState<(() => void) | null>(null);
+
+  const requestLeaveConfirmation = useCallback((action: () => void) => {
+    setPendingLeaveAction(() => action);
+  }, []);
+
+  const confirmLeave = useCallback(() => {
+    pendingLeaveAction?.();
+    setPendingLeaveAction(null);
+  }, [pendingLeaveAction]);
+
+  const dismissLeaveConfirmation = useCallback(() => setPendingLeaveAction(null), []);
+
   const onOpenDashboard = useCallback(() => setAppState('dashboard'), [setAppState]);
+
+  const handleGoHomeRequest = useCallback(() => {
+    if (appState === 'assessment-running') {
+      requestLeaveConfirmation(onFinish);
+    } else {
+      onFinish();
+    }
+  }, [appState, onFinish, requestLeaveConfirmation]);
 
   const handleYLSessionCreated = useCallback((newSessionId: string) => {
     setActiveSessionId(newSessionId);
     void refreshSessions();
   }, [setActiveSessionId, refreshSessions]);
 
+  const onBackToCatalog = useCallback(() => leavePractice('catalog-filtered'), [leavePractice]);
+
   const ylProps: YLRenderProps = {
-    onBack: onFinish,
+    onBack: onBackToCatalog,
     sessionId: selectedMessages.length > 0 ? activeSessionId ?? undefined : undefined,
     initialMessages: selectedMessages.length > 0 ? selectedMessages : undefined,
     onSessionCreated: handleYLSessionCreated,
@@ -135,7 +161,7 @@ export function AppShell({
   };
 
   const examProps: ExamRenderProps = {
-    onBack: () => leavePractice('catalog-filtered'),
+    onBack: onBackToCatalog,
   };
 
   return (
@@ -144,7 +170,12 @@ export function AppShell({
         userEmail={userEmail}
         onOpenDashboard={onOpenDashboard}
         onToggleSidebar={() => setSidebarCollapsed((v) => !v)}
-        onGoHome={onFinish}
+        onGoHome={handleGoHomeRequest}
+      />
+      <ConfirmLeaveDialog
+        open={pendingLeaveAction !== null}
+        onConfirm={confirmLeave}
+        onDismiss={dismissLeaveConfirmation}
       />
       <div className="flex-1 flex min-h-0 relative">
         <SessionSidebar
@@ -200,6 +231,8 @@ export function AppShell({
                   handleAssessmentStart={handleAssessmentStart}
                   handlePickLevel={handlePickLevel}
                   refreshSkillLevels={refreshSkillLevels}
+                  refreshPendingAssessments={refreshPendingAssessments}
+                  requestLeaveConfirmation={requestLeaveConfirmation}
                   assessmentId={assessmentId}
                   assessmentPrompts={assessmentPrompts}
                   assessmentIsYl={assessmentIsYl}

@@ -25,6 +25,7 @@ export default function App() {
     selectedSkill,
     setSelectedSkill,
     refreshSkillLevels,
+    refreshPendingAssessments,
     sustainedImprovementDetected,
     checkSustainedImprovement,
   } = useOrganization();
@@ -57,6 +58,12 @@ export default function App() {
       checkSustainedImprovement();
     }
   }, [appState, checkSustainedImprovement]);
+
+  useEffect(() => {
+    if (appState !== 'skill-selection' && appState !== 'dashboard') return;
+    void refreshSkillLevels();
+    void refreshPendingAssessments();
+  }, [appState, refreshSkillLevels, refreshPendingAssessments]);
 
   const resetToSkillSelection = useCallback(() => {
     setAppState('skill-selection');
@@ -176,6 +183,7 @@ export default function App() {
       onConversationSessionStart={onConversationSessionStart}
       refreshSessions={refreshSessions}
       refreshSkillLevels={refreshSkillLevels}
+      refreshPendingAssessments={refreshPendingAssessments}
       setActiveSessionId={setActiveSessionId}
       setSessions={setSessions}
       cefrSelectorRef={cefrSelectorRef}

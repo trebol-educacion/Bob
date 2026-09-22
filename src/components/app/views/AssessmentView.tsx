@@ -21,6 +21,8 @@ export interface AssessmentViewProps {
   handleAssessmentStart: () => void;
   handlePickLevel: (level: CefrLevel) => void;
   refreshSkillLevels: () => Promise<void>;
+  refreshPendingAssessments: () => Promise<void>;
+  requestLeaveConfirmation: (action: () => void) => void;
   assessmentId: string | null;
   assessmentPrompts: AssessmentPrompt[];
   assessmentIsYl: boolean;
@@ -39,6 +41,8 @@ export function AssessmentView({
   handleAssessmentStart,
   handlePickLevel,
   refreshSkillLevels,
+  refreshPendingAssessments,
+  requestLeaveConfirmation,
   assessmentId,
   assessmentPrompts,
   assessmentIsYl,
@@ -65,8 +69,11 @@ export function AssessmentView({
         assessment_id={assessmentId}
         prompts={assessmentPrompts}
         is_yl={assessmentIsYl}
-        onQueued={() => setAppState('dashboard')}
-        onCancel={() => setAppState('assessment-invite')}
+        onQueued={async () => {
+          await refreshPendingAssessments();
+          setAppState('dashboard');
+        }}
+        onCancel={() => requestLeaveConfirmation(() => setAppState('assessment-invite'))}
       />
     );
   }
@@ -81,7 +88,7 @@ export function AssessmentView({
           await refreshSkillLevels();
           setAppState('assessment-result');
         }}
-        onCancel={() => setAppState('assessment-invite')}
+        onCancel={() => requestLeaveConfirmation(() => setAppState('assessment-invite'))}
       />
     );
   }
@@ -96,7 +103,7 @@ export function AssessmentView({
           await refreshSkillLevels();
           setAppState('assessment-result');
         }}
-        onCancel={() => setAppState('assessment-invite')}
+        onCancel={() => requestLeaveConfirmation(() => setAppState('assessment-invite'))}
       />
     );
   }
@@ -106,8 +113,11 @@ export function AssessmentView({
       <AssessmentWritingRunner
         assessment_id={assessmentId}
         task={assessmentWritingTask}
-        onQueued={() => setAppState('dashboard')}
-        onCancel={() => setAppState('assessment-invite')}
+        onQueued={async () => {
+          await refreshPendingAssessments();
+          setAppState('dashboard');
+        }}
+        onCancel={() => requestLeaveConfirmation(() => setAppState('assessment-invite'))}
       />
     );
   }
