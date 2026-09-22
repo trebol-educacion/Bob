@@ -3,11 +3,13 @@
 import React from 'react';
 import { motion } from 'motion/react';
 import { ModeSelection } from '@/components/ModeSelection';
+import { TrackTabs } from '@/components/catalog/TrackTabs';
 import type { AppState } from '@/lib/routing';
 import type { Organization } from '@/lib/organization';
 import type { PracticeMode, CefrLevel, ModeKey } from '@/lib/types/practice';
 import type { Skill, SkillLevelMap } from '@/lib/types/skills';
 import type { AvailableMode } from '@/lib/organization/types';
+import type { PracticeTrack } from '@/lib/modes';
 
 export interface CatalogViewProps {
   setAppState: React.Dispatch<React.SetStateAction<AppState>>;
@@ -21,6 +23,8 @@ export interface CatalogViewProps {
   cefrActiveLevel: CefrLevel | null;
   cefrLevelLocked: boolean;
   organization: Organization | null;
+  track: PracticeTrack;
+  setTrack: (track: PracticeTrack) => void;
 }
 
 export function CatalogView({
@@ -35,6 +39,8 @@ export function CatalogView({
   cefrActiveLevel,
   cefrLevelLocked,
   organization,
+  track,
+  setTrack,
 }: CatalogViewProps) {
   return (
     <>
@@ -65,6 +71,7 @@ export function CatalogView({
             </button>
           </motion.div>
         )}
+        <TrackTabs track={track} onChange={setTrack} />
       </div>
       <ModeSelection
         ref={cefrSelectorRef}
@@ -74,6 +81,7 @@ export function CatalogView({
         cefrActiveLevel={(selectedSkill ? skillLevels?.[selectedSkill]?.cefr_level : null) ?? cefrActiveLevel}
         cefrLevelLocked={cefrLevelLocked}
         organizationName={organization?.name}
+        track={track}
       />
     </>
   );

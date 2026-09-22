@@ -20,6 +20,7 @@ import {
 import type { ModeKey, PracticeMode, CefrLevel, DynamicCard, CardVisibility } from '@/lib/types/practice';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import type { AvailableMode } from '@/contexts/OrganizationContext';
+import type { PracticeTrack } from '@/lib/modes';
 import { getModeIcon, getModeBadge, getModeSection, getModeTitle, getModeDescription, getModeSortWeight, getModeOfficialName, isGenericGroupedWithCambridge } from '@/lib/mode-ui';
 import { ListenAndPointIcon } from '@/components/icons/ModeIcons';
 import { LookAndAnswerIcon, TellTheStoryIcon, WhatsThisIcon, PersonalQuestionsIcon } from '@/components/icons/StartersIcons';
@@ -190,14 +191,16 @@ interface ModeSelectionProps {
   cefrActiveLevel?: CefrLevel | null;
   cefrLevelLocked?: boolean;
   organizationName?: string;
+  track?: PracticeTrack;
 }
 
 export const ModeSelection = forwardRef<HTMLDivElement, ModeSelectionProps>(function ModeSelection(
-  { onSelect, cefrActiveLevel = null },
+  { onSelect, cefrActiveLevel = null, track = 'official' },
   selectorRef
 ) {
   const { allDynamicCards, resolvedCards } = useOrganization();
   const t = useTranslations('home.modeSelection');
+  const tTrack = useTranslations('mode_ui.track');
 
   const resolvedCardMap = new Map(resolvedCards.map(rc => [rc.mode_key, rc]));
 
@@ -217,8 +220,6 @@ export const ModeSelection = forwardRef<HTMLDivElement, ModeSelectionProps>(func
   const frameworkCards = visibleCards.filter(
     card => card.framework !== 'generic' || isGenericGroupedWithCambridge(card),
   );
-
-  const showFreePractice = frameworkCards.length === 0;
 
   const sectionMap = new Map<string, DynamicCard[]>();
   for (const card of frameworkCards) {
@@ -268,7 +269,13 @@ export const ModeSelection = forwardRef<HTMLDivElement, ModeSelectionProps>(func
   return (
     <div className="relative w-full min-h-full overflow-y-auto bg-white">
       <div ref={selectorRef} className="relative z-10 w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-10 pt-4 pb-16 space-y-10">
-        {cefrActiveLevel && showFreePractice && genericCards.length > 0 && (
+        {track === 'free' && (
+          <p className="text-xs font-bold uppercase tracking-widest text-amber-600 bg-amber-50 border border-amber-200 rounded-xl px-4 py-2 inline-block">
+            {tTrack('disclaimer')}
+          </p>
+        )}
+
+        {cefrActiveLevel && track === 'free' && genericCards.length > 0 && (
           <motion.div
             key={`generic-${cefrActiveLevel}`}
             initial="hidden"
@@ -296,7 +303,7 @@ export const ModeSelection = forwardRef<HTMLDivElement, ModeSelectionProps>(func
           </motion.div>
         )}
 
-        {cefrActiveLevel && Array.from(sectionMap.entries()).map(([sectionName, cards], i) => (
+        {cefrActiveLevel && track === 'official' && Array.from(sectionMap.entries()).map(([sectionName, cards], i) => (
           <motion.div
             key={`${sectionName}-${cefrActiveLevel}`}
             initial="hidden"

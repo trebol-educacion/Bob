@@ -2,5 +2,10 @@
   "sections": {
     "freePractice": "Free practice",
     "other": "Other"
+  },
+  "track": {
+    "official": "Exam prep",
+    "free": "Free practice",
+    "disclaimer": "Free practice — not an official exam activity."
   }
 }

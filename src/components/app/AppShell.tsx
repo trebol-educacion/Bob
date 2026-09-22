@@ -20,7 +20,7 @@ import type { StoredMessage } from '@/actions/messages';
 import type { AssessmentPrompt, AssessmentListeningItem, AssessmentReadingItem, AssessmentWritingTask } from '@/actions/assessment';
 import type { AppState, YLRenderProps, ExamRenderProps } from '@/lib/routing';
 import { getRouteForMode, isConversationMode } from '@/lib/routing';
-import type { AvailableMode } from '@/contexts/OrganizationContext';
+import { useOrganization, type AvailableMode } from '@/contexts/OrganizationContext';
 import type { Organization } from '@/lib/organization';
 import type { PracticeMode, CefrLevel, ModeKey } from '@/lib/types/practice';
 import type { Skill, SkillLevelMap } from '@/lib/types/skills';
@@ -120,6 +120,7 @@ export function AppShell({
   setAssessmentResult,
 }: AppShellProps) {
   const t = useTranslations('home.bobUnavailable');
+  const { track, setTrack } = useOrganization();
 
   const [pendingLeaveAction, setPendingLeaveAction] = useState<(() => void) | null>(null);
 
@@ -265,6 +266,7 @@ export function AppShell({
                   cefrActiveLevel={cefrActiveLevel}
                   cefrLevelLocked={cefrLevelLocked}
                   organization={organization}
+                  track={track} setTrack={setTrack}
                 />
               </motion.div>
             )}

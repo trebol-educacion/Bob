@@ -11,6 +11,7 @@ import { mapSkillLevelRows, type RawSkillLevelRow } from '@/lib/organization/ski
 import { computeEnabledModes } from '@/lib/organization/enabled-modes';
 import type { AvailableMode, BobAccessDenialReason } from '@/lib/organization/types';
 import type { ModeKey, ModeFramework, CefrLevel, DynamicCard, ResolvedCard } from '@/lib/types/practice';
+import type { PracticeTrack } from '@/lib/modes';
 import type { Skill, SkillLevelMap } from '@/lib/types/skills';
 
 export type { AvailableMode, BobAccessDenialReason };
@@ -27,6 +28,8 @@ interface OrganizationContextValue {
   selectedSkill: Skill | null;
   setSelectedSkill: (skill: Skill | null) => void;
   resolvedCards: ResolvedCard[];
+  track: PracticeTrack;
+  setTrack: (track: PracticeTrack) => void;
   assessmentCooldownDays: number;
   pendingAssessments: PendingAssessmentsMap;
   sustainedImprovementDetected: boolean | null;
@@ -51,6 +54,8 @@ const OrganizationContext = createContext<OrganizationContextValue>({
   selectedSkill: null,
   setSelectedSkill: () => {},
   resolvedCards: [],
+  track: 'official',
+  setTrack: () => {},
   assessmentCooldownDays: 7,
   pendingAssessments: { speaking: null, listening: null, reading: null, writing: null },
   sustainedImprovementDetected: null,
@@ -82,6 +87,7 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
   const [pendingAssessments, setPendingAssessments] = useState<PendingAssessmentsMap>({
     speaking: null, listening: null, reading: null, writing: null,
   });
+  const [track, setTrack] = useState<PracticeTrack>('official');
   const [selectedSkill, setSelectedSkillState] = useState<Skill | null>(() => {
     if (typeof window !== 'undefined') {
       return (sessionStorage.getItem('bob_selected_skill') as Skill | null) ?? null;
@@ -269,8 +275,9 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
       studentFrameworks: cachedStudentFrameworks,
       orgFrameworks: cachedOrgFrameworks,
       allDynamicCards,
+      track,
     });
-  }, [selectedSkill, skillLevels, cachedOrg, cachedStudentFrameworks, cachedOrgFrameworks, allDynamicCards]);
+  }, [selectedSkill, skillLevels, cachedOrg, cachedStudentFrameworks, cachedOrgFrameworks, allDynamicCards, track]);
 
   const accessGranted = accessDenialReason === null && !loading;
 
@@ -287,6 +294,8 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
       selectedSkill,
       setSelectedSkill,
       resolvedCards,
+      track,
+      setTrack,
       assessmentCooldownDays,
       pendingAssessments,
       sustainedImprovementDetected,
