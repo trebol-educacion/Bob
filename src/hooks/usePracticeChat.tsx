@@ -118,7 +118,7 @@ export function usePracticeChat({
   const { saveError, addBobMessage, addUserMessage, saveMsg } = useChatMessaging({ sessionIdRef, setMessages });
 
   const handleListen = async (text: string) => {
-    await playSpeech(text);
+    await playSpeech(sessionIdRef.current, text);
   };
 
   const handleTopicSubmit = async () => {
