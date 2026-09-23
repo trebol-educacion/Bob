@@ -10,9 +10,13 @@
  */
 
 import { createSupabaseServer } from '@/lib/supabase/server'
-import { FALLBACK_PROMPTS } from './fallback-prompts'
+import { FALLBACK_PROMPTS as BASE_FALLBACK_PROMPTS } from './fallback-prompts'
+import { PRACTICE_FALLBACK_PROMPTS } from './fallback-prompts-practice'
 
-export { FALLBACK_PROMPTS } from './fallback-prompts'
+export const FALLBACK_PROMPTS: Record<string, string> = {
+  ...BASE_FALLBACK_PROMPTS,
+  ...PRACTICE_FALLBACK_PROMPTS,
+}
 
 type PromptRow = {
   prompt_key: string

@@ -12,16 +12,21 @@ import type { CefrLevel } from '@/lib/types/practice';
  * Generates a structured initial framing and first message for the simulation.
  * Falls back gracefully — intentional fallback, do NOT convert to throw.
  */
-export async function generateInitialChatAction(topic: string, level: CefrLevel = 'b1'): Promise<InitialChatResult> {
+export async function generateInitialChatAction(
+  topic: string,
+  level: CefrLevel = 'b1',
+  promptKey: string = 'generic_conversation_shared_initial',
+  extraParams: Record<string, string> = {}
+): Promise<InitialChatResult> {
   const defaultResult: InitialChatResult = {
     framing: 'La conversación está lista.',
     message: "Hello! I'm ready to start when you are.",
   };
 
-  const prompt = await getPrompt('generic_conversation_shared_initial', { TOPIC: topic, CEFR_LEVEL: level });
+  const prompt = await getPrompt(promptKey, { TOPIC: topic, CEFR_LEVEL: level, ...extraParams });
 
   const result = await callGemini(
-    { promptKey: 'generic_conversation_shared_initial', model: MODELS.FLASH_LITE_PREVIEW },
+    { promptKey, model: MODELS.FLASH_LITE_PREVIEW },
     (ai) => ai.models.generateContent({
       model: MODELS.FLASH_LITE_PREVIEW,
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
