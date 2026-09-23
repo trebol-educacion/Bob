@@ -279,7 +279,9 @@ export function usePracticeChat({
     }
   };
 
-  onRecordedRef.current = handleAudioRecorded;
+  useEffect(() => {
+    onRecordedRef.current = handleAudioRecorded;
+  });
 
   const handleAudioStart = async () => {
     await startRecordingHook();

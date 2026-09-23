@@ -414,6 +414,7 @@ export function PETPictureDescriptionPractice({
   const { isRecording, startRecording, stopRecording } = useAudioRecorder({
     onRecorded: (blob) => {
       const duration = recordingStartRef.current
+        // eslint-disable-next-line react-hooks/purity
         ? (Date.now() - recordingStartRef.current) / 1000
         : 60 - timer.seconds;
       setAudioBlob(blob);

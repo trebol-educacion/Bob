@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import {
   ChatMessage,
   chatConversationAction,
@@ -210,13 +210,15 @@ export function useConversationHandlers({
     }
   };
 
-  onRecordedRef.current = async (blob: Blob) => {
-    if (conv.phase === 'conversation') {
-      await handleSendMessage(blob);
-    } else if (conv.phase === 'questions') {
-      await handleAnswerQuestion(blob);
-    }
-  };
+  useEffect(() => {
+    onRecordedRef.current = async (blob: Blob) => {
+      if (conv.phase === 'conversation') {
+        await handleSendMessage(blob);
+      } else if (conv.phase === 'questions') {
+        await handleAnswerQuestion(blob);
+      }
+    };
+  });
 
   const handleTopicConfirm = async () => {
     const topic = conv.topicInput.trim();

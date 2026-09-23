@@ -73,7 +73,6 @@ export function WritingPractice({
 
   const wordCount = countWords(text);
   const [minWords, maxWords] = targetWordCount;
-  const elapsed = Math.floor((Date.now() - startTime) / 1000);
 
   async function handleSubmit() {
     if (submitting || feedback) return;
