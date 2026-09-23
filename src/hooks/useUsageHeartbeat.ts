@@ -11,8 +11,8 @@ const INTERACTION_EVENTS: Array<keyof WindowEventMap> = ['pointerdown', 'keydown
  * @returns void
  */
 export function useUsageHeartbeat(mode: string | null): void {
-  const lastInteractionAtRef = useRef(Date.now());
-  const lastTickAtRef = useRef(Date.now());
+  const lastInteractionAtRef = useRef(0);
+  const lastTickAtRef = useRef(0);
 
   useEffect(() => {
     if (!mode) return;
