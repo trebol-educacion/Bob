@@ -31,20 +31,6 @@ export function AssessmentReadingRunner({ assessment_id, items, onResult, onCanc
     setSelectedKey(key);
   }, []);
 
-  const handleNext = useCallback(() => {
-    if (!selectedKey || !currentItem) return;
-
-    const updatedAnswers = { ...answers, [currentItem.id]: selectedKey };
-    setAnswers(updatedAnswers);
-
-    if (isLastItem) {
-      handleSubmit(updatedAnswers);
-    } else {
-      setCurrentIdx(prev => prev + 1);
-      setSelectedKey(null);
-    }
-  }, [selectedKey, currentItem, answers, isLastItem]);
-
   const handleSubmit = useCallback(async (finalAnswers: Record<string, string>) => {
     setSubmitting(true);
 
@@ -64,6 +50,20 @@ export function AssessmentReadingRunner({ assessment_id, items, onResult, onCanc
 
     onResult(result.result);
   }, [assessment_id, onResult]);
+
+  const handleNext = useCallback(() => {
+    if (!selectedKey || !currentItem) return;
+
+    const updatedAnswers = { ...answers, [currentItem.id]: selectedKey };
+    setAnswers(updatedAnswers);
+
+    if (isLastItem) {
+      handleSubmit(updatedAnswers);
+    } else {
+      setCurrentIdx(prev => prev + 1);
+      setSelectedKey(null);
+    }
+  }, [selectedKey, currentItem, answers, isLastItem, handleSubmit]);
 
   const handleRetry = useCallback(() => {
     setCurrentIdx(0);

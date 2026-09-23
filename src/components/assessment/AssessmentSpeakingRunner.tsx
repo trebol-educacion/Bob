@@ -124,15 +124,6 @@ export function AssessmentSpeakingRunner({ assessment_id, prompts, is_yl = false
     }, 250);
   }, [stopRecording]);
 
-  const handleNext = useCallback(() => {
-    if (currentTurnIdx < prompts.length - 1) {
-      setCurrentTurnIdx((i) => i + 1);
-      setTurnState('idle');
-    } else {
-      handleSubmit();
-    }
-  }, [currentTurnIdx, prompts.length]);
-
   const handleSubmit = useCallback(async () => {
     setPhase('submitting');
 
@@ -158,6 +149,15 @@ export function AssessmentSpeakingRunner({ assessment_id, prompts, is_yl = false
       onQueued();
     }, 2_000);
   }, [assessment_id, recordedTurns, prompts.length, onQueued]);
+
+  const handleNext = useCallback(() => {
+    if (currentTurnIdx < prompts.length - 1) {
+      setCurrentTurnIdx((i) => i + 1);
+      setTurnState('idle');
+    } else {
+      handleSubmit();
+    }
+  }, [currentTurnIdx, prompts.length, handleSubmit]);
 
   const handleRetry = useCallback(() => {
     setPhase('turns');

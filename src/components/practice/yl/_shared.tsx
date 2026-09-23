@@ -559,6 +559,35 @@ interface YLAudioControlsProps {
   showNext?: boolean;
 }
 
+function YLAudioControlButton({
+  onClick,
+  title,
+  children,
+  primary = false,
+  accent = false,
+  disabled = false,
+}: {
+  onClick: () => void;
+  title: string;
+  children: React.ReactNode;
+  primary?: boolean;
+  accent?: boolean;
+  disabled?: boolean;
+}) {
+  const base =
+    'w-12 h-12 rounded-full flex items-center justify-center shadow-md transition-all hover:scale-105 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100';
+  const color = primary
+    ? 'bg-blue-600 text-white'
+    : accent
+    ? 'bg-red-500 text-white'
+    : 'bg-gray-100 text-gray-700 hover:bg-gray-200';
+  return (
+    <button type="button" onClick={onClick} title={title} disabled={disabled} className={`${base} ${color}`}>
+      {children}
+    </button>
+  );
+}
+
 export function YLAudioControls({
   isPlaying,
   isPaused,
@@ -571,76 +600,48 @@ export function YLAudioControls({
   showNext = false,
 }: YLAudioControlsProps) {
   const t = useTranslations('yl');
-  const Btn = ({
-    onClick,
-    title,
-    children,
-    primary = false,
-    accent = false,
-    disabled = false,
-  }: {
-    onClick: () => void;
-    title: string;
-    children: React.ReactNode;
-    primary?: boolean;
-    accent?: boolean;
-    disabled?: boolean;
-  }) => {
-    const base =
-      'w-12 h-12 rounded-full flex items-center justify-center shadow-md transition-all hover:scale-105 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100';
-    const color = primary
-      ? 'bg-blue-600 text-white'
-      : accent
-      ? 'bg-red-500 text-white'
-      : 'bg-gray-100 text-gray-700 hover:bg-gray-200';
-    return (
-      <button type="button" onClick={onClick} title={title} disabled={disabled} className={`${base} ${color}`}>
-        {children}
-      </button>
-    );
-  };
 
   return (
     <div className="flex items-center gap-3 justify-center">
       {isPlaying && !isPaused ? (
-        <Btn onClick={onPause} title="Pause">
+        <YLAudioControlButton onClick={onPause} title="Pause">
           <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
             <rect x="6" y="5" width="4" height="14" rx="1" />
             <rect x="14" y="5" width="4" height="14" rx="1" />
           </svg>
-        </Btn>
+        </YLAudioControlButton>
       ) : (
-        <Btn onClick={onPlay} title={t('shared.play')} primary>
+        <YLAudioControlButton onClick={onPlay} title={t('shared.play')} primary>
           <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
             <path d="M8 5v14l11-7z" />
           </svg>
-        </Btn>
+        </YLAudioControlButton>
       )}
 
-      <Btn onClick={onReplay} title="Restart">
+      <YLAudioControlButton onClick={onReplay} title="Restart">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
           <path d="M3 12a9 9 0 1 0 3-6.7" />
           <polyline points="3 4 3 10 9 10" />
         </svg>
-      </Btn>
+      </YLAudioControlButton>
 
       {showRecord && onRecord && (
-        <Btn onClick={onRecord} title="Start speaking" accent>
+        <YLAudioControlButton onClick={onRecord} title="Start speaking" accent>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
             <rect x="9" y="3" width="6" height="12" rx="3" />
             <path d="M5 11a7 7 0 0 0 14 0" />
             <line x1="12" y1="18" x2="12" y2="22" />
           </svg>
-        </Btn>
+        </YLAudioControlButton>
       )}
 
       {showNext && onNext && (
-        <Btn onClick={onNext} title={t('shared.next')} primary>
+        <YLAudioControlButton onClick={onNext} title={t('shared.next')} primary>
           <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
             <path d="M6 4l12 8-12 8V4z" />
             <rect x="18" y="4" width="2" height="16" />
           </svg>
-        </Btn>
+        </YLAudioControlButton>
       )}
     </div>
   );

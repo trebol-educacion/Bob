@@ -108,6 +108,17 @@ export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) 
   const sessionIdRef = useRef<string | null>(null);
   const userIdRef = useRef<string | null>(null);
 
+  const { startRecording, stopRecording } = useAudioRecorder({
+    onRecorded: (blob) => {
+      recordedBlobRef.current = blob;
+      setSubPhase('evaluating');
+    },
+    onError: (err) => {
+      console.error('Recording error:', err);
+      setError(t('common.micError'));
+    },
+  });
+
   const prepCountdown = useCountdown({
     seconds: PREP_SECONDS,
     onComplete: useCallback(() => {
@@ -121,17 +132,6 @@ export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) 
       stopRecording();
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []),
-  });
-
-  const { startRecording, stopRecording } = useAudioRecorder({
-    onRecorded: (blob) => {
-      recordedBlobRef.current = blob;
-      setSubPhase('evaluating');
-    },
-    onError: (err) => {
-      console.error('Recording error:', err);
-      setError(t('common.micError'));
-    },
   });
 
   useEffect(() => {
