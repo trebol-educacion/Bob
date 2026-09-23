@@ -5,6 +5,7 @@ vi.mock('@/actions/assessment/queue-guard', () => ({
 }));
 
 const profileMaybeSingle = vi.fn().mockResolvedValue({ data: { cefr_level_locked: false, cefr_active_level: null } });
+const skillLevelMaybeSingle = vi.fn().mockResolvedValue({ data: null });
 
 vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServer: vi.fn().mockResolvedValue({
@@ -21,40 +22,42 @@ vi.mock('@/lib/supabase/server', () => ({
       }),
     }),
     from: vi.fn().mockReturnValue({
+      select: vi.fn().mockReturnValue({
+        eq: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            maybeSingle: skillLevelMaybeSingle,
+          }),
+        }),
+      }),
       upsert: vi.fn().mockResolvedValue({ error: null }),
     }),
   }),
 }));
 
-describe('applyDefaultSkillLevelAction — pending assessment guard', () => {
+describe('pickInitialSkillLevelAction — alta inicial del alumno', () => {
   beforeEach(() => {
     profileMaybeSingle.mockResolvedValue({ data: { cefr_level_locked: false, cefr_active_level: null } });
+    skillLevelMaybeSingle.mockResolvedValue({ data: null });
   });
 
   it('rechaza con assessment_pending si hay una evaluación en cola para la destreza', async () => {
     const { hasPendingAssessment } = await import('@/actions/assessment/queue-guard');
     (hasPendingAssessment as ReturnType<typeof vi.fn>).mockResolvedValueOnce(true);
 
-    const { applyDefaultSkillLevelAction } = await import('@/actions/skills/write');
-    const result = await applyDefaultSkillLevelAction('speaking', 'a2');
+    const { pickInitialSkillLevelAction } = await import('@/actions/skills/write');
+    const result = await pickInitialSkillLevelAction('speaking', 'a2');
 
     expect(result).toEqual({ ok: false, code: 'assessment_pending' });
   });
 
-  it('aplica el nivel por defecto si no hay evaluación pendiente ni bloqueo', async () => {
+  it('permite el alta inicial si el alumno no tiene nivel previo ni bloqueo', async () => {
     const { hasPendingAssessment } = await import('@/actions/assessment/queue-guard');
     (hasPendingAssessment as ReturnType<typeof vi.fn>).mockResolvedValueOnce(false);
 
-    const { applyDefaultSkillLevelAction } = await import('@/actions/skills/write');
-    const result = await applyDefaultSkillLevelAction('speaking', 'a2');
+    const { pickInitialSkillLevelAction } = await import('@/actions/skills/write');
+    const result = await pickInitialSkillLevelAction('speaking', 'a2');
 
     expect(result).toEqual({ ok: true });
-  });
-});
-
-describe('applyDefaultSkillLevelAction — nivel bloqueado por el colegio', () => {
-  beforeEach(() => {
-    delete process.env.BOB_LEVEL_SELECTOR_ENABLED;
   });
 
   it('rechaza con level_locked si el colegio bloqueó el nivel y hay nivel de tenant', async () => {
@@ -62,21 +65,55 @@ describe('applyDefaultSkillLevelAction — nivel bloqueado por el colegio', () =
     (hasPendingAssessment as ReturnType<typeof vi.fn>).mockResolvedValueOnce(false);
     profileMaybeSingle.mockResolvedValueOnce({ data: { cefr_level_locked: true, cefr_active_level: 'b1' } });
 
-    const { applyDefaultSkillLevelAction } = await import('@/actions/skills/write');
-    const result = await applyDefaultSkillLevelAction('speaking', 'a2');
+    const { pickInitialSkillLevelAction } = await import('@/actions/skills/write');
+    const result = await pickInitialSkillLevelAction('speaking', 'a2');
 
     expect(result).toEqual({ ok: false, code: 'level_locked' });
   });
 
-  it('permite la elección manual con el flag de tester activo aunque el nivel esté bloqueado', async () => {
+  it('rechaza con level_already_set si la destreza ya tiene nivel asignado', async () => {
+    const { hasPendingAssessment } = await import('@/actions/assessment/queue-guard');
+    (hasPendingAssessment as ReturnType<typeof vi.fn>).mockResolvedValueOnce(false);
+    skillLevelMaybeSingle.mockResolvedValueOnce({ data: { cefr_level: 'a2' } });
+
+    const { pickInitialSkillLevelAction } = await import('@/actions/skills/write');
+    const result = await pickInitialSkillLevelAction('speaking', 'b1');
+
+    expect(result).toEqual({ ok: false, code: 'level_already_set' });
+  });
+});
+
+describe('changeSkillLevelAction — cambio de nivel desde el dashboard', () => {
+  beforeEach(() => {
+    delete process.env.BOB_LEVEL_SELECTOR_ENABLED;
+  });
+
+  it('rechaza con tester_only si el flag de servidor está apagado', async () => {
+    const { changeSkillLevelAction } = await import('@/actions/skills/write');
+    const result = await changeSkillLevelAction('speaking', 'a2');
+
+    expect(result).toEqual({ ok: false, code: 'tester_only' });
+  });
+
+  it('permite el cambio de nivel con el flag de tester activo', async () => {
     process.env.BOB_LEVEL_SELECTOR_ENABLED = 'true';
     const { hasPendingAssessment } = await import('@/actions/assessment/queue-guard');
     (hasPendingAssessment as ReturnType<typeof vi.fn>).mockResolvedValueOnce(false);
-    profileMaybeSingle.mockResolvedValueOnce({ data: { cefr_level_locked: true, cefr_active_level: 'b1' } });
 
-    const { applyDefaultSkillLevelAction } = await import('@/actions/skills/write');
-    const result = await applyDefaultSkillLevelAction('speaking', 'a2');
+    const { changeSkillLevelAction } = await import('@/actions/skills/write');
+    const result = await changeSkillLevelAction('speaking', 'b1');
 
     expect(result).toEqual({ ok: true });
+  });
+
+  it('rechaza con assessment_pending aunque el flag esté activo si hay evaluación en cola', async () => {
+    process.env.BOB_LEVEL_SELECTOR_ENABLED = 'true';
+    const { hasPendingAssessment } = await import('@/actions/assessment/queue-guard');
+    (hasPendingAssessment as ReturnType<typeof vi.fn>).mockResolvedValueOnce(true);
+
+    const { changeSkillLevelAction } = await import('@/actions/skills/write');
+    const result = await changeSkillLevelAction('speaking', 'b1');
+
+    expect(result).toEqual({ ok: false, code: 'assessment_pending' });
   });
 });

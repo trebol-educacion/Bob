@@ -63,10 +63,15 @@ export async function resetOwnSkillLevelAction(skill: Skill): Promise<{ ok: bool
   }
 }
 
-export async function applyDefaultSkillLevelAction(
+/**
+ * @param skill Skill
+ * @param cefrLevel CefrLevel
+ * @returns Promise<{ ok: boolean; code?: 'assessment_pending' | 'level_locked' | 'level_already_set' }>
+ */
+export async function pickInitialSkillLevelAction(
   skill: Skill,
   cefrLevel: CefrLevel = 'a1',
-): Promise<{ ok: boolean; code?: 'assessment_pending' | 'level_locked' }> {
+): Promise<{ ok: boolean; code?: 'assessment_pending' | 'level_locked' | 'level_already_set' }> {
   try {
     const supabase = await createSupabaseServer();
     const { data: { user } } = await supabase.auth.getUser();
@@ -85,10 +90,63 @@ export async function applyDefaultSkillLevelAction(
     const levelPolicy = resolveLevelPolicy({
       cefrLevelLocked: profile?.cefr_level_locked ?? false,
       cefrActiveLevel: (profile?.cefr_active_level ?? null) as CefrLevel | null,
-      testerOverrideEnabled: isLevelSelectorTesterEnabled(process.env.BOB_LEVEL_SELECTOR_ENABLED),
+      testerOverrideEnabled: false,
     });
-    if (levelPolicy.skipPlacement && !levelPolicy.allowManualSelection) {
+    if (levelPolicy.skipPlacement) {
       return { ok: false, code: 'level_locked' };
+    }
+
+    const { data: existingLevel } = await supabase
+      .from('skill_levels')
+      .select('cefr_level')
+      .eq('user_id', user.id)
+      .eq('skill', skill)
+      .maybeSingle();
+
+    if (existingLevel?.cefr_level) {
+      return { ok: false, code: 'level_already_set' };
+    }
+
+    const { error } = await supabase
+      .from('skill_levels')
+      .upsert(
+        {
+          user_id: user.id,
+          skill,
+          cefr_level: cefrLevel,
+          origin: 'default',
+          confidence: null,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'user_id,skill' },
+      );
+
+    return { ok: !error };
+  } catch {
+    return { ok: false };
+  }
+}
+
+/**
+ * @param skill Skill
+ * @param cefrLevel CefrLevel
+ * @returns Promise<{ ok: boolean; code?: 'tester_only' | 'assessment_pending' }>
+ */
+export async function changeSkillLevelAction(
+  skill: Skill,
+  cefrLevel: CefrLevel,
+): Promise<{ ok: boolean; code?: 'tester_only' | 'assessment_pending' }> {
+  try {
+    if (!isLevelSelectorTesterEnabled(process.env.BOB_LEVEL_SELECTOR_ENABLED)) {
+      return { ok: false, code: 'tester_only' };
+    }
+
+    const supabase = await createSupabaseServer();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { ok: false };
+
+    if (await hasPendingAssessment(supabase, user.id, skill)) {
+      return { ok: false, code: 'assessment_pending' };
     }
 
     const { error } = await supabase

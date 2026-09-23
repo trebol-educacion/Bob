@@ -2,9 +2,7 @@
 
 import React from 'react';
 import { StudentStatsPanel } from '@/components/StudentStatsPanel';
-import { applyDefaultSkillLevelAction, promoteSkillLevelAction } from '@/actions/skills';
-import { useOrganization } from '@/hooks/useOrganization';
-import { resolveLevelPolicy } from '@/lib/levels/level-policy';
+import { changeSkillLevelAction, promoteSkillLevelAction } from '@/actions/skills';
 import type { AppState } from '@/lib/routing';
 import type { CefrLevel } from '@/lib/types/practice';
 import type { Skill } from '@/lib/types/skills';
@@ -22,9 +20,6 @@ export function DashboardView({
   refreshSessions,
   refreshSkillLevels,
 }: DashboardViewProps) {
-  const { cefrLevelLocked, cefrActiveLevel } = useOrganization();
-  const levelPolicy = resolveLevelPolicy({ cefrLevelLocked, cefrActiveLevel, testerOverrideEnabled: false });
-
   return (
     <StudentStatsPanel
       onBack={() => setAppState('skill-selection')}
@@ -35,8 +30,8 @@ export function DashboardView({
         setSelectedSkill(skill);
         setAppState('assessment-invite');
       }}
-      onChangeLevel={levelPolicy.skipPlacement ? undefined : async (skill, level) => {
-        const result = await applyDefaultSkillLevelAction(skill, level as CefrLevel);
+      onChangeLevel={async (skill, level) => {
+        const result = await changeSkillLevelAction(skill, level as CefrLevel);
         if (result.ok) {
           await refreshSkillLevels();
         }

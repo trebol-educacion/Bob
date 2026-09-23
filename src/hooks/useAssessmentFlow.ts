@@ -2,7 +2,7 @@
 
 import { useCallback, useState } from 'react';
 import { startAssessmentAction } from '@/actions/assessment';
-import { applyDefaultSkillLevelAction, resetOwnSkillLevelAction } from '@/actions/skills';
+import { pickInitialSkillLevelAction, resetOwnSkillLevelAction } from '@/actions/skills';
 import { resolveLevelPolicy } from '@/lib/levels/level-policy';
 import type { AssessmentPrompt, AssessmentListeningItem, AssessmentReadingItem, AssessmentWritingTask } from '@/actions/assessment';
 import type { AppState } from '@/lib/routing';
@@ -111,7 +111,7 @@ export function useAssessmentFlow({
     if (!selectedSkill) return;
     const existing = skillLevels?.[selectedSkill]?.cefr_level;
     if (existing !== level) {
-      const result = await applyDefaultSkillLevelAction(selectedSkill, level);
+      const result = await pickInitialSkillLevelAction(selectedSkill, level);
       if (result.ok) {
         await refreshSkillLevels();
       }
