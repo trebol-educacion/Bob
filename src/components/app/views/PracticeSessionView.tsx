@@ -74,7 +74,8 @@ export function PracticeSessionView({ organization, cefrActiveLevel, skillLevels
       seed={session.seed}
       level={session.level}
       framing={session.framing}
-      message={session.message}
+      messages={session.messages}
+      turnSignals={session.turnSignals}
       onExit={onExit}
       onRestart={() => setAttempt((n) => n + 1)}
     />

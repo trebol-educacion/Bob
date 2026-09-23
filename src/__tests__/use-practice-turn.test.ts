@@ -34,7 +34,7 @@ function baseArgs() {
     seed: SEED,
     level: 'b1' as const,
     initialFraming: 'framing',
-    initialMessage: 'Hello!',
+    initialMessages: [{ role: 'model' as const, text: 'Hello!' }],
   };
 }
 

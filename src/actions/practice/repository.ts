@@ -123,6 +123,58 @@ export async function savePracticeImageAction(input: {
   }
 }
 
+const OPEN_SESSION_MAX_AGE_MS = 6 * 60 * 60 * 1000;
+
+export async function findOpenPracticeSessionAction(): Promise<PracticeResult<PracticeSession | null>> {
+  try {
+    const supabase = await createSupabaseServer();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { ok: false, code: 'unauthenticated' };
+
+    const cutoff = new Date(Date.now() - OPEN_SESSION_MAX_AGE_MS).toISOString();
+
+    const { data, error } = await supabase
+      .from('practice_sessions')
+      .select()
+      .eq('user_id', user.id)
+      .is('ended_at', null)
+      .gte('started_at', cutoff)
+      .order('started_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) {
+      if (isMissingTableError(error)) return { ok: false, code: 'degraded', degraded: true };
+      return { ok: false, code: error.message };
+    }
+    return { ok: true, data: (data as PracticeSession | null) ?? null };
+  } catch (e) {
+    return { ok: false, code: String(e) };
+  }
+}
+
+export async function listPracticeMessagesAction(sessionId: string): Promise<PracticeResult<PracticeMessage[]>> {
+  try {
+    const supabase = await createSupabaseServer();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { ok: false, code: 'unauthenticated' };
+
+    const { data, error } = await supabase
+      .from('practice_messages')
+      .select()
+      .eq('session_id', sessionId)
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      if (isMissingTableError(error)) return { ok: false, code: 'degraded', degraded: true };
+      return { ok: false, code: error.message };
+    }
+    return { ok: true, data: (data as PracticeMessage[]) ?? [] };
+  } catch (e) {
+    return { ok: false, code: String(e) };
+  }
+}
+
 export async function updatePracticeModeAction(input: {
   sessionId: string;
   mode: PracticeActivityMode;

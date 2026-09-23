@@ -24,7 +24,8 @@ export interface UsePracticeTurnArgs {
   seed: PracticeSeed;
   level: CefrLevel;
   initialFraming: string;
-  initialMessage: string;
+  initialMessages: ChatMessage[];
+  initialTurnSignals?: PracticeTurnSignal[];
 }
 
 export interface UsePracticeTurnReturn {
@@ -55,13 +56,13 @@ export interface UsePracticeTurnReturn {
  * @param args UsePracticeTurnArgs
  */
 export function usePracticeTurn(args: UsePracticeTurnArgs): UsePracticeTurnReturn {
-  const { sessionId, initialFraming, initialMessage, level } = args;
+  const { sessionId, initialFraming, initialMessages, initialTurnSignals, level } = args;
 
   const [mode, setMode] = useState(args.mode);
   const [seed, setSeed] = useState(args.seed);
   const [framing, setFraming] = useState(initialFraming);
-  const [messages, setMessages] = useState<ChatMessage[]>([{ role: 'model', text: initialMessage }]);
-  const [turnSignals, setTurnSignals] = useState<PracticeTurnSignal[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
+  const [turnSignals, setTurnSignals] = useState<PracticeTurnSignal[]>(initialTurnSignals ?? []);
   const [playCounts, setPlayCounts] = useState<Record<number, number>>({});
   const [visibleTexts, setVisibleTexts] = useState<Record<number, boolean>>({});
   const [isGeneratingAudio, setIsGeneratingAudio] = useState<number | null>(null);

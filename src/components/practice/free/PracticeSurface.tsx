@@ -10,6 +10,8 @@ import { PracticeFinished } from './PracticeFinished';
 import { usePracticeTurn } from '@/hooks/practice/usePracticeTurn';
 import { finishPracticeAction } from '@/actions/practice/finish';
 import type { PracticeActivityMode, PracticeSeed } from '@/lib/practice/types';
+import type { PracticeTurnSignal } from '@/lib/grading/practice-rubric';
+import type { ChatMessage } from '@/actions/gemini/types';
 import type { CefrLevel } from '@/lib/types/practice';
 
 export interface PracticeSurfaceProps {
@@ -18,17 +20,26 @@ export interface PracticeSurfaceProps {
   seed: PracticeSeed;
   level: CefrLevel;
   framing: string;
-  message: string;
+  messages: ChatMessage[];
+  turnSignals?: PracticeTurnSignal[];
   onExit: () => void;
   onRestart: () => void;
 }
 
-export function PracticeSurface({ sessionId, mode, seed, level, framing, message, onExit, onRestart }: PracticeSurfaceProps) {
+export function PracticeSurface({ sessionId, mode, seed, level, framing, messages, turnSignals, onExit, onRestart }: PracticeSurfaceProps) {
   const t = useTranslations('practice');
   const [result, setResult] = useState<{ score: number; detail: { participation: number; fluency: number; independence: number; comprehension: number }; feedback: string } | null>(null);
   const [finishing, setFinishing] = useState(false);
 
-  const turn = usePracticeTurn({ sessionId, mode, seed, level, initialFraming: framing, initialMessage: message });
+  const turn = usePracticeTurn({
+    sessionId,
+    mode,
+    seed,
+    level,
+    initialFraming: framing,
+    initialMessages: messages,
+    initialTurnSignals: turnSignals,
+  });
 
   const handleFinish = async () => {
     if (finishing) return;
