@@ -34,6 +34,11 @@ vi.mock('@/lib/supabase/server', () => ({
 }));
 
 describe('practice repository', () => {
+  beforeEach(async () => {
+    const { resetPracticeRepositoryHealthForTests } = await import('@/lib/practice/repository-health');
+    resetPracticeRepositoryHealthForTests();
+  });
+
   it('createPracticeSessionAction inserta y devuelve la fila', async () => {
     const { createSupabaseServer } = await import('@/lib/supabase/server');
     (createSupabaseServer as ReturnType<typeof vi.fn>).mockResolvedValueOnce(

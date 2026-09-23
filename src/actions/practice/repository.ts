@@ -1,6 +1,11 @@
 'use server';
 
 import { createSupabaseServer } from '@/lib/supabase/server';
+import {
+  isPracticeRepositoryDegraded,
+  markPracticeRepositoryDegraded,
+  markPracticeRepositoryHealthy,
+} from '@/lib/practice/repository-health';
 import type { CefrLevel } from '@/lib/types/practice';
 import type {
   PracticeActivityMode,
@@ -18,6 +23,17 @@ function isMissingTableError(error: { code?: string; message?: string } | null):
   return error.code === '42P01' || /relation .* does not exist/i.test(error.message ?? '');
 }
 
+/** @param error { code?: string; message?: string } | null */
+function handleRepositoryError(error: { code?: string; message?: string } | null): { ok: false; code: string; degraded?: boolean } {
+  if (isMissingTableError(error)) {
+    markPracticeRepositoryDegraded();
+    return { ok: false, code: 'degraded', degraded: true };
+  }
+  return { ok: false, code: error?.message ?? 'unknown_error' };
+}
+
+const DEGRADED_RESULT = { ok: false as const, code: 'degraded', degraded: true as const };
+
 export async function createPracticeSessionAction(input: {
   mode: PracticeActivityMode;
   topic: string | null;
@@ -25,6 +41,7 @@ export async function createPracticeSessionAction(input: {
   seed: PracticeSeed;
   organizationId: string | null;
 }): Promise<PracticeResult<PracticeSession>> {
+  if (isPracticeRepositoryDegraded()) return DEGRADED_RESULT;
   try {
     const supabase = await createSupabaseServer();
     const { data: { user } } = await supabase.auth.getUser();
@@ -43,10 +60,8 @@ export async function createPracticeSessionAction(input: {
       .select()
       .single();
 
-    if (error) {
-      if (isMissingTableError(error)) return { ok: false, code: 'degraded', degraded: true };
-      return { ok: false, code: error.message };
-    }
+    if (error) return handleRepositoryError(error);
+    markPracticeRepositoryHealthy();
     return { ok: true, data: data as PracticeSession };
   } catch (e) {
     return { ok: false, code: String(e) };
@@ -61,6 +76,7 @@ export async function addPracticeTurnAction(input: {
   hintUsed?: boolean;
   modelAnswerUsed?: boolean;
 }): Promise<PracticeResult<PracticeMessage>> {
+  if (isPracticeRepositoryDegraded()) return DEGRADED_RESULT;
   try {
     const supabase = await createSupabaseServer();
     const { data: { user } } = await supabase.auth.getUser();
@@ -80,10 +96,8 @@ export async function addPracticeTurnAction(input: {
       .select()
       .single();
 
-    if (error) {
-      if (isMissingTableError(error)) return { ok: false, code: 'degraded', degraded: true };
-      return { ok: false, code: error.message };
-    }
+    if (error) return handleRepositoryError(error);
+    markPracticeRepositoryHealthy();
     return { ok: true, data: data as PracticeMessage };
   } catch (e) {
     return { ok: false, code: String(e) };
@@ -96,6 +110,7 @@ export async function savePracticeImageAction(input: {
   imageUrl: string;
   model: string;
 }): Promise<PracticeResult<PracticeImage>> {
+  if (isPracticeRepositoryDegraded()) return DEGRADED_RESULT;
   try {
     const supabase = await createSupabaseServer();
     const { data: { user } } = await supabase.auth.getUser();
@@ -113,10 +128,8 @@ export async function savePracticeImageAction(input: {
       .select()
       .single();
 
-    if (error) {
-      if (isMissingTableError(error)) return { ok: false, code: 'degraded', degraded: true };
-      return { ok: false, code: error.message };
-    }
+    if (error) return handleRepositoryError(error);
+    markPracticeRepositoryHealthy();
     return { ok: true, data: data as PracticeImage };
   } catch (e) {
     return { ok: false, code: String(e) };
@@ -126,6 +139,7 @@ export async function savePracticeImageAction(input: {
 const OPEN_SESSION_MAX_AGE_MS = 6 * 60 * 60 * 1000;
 
 export async function findOpenPracticeSessionAction(): Promise<PracticeResult<PracticeSession | null>> {
+  if (isPracticeRepositoryDegraded()) return DEGRADED_RESULT;
   try {
     const supabase = await createSupabaseServer();
     const { data: { user } } = await supabase.auth.getUser();
@@ -143,10 +157,8 @@ export async function findOpenPracticeSessionAction(): Promise<PracticeResult<Pr
       .limit(1)
       .maybeSingle();
 
-    if (error) {
-      if (isMissingTableError(error)) return { ok: false, code: 'degraded', degraded: true };
-      return { ok: false, code: error.message };
-    }
+    if (error) return handleRepositoryError(error);
+    markPracticeRepositoryHealthy();
     return { ok: true, data: (data as PracticeSession | null) ?? null };
   } catch (e) {
     return { ok: false, code: String(e) };
@@ -154,6 +166,7 @@ export async function findOpenPracticeSessionAction(): Promise<PracticeResult<Pr
 }
 
 export async function listPracticeMessagesAction(sessionId: string): Promise<PracticeResult<PracticeMessage[]>> {
+  if (isPracticeRepositoryDegraded()) return DEGRADED_RESULT;
   try {
     const supabase = await createSupabaseServer();
     const { data: { user } } = await supabase.auth.getUser();
@@ -165,10 +178,8 @@ export async function listPracticeMessagesAction(sessionId: string): Promise<Pra
       .eq('session_id', sessionId)
       .order('created_at', { ascending: true });
 
-    if (error) {
-      if (isMissingTableError(error)) return { ok: false, code: 'degraded', degraded: true };
-      return { ok: false, code: error.message };
-    }
+    if (error) return handleRepositoryError(error);
+    markPracticeRepositoryHealthy();
     return { ok: true, data: (data as PracticeMessage[]) ?? [] };
   } catch (e) {
     return { ok: false, code: String(e) };
@@ -180,6 +191,7 @@ export async function updatePracticeModeAction(input: {
   mode: PracticeActivityMode;
   topic: string;
 }): Promise<PracticeResult<null>> {
+  if (isPracticeRepositoryDegraded()) return DEGRADED_RESULT;
   try {
     const supabase = await createSupabaseServer();
     const { data: { user } } = await supabase.auth.getUser();
@@ -191,10 +203,8 @@ export async function updatePracticeModeAction(input: {
       .eq('id', input.sessionId)
       .eq('user_id', user.id);
 
-    if (error) {
-      if (isMissingTableError(error)) return { ok: false, code: 'degraded', degraded: true };
-      return { ok: false, code: error.message };
-    }
+    if (error) return handleRepositoryError(error);
+    markPracticeRepositoryHealthy();
     return { ok: true, data: null };
   } catch (e) {
     return { ok: false, code: String(e) };
@@ -206,6 +216,7 @@ export async function closePracticeSessionAction(input: {
   rubricScore: number;
   rubricDetail: PracticeRubricDetail;
 }): Promise<PracticeResult<null>> {
+  if (isPracticeRepositoryDegraded()) return DEGRADED_RESULT;
   try {
     const supabase = await createSupabaseServer();
     const { data: { user } } = await supabase.auth.getUser();
@@ -227,10 +238,8 @@ export async function closePracticeSessionAction(input: {
       .eq('id', input.sessionId)
       .eq('user_id', user.id);
 
-    if (error) {
-      if (isMissingTableError(error)) return { ok: false, code: 'degraded', degraded: true };
-      return { ok: false, code: error.message };
-    }
+    if (error) return handleRepositoryError(error);
+    markPracticeRepositoryHealthy();
     return { ok: true, data: null };
   } catch (e) {
     return { ok: false, code: String(e) };
