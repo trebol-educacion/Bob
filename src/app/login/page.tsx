@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Image from 'next/image';
 import { motion } from 'motion/react';
 import { Mail, Lock, Loader2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
@@ -48,7 +49,7 @@ export default function LoginPage() {
       setLoading(false);
       return;
     }
-    window.location.assign('/');
+    window.location.assign(`${window.location.origin}/`);
   };
 
   const handleMagicLinkSubmit = async (e: React.FormEvent) => {
@@ -101,17 +102,21 @@ export default function LoginPage() {
                 background: 'rgba(255,255,255,0.10)',
               }}
             >
-              <img
+              <Image
                 src="/bob_avatar.png"
                 alt="Avatar BOB"
-                className="w-[80%] object-contain"
+                width={447}
+                height={494}
+                className="w-[80%] h-auto object-contain"
               />
             </div>
           </div>
           <div className="flex items-center justify-center">
-            <img
+            <Image
               src="/bob_logo.png"
               alt="BOB"
+              width={607}
+              height={323}
               className="h-20 w-auto object-contain"
             />
           </div>
@@ -299,9 +304,11 @@ export default function LoginPage() {
           </div>
         </div>
         <div className="flex justify-center mt-6">
-          <img
+          <Image
             src="/footer_login.png"
             alt="Footer"
+            width={15109}
+            height={6753}
             className="h-12 w-auto object-contain opacity-80"
           />
         </div>

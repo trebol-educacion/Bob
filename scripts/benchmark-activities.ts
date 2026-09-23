@@ -11,7 +11,7 @@
 
 import { config } from 'dotenv';
 import { createClient } from '@supabase/supabase-js';
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI, type Part } from '@google/genai';
 
 config({ path: '.env.local' });
 
@@ -91,7 +91,7 @@ async function geminiTTS(text: string): Promise<{ bytes: number; ms: number; ok:
           speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Sadaltager' } } },
         },
       });
-      const part = res.candidates?.[0]?.content?.parts?.find((p: any) => p.inlineData);
+      const part = res.candidates?.[0]?.content?.parts?.find((p: Part) => p.inlineData);
       return (part?.inlineData?.data?.length ?? 0) as number;
     } catch {
       return 0;
@@ -108,7 +108,7 @@ async function geminiImage(prompt: string): Promise<{ bytes: number; ms: number;
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
         config: { responseModalities: ['image', 'text'] },
       });
-      const part = res.candidates?.[0]?.content?.parts?.find((p: any) => p.inlineData?.mimeType?.startsWith('image/'));
+      const part = res.candidates?.[0]?.content?.parts?.find((p: Part) => p.inlineData?.mimeType?.startsWith('image/'));
       return (part?.inlineData?.data?.length ?? 0) as number;
     } catch {
       return 0;
@@ -161,7 +161,7 @@ async function runListeningPart3(): Promise<ActivityResult> {
   let convoText = 'Man: Hello. Woman: Hi there. Man: How are you today?';
   try {
     const parsed = JSON.parse(text);
-    convoText = (parsed.conversation ?? []).map((t: any) => `${t.speaker === 'M' ? 'Man' : 'Woman'}: ${t.line}`).join('\n');
+    convoText = (parsed.conversation ?? []).map((t: { speaker: string; line: string }) => `${t.speaker === 'M' ? 'Man' : 'Woman'}: ${t.line}`).join('\n');
   } catch {}
 
   const { ms: ttsMs, ok: ttsOk, bytes } = await geminiTTS(convoText.slice(0, 400));
@@ -213,7 +213,7 @@ async function runListeningPart5(): Promise<ActivityResult> {
   let audioText = 'Today I want to tell you about my favourite hobby.';
   try {
     const parsed = JSON.parse(text);
-    audioText = (parsed.audio ?? []).map((t: any) => t.line).join(' ');
+    audioText = (parsed.audio ?? []).map((t: { line: string }) => t.line).join(' ');
   } catch {}
 
   const { ms: ttsMs, ok: ttsOk, bytes } = await geminiTTS(audioText.slice(0, 300));

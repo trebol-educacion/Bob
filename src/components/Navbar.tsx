@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'motion/react';
 import { LogOut, User, BarChart3, Menu, Headphones, Mic2, BookOpen, PenLine } from 'lucide-react';
@@ -79,15 +80,18 @@ export function Navbar({ userEmail, onOpenDashboard, onToggleSidebar, onGoHome }
             className="flex items-center rounded-lg p-1 -m-1 hover:bg-white/10 transition-colors disabled:cursor-default disabled:hover:bg-transparent cursor-pointer"
           >
             {organization?.logo_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={organization.logo_url}
                 alt={organization.name}
                 className="h-8 w-auto object-contain"
               />
             ) : (
-              <img
+              <Image
                 src="/bob_logo.png"
                 alt="BOB"
+                width={607}
+                height={323}
                 className="h-8 w-auto object-contain"
               />
             )}

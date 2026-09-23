@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import Image from 'next/image';
 import { motion } from 'motion/react';
 import { Headphones, Mic2, BookOpen, PenLine } from 'lucide-react';
 import { useOrganization } from '@/hooks/useOrganization';
@@ -16,10 +17,12 @@ function BobGreetingAvatar() {
         className="w-full h-full relative"
         style={{ transformOrigin: '50% 80%' }}
       >
-        <img
+        <Image
           src="/bob_avatar.png"
           alt="Bob"
-          className="absolute inset-0 w-full h-full object-cover object-[50%_0%] scale-95 origin-bottom"
+          fill
+          sizes="160px"
+          className="object-cover object-[50%_0%] scale-95 origin-bottom"
         />
       </motion.div>
       {!videoEnded && (
