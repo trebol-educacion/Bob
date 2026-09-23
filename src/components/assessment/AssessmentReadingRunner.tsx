@@ -2,6 +2,7 @@
 
 import React, { useState, useCallback } from 'react';
 import { ChevronRight, RotateCcw } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import { submitAssessmentReadingAction } from '@/actions/assessment';
 import { BobMascotLoader } from '@/components/chat/BobMascotLoader';
 import type { AssessmentReadingItem } from '@/actions/assessment';
@@ -15,6 +16,7 @@ interface Props {
 }
 
 export function AssessmentReadingRunner({ assessment_id, items, onResult, onCancel }: Props) {
+  const tPlacement = useTranslations('placement');
   const [currentIdx, setCurrentIdx] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
@@ -159,7 +161,7 @@ export function AssessmentReadingRunner({ assessment_id, items, onResult, onCanc
       </button>
 
       <button onClick={onCancel} className="text-sm text-gray-400 hover:text-gray-600 transition">
-        Cancel assessment
+        {tPlacement('cancelButton')}
       </button>
     </div>
   );

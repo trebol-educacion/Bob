@@ -93,6 +93,7 @@ const SKILL_LABEL: Record<Skill, string> = {
 export function AssessmentInvite({ skill, onStartAssessment, onPickLevel, onBack }: Props) {
   const { skillLevels, assessmentCooldownDays, pendingAssessments, cefrActiveLevel, cefrLevelLocked } = useOrganization();
   const t = useTranslations('home.assessmentInvite');
+  const tPlacement = useTranslations('placement');
 
   const levelPolicy = resolveLevelPolicy({ cefrLevelLocked, cefrActiveLevel, testerOverrideEnabled: false });
   const { placementPending, locked } = resolveEffectiveLevel(
@@ -158,8 +159,8 @@ export function AssessmentInvite({ skill, onStartAssessment, onPickLevel, onBack
             </h2>
             <p className="text-sm text-gray-500 leading-snug font-medium">
               {hasExistingLevel
-                ? `Your current level is ${existingLevel!.cefr_level.toUpperCase()}. Do a short assessment to see if you've improved.`
-                : `Complete a short assessment so Bob can personalise your practice for ${skillLabel}.`}
+                ? `Your current level is ${existingLevel!.cefr_level.toUpperCase()}. Do a short level test to see if you've improved.`
+                : `Complete a short level test so Bob can personalise your practice for ${skillLabel}.`}
             </p>
           </div>
 
@@ -190,7 +191,7 @@ export function AssessmentInvite({ skill, onStartAssessment, onPickLevel, onBack
                     ? daysRemaining > 14 && cooldownInfo.availableAt
                       ? `Available on ${cooldownInfo.availableAt.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`
                       : `Available in ${daysRemaining} day${daysRemaining !== 1 ? 's' : ''}`
-                    : 'Start Assessment'}
+                    : tPlacement('startButton')}
                 </motion.button>
 
                 {allowManualSelection && (

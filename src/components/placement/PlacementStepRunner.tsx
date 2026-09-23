@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { ChevronRight, RotateCcw, Volume2 } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import { BobMascotLoader } from '@/components/chat/BobMascotLoader';
 import { PlacementProgress } from './PlacementProgress';
 import type { ClosedAnswer } from '@/lib/item-bank/scoring';
@@ -29,6 +30,7 @@ export function PlacementStepRunner({
   onSubmitStep,
   onCancel,
 }: PlacementStepRunnerProps) {
+  const tPlacement = useTranslations('placement');
   const [currentIdx, setCurrentIdx] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
@@ -116,7 +118,7 @@ export function PlacementStepRunner({
           <RotateCcw size={16} /> Try again
         </button>
         <button onClick={onCancel} className="text-sm text-gray-400 hover:text-gray-600 transition">
-          Cancel
+          {tPlacement('cancelButton')}
         </button>
       </div>
     );
@@ -184,7 +186,7 @@ export function PlacementStepRunner({
       </button>
 
       <button onClick={onCancel} className="text-sm text-gray-400 hover:text-gray-600 transition">
-        Cancel assessment
+        {tPlacement('cancelButton')}
       </button>
     </div>
   );

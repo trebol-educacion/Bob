@@ -1,0 +1,7 @@
+{
+  "startButton": "Start Level Test",
+  "cancelButton": "Cancel level test",
+  "retryButton": "Try the level test again",
+  "readyToLevelUpBody": "Your recent sessions show strong accuracy. Take a Level Test to confirm your next level.",
+  "takeTestButton": "Take Level Test"
+}

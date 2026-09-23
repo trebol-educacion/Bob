@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Mic, StopCircle, ChevronRight, RotateCcw } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import { BobMascotLoader } from '@/components/chat/BobMascotLoader';
 import { submitAssessmentSpeakingAction } from '@/actions/assessment';
 import type { AssessmentPrompt } from '@/actions/assessment';
@@ -28,6 +29,7 @@ const MAX_TURN_MS_DEFAULT = 20_000;
 const MAX_TURN_MS_YL = 10_000;
 
 export function AssessmentSpeakingRunner({ assessment_id, prompts, is_yl = false, onQueued, onCancel }: Props) {
+  const tPlacement = useTranslations('placement');
   const MAX_TURN_MS = is_yl ? MAX_TURN_MS_YL : MAX_TURN_MS_DEFAULT;
   const [currentTurnIdx, setCurrentTurnIdx] = useState(0);
   const [turnState, setTurnState] = useState<TurnState>('idle');
@@ -205,7 +207,7 @@ export function AssessmentSpeakingRunner({ assessment_id, prompts, is_yl = false
           onClick={handleRetry}
           className="flex items-center gap-2 px-5 py-2.5 bg-trebol-primary text-white rounded-xl font-semibold text-sm hover:opacity-90 transition"
         >
-          <RotateCcw size={16} /> Try the assessment again
+          <RotateCcw size={16} /> {tPlacement('retryButton')}
         </button>
         <button onClick={onCancel} className="text-sm text-gray-400 hover:text-gray-600 transition">
           Cancel

@@ -2,6 +2,7 @@
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { RotateCcw, ChevronRight } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import { submitAssessmentWritingAction } from '@/actions/assessment';
 import { BobMascotLoader } from '@/components/chat/BobMascotLoader';
 import type { AssessmentWritingTask } from '@/actions/assessment';
@@ -20,6 +21,7 @@ function countWords(text: string): number {
 }
 
 export function AssessmentWritingRunner({ assessment_id, task, onQueued, onCancel }: Props) {
+  const tPlacement = useTranslations('placement');
   const [text, setText] = useState('');
   const [phase, setPhase] = useState<'writing' | 'submitting' | 'sent' | 'failed'>('writing');
   const [failMessage, setFailMessage] = useState<string | null>(null);
@@ -145,7 +147,7 @@ export function AssessmentWritingRunner({ assessment_id, task, onQueued, onCance
       </button>
 
       <button onClick={onCancel} className="text-sm text-gray-400 hover:text-gray-600 transition">
-        Cancel assessment
+        {tPlacement('cancelButton')}
       </button>
     </div>
   );

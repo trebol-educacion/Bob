@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { motion } from 'motion/react';
+import { useTranslations } from 'next-intl';
 import { ModeSelection } from '@/components/ModeSelection';
 import { TrackTabs } from '@/components/catalog/TrackTabs';
 import type { AppState } from '@/lib/routing';
@@ -42,6 +43,7 @@ export function CatalogView({
   track,
   setTrack,
 }: CatalogViewProps) {
+  const tPlacement = useTranslations('placement');
   return (
     <>
       <div className="px-4 pt-4">
@@ -60,14 +62,14 @@ export function CatalogView({
             <div>
               <p className="text-sm font-black text-green-800">Ready to level up?</p>
               <p className="text-xs text-green-600 font-medium mt-0.5">
-                Your recent sessions show strong accuracy. Take an Assessment to confirm your next level.
+                {tPlacement('readyToLevelUpBody')}
               </p>
             </div>
             <button
               onClick={() => setAppState('assessment-invite')}
               className="shrink-0 px-3 py-1.5 rounded-xl bg-green-600 text-white text-xs font-black hover:bg-green-700 transition-colors shadow-sm"
             >
-              Take Assessment
+              {tPlacement('takeTestButton')}
             </button>
           </motion.div>
         )}
