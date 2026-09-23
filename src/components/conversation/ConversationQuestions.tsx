@@ -44,7 +44,7 @@ export function ConversationQuestions({
             <span className="font-black text-xs uppercase text-green-600">{feedbackLabel}</span>
           </div>
           <p className="text-gray-700 font-medium italic">
-            "{questionAnswers[currentQuestionIndex].feedback}"
+            &quot;{questionAnswers[currentQuestionIndex].feedback}&quot;
           </p>
         </div>
       )}

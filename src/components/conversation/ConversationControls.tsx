@@ -81,7 +81,7 @@ export function ConversationControls({
                 {currentEvaluation.score}/100
               </span>
               <p className="text-sm font-medium text-gray-700 italic truncate max-w-xs">
-                "{currentEvaluation.feedback}"
+                &quot;{currentEvaluation.feedback}&quot;
               </p>
             </div>
             <button

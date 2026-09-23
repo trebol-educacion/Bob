@@ -80,7 +80,7 @@ function FormativeFeedbackCard({ feedback }: { feedback: FormativeFeedback }) {
           style={{ background: 'color-mix(in oklab, var(--color-bob-brand) 8%, white)' }}
         >
           <p className="text-xs font-bold text-bob-brand uppercase tracking-widest">{t('example')}</p>
-          <p className="text-sm text-gray-800 italic">"{feedback.model_answer}"</p>
+          <p className="text-sm text-gray-800 italic">&quot;{feedback.model_answer}&quot;</p>
         </div>
       )}
     </div>

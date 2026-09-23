@@ -45,7 +45,7 @@ export function ConversationMessages({
     >
       {framing && (
         <InfoCard title={scenarioTitle} icon={BookOpen}>
-          <p className="italic">"{framing}"</p>
+          <p className="italic">&quot;{framing}&quot;</p>
         </InfoCard>
       )}
 

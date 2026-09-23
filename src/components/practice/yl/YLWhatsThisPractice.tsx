@@ -432,7 +432,7 @@ export function YLWhatsThisPractice({
 
   const partBadge = (
     <span className="text-xs font-bold bg-white ring-1 ring-violet-200 text-violet-700 px-2 py-1 rounded-md">
-      WHAT'S THIS?
+      WHAT&apos;S THIS?
     </span>
   );
 

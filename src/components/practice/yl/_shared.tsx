@@ -293,7 +293,7 @@ export function YLExaminerCard({ cue }: { cue: string }) {
 export function YLReactionCard({ reaction }: { reaction: string }) {
   return (
     <div className="bg-gray-50 border border-gray-100 rounded-xl px-5 py-4 text-center max-w-sm">
-      <p className="text-gray-700 font-semibold italic">"{reaction}"</p>
+      <p className="text-gray-700 font-semibold italic">&quot;{reaction}&quot;</p>
       <p className="text-xs text-gray-400 mt-1">Examiner</p>
     </div>
   );

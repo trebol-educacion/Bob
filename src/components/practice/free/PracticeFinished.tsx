@@ -32,7 +32,7 @@ export function PracticeFinished({ score, detail, feedback, labels, onRestart, o
         <p className="text-xs text-gray-400">{labels.scoreLabel}</p>
       </div>
 
-      <p className="max-w-sm text-sm font-medium text-gray-600 italic">"{feedback}"</p>
+      <p className="max-w-sm text-sm font-medium text-gray-600 italic">&quot;{feedback}&quot;</p>
 
       <div className="grid grid-cols-2 gap-3 w-full max-w-xs">
         {(Object.keys(detail) as Array<keyof PracticeRubricDetail>).map((key) => (

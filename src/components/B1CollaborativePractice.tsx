@@ -128,7 +128,7 @@ function FormativeFeedbackPanel({ feedback }: { feedback: FormativeFeedback }) {
           }}
         >
           <p className="text-xs font-bold text-bob-brand uppercase tracking-widest">Example phrase</p>
-          <p className="text-sm text-gray-800 italic">"{feedback.model_answer}"</p>
+          <p className="text-sm text-gray-800 italic">&quot;{feedback.model_answer}&quot;</p>
         </div>
       )}
     </div>
