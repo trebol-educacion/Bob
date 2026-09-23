@@ -1,17 +1,28 @@
 'use client';
 
-import React from 'react';
+import React, { useCallback, useEffect } from 'react';
 import { AssessmentInvite } from '@/components/assessment/AssessmentInvite';
 import { AssessmentSpeakingRunner } from '@/components/assessment/AssessmentSpeakingRunner';
 import { AssessmentListeningRunner } from '@/components/assessment/AssessmentListeningRunner';
 import { AssessmentReadingRunner } from '@/components/assessment/AssessmentReadingRunner';
 import { AssessmentWritingRunner } from '@/components/assessment/AssessmentWritingRunner';
 import { AssessmentResultCard } from '@/components/assessment/AssessmentResultCard';
+import { PlacementStepRunner } from '@/components/placement/PlacementStepRunner';
+import { BobMascotLoader } from '@/components/chat/BobMascotLoader';
+import { usePlacementRunner } from '@/hooks/usePlacementRunner';
 import type { AssessmentPrompt, AssessmentListeningItem, AssessmentReadingItem, AssessmentWritingTask } from '@/actions/assessment';
 import type { AppState } from '@/lib/routing';
 import type { CefrLevel } from '@/lib/types/practice';
 import type { Skill } from '@/lib/types/skills';
 import type { AssessmentResultUnion } from '@/hooks/useAssessmentFlow';
+
+/**
+ * @param skill Skill | null
+ * @returns skill is 'listening' | 'reading'
+ */
+function isPlacementRunnerSkill(skill: Skill | null): skill is 'listening' | 'reading' {
+  return skill === 'listening' || skill === 'reading';
+}
 
 export interface AssessmentViewProps {
   appState: Extract<AppState, 'assessment-invite' | 'assessment-running' | 'assessment-result'>;
@@ -52,15 +63,71 @@ export function AssessmentView({
   assessmentResult,
   setAssessmentResult,
 }: AssessmentViewProps) {
+  const placementRunner = usePlacementRunner();
+  const resetPlacementRunner = placementRunner.reset;
+
+  useEffect(() => {
+    if (appState === 'assessment-invite') {
+      resetPlacementRunner();
+    }
+  }, [appState, selectedSkill, resetPlacementRunner]);
+
+  const handleStartAssessment = useCallback(async () => {
+    if (isPlacementRunnerSkill(selectedSkill)) {
+      const result = await placementRunner.begin(selectedSkill);
+      if (result === 'curated') {
+        setAppState('assessment-running');
+        return;
+      }
+    }
+    handleAssessmentStart();
+  }, [selectedSkill, placementRunner, setAppState, handleAssessmentStart]);
+
+  const handlePlacementCancel = useCallback(() => {
+    requestLeaveConfirmation(() => {
+      void placementRunner.cancel();
+      setAppState('assessment-invite');
+    });
+  }, [requestLeaveConfirmation, placementRunner, setAppState]);
+
+  useEffect(() => {
+    if (placementRunner.status !== 'done') return;
+    void (async () => {
+      await refreshSkillLevels();
+      await refreshPendingAssessments();
+      resetPlacementRunner();
+      leavePractice('catalog-filtered');
+    })();
+  }, [placementRunner.status, refreshSkillLevels, refreshPendingAssessments, resetPlacementRunner, leavePractice]);
+
   if (appState === 'assessment-invite' && selectedSkill) {
     return (
       <AssessmentInvite
         skill={selectedSkill}
-        onStartAssessment={handleAssessmentStart}
+        onStartAssessment={handleStartAssessment}
         onPickLevel={handlePickLevel}
         onBack={() => setAppState('skill-selection')}
       />
     );
+  }
+
+  if (appState === 'assessment-running' && placementRunner.step) {
+    return (
+      <PlacementStepRunner
+        key={placementRunner.step.group.id}
+        group={placementRunner.step.group}
+        items={placementRunner.step.items}
+        stepsCompleted={placementRunner.stepsCompleted}
+        submitting={placementRunner.status === 'submitting'}
+        failed={placementRunner.status === 'error'}
+        onSubmitStep={(answers) => void placementRunner.submitStep(answers)}
+        onCancel={handlePlacementCancel}
+      />
+    );
+  }
+
+  if (appState === 'assessment-running' && placementRunner.status === 'done') {
+    return <BobMascotLoader size="lg" message="Great job! Preparing your practice…" />;
   }
 
   if (appState === 'assessment-running' && assessmentId && assessmentPrompts.length > 0) {
