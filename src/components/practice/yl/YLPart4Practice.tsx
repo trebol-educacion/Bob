@@ -1,11 +1,11 @@
 'use client';
 
 /**
- * YLPart4Practice — Personal questions. No images.
+ * YLPart4Practice, Personal questions. No images.
  *
  * Covers:
- *   - Starters Part 4: 4–5 simple personal questions (What's your name? How old are you?)
- *   - Movers   Part 4: 4–5 personal questions with more detail
+ *   - Starters Part 4: 4-5 simple personal questions (What's your name? How old are you?)
+ *   - Movers   Part 4: 4-5 personal questions with more detail
  *   - Movers   Part 5: 5 personal questions A1 level (describe a picture verbally)
  *
  * `part` prop distinguishes prompt key used by the server action.

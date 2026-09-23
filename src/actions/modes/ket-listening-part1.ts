@@ -220,7 +220,7 @@ export async function generateKETListenAndChooseAction(input: {
 
 /**
  * Evaluates answers deterministically and persists results.
- * No LLM involved — correct_option is embedded in each item.
+ * No LLM involved, correct_option is embedded in each item.
  */
 export async function submitKETListenAnswersAction(input: {
   sessionId: string;

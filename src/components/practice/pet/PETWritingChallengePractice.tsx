@@ -204,7 +204,7 @@ function tryRestoreFromMessages(messages: StoredMessage[]): {
   return { prompt, userText, feedback };
 }
 
-/** Cambridge B1 PET Writing Challenge — rotating short-writing generator with formative feedback. */
+/** Cambridge B1 PET Writing Challenge, rotating short-writing generator with formative feedback. */
 export function PETWritingChallengePractice({
   onBack,
   sessionId: initialSessionId,

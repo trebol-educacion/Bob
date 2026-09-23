@@ -224,7 +224,7 @@ function ResultText({
         const item = items.find((it) => it.number === n);
         const r = results.find((res) => res.number === n);
         if (!item || !r) return <span key={i} className="text-red-400">[?]</span>;
-        const chosenWord = r.chosen ? item.options[r.chosen] : '—';
+        const chosenWord = r.chosen ? item.options[r.chosen] : '-';
         const correctWord = item.options[r.correct_answer];
         if (r.is_correct) {
           return (
@@ -246,7 +246,7 @@ function ResultText({
   );
 }
 
-/** KET Reading Part 4 — Vocabulary Gap-Fill practice in focus mode. */
+/** KET Reading Part 4, Vocabulary Gap-Fill practice in focus mode. */
 export function KETVocabGapPractice({
   onBack,
   sessionId: initialSessionId,

@@ -12,7 +12,7 @@ const baseProps = {
 };
 
 /**
- * CAE Speaking Part 1 — Interview.
+ * CAE Speaking Part 1, Interview.
  * Microphone with a small speech bubble: intimate, personal exchange with the examiner.
  */
 export function CAEInterviewIcon({ size = 32, className }: IconProps) {
@@ -34,7 +34,7 @@ export function CAEInterviewIcon({ size = 32, className }: IconProps) {
 }
 
 /**
- * CAE Speaking Part 2 — Individual long turn.
+ * CAE Speaking Part 2, Individual long turn.
  * Profile silhouette with sustained sound bars representing the one-minute monologue.
  */
 export function CAELongTurnIcon({ size = 32, className }: IconProps) {
@@ -56,7 +56,7 @@ export function CAELongTurnIcon({ size = 32, className }: IconProps) {
 }
 
 /**
- * CAE Speaking Part 3 — Collaborative task.
+ * CAE Speaking Part 3, Collaborative task.
  * Two facing profiles with overlapping speech bubbles: paired negotiation.
  */
 export function CAECollaborativeIcon({ size = 32, className }: IconProps) {
@@ -78,7 +78,7 @@ export function CAECollaborativeIcon({ size = 32, className }: IconProps) {
 }
 
 /**
- * CAE Speaking Part 4 — Discussion.
+ * CAE Speaking Part 4, Discussion.
  * Two speech bubbles linked by a circular arrow: back-and-forth follow-up exchange.
  */
 export function CAEDiscussionIcon({ size = 32, className }: IconProps) {

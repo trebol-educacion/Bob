@@ -428,7 +428,7 @@ function ModelAnswerSection({
   );
 }
 
-/** Cambridge B2 FCE Speaking Part 2 — Long Turn (Picture Description) practice component. */
+/** Cambridge B2 FCE Speaking Part 2, Long Turn (Picture Description) practice component. */
 export function FCEPictureDescriptionPractice({
   onBack,
   sessionId: initialSessionId,

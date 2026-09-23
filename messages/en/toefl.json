@@ -10,7 +10,7 @@
     "headerSubtitle": "TOEFL iBT FORMAT",
     "footerMode": "TOEFL INTERVIEW",
     "headerTitle": "TOEFL Interview",
-    "headerTitleWithTopic": "TOEFL Interview — {topic}",
+    "headerTitleWithTopic": "TOEFL Interview, {topic}",
     "loading": "Generating your interview session…",
     "loadError": "Failed to load interview. Please try again.",
     "evalError": "Evaluation could not be completed. Please try again.",
@@ -33,7 +33,7 @@
     },
     "feedback": {
       "understood": "Your message came through clearly!",
-      "notUnderstood": "Keep going — you are improving!",
+      "notUnderstood": "Keep going, you are improving!",
       "strengths": "Strengths",
       "tips": "Tips",
       "example": "Example"
@@ -62,7 +62,7 @@
     "repeatWhenPrompted": "Repeat the sentence when prompted",
     "getReady": "Get ready…",
     "sentenceLabel": "Sentence",
-    "hiddenHint": "Hidden — repeat from memory",
+    "hiddenHint": "Hidden, repeat from memory",
     "startRecording": "Start Recording",
     "repeatSentence": "Repeat the sentence!",
     "speakClearly": "Speak clearly and naturally",

@@ -211,7 +211,7 @@ export async function generateYLImagesParallelAction(
 }
 
 /**
- * @deprecated Batched variant — kept temporarily for callers that still
+ * @deprecated Batched variant, kept temporarily for callers that still
  * pass an array. Prefer calling generateYLImageAction directly from the
  * client in a loop.
  */

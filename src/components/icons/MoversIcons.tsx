@@ -16,7 +16,7 @@ const baseSvgProps = {
 };
 
 /**
- * "Find the Differences" — Cambridge YL Movers Part 1.
+ * "Find the Differences", Cambridge YL Movers Part 1.
  * Two side-by-side picture frames with a small "spot" mark on the right one.
  */
 export function FindTheDifferencesIcon({ size = 28, className }: IconProps) {
@@ -35,7 +35,7 @@ export function FindTheDifferencesIcon({ size = 28, className }: IconProps) {
 }
 
 /**
- * "Information Exchange" — Cambridge YL Movers Part 2.
+ * "Information Exchange", Cambridge YL Movers Part 2.
  * Two speech bubbles facing each other with a tiny exchange arrow between them.
  */
 export function InformationExchangeIcon({ size = 28, className }: IconProps) {
@@ -52,7 +52,7 @@ export function InformationExchangeIcon({ size = 28, className }: IconProps) {
 }
 
 /**
- * "Picture Story" — Cambridge YL Movers Part 3.
+ * "Picture Story", Cambridge YL Movers Part 3.
  * Four small panels in a row with an arrow showing narrative sequence.
  */
 export function PictureStoryMoversIcon({ size = 28, className }: IconProps) {
@@ -73,7 +73,7 @@ export function PictureStoryMoversIcon({ size = 28, className }: IconProps) {
 }
 
 /**
- * "Personal Questions" — Cambridge YL Movers Part 4.
+ * "Personal Questions", Cambridge YL Movers Part 4.
  * A round speech bubble with a friendly smiley face inside.
  */
 export function PersonalQuestionsMoversIcon({ size = 28, className }: IconProps) {
@@ -88,7 +88,7 @@ export function PersonalQuestionsMoversIcon({ size = 28, className }: IconProps)
 }
 
 /**
- * "More About You" — Cambridge YL Movers Part 5 (extended personal questions).
+ * "More About You", Cambridge YL Movers Part 5 (extended personal questions).
  * Two friend silhouettes with a small chat dot between them.
  */
 export function MoreAboutYouIcon({ size = 28, className }: IconProps) {

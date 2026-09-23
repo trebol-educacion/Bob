@@ -96,8 +96,8 @@ export interface RouteEntry {
 /**
  * Key used to force remount of a YL component when switching between two
  * persisted sessions (history-history). Returns 'new' while the session has
- * no persisted messages — including the moment right after creation, before
- * the new session has any messages stored — so we don't remount and lose
+ * no persisted messages, including the moment right after creation, before
+ * the new session has any messages stored, so we don't remount and lose
  * the freshly-generated plan/images.
  */
 function ylInstanceKey(p: YLRenderProps): string {

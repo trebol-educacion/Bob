@@ -512,7 +512,7 @@ function PersonResultCard({
   );
 }
 
-/** KET Listening Part 4 — Short Talks matching practice with drag-and-drop (tap fallback). */
+/** KET Listening Part 4, Short Talks matching practice with drag-and-drop (tap fallback). */
 export function KETShortTalksPractice({
   onBack,
   sessionId: initialSessionId,

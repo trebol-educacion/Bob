@@ -310,7 +310,7 @@ function tryRestoreFromMessages(messages: StoredMessage[]): {
   return { prompt, userText, feedback };
 }
 
-/** FCE Writing Part 1 — Compulsory Essay practice component. */
+/** FCE Writing Part 1, Compulsory Essay practice component. */
 export function FCEEssayWritingPractice({
   onBack,
   sessionId: initialSessionId,

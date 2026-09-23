@@ -9,7 +9,7 @@ export interface GeminiCallContext {
   userId?: string;
 }
 
-/** Discriminated union returned by callGemini — never throws. */
+/** Discriminated union returned by callGemini, never throws. */
 export type GeminiCallResult<T> =
   | { ok: true; data: T; latencyMs: number; tokens?: { input?: number; output?: number } }
   | { ok: false; error: string; latencyMs: number };
@@ -74,7 +74,7 @@ function extractTokens(data: unknown): { input?: number; output?: number } | und
 
 /**
  * Streams a Gemini call chunk by chunk instead of waiting for the full response.
- * Logs once the stream is fully consumed by the caller (via onDone). Never throws —
+ * Logs once the stream is fully consumed by the caller (via onDone). Never throws -
  * a failure mid-stream is reported through onError and the async iterable ends.
  */
 export async function streamGemini<T extends { text?: string }>(

@@ -5,7 +5,7 @@ import { motion } from 'motion/react';
 import { BobAvatar } from '@/components/practice/yl/_shared';
 
 /**
- * TypingIndicator — renders an assistant-style bubble with 3 animated dots.
+ * TypingIndicator, renders an assistant-style bubble with 3 animated dots.
  * Shows while Bob is generating a response.
  */
 export function TypingIndicator() {

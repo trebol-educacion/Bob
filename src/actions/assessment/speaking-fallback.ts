@@ -2,7 +2,7 @@ import type { AssessmentPrompt } from './types';
 
 export const FALLBACK_SPEAKING_PROMPTS: Record<string, AssessmentPrompt[]> = {
   cefr_assessment_speaking_a1_a2_generation: [
-    { turn_number: 1, prompt_text: 'Tell me about your school — what do you study and which subject do you like best?' },
+    { turn_number: 1, prompt_text: 'Tell me about your school, what do you study and which subject do you like best?' },
     { turn_number: 2, prompt_text: 'Describe what you usually do on weekends.' },
     { turn_number: 3, prompt_text: 'Imagine you are in a park with friends. Tell me what is happening.' },
   ],

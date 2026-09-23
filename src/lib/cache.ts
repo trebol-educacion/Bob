@@ -47,7 +47,7 @@ export async function getCachedContentIfExists<T>(
 
 /**
  * Return cached output for key if present; otherwise call producer, persist, and return.
- * Per D-A4: producer errors are caught and returned as { error } — caller decides.
+ * Per D-A4: producer errors are caught and returned as { error }, caller decides.
  */
 export async function getOrCreateCachedContent<T>(
   key: CacheKey,

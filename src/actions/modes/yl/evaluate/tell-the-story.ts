@@ -23,7 +23,7 @@ export async function evaluateTellTheStoryAnswerAction(input: {
       score_max: 1,
       cefr_band: 'a1',
       correct: false,
-      reaction: "I didn't hear you — let's keep going!",
+      reaction: "I didn't hear you, let's keep going!",
       feedback: undefined,
       transcript_used: '',
       transcript: '',

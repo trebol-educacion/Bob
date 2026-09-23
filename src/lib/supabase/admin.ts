@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 
 /**
- * Supabase admin client using the service role key. Server-only — never import
+ * Supabase admin client using the service role key. Server-only, never import
  * from client components or browser bundles.
  */
 export function createSupabaseAdmin() {

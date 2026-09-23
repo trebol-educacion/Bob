@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * YLTellTheStoryPractice — Cambridge Movers Part 3 "Tell the Story".
+ * YLTellTheStoryPractice, Cambridge Movers Part 3 "Tell the Story".
  *
  * Bob shares 4 sequential pictures. Bob models scene 1; the child narrates
  * scenes 2, 3, and 4 in chronological order. Binary evaluation per turn.
@@ -319,7 +319,7 @@ export function YLTellTheStoryPractice({
           const scene1Model = planScenes[0]?.modeled_description ?? '';
           const cueTexts = planScenes.slice(1).map((s) => s.examiner_cue ?? '');
           const reactionCorrect = planScenes.slice(1).map(() => 'Great storytelling! Keep going!');
-          const reactionWrong = planScenes.slice(1).map((s) => `Almost — ${s.expected_answer ?? ''}`);
+          const reactionWrong = planScenes.slice(1).map((s) => `Almost, ${s.expected_answer ?? ''}`);
           void pregenerateYLCueAudiosAction(sid, [
             storySetupText,
             scene1Model,

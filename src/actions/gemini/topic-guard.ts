@@ -11,7 +11,7 @@ export interface TopicGuardResult {
 }
 
 /**
- * Falls back to `appropriate: true` on any infra failure — intentional
+ * Falls back to `appropriate: true` on any infra failure, intentional
  * fail-open so a Gemini/network hiccup never blocks the whole feature.
  * Do NOT convert to throw.
  */

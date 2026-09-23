@@ -182,7 +182,7 @@ function AudioButton({
   );
 }
 
-/** PET B1 Listening Part 2 — short monologue + 4-option multiple choice. */
+/** PET B1 Listening Part 2, short monologue + 4-option multiple choice. */
 export function PETMultipleChoicePractice({
   onBack,
   sessionId: initialSessionId,

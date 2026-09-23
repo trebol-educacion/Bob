@@ -1,5 +1,5 @@
 /**
- * FCE B2 Part 2 — topics and parse helpers shared by the actions.
+ * FCE B2 Part 2, topics and parse helpers shared by the actions.
  */
 
 import { z } from 'zod';

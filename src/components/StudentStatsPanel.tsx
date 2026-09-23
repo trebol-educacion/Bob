@@ -412,7 +412,7 @@ export function StudentStatsPanel({ onBack, onTakeAssessment, onChangeLevel, onL
       return {
         key: skill,
         label: t(SKILL_LABEL_KEY[skill]),
-        level: currentLabel ?? '—',
+        level: currentLabel ?? '-',
         goalLevel: nextLevelLabel(current ?? 'a1'),
         cefrValue: current,
         done: Math.min(stat.sessions, target),

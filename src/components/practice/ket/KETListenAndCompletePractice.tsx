@@ -362,11 +362,11 @@ function GapResultRow({ result, animate }: { result: GapResult; animate: boolean
         >
           {correct ? (
             <>
-              <span className="text-base text-green-700 font-semibold">{result.user_input || '—'}</span>
+              <span className="text-base text-green-700 font-semibold">{result.user_input || '-'}</span>
               <ResultCheck animate={animate} />
             </>
           ) : (
-            <span className="text-base text-rose-500 line-through">{result.user_input || '—'}</span>
+            <span className="text-base text-rose-500 line-through">{result.user_input || '-'}</span>
           )}
         </span>
         {!correct && (
@@ -387,7 +387,7 @@ function GapResultRow({ result, animate }: { result: GapResult; animate: boolean
   );
 }
 
-/** KET Listening Part 2 — Listen and Complete practice component. */
+/** KET Listening Part 2, Listen and Complete practice component. */
 export function KETListenAndCompletePractice({
   onBack,
   sessionId: initialSessionId,

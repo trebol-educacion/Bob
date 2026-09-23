@@ -538,7 +538,7 @@ function ResultCard({
   );
 }
 
-/** KET Listening Part 1 — Listen and Choose practice component. */
+/** KET Listening Part 1, Listen and Choose practice component. */
 export function KETListenAndChoosePractice({
   onBack,
   sessionId: initialSessionId,

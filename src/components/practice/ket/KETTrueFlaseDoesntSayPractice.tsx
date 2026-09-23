@@ -419,7 +419,7 @@ function VerdictCard({
   );
 }
 
-/** KET Listening Part 5 — True, False or Doesn't Say focus-mode practice component. */
+/** KET Listening Part 5, True, False or Doesn't Say focus-mode practice component. */
 export function KETTrueFalseDoesntSayPractice({
   onBack,
   sessionId: initialSessionId,

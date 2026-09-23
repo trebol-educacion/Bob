@@ -355,7 +355,7 @@ function ModelAnswerSection({ topic, scenePrompt }: { topic: string; scenePrompt
   );
 }
 
-/** Cambridge B1 PET Speaking Part 2 — Picture Description practice component. */
+/** Cambridge B1 PET Speaking Part 2, Picture Description practice component. */
 export function PETPictureDescriptionPractice({
   onBack,
   sessionId: initialSessionId,

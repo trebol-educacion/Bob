@@ -365,9 +365,9 @@ function GapResultSlot({ number, result }: { number: number; result: PETGapFillG
       </span>
       <span className="border-b-2 px-1 font-kalam text-base" style={{ borderColor }}>
         {correct ? (
-          <span className="text-green-700 font-semibold">{result.user_input || '—'}</span>
+          <span className="text-green-700 font-semibold">{result.user_input || '-'}</span>
         ) : (
-          <span className="text-rose-500 line-through">{result.user_input || '—'}</span>
+          <span className="text-rose-500 line-through">{result.user_input || '-'}</span>
         )}
       </span>
       {!correct && (
@@ -382,7 +382,7 @@ function GapResultSlot({ number, result }: { number: number; result: PETGapFillG
   );
 }
 
-/** PET Listening Part 3 — Interactive Gap-Fill practice component. */
+/** PET Listening Part 3, Interactive Gap-Fill practice component. */
 export function PETListeningGapFillPractice({
   onBack,
   sessionId: initialSessionId,

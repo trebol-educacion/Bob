@@ -103,7 +103,7 @@ export async function generateKETSignsAndNoticesAction(input: {
   const [generationPrompt, framingText] = await Promise.all([
     getPrompt('cambridge_ket_reading_part1_a2_generation').catch(() => null),
     getPrompt('cambridge_ket_reading_part1_a2_framing').catch(
-      () => 'You will read 6 signs and notices. For each one, choose the meaning that fits best — A, B or C.'
+      () => 'You will read 6 signs and notices. For each one, choose the meaning that fits best, A, B or C.'
     ),
   ]);
 

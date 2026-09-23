@@ -469,7 +469,7 @@ function ResultStatementCard({
           ].join(' ')}
         >
           <span>
-            You said {result.chosen_verdict === 'T' ? 'True' : result.chosen_verdict === 'F' ? 'False' : '—'}
+            You said {result.chosen_verdict === 'T' ? 'True' : result.chosen_verdict === 'F' ? 'False' : '-'}
           </span>
           <span className="text-xs font-bold">
             Answer: {result.correct_verdict === 'T' ? 'True' : 'False'}
@@ -514,7 +514,7 @@ function ResultStatementCard({
   );
 }
 
-/** PET Listening Part 5 — True or False with Justification practice component. */
+/** PET Listening Part 5, True or False with Justification practice component. */
 export function PETListeningTrueFalseJustifyPractice({
   onBack,
   sessionId: initialSessionId,

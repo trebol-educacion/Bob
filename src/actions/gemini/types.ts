@@ -1,5 +1,5 @@
 /**
- * Gemini actions — shared type contracts.
+ * Gemini actions, shared type contracts.
  */
 
 export interface EvaluationResult {

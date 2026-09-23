@@ -114,7 +114,7 @@ export async function generatePETListeningSituationalAction(input: {
     getPrompt('cambridge_pet_listening_part1_b1_generation').catch(() => null),
     getPrompt('cambridge_pet_listening_part1_b1_framing').catch(
       () =>
-        'Vas a escuchar varias conversaciones cortas de la vida diaria entre dos personas. Después de cada una, elige la respuesta correcta — A, B o C.'
+        'Vas a escuchar varias conversaciones cortas de la vida diaria entre dos personas. Después de cada una, elige la respuesta correcta, A, B o C.'
     ),
   ]);
 

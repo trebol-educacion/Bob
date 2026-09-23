@@ -10,7 +10,7 @@ import type { CefrLevel } from '@/lib/types/practice';
 
 /**
  * Generates a structured initial framing and first message for the simulation.
- * Falls back gracefully — intentional fallback, do NOT convert to throw.
+ * Falls back gracefully, intentional fallback, do NOT convert to throw.
  */
 export async function generateInitialChatAction(
   topic: string,
@@ -57,7 +57,7 @@ export async function generateInitialChatAction(
 
 /**
  * Simulates the remaining turns of a conversation if it was finished early.
- * Falls back gracefully — intentional fallback, do NOT convert to throw.
+ * Falls back gracefully, intentional fallback, do NOT convert to throw.
  */
 export async function simulateConversationAction(
   history: ChatMessage[],
@@ -107,7 +107,7 @@ export async function simulateConversationAction(
 
 /**
  * Generates comprehension questions based on the conversation history.
- * Falls back gracefully — intentional fallback, do NOT convert to throw.
+ * Falls back gracefully, intentional fallback, do NOT convert to throw.
  */
 export async function generateQuestionsAction(
   history: ChatMessage[],
@@ -159,7 +159,7 @@ export async function generateQuestionsAction(
 
 /**
  * Simulates a response from the user's perspective to continue the conversation.
- * Falls back gracefully — intentional fallback, do NOT convert to throw.
+ * Falls back gracefully, intentional fallback, do NOT convert to throw.
  */
 export async function simulateUserResponseAction(
   history: ChatMessage[],

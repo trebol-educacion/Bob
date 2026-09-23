@@ -4,7 +4,7 @@ import { callGemini } from '@/lib/gemini-client';
 
 const FLASH_IMAGE_MODEL = 'gemini-2.5-flash-image';
 
-/** Visible placeholder — not a transparent pixel. */
+/** Visible placeholder, not a transparent pixel. */
 export const YL_IMAGE_PLACEHOLDER =
   'data:image/svg+xml,' +
   encodeURIComponent(

@@ -26,7 +26,7 @@ export async function persistYLImageAction(
   });
 }
 
-/** @deprecated Kept for backwards compatibility — iterates one image at a time. */
+/** @deprecated Kept for backwards compatibility, iterates one image at a time. */
 export async function persistYLImagesAction(
   sessionId: string,
   imageDataUris: string[]

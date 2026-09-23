@@ -117,7 +117,7 @@ export async function generateToeflRepeatSessionAction(
 
 /**
  * Pre-generates TTS audio for all phrases in parallel (max concurrency 3).
- * Returns raw PCM base64 + mimeType for each phrase — client converts to WAV.
+ * Returns raw PCM base64 + mimeType for each phrase, client converts to WAV.
  */
 export async function generateToeflRepeatAudiosAction(
   phrases: string[]
@@ -204,7 +204,7 @@ Listen to the audio and transcribe what the student said. Then compare word by w
 
 Return ONLY a JSON object with these fields:
 - "kind": always "repetition_objective"
-- "exact_repetition": boolean — true only if every word matches exactly (case-insensitive)
+- "exact_repetition": boolean, true only if every word matches exactly (case-insensitive)
 - "missing_words": array of words from the target sentence that were omitted
 - "extra_words": array of words the student said that are not in the target sentence
 - "transcribed_text": what the student actually said (verbatim transcription)

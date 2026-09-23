@@ -517,7 +517,7 @@ function TranscriptBlock({ turns }: { turns: ConversationTurn[] }) {
   );
 }
 
-/** KET Listening Part 3 — Listen and Decide practice component. */
+/** KET Listening Part 3, Listen and Decide practice component. */
 export function KETListenAndDecidePractice({
   onBack,
   sessionId: initialSessionId,

@@ -1,5 +1,5 @@
 /**
- * Assessment — shared type contracts.
+ * Assessment, shared type contracts.
  */
 
 import type { Skill, AssessmentResultListening, AssessmentResultReading } from '@/lib/types/skills';

@@ -50,7 +50,7 @@ export interface ShortTalksResult {
   exercise: ShortTalksExercise;
 }
 
-/** Plan without audio — returned by the fast first-phase action. */
+/** Plan without audio, returned by the fast first-phase action. */
 export interface ShortTalksPlan {
   sessionId: string;
   userId: string;
@@ -83,7 +83,7 @@ function safeParse<T>(schema: z.ZodType<T>, raw: string): T | null {
 }
 
 /**
- * Phase 1 — fast (~3s): generates text only, no TTS.
+ * Phase 1, fast (~3s): generates text only, no TTS.
  * The component calls this first, renders the exercise immediately,
  * then loads audio per person in the background via generateKETPersonAudioAction.
  */
@@ -176,7 +176,7 @@ export async function generateKETShortTalksPlanAction(input: {
   };
 }
 
-/** Phase 2 — generates TTS for a single person monologue (~7-9s, cached). */
+/** Phase 2, generates TTS for a single person monologue (~7-9s, cached). */
 export async function generateKETPersonAudioAction(
   monologue: string
 ): Promise<{ audio_b64: string; audio_mime: string }> {

@@ -245,7 +245,7 @@ function PassageSheet({
   );
 }
 
-/** KET Reading Part 3 — Long Text Comprehension focus-mode practice component. */
+/** KET Reading Part 3, Long Text Comprehension focus-mode practice component. */
 export function KETLongTextPractice({
   onBack, sessionId: initialSessionId, initialMessages, onSessionCreated, onSessionFinished, onOpenDashboard,
 }: KETLongTextPracticeProps) {

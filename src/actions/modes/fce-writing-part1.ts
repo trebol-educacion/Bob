@@ -112,7 +112,7 @@ export async function generateFCEEssayAction(input: {
   if (!sessionId) {
     const result = await createSessionAction({
       mode: 'cambridge_fce_writing_part1',
-      title: 'Writing Part 1 — Essay',
+      title: 'Writing Part 1, Essay',
     });
     if (!result.data) {
       return { error: result.error ?? 'Could not create session' };

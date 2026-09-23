@@ -64,7 +64,7 @@ export function AssessmentWritingRunner({ assessment_id, task, onQueued, onCance
   }, []);
 
   if (phase === 'sent') {
-    return <BobMascotLoader size="lg" message="Writing sent! Bob will evaluate it in the background — check your dashboard in a moment." />;
+    return <BobMascotLoader size="lg" message="Writing sent! Bob will evaluate it in the background, check your dashboard in a moment." />;
   }
 
   if (phase === 'submitting') {

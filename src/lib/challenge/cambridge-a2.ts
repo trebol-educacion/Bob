@@ -1,5 +1,5 @@
 /**
- * Cambridge A2 Key challenge exam — runtime logic.
+ * Cambridge A2 Key challenge exam, runtime logic.
  *
  * Builds the exam from the static sample content and merges pre-generated
  * image URLs at read time. Type contracts and content live in sibling modules.

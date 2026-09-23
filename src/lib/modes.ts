@@ -17,9 +17,9 @@ export interface ResolveModesArgs {
  * Returns resolved cards for the selected skill with visibility per card.
  *
  * Visibility rules (spec bob-skill-first-assessment §4, D3):
- *   - `enabled`                — framework + CEFR level match the student's level for selectedSkill.
- *   - `disabled-mismatch`      — framework matches but CEFR level differs from the student's level.
- *   - `disabled-not-available` — card is marked status='coming_soon' or 'hidden', or skill has
+ *   - `enabled`               , framework + CEFR level match the student's level for selectedSkill.
+ *   - `disabled-mismatch`     , framework matches but CEFR level differs from the student's level.
+ *   - `disabled-not-available`, card is marked status='coming_soon' or 'hidden', or skill has
  *                                no level assigned in skillLevels.
  *
  * Cards whose framework is not in the effective intersection are excluded entirely.

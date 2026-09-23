@@ -82,7 +82,7 @@ export async function generatePETShortTextsAction(input: {
   if (!sessionId) {
     const result = await createSessionAction({
       mode: 'cambridge_pet_reading_part1',
-      title: 'Reading Part 1 — Short Texts',
+      title: 'Reading Part 1, Short Texts',
     });
     if (!result.data) {
       return { error: result.error ?? 'Could not create session' };
@@ -99,7 +99,7 @@ export async function generatePETShortTextsAction(input: {
   const [generationPrompt, framingText] = await Promise.all([
     getPrompt('cambridge_pet_reading_part1_b1_generation').catch(() => null),
     getPrompt('cambridge_pet_reading_part1_b1_framing').catch(
-      () => 'You will read 5 short texts (notices, emails, messages, postcards). For each one, choose the meaning that fits best — A, B or C.'
+      () => 'You will read 5 short texts (notices, emails, messages, postcards). For each one, choose the meaning that fits best, A, B or C.'
     ),
   ]);
 

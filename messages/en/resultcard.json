@@ -9,7 +9,7 @@
   "readAloud": "Read this phrase aloud:",
   "listenPronunciation": "Listen to pronunciation",
   "wellDone": "Well done!",
-  "submitted": "Submitted — see feedback below",
+  "submitted": "Submitted, see feedback below",
   "highlights": "Highlights",
   "toImprove": "To improve",
   "modelAnswer": "Model answer",
@@ -34,7 +34,7 @@
   "notQuite": "Not quite",
   "greatSentence": "Great sentence:",
   "correctSentence": "Correct sentence:",
-  "wellDoneChose": "Well done — you chose {label}.",
+  "wellDoneChose": "Well done, you chose {label}.",
   "choseWrong": "You chose {label}.",
   "theAnswerIs": "The answer is {key}"
 }

@@ -521,7 +521,7 @@ function ResultQuestionCard({
   );
 }
 
-/** PET Listening Part 1 — Situational Multiple Choice practice component. */
+/** PET Listening Part 1, Situational Multiple Choice practice component. */
 export function PETListeningSituationalPractice({
   onBack,
   sessionId: initialSessionId,

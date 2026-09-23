@@ -207,7 +207,7 @@ function PlaybackPlayer({ url }: { url: string }) {
 
 function FeedbackBlocks({ feedback }: { feedback: SpeakingFeedback }) {
   const [modelOpen, setModelOpen] = useState(false);
-  const highlights = feedback.highlights.length > 0 ? feedback.highlights : ['You spoke up — well done!'];
+  const highlights = feedback.highlights.length > 0 ? feedback.highlights : ['You spoke up, well done!'];
   const tip = feedback.suggestions.length > 0 ? feedback.suggestions[0] : null;
 
   return (

@@ -1,5 +1,5 @@
 /**
- * db-prompts.ts — Supabase-backed prompt cache for Bob.
+ * db-prompts.ts, Supabase-backed prompt cache for Bob.
  *
  * Fetches prompt text from the `bob_prompts` table and caches it in-process
  * for 5 minutes. On DB failure, falls back to FALLBACK_PROMPTS so Bob keeps
@@ -91,8 +91,8 @@ function substituteParams(
  * Retrieves a prompt by key, substituting {NAME} placeholders with `params`.
  *
  * Resolution order:
- *   1. In-process cache (TTL: 5 min) — refreshed from `bob_prompts` table
- *   2. FALLBACK_PROMPTS — used when DB is unreachable or key is missing from DB
+ *   1. In-process cache (TTL: 5 min), refreshed from `bob_prompts` table
+ *   2. FALLBACK_PROMPTS, used when DB is unreachable or key is missing from DB
  *
  * @throws Error if `key` is not found in either cache or FALLBACK_PROMPTS
  */
@@ -118,7 +118,7 @@ export async function getPrompt(
     template = FALLBACK_PROMPTS[key]
     if (template !== undefined) {
       console.warn(
-        `[getPrompt] Key '${key}' not found in DB cache — using fallback prompt`
+        `[getPrompt] Key '${key}' not found in DB cache, using fallback prompt`
       )
     }
   }

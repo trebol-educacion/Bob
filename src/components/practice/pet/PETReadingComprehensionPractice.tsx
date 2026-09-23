@@ -225,7 +225,7 @@ function ResultCard({ result, animate }: { result: PETReadingQuestionResult; ani
           <p className="text-gray-700">
             <span className="font-semibold text-gray-500">Your answer: </span>
             <span className={result.is_correct ? 'text-green-700' : 'text-red-600'}>
-              {result.chosen || '—'}
+              {result.chosen || '-'}
             </span>
           </p>
           {!result.is_correct && (
@@ -241,7 +241,7 @@ function ResultCard({ result, animate }: { result: PETReadingQuestionResult; ani
   );
 }
 
-/** PET Reading — Comprehensive Text practice component (one passage + 10 questions, no audio). */
+/** PET Reading, Comprehensive Text practice component (one passage + 10 questions, no audio). */
 export function PETReadingComprehensionPractice({
   onBack,
   sessionId: initialSessionId,
@@ -382,7 +382,7 @@ export function PETReadingComprehensionPractice({
           <PETReadingIcon size={18} className="text-emerald-700" />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-bold text-gray-800 truncate">Reading — Comprehensive Text</p>
+          <p className="text-sm font-bold text-gray-800 truncate">Reading, Comprehensive Text</p>
           <p className="text-xs text-gray-400">Reading · B1</p>
         </div>
         <span className="shrink-0 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-bold uppercase tracking-widest">

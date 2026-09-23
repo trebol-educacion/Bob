@@ -4,7 +4,7 @@ type IconProps = {
 };
 
 /**
- * Cambridge Flyers Speaking Part 1 — "Find the differences".
+ * Cambridge Flyers Speaking Part 1, "Find the differences".
  * Two overlapping framed pictures with a magnifying glass on top.
  */
 export function FlyersFindDifferencesIcon({ size = 32, className }: IconProps) {

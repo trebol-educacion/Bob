@@ -207,7 +207,7 @@ function FeedbackPanel({
   );
 }
 
-/** KET Writing Part 7 — Picture Story practice component. */
+/** KET Writing Part 7, Picture Story practice component. */
 export function KETStoryWritingPractice({
   onBack,
   sessionId: initialSessionId,

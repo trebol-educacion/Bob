@@ -49,7 +49,7 @@ const EMPTY_MEDIA: PictureDescMedia = {
   image_url: '',
 };
 
-/** KET Speaking Part 3 — Describe the Picture (two-phase loading). */
+/** KET Speaking Part 3, Describe the Picture (two-phase loading). */
 export function KETDescribePicturePractice({
   onBack, sessionId: initialSessionId, initialMessages, onSessionCreated, onSessionFinished, onOpenDashboard,
 }: KETDescribePicturePracticeProps) {

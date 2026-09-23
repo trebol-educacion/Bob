@@ -74,7 +74,7 @@ export async function generateKETLongTextAction(input: {
 
   const [generationPrompt, framingText] = await Promise.all([
     getPrompt('cambridge_ket_reading_part3_a2_generation').catch(() => null),
-    getPrompt('cambridge_ket_reading_part3_a2_framing').catch(() => 'Read the article carefully. Then choose the best answer — A, B or C — for each question.'),
+    getPrompt('cambridge_ket_reading_part3_a2_framing').catch(() => 'Read the article carefully. Then choose the best answer, A, B or C, for each question.'),
   ]);
 
   if (!generationPrompt) return { error: 'Could not load generation prompt' };

@@ -514,7 +514,7 @@ function ResultQuestionCard({
   );
 }
 
-/** PET Listening Part 4 — Attitude & Opinion Detection practice component. */
+/** PET Listening Part 4, Attitude & Opinion Detection practice component. */
 export function PETListeningAttitudePractice({
   onBack,
   sessionId: initialSessionId,

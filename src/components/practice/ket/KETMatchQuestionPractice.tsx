@@ -341,7 +341,7 @@ function QuestionResultCard({
   );
 }
 
-/** KET Reading Part 2 — Multiple Matching practice with focus-mode drag-and-drop (tap fallback). */
+/** KET Reading Part 2, Multiple Matching practice with focus-mode drag-and-drop (tap fallback). */
 export function KETMatchQuestionPractice({
   onBack, sessionId: initialSessionId, initialMessages, onSessionCreated, onSessionFinished, onOpenDashboard,
 }: KETMatchQuestionPracticeProps) {

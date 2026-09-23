@@ -316,7 +316,7 @@ function ResultCard({
   );
 }
 
-/** KET Reading Part 1 — Signs and Notices practice component. */
+/** KET Reading Part 1, Signs and Notices practice component. */
 export function KETSignsAndNoticesPractice({
   onBack,
   sessionId: initialSessionId,

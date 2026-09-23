@@ -1,5 +1,5 @@
 /**
- * FCE B2 Part 2 — data contracts (schemas and types).
+ * FCE B2 Part 2, data contracts (schemas and types).
  */
 
 import { z } from 'zod';

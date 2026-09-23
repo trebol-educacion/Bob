@@ -1,5 +1,5 @@
 /**
- * Cambridge A2 Key challenge — sample exam content.
+ * Cambridge A2 Key challenge, sample exam content.
  *
  * Static seed data for the A2 Key challenge runner. Image URLs are merged
  * at read time by `getCambridgeA2Exam`.
@@ -288,7 +288,7 @@ export const SAMPLE_EXAM: ChallengeExam = {
         },
         {
           id: 'R1Q2',
-          noticeText: 'Mum – Your football kit is washed and on your bed. Don’t forget your water bottle! Love, Dad',
+          noticeText: 'Mum, Your football kit is washed and on your bed. Don’t forget your water bottle! Love, Dad',
           question: 'Why did Dad write this message?',
           options: [
             { key: 'A', text: 'To ask for help with washing' },
@@ -570,7 +570,7 @@ export const SAMPLE_EXAM: ChallengeExam = {
       skill: 'speaking',
       title: 'Speaking · Part 1',
       instructions:
-        'This is the interview. Answer each question out loud. Record your answer or simply speak it aloud. You will receive supportive, qualitative feedback — there is no exam score here.',
+        'This is the interview. Answer each question out loud. Record your answer or simply speak it aloud. You will receive supportive, qualitative feedback, there is no exam score here.',
       format: 'speaking_interview',
       questions: [
         { id: 'S1Q1', text: 'What is your name and how old are you?' },
@@ -585,7 +585,7 @@ export const SAMPLE_EXAM: ChallengeExam = {
       skill: 'speaking',
       title: 'Speaking · Part 2',
       instructions:
-        'This is the collaborative task. Look at the picture and talk about it, using the points below to help you. You will receive supportive, qualitative feedback — there is no exam score here.',
+        'This is the collaborative task. Look at the picture and talk about it, using the points below to help you. You will receive supportive, qualitative feedback, there is no exam score here.',
       format: 'speaking_collaborative',
       prompt: 'A family is planning a weekend trip. Talk about where they could go and what they could take.',
       visual: {

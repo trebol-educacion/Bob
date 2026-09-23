@@ -39,9 +39,9 @@ export async function evaluateYLFinalAction(input: {
 
   const promptText = await getPrompt(evaluationKey(exam, part), {
     USER_TRANSCRIPT: transcript,
-    QUESTION: `Full session — ${input.turnsCount} turns`,
-    STORY_BEAT: `Full session — ${input.turnsCount} turns`,
-    DIFFERENCE: `Full session — ${input.turnsCount} turns`,
+    QUESTION: `Full session, ${input.turnsCount} turns`,
+    STORY_BEAT: `Full session, ${input.turnsCount} turns`,
+    DIFFERENCE: `Full session, ${input.turnsCount} turns`,
     AUDIO_DURATION_SECONDS: 30,
   });
 

@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * YLFindDifferencesPractice — Cambridge Movers Part 1 "Find the Differences".
+ * YLFindDifferencesPractice, Cambridge Movers Part 1 "Find the Differences".
  *
  * Bob shows his picture (A) and describes one property of an object.
  * The child describes the same object in their picture (B) with the difference.
@@ -268,7 +268,7 @@ export function YLFindDifferencesPractice({
           const cueTexts = diffs.map((d) => d.examiner_cue);
           const reactionTexts = diffs.flatMap((d) => [
             `Yes! Well spotted!`,
-            `Almost — ${d.expected_answer} Good try!`,
+            `Almost, ${d.expected_answer} Good try!`,
           ]);
           void pregenerateYLCueAudiosAction(sid, [...cueTexts, ...reactionTexts]);
         }
@@ -622,7 +622,7 @@ export function YLFindDifferencesPractice({
       headerConfig={{
         icon: FindTheDifferencesIcon,
         title: t('findDifferences.title'),
-        subtitle: `Ages 8–11 · Turn ${turnIndex + 1}/${TOTAL_TURNS}`,
+        subtitle: `Ages 8-11 · Turn ${turnIndex + 1}/${TOTAL_TURNS}`,
         accentColor: 'amber',
         leftSlot: backButton,
         rightSlot: (

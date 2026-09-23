@@ -254,7 +254,7 @@ function tryRestoreFromMessages(messages: StoredMessage[]): {
   return { prompt, userText, feedback };
 }
 
-/** PET Writing Part 1 — Email practice component. */
+/** PET Writing Part 1, Email practice component. */
 export function PETEmailWritingPractice({
   onBack,
   sessionId: initialSessionId,

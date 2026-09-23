@@ -1,5 +1,5 @@
 /**
- * PET B1 Part 2 — topics and parse helpers shared by the actions.
+ * PET B1 Part 2, topics and parse helpers shared by the actions.
  */
 
 import { z } from 'zod';

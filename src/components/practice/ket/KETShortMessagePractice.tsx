@@ -205,7 +205,7 @@ function tryRestoreFromMessages(messages: StoredMessage[]): {
   return { prompt, userText, feedback };
 }
 
-/** KET Writing Part 6 — Short Message focus-mode practice component. */
+/** KET Writing Part 6, Short Message focus-mode practice component. */
 export function KETShortMessagePractice({
   onBack,
   sessionId: initialSessionId,

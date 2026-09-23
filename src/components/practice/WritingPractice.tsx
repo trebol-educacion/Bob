@@ -156,7 +156,7 @@ export function WritingPractice({
 
         <div className="flex gap-4 text-sm text-gray-500">
           <span>{t('words')} <strong>{feedback.indicators.word_count}</strong></span>
-          <span>{t('target')} <strong>{feedback.indicators.target_word_count_range[0]}–{feedback.indicators.target_word_count_range[1]}</strong></span>
+          <span>{t('target')} <strong>{feedback.indicators.target_word_count_range[0]}-{feedback.indicators.target_word_count_range[1]}</strong></span>
         </div>
 
         {(feedback.indicators.covered_bullets?.length ?? 0) > 0 && (
@@ -196,7 +196,7 @@ export function WritingPractice({
 
       <div className="flex items-center justify-between text-xs text-gray-400 px-1">
         <span>
-          {t('words')} <strong className={wordCount < minWords ? 'text-amber-500' : wordCount > maxWords ? 'text-red-400' : 'text-green-600'}>{wordCount}</strong> / {minWords}–{maxWords}
+          {t('words')} <strong className={wordCount < minWords ? 'text-amber-500' : wordCount > maxWords ? 'text-red-400' : 'text-green-600'}>{wordCount}</strong> / {minWords}-{maxWords}
         </span>
         <span>{minutes}:{String(seconds).padStart(2, '0')}</span>
       </div>

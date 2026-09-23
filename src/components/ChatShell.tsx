@@ -29,7 +29,7 @@ export type ChatHeaderConfig = {
 export type ChatFooterConfig = {
   /** Badge text: "SITUACIONES" | "CONVERSACIÓN" | "YL PART 1" */
   modeLabel: string;
-  /** Model display name — import from ACTIVE_MODEL_LABEL in gemini.ts */
+  /** Model display name, import from ACTIVE_MODEL_LABEL in gemini.ts */
   modelName: string;
   /** Optional helper text rendered as a third line */
   helperText?: string;
@@ -38,9 +38,9 @@ export type ChatFooterConfig = {
 export type ChatShellProps = {
   headerConfig: ChatHeaderConfig;
   footerConfig: ChatFooterConfig;
-  /** Message list, cards, images — the scrollable body */
+  /** Message list, cards, images, the scrollable body */
   children: React.ReactNode;
-  /** Mode-specific mic bar, text input, send button — rendered above <ChatFooter> */
+  /** Mode-specific mic bar, text input, send button, rendered above <ChatFooter> */
   inputSlot: React.ReactNode;
   /** Key for motion.section re-mount animation. Pass mode string. */
   animationKey?: string;

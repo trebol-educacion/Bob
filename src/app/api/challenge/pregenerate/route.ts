@@ -9,7 +9,7 @@ const CHUNK_SIZE = 6;
 
 /**
  * Generates missing versioned challenge images and stores them in Supabase.
- * Idempotent — existing (slot_key, version) rows are never regenerated,
+ * Idempotent, existing (slot_key, version) rows are never regenerated,
  * making it safe to re-run when a Vercel function times out mid-batch.
  */
 export async function POST(req: NextRequest): Promise<NextResponse> {

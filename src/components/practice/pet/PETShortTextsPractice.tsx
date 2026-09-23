@@ -236,7 +236,7 @@ function ResultCard({
   );
 }
 
-/** PET Reading Part 1 — Short Texts practice component. */
+/** PET Reading Part 1, Short Texts practice component. */
 export function PETShortTextsPractice({
   onBack,
   sessionId: initialSessionId,

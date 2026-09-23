@@ -299,7 +299,7 @@ function GapResultRow({
   );
 }
 
-/** FCE Reading & Use of English Part 1 — Multiple-Choice Cloze practice component. */
+/** FCE Reading & Use of English Part 1, Multiple-Choice Cloze practice component. */
 export function FCEMultipleChoiceClozePractice({
   onBack,
   sessionId: initialSessionId,

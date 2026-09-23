@@ -51,7 +51,7 @@ export interface PictureStoryPrompt {
   framing_text: string;
 }
 
-/** Plan without images — returned by the fast first-phase action. */
+/** Plan without images, returned by the fast first-phase action. */
 export interface PictureStoryPlan {
   sessionId: string;
   userId: string;
@@ -77,7 +77,7 @@ function buildFallbackFeedback(): PictureStoryFeedback {
 }
 
 /**
- * Phase 1 — fast (~2s): generates the story premise + scene descriptions only.
+ * Phase 1, fast (~2s): generates the story premise + scene descriptions only.
  * The component renders the exercise immediately, then loads the 3 scene
  * images in the background via generateKETSceneImageAction.
  */
@@ -88,7 +88,7 @@ export async function generateKETPictureStoryPlanAction(input: {
   let userId: string | undefined;
 
   if (!sessionId) {
-    const result = await createSessionAction({ mode: 'cambridge_ket_writing_part7', title: 'Writing Part 7 — Picture Story' });
+    const result = await createSessionAction({ mode: 'cambridge_ket_writing_part7', title: 'Writing Part 7, Picture Story' });
     if (!result.data) return { error: result.error ?? 'Could not create session' };
     sessionId = result.data.id;
     userId = result.data.user_id;
@@ -143,7 +143,7 @@ export async function generateKETPictureStoryPlanAction(input: {
   };
 }
 
-/** Phase 2 — generates a single scene image (~6-9s, cached). */
+/** Phase 2, generates a single scene image (~6-9s, cached). */
 export async function generateKETSceneImageAction(input: {
   imagePrompt: string;
   sessionId: string;
@@ -154,7 +154,7 @@ export async function generateKETSceneImageAction(input: {
   return { image_url: urls[0] ?? '' };
 }
 
-/** Legacy full action (kept for compatibility — restore path uses persisted images). */
+/** Legacy full action (kept for compatibility, restore path uses persisted images). */
 export async function generateKETPictureStoryAction(input: {
   sessionId?: string;
 }): Promise<PictureStoryPrompt | { error: string }> {
@@ -162,7 +162,7 @@ export async function generateKETPictureStoryAction(input: {
   let userId: string | undefined;
 
   if (!sessionId) {
-    const result = await createSessionAction({ mode: 'cambridge_ket_writing_part7', title: 'Writing Part 7 — Picture Story' });
+    const result = await createSessionAction({ mode: 'cambridge_ket_writing_part7', title: 'Writing Part 7, Picture Story' });
     if (!result.data) return { error: result.error ?? 'Could not create session' };
     sessionId = result.data.id;
     userId = result.data.user_id;

@@ -109,7 +109,7 @@ export function Navbar({ userEmail, onOpenDashboard, onToggleSidebar, onGoHome }
                 {SKILL_LABEL[selectedSkill]}
               </span>
               <span className="text-xs font-black uppercase tracking-wide text-white px-1.5 py-0.5 rounded-md bg-white/20">
-                {currentLevel ?? '—'}
+                {currentLevel ?? '-'}
               </span>
             </div>
           )}

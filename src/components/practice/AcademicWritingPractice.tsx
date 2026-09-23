@@ -32,20 +32,20 @@ const CONFIG: Record<string, AcademicConfig> = {
   toefl_writing_academic_discussion: {
     framework: 'toefl',
     exam_part: 'toefl_writing_academic_discussion',
-    modeTitle: 'TOEFL Writing — Academic Discussion',
+    modeTitle: 'TOEFL Writing, Academic Discussion',
     instructions: 'Your professor is asking the class a question about this week\'s topic. Read the discussion and post your contribution.',
     bullets: ['State your opinion clearly', 'Support it with a reason or example', 'Respond to at least one classmate'],
     targetWordCount: [100, 200],
     forumPosts: [
       { author: 'Dr. Smith (Professor)', text: 'Do you think universities should require all students to study abroad for at least one semester? Why or why not?' },
       { author: 'Maria (classmate)', text: 'I think it\'s a great idea because exposure to different cultures builds empathy and communication skills.' },
-      { author: 'James (classmate)', text: 'I disagree — not everyone can afford it. Universities should offer virtual exchange programs instead.' },
+      { author: 'James (classmate)', text: 'I disagree, not everyone can afford it. Universities should offer virtual exchange programs instead.' },
     ],
   },
   cambridge_fce_writing_part1: {
     framework: 'cambridge',
     exam_part: 'cambridge_fce_writing_part1',
-    modeTitle: 'Writing — Part 1 Essay',
+    modeTitle: 'Writing, Part 1 Essay',
     instructions: 'In your English class you have been talking about technology. Now your teacher has asked you to write an essay. Write your essay using all the notes and give reasons for your point of view.',
     bullets: ['Social media and communication', 'Online privacy', 'Your own idea'],
     targetWordCount: [140, 190],

@@ -16,7 +16,7 @@ export interface PracticeRubricResult {
 const NO_TURNS_RESULT: PracticeRubricResult = {
   score: 0,
   detail: { participation: 0, fluency: 0, independence: 0, comprehension: 0 },
-  feedback: 'No turns to grade yet — keep practicing to get feedback.',
+  feedback: 'No turns to grade yet, keep practicing to get feedback.',
 };
 
 const AUDIO_SCORE_CAP = 3;
@@ -57,7 +57,7 @@ export function gradePracticeSession(turns: PracticeTurnSignal[]): PracticeRubri
 
   const feedback =
     audioTurns === 0
-      ? 'Try speaking your answers out loud next time — that is what Bob listens for.'
+      ? 'Try speaking your answers out loud next time, that is what Bob listens for.'
       : independence < 5
         ? 'Good effort. Try answering before reaching for a hint or the model answer next time.'
         : 'Nice work! You spoke clearly and kept the conversation going.';

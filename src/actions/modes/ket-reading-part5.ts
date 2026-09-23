@@ -76,7 +76,7 @@ export async function generateKETReadingTFDSAction(input: {
 
   const [generationPrompt, framingText] = await Promise.all([
     getPrompt('cambridge_ket_reading_part5_a2_generation').catch(() => null),
-    getPrompt('cambridge_ket_reading_part5_a2_framing').catch(() => 'Read the text carefully. Then decide if each statement is True, False, or Doesn\'t Say — T, F or DS.'),
+    getPrompt('cambridge_ket_reading_part5_a2_framing').catch(() => 'Read the text carefully. Then decide if each statement is True, False, or Doesn\'t Say, T, F or DS.'),
   ]);
 
   if (!generationPrompt) return { error: 'Could not load generation prompt' };

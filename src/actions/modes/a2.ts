@@ -32,7 +32,7 @@ const FormativeFeedbackFallback: FormativeFeedback = {
   kind: 'formative',
   understood: false,
   highlights: [],
-  suggestions: ['Try again — we could not process your response.'],
+  suggestions: ['Try again, we could not process your response.'],
 };
 
 /** Generate an A2 session plan and persist it as a 'phrase' message in bob_messages. */
@@ -162,7 +162,7 @@ export async function evaluateA2FinalAction(
 
 Analyse this speaking interview transcript and return ONLY a JSON object with these fields:
 - "kind": always "formative"
-- "understood": boolean — did the student generally communicate successfully?
+- "understood": boolean, did the student generally communicate successfully?
 - "highlights": array of 1-3 strings celebrating specific things the student did well (e.g. "Used past tense correctly", "Good vocabulary for hobbies")
 - "suggestions": array of 1-3 friendly, concrete improvement tips (e.g. "Try to give longer answers with 'because'", "Remember to use 'there is/are' for descriptions")
 - "model_answer": one short example sentence showing a strong answer to any one question

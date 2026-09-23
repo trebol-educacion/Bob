@@ -1,5 +1,5 @@
 /**
- * PET B1 Part 2 — data contracts (schemas and types).
+ * PET B1 Part 2, data contracts (schemas and types).
  */
 
 import { z } from 'zod';

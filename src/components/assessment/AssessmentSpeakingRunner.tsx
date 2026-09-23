@@ -190,7 +190,7 @@ export function AssessmentSpeakingRunner({ assessment_id, prompts, is_yl = false
   }
 
   if (phase === 'sent') {
-    return <BobMascotLoader size="lg" message="Recording sent! Bob will evaluate it in the background — check your dashboard in a moment." />;
+    return <BobMascotLoader size="lg" message="Recording sent! Bob will evaluate it in the background, check your dashboard in a moment." />;
   }
 
   if (phase === 'submitting') {
@@ -260,7 +260,7 @@ export function AssessmentSpeakingRunner({ assessment_id, prompts, is_yl = false
         <div className="flex flex-col items-center gap-4 w-full">
           <div className="flex items-center gap-2 text-red-500 font-semibold text-sm">
             <span className="inline-block w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
-            Recording — {elapsed}s / {MAX_TURN_MS / 1000}s
+            Recording, {elapsed}s / {MAX_TURN_MS / 1000}s
           </div>
           <div className="w-full h-2 rounded-full bg-gray-100">
             <div

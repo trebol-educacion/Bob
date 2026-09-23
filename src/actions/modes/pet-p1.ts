@@ -37,7 +37,7 @@ const FormativeFeedbackFallback: FormativeFeedback = {
   kind: 'formative',
   understood: false,
   highlights: [],
-  suggestions: ['Try again — we could not process your response.'],
+  suggestions: ['Try again, we could not process your response.'],
 };
 
 /** Generate a B1 PET Part 1 interview plan and persist it as a 'phrase' message. */

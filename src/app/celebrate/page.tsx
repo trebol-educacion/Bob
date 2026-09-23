@@ -93,7 +93,7 @@ export default function CelebrateDemoPage() {
           key={key}
           score={score}
           scoreMax={scoreMax}
-          feedback="Demo feedback — looking good, keep going!"
+          feedback="Demo feedback, looking good, keep going!"
           onAction={() => alert('Action clicked')}
           actionLabel="See my progress"
           animate

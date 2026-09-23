@@ -50,7 +50,7 @@ function rubricTotal(rubric: RubricCriteria): number {
 
 function FeedbackBlocks({ feedback }: { feedback: FormativeFeedback }) {
   const [modelOpen, setModelOpen] = useState(false);
-  const highlights = feedback.highlights.length > 0 ? feedback.highlights : ['You spoke up — well done!'];
+  const highlights = feedback.highlights.length > 0 ? feedback.highlights : ['You spoke up, well done!'];
   const tip = feedback.suggestions.length > 0 ? feedback.suggestions[0] : null;
 
   return (
@@ -218,7 +218,7 @@ function ProgressDots({ total, currentIndex }: { total: number; currentIndex: nu
   );
 }
 
-/** A2 Key Part 1 Speaking practice — kid-first focus-mode Cambridge KET interview. */
+/** A2 Key Part 1 Speaking practice, kid-first focus-mode Cambridge KET interview. */
 export function A2Part1Practice({ onBack }: A2Part1PracticeProps) {
   const t = useTranslations('cambridge');
   const reduceMotion = useReducedMotion();
@@ -302,7 +302,7 @@ export function A2Part1Practice({ onBack }: A2Part1PracticeProps) {
 
   const startSession = useCallback(async () => {
     try {
-      const sessionResult = await createSessionAction({ mode: 'cambridge_ket_part1', title: 'A2 Speaking – Part 1' });
+      const sessionResult = await createSessionAction({ mode: 'cambridge_ket_part1', title: 'A2 Speaking, Part 1' });
       if (!sessionResult.data) throw new Error(sessionResult.error ?? 'Failed to create session');
       sessionIdRef.current = sessionResult.data.id;
       userIdRef.current = sessionResult.data.user_id;

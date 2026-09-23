@@ -70,7 +70,7 @@ async function tryResumeOpenSession(level: CefrLevel): Promise<ResolvePracticeSe
 
 /**
  * Resolves the practice session for the UI to render immediately: resumes an
- * open session if one exists, otherwise creates a new one. Never calls Gemini —
+ * open session if one exists, otherwise creates a new one. Never calls Gemini -
  * the first Bob message is streamed separately and in parallel by the client
  * via /api/practice/initial-turn, so this action never blocks on it.
  *

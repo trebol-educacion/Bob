@@ -2,7 +2,7 @@
 
 /**
  * Shared utilities and sub-components for YL practice components.
- * Keeps recurring patterns (audio, TTS, results, turn loop) DRY across Part1–4.
+ * Keeps recurring patterns (audio, TTS, results, turn loop) DRY across Part1-4.
  */
 
 import React from 'react';
@@ -116,7 +116,7 @@ export async function playTTS(text: string): Promise<void> {
   }
 }
 
-/** Loading screen shown during YL activity setup — uses Bob mascot per D-B3. */
+/** Loading screen shown during YL activity setup, uses Bob mascot per D-B3. */
 export function YLLoadingScreen({ message }: { message: string }) {
   return <BobMascotLoader message={message} />;
 }
@@ -217,7 +217,7 @@ export function YLResultCompact({ evalResult }: { evalResult: EvalResponse }) {
   );
 }
 
-// Backwards-compat aliases — older code paths still import these
+// Backwards-compat aliases, older code paths still import these
 export function YLScoreDisplay({ evalResult }: { evalResult: EvalResponse }) {
   return <YLResultCompact evalResult={evalResult} />;
 }

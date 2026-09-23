@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * YLWhatsThisPractice — Cambridge Starters Part 3 "What's This?".
+ * YLWhatsThisPractice, Cambridge Starters Part 3 "What's This?".
  *
  * Bob shows 4 object cards one at a time. For each card the child answers
  * 2 spoken questions: "What's this?" and "Have you got a [X]?".
@@ -274,7 +274,7 @@ export function YLWhatsThisPractice({
           for (const card of p.object_cards) {
             reactionTexts.push(`That's right! It's a ${card.word}. Well done!`);
             reactionTexts.push(`Good try! It's a ${card.word}.`);
-            reactionTexts.push(`Great job! Yes or no — you did it!`);
+            reactionTexts.push(`Great job! Yes or no, you did it!`);
             reactionTexts.push(`Good try! Keep going!`);
           }
           const allTexts = [...questionTexts, ...reactionTexts];
@@ -612,7 +612,7 @@ export function YLWhatsThisPractice({
       headerConfig={{
         icon: WhatsThisIcon,
         title: t('whatsThis.title'),
-        subtitle: `Ages 6–8 · Card ${cardIndex + 1}/${totalCards} · Q${questionIndex + 1}/2`,
+        subtitle: `Ages 6-8 · Card ${cardIndex + 1}/${totalCards} · Q${questionIndex + 1}/2`,
         accentColor: 'violet',
         leftSlot: backButton,
         rightSlot: (

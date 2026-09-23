@@ -74,7 +74,7 @@ export async function startPETListeningPart2Action(): Promise<
 
   const sessionResult = await createSessionAction({
     mode: 'cambridge_pet_listening_part2',
-    title: 'Listening Part 2 — Multiple Choice',
+    title: 'Listening Part 2, Multiple Choice',
   });
 
   if (!sessionResult.data) {
@@ -119,7 +119,7 @@ export async function startPETListeningPart2Action(): Promise<
 /**
  * Validates a single answer server-side and persists both the user answer
  * and Bob's per-turn evaluation message.
- * The correct_key is never sent to the client — it is fetched here directly.
+ * The correct_key is never sent to the client, it is fetched here directly.
  */
 export async function submitPETListeningAnswerAction(
   session_id: string,

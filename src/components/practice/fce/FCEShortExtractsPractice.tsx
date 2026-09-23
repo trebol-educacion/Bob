@@ -182,7 +182,7 @@ function AudioButton({
   );
 }
 
-/** FCE B2 Listening Part 1 — 8 short extracts, 3-option multiple choice. */
+/** FCE B2 Listening Part 1, 8 short extracts, 3-option multiple choice. */
 export function FCEShortExtractsPractice({
   onBack,
   sessionId: initialSessionId,
@@ -605,7 +605,7 @@ function Header({
         <Volume2 size={18} className="text-indigo-600" />
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-bold text-gray-800 truncate">Listening Part 1 — Short Extracts</p>
+        <p className="text-sm font-bold text-gray-800 truncate">Listening Part 1, Short Extracts</p>
         <p className="text-xs text-gray-400">Multiple Choice</p>
       </div>
       <div className="shrink-0 flex items-center gap-2">

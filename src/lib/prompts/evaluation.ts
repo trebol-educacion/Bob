@@ -4,11 +4,11 @@
 
 const SCORING_RUBRIC = `
 SCORING RUBRIC (STRICTLY ENFORCED):
-  0–30:   Silent, inaudible, completely unintelligible
-  31–60:  Severe errors — words unrecognisable, very hard to understand
-  61–80:  Understandable with effort — strong accent or frequent minor errors
-  81–95:  Good — clear and natural, minimal errors
-  96–100: Excellent — near-native level
+  0-30:   Silent, inaudible, completely unintelligible
+  31-60:  Severe errors, words unrecognisable, very hard to understand
+  61-80:  Understandable with effort, strong accent or frequent minor errors
+  81-95:  Good, clear and natural, minimal errors
+  96-100: Excellent, near-native level
 `;
 
 export function buildPronunciationEvaluationPrompt(targetPhrase: string): string {
@@ -41,7 +41,7 @@ export function buildImageDescriptionEvaluationPrompt(sceneDescription: string):
     - If the description is under 10 seconds or contains no mention of people → max score 50.
     - DO NOT inflate scores.
 
-    Also generate a model_answer: a 3–4 sentence B1-level description of the image based on the context provided.
+    Also generate a model_answer: a 3-4 sentence B1-level description of the image based on the context provided.
 
     Devuelve la respuesta estrictamente en formato JSON.
   `;

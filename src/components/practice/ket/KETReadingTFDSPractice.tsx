@@ -271,7 +271,7 @@ function PassageSheet({
   );
 }
 
-/** KET Reading Part 5 — True, False or Doesn't Say focus-mode practice component. */
+/** KET Reading Part 5, True, False or Doesn't Say focus-mode practice component. */
 export function KETReadingTFDSPractice({
   onBack, sessionId: initialSessionId, initialMessages, onSessionCreated, onSessionFinished, onOpenDashboard,
 }: KETReadingTFDSPracticeProps) {

@@ -55,7 +55,7 @@ async function persistChallengeSectionResults(
   if (error) console.error('[saveChallengeAttemptAction] activity_results insert failed:', error.message);
 }
 
-/** Persists a completed challenge attempt. Never throws — returns `{ ok: false }` on any failure. */
+/** Persists a completed challenge attempt. Never throws, returns `{ ok: false }` on any failure. */
 export async function saveChallengeAttemptAction(input: {
   framework: string;
   examId: string;

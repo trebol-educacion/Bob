@@ -51,7 +51,7 @@ const EMPTY_MEDIA: HobbyTalkMedia = {
   image_url: '',
 };
 
-/** KET Speaking Part 2 — Talk About a Hobby (two-phase loading). */
+/** KET Speaking Part 2, Talk About a Hobby (two-phase loading). */
 export function KETHobbyTalkPractice({
   onBack, sessionId: initialSessionId, initialMessages, onSessionCreated, onSessionFinished, onOpenDashboard,
 }: KETHobbyTalkPracticeProps) {

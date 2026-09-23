@@ -160,7 +160,7 @@ export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) 
       const sessionResult = await createSessionAction({
         mode: 'toefl_interview',
         topic: plan.topic_id,
-        title: `TOEFL Interview — ${plan.topic_name}`,
+        title: `TOEFL Interview, ${plan.topic_name}`,
       });
       if (sessionResult.data) {
         sessionIdRef.current = sessionResult.data.id;

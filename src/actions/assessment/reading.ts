@@ -8,7 +8,7 @@ import { resolveCooldownUntil } from './shared';
 
 /**
  * Scores a completed Reading Assessment deterministically.
- * No LLM call — pure comparison against bob_closed_items.correct_key.
+ * No LLM call, pure comparison against bob_closed_items.correct_key.
  * D-D1 compliance: zero Gemini calls on this path.
  */
 export async function submitAssessmentReadingAction(
@@ -117,7 +117,7 @@ export async function submitAssessmentReadingAction(
       kind: 'formative',
       understood: correct >= Math.ceil(total / 2),
       highlights: correct === total
-        ? ['You answered all questions correctly — excellent reading comprehension!']
+        ? ['You answered all questions correctly, excellent reading comprehension!']
         : [`You got ${correct} out of ${total} correct.`],
       suggestions: failedItemIds.length > 0
         ? ['Re-read the texts for the questions you missed and look for the key information.']

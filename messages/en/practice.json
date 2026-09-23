@@ -7,7 +7,7 @@
     },
     "practice": {
       "title": "Practice",
-      "subtitle": "Talk, listen and describe — any topic, straight away."
+      "subtitle": "Talk, listen and describe, any topic, straight away."
     }
   },
   "starting": "Bob is getting ready...",
@@ -19,7 +19,7 @@
   "hideTextLabel": "Hide text",
   "image": {
     "loading": "Picture is loading...",
-    "unavailable": "Picture unavailable — let's keep talking"
+    "unavailable": "Picture unavailable, let's keep talking"
   },
   "controls": {
     "placeholder": "Type your answer...",
@@ -56,7 +56,7 @@
   },
   "finished": {
     "title": "Practice finished",
-    "scoreLabel": "This is practice — it doesn't count towards your level.",
+    "scoreLabel": "This is practice, it doesn't count towards your level.",
     "again": "Practice again",
     "home": "Back home",
     "criteria": {
