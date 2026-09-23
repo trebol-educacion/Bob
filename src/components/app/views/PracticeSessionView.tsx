@@ -1,11 +1,11 @@
 'use client';
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React from 'react';
 import { useTranslations } from 'next-intl';
-import { Loader2 } from 'lucide-react';
 import { PracticeSurface } from '@/components/practice/free/PracticeSurface';
+import { PracticeBootBubble } from '@/components/practice/free/PracticeBootBubble';
 import { ConversationErrorBanner } from '@/components/conversation/ConversationErrorBanner';
-import { startPracticeAction, type StartPracticeResult } from '@/actions/practice/start';
+import { usePracticeBoot } from '@/hooks/practice/usePracticeBoot';
 import type { Organization } from '@/lib/organization';
 import type { CefrLevel } from '@/lib/types/practice';
 import type { SkillLevelMap } from '@/lib/types/skills';
@@ -20,31 +20,9 @@ export interface PracticeSessionViewProps {
 /** @param props PracticeSessionViewProps */
 export function PracticeSessionView({ organization, cefrActiveLevel, skillLevels, onExit }: PracticeSessionViewProps) {
   const t = useTranslations('practice');
-  const [session, setSession] = useState<StartPracticeResult | null>(null);
-  const [failed, setFailed] = useState(false);
-  const [attempt, setAttempt] = useState(0);
+  const boot = usePracticeBoot({ mode: 'conversation', organization, cefrActiveLevel, skillLevels });
 
-  const start = useCallback(async () => {
-    setFailed(false);
-    setSession(null);
-    try {
-      const result = await startPracticeAction({
-        mode: 'conversation',
-        skillLevels,
-        cefrActiveLevel,
-        organizationId: organization?.id ?? null,
-      });
-      setSession(result);
-    } catch (error) {
-      console.error('[PracticeSessionView] startPracticeAction failed:', error);
-      setFailed(true);
-    }
-  }, [skillLevels, cefrActiveLevel, organization]);
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    void start();
-  }, [start, attempt]);
+  const failed = boot.phase === 'ready' && !boot.message && boot.messages.length === 0;
 
   if (failed) {
     return (
@@ -52,33 +30,39 @@ export function PracticeSessionView({ organization, cefrActiveLevel, skillLevels
         <ConversationErrorBanner
           message={t('errors.startError')}
           retryLabel={t('errors.retry')}
-          onRetry={() => setAttempt((n) => n + 1)}
+          onRetry={boot.restart}
         />
       </div>
     );
   }
 
-  if (!session) {
+  if (boot.phase === 'ready') {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center gap-3 text-gray-400">
-        <Loader2 size={32} className="animate-spin" />
-        <p className="text-sm font-bold uppercase tracking-widest">{t('starting')}</p>
-      </div>
+      <PracticeSurface
+        key={boot.sessionId ?? 'in-memory'}
+        sessionId={boot.sessionId}
+        mode={boot.mode}
+        seed={boot.seed}
+        level={boot.level}
+        framing={boot.framing}
+        messages={boot.messages}
+        turnSignals={boot.turnSignals}
+        onExit={onExit}
+        onRestart={boot.restart}
+      />
     );
   }
 
   return (
-    <PracticeSurface
-      key={session.sessionId ?? 'in-memory'}
-      sessionId={session.sessionId}
-      mode={session.mode}
-      seed={session.seed}
-      level={session.level}
-      framing={session.framing}
-      messages={session.messages}
-      turnSignals={session.turnSignals}
-      onExit={onExit}
-      onRestart={() => setAttempt((n) => n + 1)}
-    />
+    <div className="flex-1 flex flex-col min-h-0">
+      <div className="flex-1 overflow-y-auto px-4 py-4">
+        <PracticeBootBubble
+          framing={boot.framing}
+          message={boot.message}
+          scenarioTitle={t('scenarioTitle')}
+          preparingLabel={t('starting')}
+        />
+      </div>
+    </div>
   );
 }
