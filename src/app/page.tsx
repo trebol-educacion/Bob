@@ -13,7 +13,7 @@ import { isConversationMode, isExamMode, type AppState } from '@/lib/routing';
 import type { PracticeMode } from '@/lib/types/practice';
 
 export default function App() {
-  const [appState, setAppState] = useState<AppState>('skill-selection');
+  const [appState, setAppState] = useState<AppState>('home');
   const [userEmail, setUserEmail] = useState<string | undefined>();
   const {
     organization,
@@ -88,6 +88,9 @@ export default function App() {
     setTopic('');
   }, [setSelectedSkill]);
 
+  const onSelectExam = useCallback(() => setAppState('skill-selection'), []);
+  const onSelectPractice = useCallback(() => setAppState('practice-session'), []);
+
   const {
     sessions,
     activeSessionId,
@@ -147,7 +150,7 @@ export default function App() {
   }, [handleConversationSessionStart]);
 
   const onFinish = useCallback(() => {
-    leavePractice('skill-selection');
+    leavePractice('home');
     setSelectedSkill(null);
     setMode(null);
     setTopic('');
@@ -194,6 +197,8 @@ export default function App() {
       onDeleteSession={onDeleteSession}
       onFinish={onFinish}
       leavePractice={leavePractice}
+      onSelectExam={onSelectExam}
+      onSelectPractice={onSelectPractice}
       handleSkillSelect={assessment.handleSkillSelect}
       handleModeSelect={handleModeSelect}
       handleAssessmentStart={assessment.handleAssessmentStart}

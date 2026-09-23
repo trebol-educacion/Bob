@@ -8,6 +8,8 @@ import { PlacementRequired } from '@/components/placement/PlacementRequired';
 import { ConversationPracticeView } from './views/ConversationPracticeView';
 import { ChallengeHome } from '@/components/challenge/ChallengeHome';
 import { ChallengeRunner } from '@/components/challenge/ChallengeRunner';
+import { HomeView } from './views/HomeView';
+import { PracticeSessionView } from './views/PracticeSessionView';
 import { CatalogView } from './views/CatalogView';
 import { ModeSelectorView } from './views/ModeSelectorView';
 import { PracticeView } from './views/PracticeView';
@@ -42,6 +44,8 @@ export interface AppShellRoutesProps {
   selectedMessages: StoredMessage[];
   onFinish: () => void;
   leavePractice: (target: AppState) => void;
+  onSelectExam: () => void;
+  onSelectPractice: () => void;
   handleSkillSelect: (skill: Skill) => void;
   setSelectedSkill: (skill: Skill | null) => void;
   handleModeSelect: (m: PracticeMode) => void;
@@ -85,6 +89,8 @@ export function AppShellRoutes({
   selectedMessages,
   onFinish,
   leavePractice,
+  onSelectExam,
+  onSelectPractice,
   handleSkillSelect,
   setSelectedSkill,
   handleModeSelect,
@@ -134,6 +140,40 @@ export function AppShellRoutes({
 
   return (
     <AnimatePresence mode="wait">
+
+      {appState === 'home' && (
+        <motion.div
+          key="home"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -20 }}
+          className="w-full flex-1 overflow-y-auto"
+        >
+          <HomeView
+            organization={organization}
+            cefrActiveLevel={cefrActiveLevel}
+            onSelectExam={onSelectExam}
+            onSelectPractice={onSelectPractice}
+          />
+        </motion.div>
+      )}
+
+      {appState === 'practice-session' && (
+        <motion.div
+          key="practice-session"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="flex-1 flex flex-col min-h-0"
+        >
+          <PracticeSessionView
+            organization={organization}
+            cefrActiveLevel={cefrActiveLevel}
+            skillLevels={skillLevels}
+            onExit={() => leavePractice('home')}
+          />
+        </motion.div>
+      )}
 
       {appState === 'skill-selection' && (
         <motion.div

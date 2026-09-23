@@ -1,0 +1,53 @@
+{
+  "home": {
+    "exam": {
+      "title": "Exam",
+      "subtitle": "Cambridge and TOEFL, by skill and part.",
+      "level": "Your level: {level}"
+    },
+    "practice": {
+      "title": "Practice",
+      "subtitle": "Talk, listen and describe — any topic, straight away."
+    }
+  },
+  "starting": "Bob is getting ready...",
+  "scenarioTitle": "Scenario",
+  "listenAudioLabel": "Listen to hear the message",
+  "repeatAudioLabel": "Listen again",
+  "playAudioLabel": "Listen",
+  "showHintLabel": "Show hint",
+  "hideTextLabel": "Hide text",
+  "image": {
+    "loading": "Picture is loading...",
+    "unavailable": "Picture unavailable — let's keep talking"
+  },
+  "controls": {
+    "placeholder": "Type your answer...",
+    "modelAnswer": "Show me an answer",
+    "exit": "Exit",
+    "finish": "Finish"
+  },
+  "modes": {
+    "conversation": "Conversation",
+    "situation": "Situation",
+    "picture": "Picture"
+  },
+  "errors": {
+    "conversationError": "Something went wrong with that turn.",
+    "sendMessageError": "Bob couldn't answer just now.",
+    "startError": "Bob couldn't start practice just now.",
+    "retry": "Try again"
+  },
+  "finished": {
+    "title": "Practice finished",
+    "scoreLabel": "This is practice — it doesn't count towards your level.",
+    "again": "Practice again",
+    "home": "Back home",
+    "criteria": {
+      "participation": "Speaking",
+      "fluency": "Fluency",
+      "independence": "Independence",
+      "comprehension": "Depth"
+    }
+  }
+}

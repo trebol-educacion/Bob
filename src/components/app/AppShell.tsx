@@ -40,6 +40,8 @@ export interface AppShellProps {
   onDeleteSession: (id: string) => void;
   onFinish: () => void;
   leavePractice: (target: AppState) => void;
+  onSelectExam: () => void;
+  onSelectPractice: () => void;
   handleSkillSelect: (skill: Skill) => void;
   setSelectedSkill: (skill: Skill | null) => void;
   handleModeSelect: (m: PracticeMode) => void;
@@ -87,6 +89,8 @@ export function AppShell({
   onDeleteSession,
   onFinish,
   leavePractice,
+  onSelectExam,
+  onSelectPractice,
   handleSkillSelect,
   setSelectedSkill,
   handleModeSelect,
@@ -179,6 +183,8 @@ export function AppShell({
             selectedMessages={selectedMessages}
             onFinish={onFinish}
             leavePractice={leavePractice}
+            onSelectExam={onSelectExam}
+            onSelectPractice={onSelectPractice}
             handleSkillSelect={handleSkillSelect}
             setSelectedSkill={setSelectedSkill}
             handleModeSelect={handleModeSelect}
