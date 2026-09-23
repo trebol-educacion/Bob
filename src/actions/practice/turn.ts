@@ -1,15 +1,10 @@
 'use server';
 
 import { generateInitialChatAction } from '@/actions/gemini/conversation';
+import { MODE_PROMPT_KEY } from '@/lib/practice/mode-prompt-key';
 import type { InitialChatResult } from '@/actions/gemini/types';
 import type { PracticeActivityMode, PracticeSeed } from '@/lib/practice/types';
 import type { CefrLevel } from '@/lib/types/practice';
-
-const MODE_PROMPT_KEY: Record<PracticeActivityMode, string> = {
-  conversation: 'generic_conversation_shared_initial',
-  situation: 'practice_situation_shared_initial',
-  picture: 'practice_picture_shared_initial',
-};
 
 /**
  * @param mode PracticeActivityMode
