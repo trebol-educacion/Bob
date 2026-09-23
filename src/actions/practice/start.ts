@@ -2,10 +2,8 @@
 
 import { pickPracticeSeed } from '@/lib/practice/seed';
 import { resolveEffectiveLevel } from '@/lib/levels/effective-level';
-import { generatePracticeInitialTurnAction } from './turn';
 import {
   createPracticeSessionAction,
-  addPracticeTurnAction,
   findOpenPracticeSessionAction,
   listPracticeMessagesAction,
 } from './repository';
@@ -15,21 +13,20 @@ import type { ChatMessage } from '@/actions/gemini/types';
 import type { CefrLevel } from '@/lib/types/practice';
 import type { SkillLevelMap } from '@/lib/types/skills';
 
-export interface StartPracticeInput {
+export interface ResolvePracticeSessionInput {
   mode: PracticeActivityMode;
   skillLevels: SkillLevelMap | null;
   cefrActiveLevel: CefrLevel | null;
   organizationId: string | null;
 }
 
-export interface StartPracticeResult {
+export interface ResolvePracticeSessionResult {
   sessionId: string | null;
   degraded: boolean;
   resumed: boolean;
   mode: PracticeActivityMode;
   level: CefrLevel;
   seed: PracticeSeed;
-  framing: string;
   messages: ChatMessage[];
   turnSignals: PracticeTurnSignal[];
 }
@@ -37,7 +34,7 @@ export interface StartPracticeResult {
 const DEFAULT_LEVEL: CefrLevel = 'b1';
 
 /** @param level CefrLevel */
-async function tryResumeOpenSession(level: CefrLevel): Promise<StartPracticeResult | null> {
+async function tryResumeOpenSession(level: CefrLevel): Promise<ResolvePracticeSessionResult | null> {
   const found = await findOpenPracticeSessionAction();
   if (!found.ok || !found.data) return null;
 
@@ -66,21 +63,28 @@ async function tryResumeOpenSession(level: CefrLevel): Promise<StartPracticeResu
     mode: session.mode,
     level: session.cefr_level ?? level,
     seed: session.seed ?? pickPracticeSeed(session.mode),
-    framing: '',
     messages,
     turnSignals,
   };
 }
 
-/** @param input StartPracticeInput */
-export async function startPracticeAction(input: StartPracticeInput): Promise<StartPracticeResult> {
+/**
+ * Resolves the practice session for the UI to render immediately: resumes an
+ * open session if one exists, otherwise creates a new one. Never calls Gemini —
+ * the first Bob message is streamed separately and in parallel by the client
+ * via /api/practice/initial-turn, so this action never blocks on it.
+ *
+ * @param input ResolvePracticeSessionInput
+ */
+export async function resolvePracticeSessionAction(
+  input: ResolvePracticeSessionInput
+): Promise<ResolvePracticeSessionResult> {
   const level = resolveEffectiveLevel(input.skillLevels, input.cefrActiveLevel, 'speaking').level ?? DEFAULT_LEVEL;
 
   const resumed = await tryResumeOpenSession(level);
   if (resumed) return resumed;
 
   const seed = pickPracticeSeed(input.mode);
-
   const created = await createPracticeSessionAction({
     mode: input.mode,
     topic: seed.topic,
@@ -89,24 +93,14 @@ export async function startPracticeAction(input: StartPracticeInput): Promise<St
     organizationId: input.organizationId,
   });
 
-  const sessionId = created.ok ? created.data.id : null;
-  const degraded = !created.ok;
-
-  const initialTurn = await generatePracticeInitialTurnAction(input.mode, seed, level);
-
-  if (sessionId) {
-    void addPracticeTurnAction({ sessionId, role: 'bob', content: initialTurn.message });
-  }
-
   return {
-    sessionId,
-    degraded,
+    sessionId: created.ok ? created.data.id : null,
+    degraded: !created.ok,
     resumed: false,
     mode: input.mode,
     level,
     seed,
-    framing: initialTurn.framing,
-    messages: [{ role: 'model', text: initialTurn.message }],
+    messages: [],
     turnSignals: [],
   };
 }
