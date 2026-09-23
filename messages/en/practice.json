@@ -25,7 +25,12 @@
     "placeholder": "Type your answer...",
     "modelAnswer": "Show me an answer",
     "exit": "Exit",
-    "finish": "Finish"
+    "finish": "Finish",
+    "recording": "Recording"
+  },
+  "pendingTurn": {
+    "processingVoice": "Processing your voice...",
+    "stillWorking": "Still working on it, thanks for waiting..."
   },
   "modes": {
     "conversation": "Conversation",
@@ -52,7 +57,8 @@
     "conversationError": "Something went wrong with that turn.",
     "sendMessageError": "Bob couldn't answer just now.",
     "startError": "Bob couldn't start practice just now.",
-    "retry": "Try again"
+    "retry": "Try again",
+    "dismiss": "Dismiss"
   },
   "finished": {
     "title": "Practice finished",

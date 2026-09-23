@@ -7,6 +7,13 @@ export interface PracticeControlsLabels {
   modelAnswer: string;
   exit: string;
   finish: string;
+  recording: string;
+}
+
+function formatElapsed(totalSeconds: number): string {
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${String(seconds).padStart(2, '0')}`;
 }
 
 export interface PracticeControlsProps {
@@ -34,13 +41,21 @@ export function PracticeControls({
   isProcessing,
   pendingModelAnswer,
 }: PracticeControlsProps) {
-  const { isRecording, startRecording, stopRecording } = useAudioRecorder({
+  const { isRecording, elapsedSeconds, startRecording, stopRecording } = useAudioRecorder({
     onRecorded: onSendAudio,
     onError: (error) => console.error('[PracticeControls] recorder error:', error),
   });
 
   return (
     <div className="flex-none border-t border-gray-100 bg-white px-4 py-3 space-y-3">
+      {isRecording && (
+        <div className="flex items-center justify-center gap-2 text-red-500">
+          <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+          <span className="text-xs font-black uppercase tracking-widest">{labels.recording}</span>
+          <span className="text-xs font-black tabular-nums">{formatElapsed(elapsedSeconds)}</span>
+        </div>
+      )}
+
       <div className="flex items-center justify-end gap-2">
         <div className="flex items-center gap-2">
           <button

@@ -2,6 +2,8 @@
 
 import React, { useState } from 'react';
 import { useTranslations } from 'next-intl';
+import { Loader2 } from 'lucide-react';
+import { MessageBubble, TypingIndicator } from '@/components/chat';
 import { ConversationMessages } from '@/components/conversation/ConversationMessages';
 import { ConversationErrorBanner } from '@/components/conversation/ConversationErrorBanner';
 import { PracticeControls } from './PracticeControls';
@@ -89,8 +91,8 @@ export function PracticeSurface({ sessionId, mode, seed, level, framing, message
           <div className="mb-3">
             <ConversationErrorBanner
               message={t(`errors.${turn.errorMessage}`)}
-              retryLabel={t('errors.retry')}
-              onRetry={turn.dismissError}
+              retryLabel={turn.canRetry ? t('errors.retry') : t('errors.dismiss')}
+              onRetry={turn.canRetry ? turn.retryLastTurn : turn.dismissError}
             />
           </div>
         )}
@@ -111,6 +113,27 @@ export function PracticeSurface({ sessionId, mode, seed, level, framing, message
           hideTextLabel={t('hideTextLabel')}
           listenFirst={turn.mode === 'conversation'}
         />
+
+        {turn.pendingTurn && (
+          <div className="mt-3 space-y-2">
+            <div className="flex justify-end">
+              <div className="max-w-[85%]">
+                <MessageBubble variant="user" noAnimate>
+                  <span className="flex items-center gap-2 opacity-80">
+                    <Loader2 size={14} className="animate-spin" />
+                    {turn.pendingTurn.text ?? t('pendingTurn.processingVoice')}
+                  </span>
+                </MessageBubble>
+              </div>
+            </div>
+            <TypingIndicator />
+            {turn.isSlow && (
+              <p className="text-xs font-bold uppercase tracking-widest text-gray-400 pl-11">
+                {t('pendingTurn.stillWorking')}
+              </p>
+            )}
+          </div>
+        )}
       </div>
 
       <PracticeControls
@@ -119,6 +142,7 @@ export function PracticeSurface({ sessionId, mode, seed, level, framing, message
           modelAnswer: t('controls.modelAnswer'),
           exit: t('controls.exit'),
           finish: t('controls.finish'),
+          recording: t('controls.recording'),
         }}
         inputText={turn.inputText}
         onInputTextChange={turn.setInputText}
