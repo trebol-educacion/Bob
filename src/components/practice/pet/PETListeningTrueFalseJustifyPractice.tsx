@@ -427,7 +427,7 @@ function ResultStatementCard({
   result,
   index,
   animate,
-  reduceMotion,
+  reduceMotion: _reduceMotion,
 }: {
   result: PETJustifyStatementResult;
   index: number;

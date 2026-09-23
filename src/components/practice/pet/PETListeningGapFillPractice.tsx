@@ -391,7 +391,6 @@ export function PETListeningGapFillPractice({
   onSessionFinished,
   onOpenDashboard,
 }: PETListeningGapFillPracticeProps) {
-  const reduceMotion = useReducedMotion();
   const [phase, setPhase] = useState<Phase>('loading');
   const [sessionId, setSessionId] = useState<string | undefined>(initialSessionId);
   const [userId, setUserId] = useState<string | undefined>();

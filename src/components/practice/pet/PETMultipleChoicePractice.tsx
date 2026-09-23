@@ -145,7 +145,7 @@ function ProgressDots({
 }
 
 function AudioButton({
-  audioUrl,
+  audioUrl: _audioUrl,
   playsUsed,
   onPlay,
 }: {

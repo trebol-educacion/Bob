@@ -73,7 +73,7 @@ async function geminiText(prompt: string): Promise<{ text: string; ms: number; o
         config: { responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
       });
       return res.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
-    } catch (e) {
+    } catch {
       return '';
     }
   });

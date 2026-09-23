@@ -123,7 +123,7 @@ export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) 
     }, []),
   });
 
-  const { isRecording, startRecording, stopRecording } = useAudioRecorder({
+  const { startRecording, stopRecording } = useAudioRecorder({
     onRecorded: (blob) => {
       recordedBlobRef.current = blob;
       setSubPhase('evaluating');

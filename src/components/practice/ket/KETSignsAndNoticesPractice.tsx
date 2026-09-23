@@ -226,7 +226,7 @@ function ResultCard({
   result,
   index,
   animate,
-  reduceMotion,
+  reduceMotion: _reduceMotion,
   explanationLabel,
   imageUrl,
 }: {

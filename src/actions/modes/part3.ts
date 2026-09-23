@@ -3,8 +3,6 @@
 import { z } from 'zod';
 import { MODELS } from '@/lib/models';
 import {
-  CollaborativeEvaluationSchema,
-  type CollaborativeEvaluation,
   FormativeFeedbackSchema,
   type FormativeFeedback,
 } from '@/lib/types/practice';
@@ -44,17 +42,6 @@ const ScenarioFallback: Part3Scenario = {
   situation: 'You and a friend are planning a day trip for your class.',
   prompt_question: 'Which of these places would be best for your class trip?',
   options: ['the beach', 'a museum', 'a theme park', 'the countryside', 'a sports centre'],
-};
-
-const EvaluationFallback: CollaborativeEvaluation = {
-  score: 0,
-  task_achievement: 0,
-  interaction: 0,
-  grammar: 0,
-  vocabulary: 0,
-  feedback: 'Unable to evaluate at this time. Please try again.',
-  strengths: [],
-  areas_for_improvement: [],
 };
 
 const FormativeFeedbackFallback: FormativeFeedback = {

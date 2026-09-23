@@ -1,5 +1,4 @@
-import React, { forwardRef, useState } from 'react';
-import Image from 'next/image';
+import React, { forwardRef } from 'react';
 import { motion } from 'motion/react';
 import { useTranslations } from 'next-intl';
 import {
@@ -140,47 +139,6 @@ function ModeCard({ mode, icon, title, description, badge, officialName, visibil
         </div>
       )}
     </motion.button>
-  );
-}
-
-/**
- * Plays the Bob greeting video once on first load, then swaps to the
- * static avatar PNG. Avoids continuous CPU drain from looping playback.
- */
-function BobIntroAvatar() {
-  const [videoEnded, setVideoEnded] = useState(false);
-
-  return (
-    <div className="relative w-full h-full rounded-full bg-white shadow-xl ring-4 ring-white overflow-hidden">
-      <motion.div
-        animate={{ rotate: [0, -6, 6, -4, 0] }}
-        transition={{ delay: 0.7, duration: 1.4, ease: 'easeInOut' }}
-        className="w-full h-full relative"
-        style={{ transformOrigin: '50% 80%' }}
-      >
-        <Image
-          src="/bob_avatar.png"
-          alt="Bob"
-          fill
-          sizes="160px"
-          className="object-cover object-[50%_0%] scale-95 origin-bottom"
-          priority
-        />
-      </motion.div>
-      {!videoEnded && (
-        <video
-          autoPlay
-          muted
-          playsInline
-          preload="auto"
-          onEnded={() => setVideoEnded(true)}
-          onError={() => setVideoEnded(true)}
-          className="absolute inset-0 w-full h-full object-cover object-[50%_35%]"
-        >
-          <source src="/bob_hello.mp4" type="video/mp4" />
-        </video>
-      )}
-    </div>
   );
 }
 

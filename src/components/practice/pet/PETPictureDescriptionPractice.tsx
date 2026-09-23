@@ -12,7 +12,6 @@ import { ChatInputBar } from '@/components/chat/ChatInputBar';
 import { BobAvatar } from '@/components/practice/yl/_shared';
 import { useCountdownTimer } from '@/hooks/useCountdownTimer';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
-import { validateRecordedAudio } from '@/lib/audio-guard';
 import {
   generatePETPictureDescriptionAction,
   evaluatePETPictureDescriptionAction,
@@ -381,7 +380,7 @@ export function PETPictureDescriptionPractice({
     emotions: [],
     weather_setting: [],
   });
-  const [languageBank, setLanguageBank] = useState<PETPictureDescriptionResult['languageBank']>({
+  const [, setLanguageBank] = useState<PETPictureDescriptionResult['languageBank']>({
     openers: [],
     speculation: [],
     describing_people: [],
@@ -400,6 +399,9 @@ export function PETPictureDescriptionPractice({
 
   const initStartedRef = useRef(false);
   const recordingStartRef = useRef<number | null>(null);
+
+  void audioBlob;
+  void mimeType;
 
   const timer = useCountdownTimer({
     totalSeconds: 60,
@@ -428,6 +430,9 @@ export function PETPictureDescriptionPractice({
       setPhase('ready');
     },
   });
+
+  void isRecording;
+  void audioDuration;
 
   useEffect(() => {
     if (initStartedRef.current) return;

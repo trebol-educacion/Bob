@@ -1,16 +1,11 @@
 'use server';
 
-import { z } from 'zod';
 import { MODELS } from '@/lib/models';
-import { EvalResponseSchema, type EvalResponse, type ModeKey } from '@/lib/types/practice';
+import { EvalResponseSchema, type ModeKey } from '@/lib/types/practice';
 import { type YLTurnEvalResult } from '@/lib/types/yl';
 import { getPrompt } from '@/lib/prompts/db-prompts';
 import { callGemini } from '@/lib/gemini-client';
 import { parseYLMode, evaluationKey, reactionKey, EvalFallback } from '../_helpers';
-
-const YLTurnEvalSchema = EvalResponseSchema.extend({
-  reaction: z.string(),
-});
 
 export async function evaluateYLTurnAction(input: {
   mode: ModeKey;

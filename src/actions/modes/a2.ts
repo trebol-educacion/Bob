@@ -2,7 +2,7 @@
 
 import { z } from 'zod';
 import { MODELS } from '@/lib/models';
-import { CambridgeEvaluationSchema, type CambridgeEvaluation, FormativeFeedbackSchema, type FormativeFeedback } from '@/lib/types/practice';
+import { FormativeFeedbackSchema, type FormativeFeedback } from '@/lib/types/practice';
 import { getPrompt } from '@/lib/prompts/db-prompts';
 import { persistMessage, readSessionMessagesForCurrentOrUser } from '@/lib/persist-activity';
 import { getOrCreateCachedContent } from '@/lib/cache';
@@ -26,16 +26,6 @@ const A2SessionPlanFallback: A2SessionPlan = {
   topic2: 'Free time',
   topic2_questions: ['What do you do at the weekend?', 'Do you play any sports?', 'What is your favourite hobby?'],
   final_question: 'What do you want to do when you grow up?',
-};
-
-const CambridgeEvaluationFallback: CambridgeEvaluation = {
-  score: 0,
-  grammar: 0,
-  vocabulary: 0,
-  fluency: 0,
-  feedback: 'Unable to evaluate at this time. Please try again.',
-  strengths: [],
-  areas_for_improvement: [],
 };
 
 const FormativeFeedbackFallback: FormativeFeedback = {

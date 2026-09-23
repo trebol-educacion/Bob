@@ -17,7 +17,7 @@ export function blobToBase64(blob: Blob): Promise<string> {
 export function pcmToWavBase64(rawData: string, mimeType: string): string {
   const parts = mimeType.split(';');
   let sampleRate = 24000;
-  let bitsPerSample = 16;
+  const bitsPerSample = 16;
   const numChannels = 1;
 
   parts.forEach(part => {

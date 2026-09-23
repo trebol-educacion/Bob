@@ -12,7 +12,6 @@ import { ChatInputBar } from '@/components/chat/ChatInputBar';
 import { BobAvatar } from '@/components/practice/yl/_shared';
 import { useCountdownTimer } from '@/hooks/useCountdownTimer';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
-import { validateRecordedAudio } from '@/lib/audio-guard';
 import {
   generateFCEPictureDescriptionAction,
   evaluateFCEPictureDescriptionAction,
@@ -455,7 +454,7 @@ export function FCEPictureDescriptionPractice({
     emotions: [],
     settings: [],
   });
-  const [languageBank, setLanguageBank] = useState<FCELongTurnResult['languageBank']>({
+  const [, setLanguageBank] = useState<FCELongTurnResult['languageBank']>({
     openers: [],
     contrast: [],
     speculation: [],

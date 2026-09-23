@@ -68,7 +68,7 @@ export function ToeflListenRepeatPractice({ onBack }: ToeflListenRepeatPracticeP
     },
   });
 
-  const { isRecording, startRecording, stopRecording } = useAudioRecorder({
+  const { startRecording, stopRecording } = useAudioRecorder({
     onRecorded: (blob) => {
       recordedBlobRef.current = blob;
       setPhase('evaluating');

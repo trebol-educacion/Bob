@@ -9,7 +9,6 @@
  */
 
 import React, { useEffect, useRef, useState } from 'react';
-import { motion } from 'motion/react';
 import { ArrowLeft } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { ListenAndPointIcon } from '@/components/icons/ModeIcons';
@@ -28,16 +27,12 @@ import type { YLExam, YLPlan } from '@/lib/types/yl';
 import type { EvalResponse, ModeKey } from '@/lib/types/practice';
 import { ChatShell } from '@/components/ChatShell';
 import {
-  playTTS,
   stopCurrentAudio,
   YLLoadingScreen,
   YLErrorScreen,
   YLVoiceNote,
   YLBobTextMessage,
   YLUserTextMessage,
-  YLScoreDisplay,
-  YLFeedbackCard,
-  YLResultsHeader,
   YLReadOnlyMessage,
 } from './_shared';
 
@@ -333,9 +328,6 @@ export function YLPointingPractice({
     return <YLLoadingScreen message={t('common.gettingPracticeReady')} />;
   if (phase === 'evaluating')
     return <YLLoadingScreen message={t('common.calculatingFinalScore')} />;
-
-  const partLabel = 'Starters Part 1 — Point to the picture';
-  const progress = Math.round(((cueIndex + (phase === 'answered' ? 1 : 0)) / totalCues) * 100);
 
   const backButton = (
     <button

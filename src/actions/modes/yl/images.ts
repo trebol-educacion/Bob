@@ -1,10 +1,8 @@
 'use server';
 
-import { MODELS } from '@/lib/models';
 import { type YLExam } from '@/lib/types/yl';
 import { createSupabaseServer } from '@/lib/supabase/server';
 import { getOrCreateCachedContent } from '@/lib/cache';
-import { callGemini } from '@/lib/gemini-client';
 import {
   buildDirectImagenPrompt,
   generateImageWithFallback,

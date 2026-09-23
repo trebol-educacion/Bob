@@ -2,7 +2,7 @@
  * Assessment — shared type contracts.
  */
 
-import type { Skill, AssessmentCefrBand, AssessmentConfidence, AssessmentResultSpeaking, AssessmentResultListening, AssessmentResultReading, AssessmentResultWriting, AssessmentWritingFeedback } from '@/lib/types/skills';
+import type { Skill, AssessmentResultListening, AssessmentResultReading } from '@/lib/types/skills';
 
 export interface AssessmentPrompt {
   turn_number: number;

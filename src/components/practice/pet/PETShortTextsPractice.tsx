@@ -79,7 +79,6 @@ function ShortTextCard({
   onSelect: (id: 'A' | 'B' | 'C') => void;
   disabled: boolean;
 }) {
-  const t = useTranslations('cambridge');
   const emoji = textContextEmoji(item.text_context);
 
   return (

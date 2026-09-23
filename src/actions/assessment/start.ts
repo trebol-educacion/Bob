@@ -6,7 +6,7 @@ import { fetchOpenTasks } from '@/actions/item-bank/repository';
 import { hasPendingAssessment } from './queue-guard';
 import { FALLBACK_SPEAKING_PROMPTS, openTaskQuestionsToPrompts } from './speaking-fallback';
 import type { Skill } from '@/lib/types/skills';
-import type { AssessmentListeningItem, AssessmentReadingItem, AssessmentWritingTask, StartAssessmentResult } from './types';
+import type { AssessmentListeningItem, AssessmentReadingItem, StartAssessmentResult } from './types';
 
 /**
  * Starts an Assessment session for the given skill.

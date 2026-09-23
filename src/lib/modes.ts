@@ -1,4 +1,4 @@
-import type { CardVisibility, DynamicCard, ModeFramework, ModeKey, ResolvedCard } from './types/practice';
+import type { CardVisibility, DynamicCard, ModeFramework, ResolvedCard } from './types/practice';
 import type { Skill, SkillLevelMap } from './types/skills';
 
 export type PracticeTrack = 'official' | 'free';
