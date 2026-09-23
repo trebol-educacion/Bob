@@ -11,6 +11,7 @@ const mockCards: DynamicCard[] = [
     description: null,
     mode_key: 'cambridge_ket_p1',
     status: 'enabled',
+    skill: 'speaking',
   },
   {
     framework: 'cambridge',
@@ -20,6 +21,7 @@ const mockCards: DynamicCard[] = [
     description: null,
     mode_key: 'cambridge_pet_p1',
     status: 'enabled',
+    skill: 'speaking',
   },
   {
     framework: 'cambridge',
@@ -29,6 +31,7 @@ const mockCards: DynamicCard[] = [
     description: null,
     mode_key: 'cambridge_fce_p1',
     status: 'coming_soon',
+    skill: 'speaking',
   },
 ];
 

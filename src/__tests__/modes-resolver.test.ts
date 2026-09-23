@@ -7,11 +7,11 @@ const b1SkillLevels: SkillLevelMap = {
 };
 
 const mockCards: DynamicCard[] = [
-  { framework: 'cambridge', exam_part: 'starters_p1', cefr_level: 'a1', label: 'Starters P1', description: null, mode_key: 'cambridge_starters_p1', status: 'enabled' },
-  { framework: 'cambridge', exam_part: 'ket_p1', cefr_level: 'b1', label: 'KET P1', description: null, mode_key: 'cambridge_ket_p1', status: 'enabled' },
-  { framework: 'toefl', exam_part: 'listen_repeat', cefr_level: 'b1', label: 'Listen & Repeat', description: null, mode_key: 'toefl_listen_repeat', status: 'enabled' },
-  { framework: 'generic', exam_part: 'conversation', cefr_level: null, label: 'Free Conversation', description: null, mode_key: 'generic_conversation', status: 'enabled' },
-  { framework: 'generic', exam_part: 'vocab', cefr_level: 'b1', label: 'Vocabulary B1', description: null, mode_key: 'generic_vocab_b1', status: 'enabled' },
+  { framework: 'cambridge', exam_part: 'starters_p1', cefr_level: 'a1', label: 'Starters P1', description: null, mode_key: 'cambridge_starters_p1', status: 'enabled', skill: 'speaking' },
+  { framework: 'cambridge', exam_part: 'ket_p1', cefr_level: 'b1', label: 'KET P1', description: null, mode_key: 'cambridge_ket_p1', status: 'enabled', skill: 'speaking' },
+  { framework: 'toefl', exam_part: 'listen_repeat', cefr_level: 'b1', label: 'Listen & Repeat', description: null, mode_key: 'toefl_listen_repeat', status: 'enabled', skill: 'speaking' },
+  { framework: 'generic', exam_part: 'conversation', cefr_level: null, label: 'Free Conversation', description: null, mode_key: 'generic_conversation', status: 'enabled', skill: 'speaking' },
+  { framework: 'generic', exam_part: 'vocab', cefr_level: 'b1', label: 'Vocabulary B1', description: null, mode_key: 'generic_vocab_b1', status: 'enabled', skill: 'speaking' },
 ];
 
 describe('resolveEnabledModes', () => {
