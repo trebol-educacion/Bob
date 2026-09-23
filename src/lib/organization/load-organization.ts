@@ -6,7 +6,8 @@ import type { SkillLevelMap } from '@/lib/types/skills';
 import { mapSkillLevelRows, type RawSkillLevelRow } from './skill-levels';
 import { computeEnabledModes } from './enabled-modes';
 import { dedupeAvailableModes, dedupeDynamicCards, type RawAvailableModeRow, type RawDynamicCardRow } from './catalog';
-import { extractOrgFrameworks, extractStudentFrameworks, type FrameworkQueryRow } from './frameworks';
+import { extractOrgFrameworks, type OrgFrameworkQueryRow } from './frameworks';
+import { loadStudentFrameworks } from './student-frameworks';
 import type { AvailableMode, BobAccessDenialReason } from './types';
 
 export interface OrganizationDataBundle {
@@ -34,13 +35,10 @@ export async function loadOrganizationData(
       .select('role, cefr_active_level, cefr_level_locked')
       .eq('id', userId)
       .maybeSingle(),
-    supabase
-      .schema('public').from('student_english_frameworks')
-      .select('framework_id, pedagogical_frameworks(name, type)')
-      .eq('user_id', userId),
+    loadStudentFrameworks(supabase, userId),
     org?.id
       ? supabase
-          .schema('public').from('organization_frameworks')
+          .schema('mia').from('organization_frameworks')
           .select('framework_id, pedagogical_frameworks(name, type)')
           .eq('organization_id', org.id)
       : Promise.resolve({ data: [], error: null } as { data: never[]; error: null }),
@@ -78,10 +76,15 @@ export async function loadOrganizationData(
     console.error('[OrganizationContext] profiles query failed:', profileResult.error);
   }
   if (studentFwResult.error) {
-    console.error('[OrganizationContext] student_english_frameworks query failed:', studentFwResult.error);
+    const { table, schema, code, message } = studentFwResult.error;
+    console.error(
+      `[OrganizationContext] student frameworks resolution failed: table=${table} schema=${schema} code=${code ?? 'unknown'} message=${message}`,
+    );
   }
   if (orgFwResult.error) {
-    console.error('[OrganizationContext] organization_frameworks query failed:', orgFwResult.error);
+    console.error(
+      `[OrganizationContext] organization_frameworks query failed: table=organization_frameworks schema=mia code=${orgFwResult.error.code ?? 'unknown'} message=${orgFwResult.error.message}`,
+    );
   }
   if (availableModesResult.error) {
     console.error('[OrganizationContext] bob_prompts (availableModes) query failed:', availableModesResult.error);
@@ -118,8 +121,8 @@ export async function loadOrganizationData(
     console.warn('[Bob access gate] access denied:', accessDenialReason, 'user:', userId);
   }
 
-  const studentFrameworks = extractStudentFrameworks((studentFwResult.data ?? []) as FrameworkQueryRow[]);
-  const orgFrameworks = extractOrgFrameworks((orgFwResult.data ?? []) as FrameworkQueryRow[]);
+  const studentFrameworks = studentFwResult.frameworks;
+  const orgFrameworks = extractOrgFrameworks((orgFwResult.data ?? []) as OrgFrameworkQueryRow[]);
 
   const allDynamicCards = dedupeDynamicCards((allCardsResult.data ?? []) as RawDynamicCardRow[]);
 

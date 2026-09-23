@@ -5,7 +5,17 @@ const FRAMEWORK_NAME_MAP: Record<string, ModeFramework> = {
   'TOEFL iBT': 'toefl',
 };
 
-export interface FrameworkQueryRow {
+export interface PedagogicalFrameworkRow {
+  id: string;
+  name: string;
+  type?: string | null;
+}
+
+export interface StudentFrameworkLinkRow {
+  framework_id: string;
+}
+
+export interface OrgFrameworkQueryRow {
   pedagogical_frameworks?: { name?: string; type?: string } | null;
 }
 
@@ -13,21 +23,31 @@ export function normalizeFrameworkName(name: string): ModeFramework | null {
   return FRAMEWORK_NAME_MAP[name] ?? null;
 }
 
-export function extractStudentFrameworks(rows: FrameworkQueryRow[]): ModeFramework[] {
-  return rows
-    .map((r) => {
-      const name = r.pedagogical_frameworks?.name;
-      return name ? normalizeFrameworkName(name) : null;
-    })
-    .filter((f): f is ModeFramework => f !== null);
+export function resolveFrameworkNames(
+  frameworkIds: string[],
+  frameworks: PedagogicalFrameworkRow[],
+): ModeFramework[] {
+  const byId = new Map(frameworks.map((framework) => [framework.id, framework]));
+  const result: ModeFramework[] = [];
+  for (const frameworkId of frameworkIds) {
+    const framework = byId.get(frameworkId);
+    const normalized = framework ? normalizeFrameworkName(framework.name) : null;
+    if (normalized && !result.includes(normalized)) {
+      result.push(normalized);
+    }
+  }
+  return result;
 }
 
-export function extractOrgFrameworks(rows: FrameworkQueryRow[]): ModeFramework[] {
-  return rows
-    .filter((r) => r.pedagogical_frameworks?.type === 'english')
-    .map((r) => {
-      const name = r.pedagogical_frameworks?.name;
-      return name ? normalizeFrameworkName(name) : null;
-    })
-    .filter((f): f is ModeFramework => f !== null);
+export function extractOrgFrameworks(rows: OrgFrameworkQueryRow[]): ModeFramework[] {
+  const result: ModeFramework[] = [];
+  for (const row of rows) {
+    if (row.pedagogical_frameworks?.type !== 'english') continue;
+    const name = row.pedagogical_frameworks?.name;
+    const normalized = name ? normalizeFrameworkName(name) : null;
+    if (normalized && !result.includes(normalized)) {
+      result.push(normalized);
+    }
+  }
+  return result;
 }

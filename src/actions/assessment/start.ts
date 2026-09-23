@@ -3,6 +3,7 @@
 import { createSupabaseServer } from '@/lib/supabase/server';
 import { getPrompt } from '@/lib/prompts/db-prompts';
 import { fetchOpenTasks } from '@/actions/item-bank/repository';
+import { loadStudentFrameworks } from '@/lib/organization/student-frameworks';
 import { hasPendingAssessment } from './queue-guard';
 import { FALLBACK_SPEAKING_PROMPTS, openTaskQuestionsToPrompts } from './speaking-fallback';
 import type { Skill } from '@/lib/types/skills';
@@ -149,18 +150,15 @@ export async function startAssessmentAction(skill: Skill): Promise<StartAssessme
 
   const currentLevel = skillLevel?.cefr_level ?? profile.cefr_active_level ?? 'a2';
 
-  const { data: studentFwRows } = await supabase
-    .schema('public').from('student_english_frameworks')
-    .select('framework_id, pedagogical_frameworks(name)')
-    .eq('student_id', user.id);
+  const studentFwResult = await loadStudentFrameworks(supabase, user.id);
+  if (studentFwResult.error) {
+    const { table, schema, code, message } = studentFwResult.error;
+    console.error(
+      `[startAssessmentAction] student frameworks resolution failed: table=${table} schema=${schema} code=${code ?? 'unknown'} message=${message}`,
+    );
+  }
 
-  const frameworkNames = (studentFwRows ?? [])
-    .map((r: Record<string, unknown>) => {
-      const pf = r.pedagogical_frameworks as { name?: string } | null;
-      return pf?.name ?? '';
-    });
-
-  const hasCambridge = frameworkNames.some((n: string) => n === 'Cambridge English');
+  const hasCambridge = studentFwResult.frameworks.includes('cambridge');
   const isYlLevel = currentLevel === 'pre_a1' || currentLevel === 'a1';
   const isYl = hasCambridge && isYlLevel;
 
