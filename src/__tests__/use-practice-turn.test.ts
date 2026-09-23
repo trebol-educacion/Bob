@@ -23,6 +23,7 @@ vi.mock('@/actions/practice/image', () => ({
 }));
 
 import { chatTextConversationAction, generateSpeechAction } from '@/actions/gemini';
+import { generatePracticeImageAction } from '@/actions/practice/image';
 import { usePracticeTurn } from '@/hooks/practice/usePracticeTurn';
 
 const SEED = { angle: 'a', character: 'a friend', tone: 'warm', topic: 'a warm chat' };
@@ -97,5 +98,19 @@ describe('usePracticeTurn', () => {
     expect(result.current.turnSignals).toHaveLength(1);
     expect(result.current.turnSignals[0]).toMatchObject({ hasAudio: false, turnScore: 80 });
     expect(result.current.messages).toHaveLength(3);
+  });
+
+  it('modo picture sin sessionId (repositorio degradado) igual pide la imagen, no se queda mudo', async () => {
+    (generateSpeechAction as ReturnType<typeof vi.fn>).mockResolvedValue({ data: '', mimeType: 'audio/L16;rate=24000' });
+    (generatePracticeImageAction as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, imageUrl: 'data:image/png;base64,AAAA' });
+
+    const { result } = renderHook(() => usePracticeTurn({ ...baseArgs(), sessionId: null, mode: 'picture' }));
+
+    await waitFor(() => {
+      expect(generatePracticeImageAction).toHaveBeenCalledWith(null, SEED.topic);
+    });
+    await waitFor(() => {
+      expect(result.current.imageUrl).toBe('data:image/png;base64,AAAA');
+    });
   });
 });
