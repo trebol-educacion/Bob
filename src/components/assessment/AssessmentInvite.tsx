@@ -104,20 +104,17 @@ export function AssessmentInvite({ skill, onStartAssessment, onPickLevel, onBack
   const existingLevel = skillLevels?.[skill];
   const hasExistingLevel = Boolean(existingLevel?.cefr_level);
 
-  const [now, setNow] = React.useState<number | null>(null);
-  React.useEffect(() => {
-    setNow(Date.now());
-  }, []);
+  const [now] = React.useState(() => Date.now());
 
   const cooldownActive = (() => {
-    if (!existingLevel?.last_assessment_at || now === null) return false;
+    if (!existingLevel?.last_assessment_at) return false;
     const lastAt = new Date(existingLevel.last_assessment_at).getTime();
     const cooldownMs = assessmentCooldownDays * 24 * 60 * 60 * 1000;
     return now - lastAt < cooldownMs;
   })();
 
   const cooldownInfo = (() => {
-    if (!cooldownActive || !existingLevel?.last_assessment_at || now === null) return { days: 0, availableAt: null as Date | null };
+    if (!cooldownActive || !existingLevel?.last_assessment_at) return { days: 0, availableAt: null as Date | null };
     const lastAt = new Date(existingLevel.last_assessment_at).getTime();
     const cooldownMs = assessmentCooldownDays * 24 * 60 * 60 * 1000;
     const remaining = lastAt + cooldownMs - now;

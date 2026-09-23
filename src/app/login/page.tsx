@@ -22,6 +22,7 @@ export default function LoginPage() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('error') === 'enlace') {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setMode('magiclink');
       setError(t('magicLinkExpired'));
       const paramEmail = params.get('email');

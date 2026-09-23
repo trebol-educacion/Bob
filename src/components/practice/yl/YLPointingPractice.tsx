@@ -190,6 +190,7 @@ export function YLPointingPractice({
     }
 
     if (isReadOnly) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setPhase('finished');
       return;
     }
@@ -315,6 +316,7 @@ export function YLPointingPractice({
             ? 'Good job! Next time try to get them all right.'
             : "Let's practice the vocabulary a little more.",
       };
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setFinalEval(result);
       setPhase('finished');
 

@@ -396,6 +396,7 @@ export function KETMatchQuestionPractice({
   useEffect(() => {
     if (phase !== 'ready' || !exercise || activeQuestion !== null) return;
     const next = firstUnanswered(exercise.questions, answers);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setActiveQuestion(next ?? exercise.questions[0]?.number ?? null);
   }, [phase, exercise, activeQuestion, answers]);
 

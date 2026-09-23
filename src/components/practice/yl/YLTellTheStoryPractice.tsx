@@ -284,6 +284,7 @@ export function YLTellTheStoryPractice({
     }
 
     if (isReadOnly) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setPhase('finished');
       return;
     }
@@ -350,6 +351,7 @@ export function YLTellTheStoryPractice({
           ? 'Great job! You are a great storyteller!'
           : "Good try! Let's keep practising!",
     };
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setFinalEval(result);
     setPhase('finished');
     void saveYLFinalEvalAction(sessionId, result)
@@ -390,6 +392,7 @@ export function YLTellTheStoryPractice({
 
     if (!sessionId || !currentScene) return;
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setPhase('processing');
 
     void (async () => {

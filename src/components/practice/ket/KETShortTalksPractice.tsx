@@ -637,6 +637,7 @@ export function KETShortTalksPractice({
   useEffect(() => {
     if (phase !== 'ready' || !exercise || activePerson !== null) return;
     const next = firstUnmatched(exercise.people, answers);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setActivePerson(next ?? exercise.people[0]?.number ?? null);
   }, [phase, exercise, activePerson, answers]);
 

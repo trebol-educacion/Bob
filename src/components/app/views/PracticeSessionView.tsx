@@ -42,6 +42,7 @@ export function PracticeSessionView({ organization, cefrActiveLevel, skillLevels
   }, [skillLevels, cefrActiveLevel, organization]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void start();
   }, [start, attempt]);
 

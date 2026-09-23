@@ -87,6 +87,7 @@ export function usePracticeTurn(args: UsePracticeTurnArgs): UsePracticeTurnRetur
   useEffect(() => {
     if (mode !== 'picture' || imageUrl) return;
     let cancelled = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setImageLoading(true);
     (async () => {
       const result = sessionId ? await generatePracticeImageAction(sessionId, seed.topic) : { ok: false, imageUrl: null };

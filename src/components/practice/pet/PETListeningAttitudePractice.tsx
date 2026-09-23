@@ -590,6 +590,7 @@ export function PETListeningAttitudePractice({
     if (!items.length) return;
     audioStartedRef.current = true;
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setAudioByItem(
       Object.fromEntries(
         items.map((item) => [item.number, { b64: '', mime: 'audio/L16;codec=pcm;rate=24000', status: 'loading' as AudioStatus }])

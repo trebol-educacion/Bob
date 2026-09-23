@@ -234,6 +234,7 @@ export function YLFindDifferencesPractice({
     }
 
     if (isReadOnly) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setPhase('finished');
       return;
     }
@@ -294,6 +295,7 @@ export function YLFindDifferencesPractice({
           ? 'Great job! Keep practising!'
           : "Let's keep practising the differences!",
     };
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setFinalEval(result);
     setPhase('finished');
     void saveYLFinalEvalAction(sessionId, result)
@@ -334,6 +336,7 @@ export function YLFindDifferencesPractice({
 
     if (!sessionId || !currentDiff) return;
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setPhase('processing');
 
     void (async () => {

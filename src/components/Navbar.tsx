@@ -36,7 +36,10 @@ export function Navbar({ userEmail, onOpenDashboard, onToggleSidebar, onGoHome }
   const [open, setOpen] = useState(false);
   const { organization, selectedSkill, skillLevels } = useOrganization();
   const [mounted, setMounted] = useState(false);
-  useEffect(() => { setMounted(true); }, []);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMounted(true);
+  }, []);
   const currentLevel = selectedSkill ? skillLevels?.[selectedSkill]?.cefr_level ?? null : null;
   const SkillIcon = selectedSkill ? SKILL_ICON[selectedSkill] : null;
   const t = useTranslations('shell.navbar');

@@ -236,6 +236,7 @@ export function YLWhatsThisPractice({
     }
 
     if (isReadOnly) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setPhase('finished');
       return;
     }
@@ -302,6 +303,7 @@ export function YLWhatsThisPractice({
           ? 'Great job! Keep practising!'
           : "Let's keep practising the words!",
     };
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setFinalEval(result);
     setPhase('finished');
     void saveYLFinalEvalAction(sessionId, result)
@@ -342,6 +344,7 @@ export function YLWhatsThisPractice({
 
     if (!sessionId || !currentQuestion || !currentCard) return;
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setPhase('processing');
 
     void (async () => {

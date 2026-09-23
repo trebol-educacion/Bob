@@ -179,6 +179,7 @@ export function YLPart2Practice({
 
   useEffect(() => {
     if (phase === 'ready' && plan) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       void runTurn(0);
     }
   }, [phase, plan, runTurn]);

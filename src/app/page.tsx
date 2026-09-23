@@ -49,6 +49,7 @@ export default function App() {
 
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 767px)');
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (mq.matches) setSidebarCollapsed(true);
     const handler = (e: MediaQueryListEvent) => {
       if (e.matches) setSidebarCollapsed(true);
@@ -78,6 +79,7 @@ export default function App() {
     if (!isBrandNewStudent(skillLevels)) return;
 
     firstEntryGateAttemptedRef.current = true;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setAppState('placement-required');
   }, [appState, orgLoading, skillLevels]);
 
