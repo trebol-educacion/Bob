@@ -4,6 +4,7 @@ import React, { useCallback } from 'react';
 import { useTranslations } from 'next-intl';
 import { motion, AnimatePresence } from 'motion/react';
 import { SkillSelector } from '@/components/assessment/SkillSelector';
+import { PlacementRequired } from '@/components/placement/PlacementRequired';
 import { ConversationPracticeView } from './views/ConversationPracticeView';
 import { ChallengeHome } from '@/components/challenge/ChallengeHome';
 import { ChallengeRunner } from '@/components/challenge/ChallengeRunner';
@@ -154,6 +155,22 @@ export function AppShellRoutes({
           ) : (
             <SkillSelector onSelect={handleSkillSelect} />
           )}
+        </motion.div>
+      )}
+
+      {appState === 'placement-required' && (
+        <motion.div
+          key="placement-required"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -20 }}
+          className="w-full flex-1 overflow-y-auto flex flex-col"
+        >
+          <PlacementRequired
+            setAppState={setAppState}
+            refreshSkillLevels={refreshSkillLevels}
+            refreshPendingAssessments={refreshPendingAssessments}
+          />
         </motion.div>
       )}
 

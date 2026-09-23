@@ -133,13 +133,15 @@ export function AppShell({
     }
   }, [appState, onFinish, requestLeaveConfirmation]);
 
+  const placementRequired = appState === 'placement-required';
+
   return (
     <div className="h-screen bg-trebol-bg flex flex-col overflow-hidden">
       <Navbar
         userEmail={userEmail}
-        onOpenDashboard={onOpenDashboard}
+        onOpenDashboard={placementRequired ? undefined : onOpenDashboard}
         onToggleSidebar={() => setSidebarCollapsed((v) => !v)}
-        onGoHome={handleGoHomeRequest}
+        onGoHome={placementRequired ? undefined : handleGoHomeRequest}
       />
       <ConfirmLeaveDialog
         open={pendingLeaveAction !== null}
@@ -147,16 +149,18 @@ export function AppShell({
         onDismiss={dismissLeaveConfirmation}
       />
       <div className="flex-1 flex min-h-0 relative">
-        <SessionSidebar
-          sessions={sessions}
-          activeSessionId={activeSessionId}
-          onSelectSession={onSelectSession}
-          onNewSession={onNewSession}
-          onDeleteSession={onDeleteSession}
-          loading={sessionsLoading}
-          collapsed={sidebarCollapsed}
-          onToggleCollapsed={() => setSidebarCollapsed((v) => !v)}
-        />
+        {!placementRequired && (
+          <SessionSidebar
+            sessions={sessions}
+            activeSessionId={activeSessionId}
+            onSelectSession={onSelectSession}
+            onNewSession={onNewSession}
+            onDeleteSession={onDeleteSession}
+            loading={sessionsLoading}
+            collapsed={sidebarCollapsed}
+            onToggleCollapsed={() => setSidebarCollapsed((v) => !v)}
+          />
+        )}
         <main className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden">
           <AppShellRoutes
             appState={appState}

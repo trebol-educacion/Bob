@@ -8,6 +8,7 @@ import { useSessionState } from '@/hooks/useSessionState';
 import { useOrganization } from '@/hooks/useOrganization';
 import { useAssessmentFlow } from '@/hooks/useAssessmentFlow';
 import { useUsageHeartbeat } from '@/hooks/useUsageHeartbeat';
+import { isBrandNewStudent } from '@/lib/placement/first-entry-gate';
 import { isConversationMode, isExamMode, type AppState } from '@/lib/routing';
 import type { PracticeMode } from '@/lib/types/practice';
 
@@ -67,6 +68,18 @@ export default function App() {
     void refreshSkillLevels();
     void refreshPendingAssessments();
   }, [appState, refreshSkillLevels, refreshPendingAssessments]);
+
+  const firstEntryGateAttemptedRef = useRef(false);
+
+  useEffect(() => {
+    if (appState !== 'skill-selection') return;
+    if (orgLoading) return;
+    if (firstEntryGateAttemptedRef.current) return;
+    if (!isBrandNewStudent(skillLevels)) return;
+
+    firstEntryGateAttemptedRef.current = true;
+    setAppState('placement-required');
+  }, [appState, orgLoading, skillLevels]);
 
   const resetToSkillSelection = useCallback(() => {
     setAppState('skill-selection');

@@ -56,6 +56,7 @@ import {
 
 export type AppState =
   | 'skill-selection'
+  | 'placement-required'
   | 'assessment-invite'
   | 'assessment-running'
   | 'assessment-result'
