@@ -10,7 +10,10 @@ type DeletableTable =
   | 'skill_levels'
   | 'skill_level_history'
   | 'challenge_attempts'
-  | 'assessment_queue';
+  | 'assessment_queue'
+  | 'practice_sessions'
+  | 'practice_messages'
+  | 'practice_images';
 
 export interface DeleteStudentDataCounts {
   deletedMessages: number;
@@ -21,6 +24,9 @@ export interface DeleteStudentDataCounts {
   deletedSkillLevelHistory: number;
   deletedChallengeAttempts: number;
   deletedAssessmentQueue: number;
+  deletedPracticeSessions: number;
+  deletedPracticeMessages: number;
+  deletedPracticeImages: number;
 }
 
 /** Borra todos los datos de práctica de un alumno y registra la acción en audit_log. */
@@ -72,6 +78,9 @@ export async function deleteStudentDataAction(
     'skill_level_history',
     'challenge_attempts',
     'assessment_queue',
+    'practice_sessions',
+    'practice_messages',
+    'practice_images',
   ];
 
   const counts: Record<DeletableTable, number> = {
@@ -83,6 +92,9 @@ export async function deleteStudentDataAction(
     skill_level_history: 0,
     challenge_attempts: 0,
     assessment_queue: 0,
+    practice_sessions: 0,
+    practice_messages: 0,
+    practice_images: 0,
   };
 
   for (const table of tables) {
@@ -93,6 +105,16 @@ export async function deleteStudentDataAction(
 
     if (error) return { ok: false, error: error.message };
     counts[table] = count ?? 0;
+  }
+
+  const { data: practiceImageFiles } = await supabase.storage
+    .from('bob-practice-images')
+    .list(targetStudentUserId);
+
+  if (practiceImageFiles && practiceImageFiles.length > 0) {
+    await supabase.storage
+      .from('bob-practice-images')
+      .remove(practiceImageFiles.map((f) => `${targetStudentUserId}/${f.name}`));
   }
 
   const { error: auditError } = await supabase
@@ -117,5 +139,8 @@ export async function deleteStudentDataAction(
     deletedSkillLevelHistory: counts.skill_level_history,
     deletedChallengeAttempts: counts.challenge_attempts,
     deletedAssessmentQueue: counts.assessment_queue,
+    deletedPracticeSessions: counts.practice_sessions,
+    deletedPracticeMessages: counts.practice_messages,
+    deletedPracticeImages: counts.practice_images,
   };
 }

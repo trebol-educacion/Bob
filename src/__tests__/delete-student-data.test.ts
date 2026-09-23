@@ -9,6 +9,9 @@ const DELETED_TABLES = [
   'skill_level_history',
   'challenge_attempts',
   'assessment_queue',
+  'practice_sessions',
+  'practice_messages',
+  'practice_images',
 ];
 
 function makeSupabase(profileByCall: Array<{ role?: string; organization_id: string }>) {
@@ -43,6 +46,12 @@ function makeSupabase(profileByCall: Array<{ role?: string; organization_id: str
       }),
     }),
     from,
+    storage: {
+      from: vi.fn().mockReturnValue({
+        list: vi.fn().mockResolvedValue({ data: [], error: null }),
+        remove: vi.fn().mockResolvedValue({ data: [], error: null }),
+      }),
+    },
   };
 }
 
@@ -95,6 +104,9 @@ describe('deleteStudentDataAction — module smoke', () => {
       expect(result.deletedSkillLevelHistory).toBe(1);
       expect(result.deletedChallengeAttempts).toBe(1);
       expect(result.deletedAssessmentQueue).toBe(1);
+      expect(result.deletedPracticeSessions).toBe(1);
+      expect(result.deletedPracticeMessages).toBe(1);
+      expect(result.deletedPracticeImages).toBe(1);
     }
   });
 });
