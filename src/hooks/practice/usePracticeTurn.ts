@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import {
   chatConversationAction,
   chatTextConversationAction,
-  simulateUserResponseAction,
+  suggestStudentAnswerAction,
   generateSpeechAction,
 } from '@/actions/gemini';
 import type { ChatMessage } from '@/actions/gemini';
@@ -198,9 +198,9 @@ export function usePracticeTurn(args: UsePracticeTurnArgs): UsePracticeTurnRetur
     if (isProcessing) return;
     setIsProcessing(true);
     try {
-      const suggestion = await simulateUserResponseAction(messages, seed.topic, level);
+      const suggestion = await suggestStudentAnswerAction(messages, seed.topic, level);
       pendingModelAnswerUsedRef.current = true;
-      setPendingModelAnswer(suggestion);
+      setPendingModelAnswer(suggestion.answer);
     } catch (error) {
       console.error('[usePracticeTurn] handleRequestModelAnswer failed:', error);
     } finally {

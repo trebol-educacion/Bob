@@ -5,7 +5,7 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 vi.mock('@/actions/gemini', () => ({
   chatConversationAction: vi.fn(),
   chatTextConversationAction: vi.fn(),
-  simulateUserResponseAction: vi.fn(),
+  suggestStudentAnswerAction: vi.fn(),
   generateSpeechAction: vi.fn(),
 }));
 
@@ -22,7 +22,7 @@ vi.mock('@/actions/practice/image', () => ({
   generatePracticeImageAction: vi.fn().mockResolvedValue({ ok: false, imageUrl: null }),
 }));
 
-import { chatTextConversationAction, generateSpeechAction } from '@/actions/gemini';
+import { chatTextConversationAction, generateSpeechAction, suggestStudentAnswerAction } from '@/actions/gemini';
 import { generatePracticeImageAction } from '@/actions/practice/image';
 import { usePracticeTurn } from '@/hooks/practice/usePracticeTurn';
 
@@ -98,6 +98,34 @@ describe('usePracticeTurn', () => {
     expect(result.current.turnSignals).toHaveLength(1);
     expect(result.current.turnSignals[0]).toMatchObject({ hasAudio: false, turnScore: 80 });
     expect(result.current.messages).toHaveLength(3);
+  });
+
+  it('Show me an answer: pide una respuesta modelo ya interpretada, nunca JSON crudo, y marca el turno como asistido', async () => {
+    (generateSpeechAction as ReturnType<typeof vi.fn>).mockResolvedValue({ data: '', mimeType: 'audio/L16;rate=24000' });
+    (suggestStudentAnswerAction as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, answer: "You're very welcome!" });
+    (chatTextConversationAction as ReturnType<typeof vi.fn>).mockResolvedValue({
+      evaluation: { score: 90, feedback: 'good', transcribed_text: "You're very welcome!" },
+      ai_response: 'Glad to hear it!',
+    });
+
+    const { result } = renderHook(() => usePracticeTurn(baseArgs()));
+
+    await act(async () => {
+      await result.current.handleRequestModelAnswer();
+    });
+
+    expect(suggestStudentAnswerAction).toHaveBeenCalledWith(baseArgs().initialMessages, SEED.topic, 'b1');
+    expect(result.current.pendingModelAnswer).toBe("You're very welcome!");
+
+    act(() => {
+      result.current.setInputText("You're very welcome!");
+    });
+    await act(async () => {
+      await result.current.handleSendText();
+    });
+
+    expect(result.current.turnSignals[0]).toMatchObject({ modelAnswerUsed: true });
+    expect(result.current.pendingModelAnswer).toBeNull();
   });
 
   it('modo picture sin sessionId (repositorio degradado) igual pide la imagen, no se queda mudo', async () => {

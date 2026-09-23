@@ -5,3 +5,4 @@ export * from './gemini/image';
 export * from './gemini/evaluation';
 export * from './gemini/conversation';
 export * from './gemini/topic-guard';
+export * from './gemini/suggest-answer';
