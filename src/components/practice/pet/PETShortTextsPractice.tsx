@@ -308,7 +308,7 @@ export function PETShortTextsPractice({
     }
 
     void init();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleSelect(itemNumber: number, optionId: 'A' | 'B' | 'C') {
     setAnswers((prev) => ({ ...prev, [itemNumber]: optionId }));

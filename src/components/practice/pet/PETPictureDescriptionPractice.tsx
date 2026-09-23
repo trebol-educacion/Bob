@@ -485,7 +485,7 @@ export function PETPictureDescriptionPractice({
     }
 
     void init();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleStartRecording() {
     setAudioError(false);

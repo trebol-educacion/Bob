@@ -285,7 +285,7 @@ export function KETLongTextPractice({
       setExercise(result.exercise); setFramingText(result.framing_text); setPhase('reading');
     }
     void init();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => () => { if (advanceRef.current) clearTimeout(advanceRef.current); }, []);
 

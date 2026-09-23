@@ -151,7 +151,7 @@ export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) 
     }
     load();
     return () => { cancelled = true; };
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleStart = useCallback(async () => {
     if (!plan) return;

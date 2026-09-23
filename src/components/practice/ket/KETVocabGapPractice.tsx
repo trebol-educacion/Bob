@@ -306,7 +306,7 @@ export function KETVocabGapPractice({
       setPhase('ready');
     }
     void init();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleSelect(itemNumber: number, key: OptionKey) {
     if (!exercise) return;

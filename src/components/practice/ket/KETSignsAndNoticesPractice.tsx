@@ -392,7 +392,7 @@ export function KETSignsAndNoticesPractice({
     }
 
     void init();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => () => {
     if (advanceRef.current) clearTimeout(advanceRef.current);

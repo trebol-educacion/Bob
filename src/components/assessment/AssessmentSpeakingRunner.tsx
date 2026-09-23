@@ -122,7 +122,7 @@ export function AssessmentSpeakingRunner({ assessment_id, prompts, is_yl = false
         stopRecording();
       }
     }, 250);
-  }, [stopRecording]);
+  }, [stopRecording, MAX_TURN_MS]);
 
   const handleSubmit = useCallback(async () => {
     setPhase('submitting');

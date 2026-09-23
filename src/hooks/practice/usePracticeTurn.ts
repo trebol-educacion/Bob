@@ -98,7 +98,7 @@ export function usePracticeTurn(args: UsePracticeTurnArgs): UsePracticeTurnRetur
     return () => {
       cancelled = true;
     };
-  }, [mode, sessionId, seed.topic]);
+  }, [mode, sessionId, seed.topic, imageUrl]);
 
   useEffect(() => {
     const lastIndex = messages.length - 1;

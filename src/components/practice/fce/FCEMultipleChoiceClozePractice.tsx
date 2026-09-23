@@ -377,7 +377,7 @@ export function FCEMultipleChoiceClozePractice({
     }
 
     void init();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleSelect(gapNumber: number, optionId: 'A' | 'B' | 'C' | 'D') {
     setAnswers((prev) => ({ ...prev, [gapNumber]: optionId }));

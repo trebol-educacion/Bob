@@ -314,7 +314,7 @@ export function PETReadingComprehensionPractice({
     }
 
     void init();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleSelectMcq(number: number, value: 'A' | 'B' | 'C') {
     setAnswers((prev) => ({ ...prev, [number]: { type: 'mcq', value } }));

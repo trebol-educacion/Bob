@@ -472,7 +472,7 @@ export function KETListenAndCompletePractice({
     }
 
     void init();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (audioStartedRef.current) return;

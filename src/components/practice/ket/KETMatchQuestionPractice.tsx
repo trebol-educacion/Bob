@@ -386,7 +386,7 @@ export function KETMatchQuestionPractice({
       setExercise(result.exercise); setFramingText(result.framing_text); setPhase('ready');
     }
     void init();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   function firstUnanswered(questions: MatchQuestion[], current: Record<number, TextLabel | null>): number | null {
     const target = questions.find((q) => !current[q.number]);

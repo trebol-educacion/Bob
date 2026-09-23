@@ -247,7 +247,7 @@ export function PETMultipleChoicePractice({
     }
 
     void init();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handlePlay = useCallback(() => {
     const item = items[currentIdx];

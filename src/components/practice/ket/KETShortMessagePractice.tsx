@@ -269,7 +269,7 @@ export function KETShortMessagePractice({
     }
 
     void init();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleSubmit() {
     if (!prompt || !text.trim() || wordCount < MIN_WORDS) return;

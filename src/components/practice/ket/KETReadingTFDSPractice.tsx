@@ -311,7 +311,7 @@ export function KETReadingTFDSPractice({
       setExercise(result.exercise); setFramingText(result.framing_text); setPhase('ready');
     }
     void init();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => () => { if (advanceRef.current) clearTimeout(advanceRef.current); }, []);
 

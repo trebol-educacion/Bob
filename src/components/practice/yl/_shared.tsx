@@ -387,7 +387,7 @@ export function YLVoiceNote({
     } catch {
       stop();
     }
-  }, [playing, stop, text, sessionId]);
+  }, [playing, stop, text, sessionId, side]);
 
   React.useEffect(() => {
     if (!autoPlay || autoPlayedRef.current) return;

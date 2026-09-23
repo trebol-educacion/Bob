@@ -292,7 +292,7 @@ export function KETStoryWritingPractice({
       void loadSceneImagesInBackground(plan.sessionId, plan.scenes);
     }
     void init();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleSubmit() {
     if (!sessionId || !userId) return;

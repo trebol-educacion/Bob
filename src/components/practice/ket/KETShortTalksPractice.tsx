@@ -627,7 +627,7 @@ export function KETShortTalksPractice({
     }
 
     void init();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   function firstUnmatched(people: Person[], current: Record<number, CharKey | null>): number | null {
     const target = people.find((p) => !current[p.number]);

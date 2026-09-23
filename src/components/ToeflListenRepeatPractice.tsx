@@ -127,7 +127,7 @@ export function ToeflListenRepeatPractice({ onBack }: ToeflListenRepeatPracticeP
 
     load();
     return () => { cancelled = true; };
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (phase !== 'play') return;

@@ -315,7 +315,7 @@ export function PETEmailWritingPractice({
     }
 
     void init();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleSubmit() {
     if (!prompt || !text.trim()) return;
