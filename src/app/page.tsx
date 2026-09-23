@@ -11,6 +11,7 @@ import { useUsageHeartbeat } from '@/hooks/useUsageHeartbeat';
 import { isBrandNewStudent } from '@/lib/placement/first-entry-gate';
 import { isConversationMode, isExamMode, type AppState } from '@/lib/routing';
 import type { PracticeMode } from '@/lib/types/practice';
+import type { PracticeActivityMode } from '@/lib/practice/types';
 
 export default function App() {
   const [appState, setAppState] = useState<AppState>('home');
@@ -43,6 +44,7 @@ export default function App() {
 
   const [mode, setMode] = useState<PracticeMode>(null);
   const [topic, setTopic] = useState('');
+  const [practiceMode, setPracticeMode] = useState<PracticeActivityMode>('conversation');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   useUsageHeartbeat(mode);
@@ -91,7 +93,11 @@ export default function App() {
   }, [setSelectedSkill]);
 
   const onSelectExam = useCallback(() => setAppState('skill-selection'), []);
-  const onSelectPractice = useCallback(() => setAppState('practice-session'), []);
+  const onSelectPractice = useCallback(() => setAppState('practice-mode-select'), []);
+  const onSelectPracticeMode = useCallback((selected: PracticeActivityMode) => {
+    setPracticeMode(selected);
+    setAppState('practice-session');
+  }, []);
 
   const {
     sessions,
@@ -201,6 +207,8 @@ export default function App() {
       leavePractice={leavePractice}
       onSelectExam={onSelectExam}
       onSelectPractice={onSelectPractice}
+      practiceMode={practiceMode}
+      onSelectPracticeMode={onSelectPracticeMode}
       handleSkillSelect={assessment.handleSkillSelect}
       handleModeSelect={handleModeSelect}
       handleAssessmentStart={assessment.handleAssessmentStart}

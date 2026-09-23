@@ -12,6 +12,7 @@ import type { AppState } from '@/lib/routing';
 import { useOrganization, type AvailableMode } from '@/contexts/OrganizationContext';
 import type { Organization } from '@/lib/organization';
 import type { PracticeMode, CefrLevel, ModeKey } from '@/lib/types/practice';
+import type { PracticeActivityMode } from '@/lib/practice/types';
 import type { Skill, SkillLevelMap } from '@/lib/types/skills';
 import type { AssessmentResultUnion } from '@/hooks/useAssessmentFlow';
 
@@ -42,6 +43,8 @@ export interface AppShellProps {
   leavePractice: (target: AppState) => void;
   onSelectExam: () => void;
   onSelectPractice: () => void;
+  practiceMode: PracticeActivityMode;
+  onSelectPracticeMode: (mode: PracticeActivityMode) => void;
   handleSkillSelect: (skill: Skill) => void;
   setSelectedSkill: (skill: Skill | null) => void;
   handleModeSelect: (m: PracticeMode) => void;
@@ -91,6 +94,8 @@ export function AppShell({
   leavePractice,
   onSelectExam,
   onSelectPractice,
+  practiceMode,
+  onSelectPracticeMode,
   handleSkillSelect,
   setSelectedSkill,
   handleModeSelect,
@@ -185,6 +190,8 @@ export function AppShell({
             leavePractice={leavePractice}
             onSelectExam={onSelectExam}
             onSelectPractice={onSelectPractice}
+            practiceMode={practiceMode}
+            onSelectPracticeMode={onSelectPracticeMode}
             handleSkillSelect={handleSkillSelect}
             setSelectedSkill={setSelectedSkill}
             handleModeSelect={handleModeSelect}

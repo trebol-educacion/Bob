@@ -58,6 +58,7 @@ export type AppState =
   | 'home'
   | 'skill-selection'
   | 'placement-required'
+  | 'practice-mode-select'
   | 'practice-session'
   | 'assessment-invite'
   | 'assessment-running'

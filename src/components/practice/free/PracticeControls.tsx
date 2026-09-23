@@ -1,22 +1,16 @@
 import React from 'react';
 import { Mic, Square, Send, Sparkles, LogOut, CheckCircle } from 'lucide-react';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
-import type { PracticeActivityMode } from '@/lib/practice/types';
-
-const MODES: PracticeActivityMode[] = ['conversation', 'situation', 'picture'];
 
 export interface PracticeControlsLabels {
   placeholder: string;
   modelAnswer: string;
   exit: string;
   finish: string;
-  modes: Record<PracticeActivityMode, string>;
 }
 
 export interface PracticeControlsProps {
   labels: PracticeControlsLabels;
-  mode: PracticeActivityMode;
-  onSwitchMode: (mode: PracticeActivityMode) => void;
   inputText: string;
   onInputTextChange: (v: string) => void;
   onSendText: () => void;
@@ -30,8 +24,6 @@ export interface PracticeControlsProps {
 
 export function PracticeControls({
   labels,
-  mode,
-  onSwitchMode,
   inputText,
   onInputTextChange,
   onSendText,
@@ -49,22 +41,7 @@ export function PracticeControls({
 
   return (
     <div className="flex-none border-t border-gray-100 bg-white px-4 py-3 space-y-3">
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-1 bg-gray-50 rounded-full p-1">
-          {MODES.map((m) => (
-            <button
-              key={m}
-              onClick={() => onSwitchMode(m)}
-              disabled={isProcessing}
-              className={`px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wide transition-colors disabled:opacity-40 ${
-                m === mode ? 'text-white' : 'text-gray-500 hover:text-gray-700'
-              }`}
-              style={m === mode ? { background: 'var(--color-bob-brand)' } : undefined}
-            >
-              {labels.modes[m]}
-            </button>
-          ))}
-        </div>
+      <div className="flex items-center justify-end gap-2">
         <div className="flex items-center gap-2">
           <button
             onClick={onFinish}

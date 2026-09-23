@@ -118,14 +118,7 @@ export function PracticeSurface({ sessionId, mode, seed, level, framing, message
           modelAnswer: t('controls.modelAnswer'),
           exit: t('controls.exit'),
           finish: t('controls.finish'),
-          modes: {
-            conversation: t('modes.conversation'),
-            situation: t('modes.situation'),
-            picture: t('modes.picture'),
-          },
         }}
-        mode={turn.mode}
-        onSwitchMode={turn.handleSwitchMode}
         inputText={turn.inputText}
         onInputTextChange={turn.setInputText}
         onSendText={turn.handleSendText}

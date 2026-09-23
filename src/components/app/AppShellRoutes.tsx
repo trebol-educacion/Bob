@@ -8,8 +8,7 @@ import { PlacementRequired } from '@/components/placement/PlacementRequired';
 import { ConversationPracticeView } from './views/ConversationPracticeView';
 import { ChallengeHome } from '@/components/challenge/ChallengeHome';
 import { ChallengeRunner } from '@/components/challenge/ChallengeRunner';
-import { HomeView } from './views/HomeView';
-import { PracticeSessionView } from './views/PracticeSessionView';
+import { PracticeHomeFlow } from './views/PracticeHomeFlow';
 import { CatalogView } from './views/CatalogView';
 import { ModeSelectorView } from './views/ModeSelectorView';
 import { PracticeView } from './views/PracticeView';
@@ -23,6 +22,7 @@ import { getRouteForMode, isConversationMode } from '@/lib/routing';
 import type { Organization } from '@/lib/organization';
 import type { AvailableMode } from '@/lib/organization/types';
 import type { PracticeMode, CefrLevel, ModeKey } from '@/lib/types/practice';
+import type { PracticeActivityMode } from '@/lib/practice/types';
 import type { Skill, SkillLevelMap } from '@/lib/types/skills';
 import type { AssessmentResultUnion } from '@/hooks/useAssessmentFlow';
 import type { PracticeTrack } from '@/lib/modes';
@@ -46,6 +46,8 @@ export interface AppShellRoutesProps {
   leavePractice: (target: AppState) => void;
   onSelectExam: () => void;
   onSelectPractice: () => void;
+  practiceMode: PracticeActivityMode;
+  onSelectPracticeMode: (mode: PracticeActivityMode) => void;
   handleSkillSelect: (skill: Skill) => void;
   setSelectedSkill: (skill: Skill | null) => void;
   handleModeSelect: (m: PracticeMode) => void;
@@ -91,6 +93,8 @@ export function AppShellRoutes({
   leavePractice,
   onSelectExam,
   onSelectPractice,
+  practiceMode,
+  onSelectPracticeMode,
   handleSkillSelect,
   setSelectedSkill,
   handleModeSelect,
@@ -119,6 +123,7 @@ export function AppShellRoutes({
 
   const onOpenDashboard = useCallback(() => setAppState('dashboard'), [setAppState]);
   const onBackToCatalog = useCallback(() => leavePractice('catalog-filtered'), [leavePractice]);
+  const onBackHome = useCallback(() => leavePractice('home'), [leavePractice]);
 
   const handleYLSessionCreated = useCallback((newSessionId: string) => {
     setActiveSessionId(newSessionId);
@@ -141,36 +146,24 @@ export function AppShellRoutes({
   return (
     <AnimatePresence mode="wait">
 
-      {appState === 'home' && (
+      {(appState === 'home' || appState === 'practice-mode-select' || appState === 'practice-session') && (
         <motion.div
-          key="home"
-          initial={{ opacity: 0, y: 20 }}
+          key={`practice-flow-${appState}`}
+          initial={{ opacity: 0, y: appState === 'practice-session' ? 0 : 20 }}
           animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -20 }}
-          className="w-full flex-1 overflow-y-auto"
+          exit={{ opacity: 0, y: appState === 'practice-session' ? 0 : -20 }}
+          className={appState === 'practice-session' ? 'flex-1 flex flex-col min-h-0' : 'w-full flex-1 overflow-y-auto'}
         >
-          <HomeView
-            organization={organization}
-            cefrActiveLevel={cefrActiveLevel}
-            onSelectExam={onSelectExam}
-            onSelectPractice={onSelectPractice}
-          />
-        </motion.div>
-      )}
-
-      {appState === 'practice-session' && (
-        <motion.div
-          key="practice-session"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="flex-1 flex flex-col min-h-0"
-        >
-          <PracticeSessionView
+          <PracticeHomeFlow
+            appState={appState}
             organization={organization}
             cefrActiveLevel={cefrActiveLevel}
             skillLevels={skillLevels}
-            onExit={() => leavePractice('home')}
+            onSelectExam={onSelectExam}
+            onSelectPractice={onSelectPractice}
+            practiceMode={practiceMode}
+            onSelectPracticeMode={onSelectPracticeMode}
+            onExitPractice={onBackHome}
           />
         </motion.div>
       )}

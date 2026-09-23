@@ -9,10 +9,8 @@ import {
 } from '@/actions/gemini';
 import type { ChatMessage } from '@/actions/gemini';
 import { pcmToWavBase64, blobToBase64 } from '@/lib/audio';
-import { addPracticeTurnAction, updatePracticeModeAction } from '@/actions/practice/repository';
-import { generatePracticeInitialTurnAction } from '@/actions/practice/turn';
+import { addPracticeTurnAction } from '@/actions/practice/repository';
 import { generatePracticeImageAction } from '@/actions/practice/image';
-import { pickPracticeSeed } from '@/lib/practice/seed';
 import { isHintAvailable, markAssistedTurn } from '@/lib/practice/scaffolding';
 import type { PracticeTurnSignal } from '@/lib/grading/practice-rubric';
 import type { PracticeActivityMode, PracticeSeed } from '@/lib/practice/types';
@@ -48,7 +46,6 @@ export interface UsePracticeTurnReturn {
   handleSendText: () => Promise<void>;
   handleSendAudio: (blob: Blob) => Promise<void>;
   handleRequestModelAnswer: () => Promise<void>;
-  handleSwitchMode: (nextMode: PracticeActivityMode) => Promise<void>;
   dismissError: () => void;
 }
 
@@ -56,11 +53,9 @@ export interface UsePracticeTurnReturn {
  * @param args UsePracticeTurnArgs
  */
 export function usePracticeTurn(args: UsePracticeTurnArgs): UsePracticeTurnReturn {
-  const { sessionId, initialFraming, initialMessages, initialTurnSignals, level } = args;
+  const { sessionId, mode, seed, initialFraming, initialMessages, initialTurnSignals, level } = args;
 
-  const [mode, setMode] = useState(args.mode);
-  const [seed, setSeed] = useState(args.seed);
-  const [framing, setFraming] = useState(initialFraming);
+  const framing = initialFraming;
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
   const [turnSignals, setTurnSignals] = useState<PracticeTurnSignal[]>(initialTurnSignals ?? []);
   const [playCounts, setPlayCounts] = useState<Record<number, number>>({});
@@ -213,35 +208,6 @@ export function usePracticeTurn(args: UsePracticeTurnArgs): UsePracticeTurnRetur
     }
   };
 
-  const handleSwitchMode = async (nextMode: PracticeActivityMode) => {
-    if (nextMode === mode || isProcessing) return;
-    setIsProcessing(true);
-    setErrorMessage(null);
-    try {
-      const nextSeed = pickPracticeSeed(nextMode);
-      const turn = await generatePracticeInitialTurnAction(nextMode, nextSeed, level);
-
-      setMode(nextMode);
-      setSeed(nextSeed);
-      setFraming(turn.framing);
-      setImageUrl(null);
-      setImageLoading(nextMode === 'picture');
-      setMessages((prev) => [...prev, { role: 'model', text: turn.message }]);
-      persistTurn('bob', turn.message);
-
-      if (sessionId) {
-        void updatePracticeModeAction({ sessionId, mode: nextMode, topic: nextSeed.topic }).catch((error) =>
-          console.error('[usePracticeTurn] updatePracticeModeAction failed:', error)
-        );
-      }
-    } catch (error) {
-      console.error('[usePracticeTurn] handleSwitchMode failed:', error);
-      setErrorMessage('conversationError');
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
   const dismissError = () => setErrorMessage(null);
 
   return {
@@ -264,7 +230,6 @@ export function usePracticeTurn(args: UsePracticeTurnArgs): UsePracticeTurnRetur
     handleSendText,
     handleSendAudio,
     handleRequestModelAnswer,
-    handleSwitchMode,
     dismissError,
   };
 }

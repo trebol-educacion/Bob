@@ -32,6 +32,22 @@
     "situation": "Situation",
     "picture": "Picture"
   },
+  "modeSelect": {
+    "heading": "Choose how to practice",
+    "subtitle": "Pick a mode and start talking with Bob right away.",
+    "conversation": {
+      "title": "Conversation",
+      "subtitle": "Chat about anything, at your own pace."
+    },
+    "situation": {
+      "title": "Situation",
+      "subtitle": "Step into a scenario and react in English."
+    },
+    "picture": {
+      "title": "Picture",
+      "subtitle": "Describe what you see and keep the story going."
+    }
+  },
   "errors": {
     "conversationError": "Something went wrong with that turn.",
     "sendMessageError": "Bob couldn't answer just now.",

@@ -8,9 +8,11 @@ import { ConversationErrorBanner } from '@/components/conversation/ConversationE
 import { usePracticeBoot } from '@/hooks/practice/usePracticeBoot';
 import type { Organization } from '@/lib/organization';
 import type { CefrLevel } from '@/lib/types/practice';
+import type { PracticeActivityMode } from '@/lib/practice/types';
 import type { SkillLevelMap } from '@/lib/types/skills';
 
 export interface PracticeSessionViewProps {
+  mode: PracticeActivityMode;
   organization: Organization | null;
   cefrActiveLevel: CefrLevel | null;
   skillLevels: SkillLevelMap | null;
@@ -18,9 +20,9 @@ export interface PracticeSessionViewProps {
 }
 
 /** @param props PracticeSessionViewProps */
-export function PracticeSessionView({ organization, cefrActiveLevel, skillLevels, onExit }: PracticeSessionViewProps) {
+export function PracticeSessionView({ mode, organization, cefrActiveLevel, skillLevels, onExit }: PracticeSessionViewProps) {
   const t = useTranslations('practice');
-  const boot = usePracticeBoot({ mode: 'conversation', organization, cefrActiveLevel, skillLevels });
+  const boot = usePracticeBoot({ mode, organization, cefrActiveLevel, skillLevels });
 
   const failed = boot.phase === 'ready' && !boot.message && boot.messages.length === 0;
 
