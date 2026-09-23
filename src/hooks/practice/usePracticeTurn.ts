@@ -52,6 +52,25 @@ export interface UsePracticeTurnReturn {
 /**
  * @param args UsePracticeTurnArgs
  */
+const AUTOPLAY_DELAY_MS = 500;
+const AUDIO_TIMEOUT_MS = 6000;
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('audio-timeout')), ms);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        clearTimeout(timer);
+        reject(error);
+      }
+    );
+  });
+}
+
 export function usePracticeTurn(args: UsePracticeTurnArgs): UsePracticeTurnReturn {
   const { sessionId, mode, seed, initialFraming, initialMessages, initialTurnSignals, level } = args;
 
@@ -71,6 +90,9 @@ export function usePracticeTurn(args: UsePracticeTurnArgs): UsePracticeTurnRetur
   const audioCacheRef = useRef<Map<number, string>>(new Map());
   const pendingHintRef = useRef(false);
   const pendingModelAnswerUsedRef = useRef(false);
+  const autoplayedRef = useRef<Set<number>>(new Set(initialMessages.map((_message, index) => index)));
+
+  const revealText = (index: number) => setVisibleTexts((prev) => ({ ...prev, [index]: true }));
 
   const persistTurn = (role: 'bob' | 'student', content: string, hintUsed = false, modelAnswerUsed = false) => {
     if (!sessionId) return;
@@ -118,25 +140,40 @@ export function usePracticeTurn(args: UsePracticeTurnArgs): UsePracticeTurnRetur
 
     if (cached) {
       try {
-        await new Audio(cached).play();
+        await withTimeout(new Audio(cached).play(), AUDIO_TIMEOUT_MS);
       } catch (error) {
         console.error('[usePracticeTurn] cached audio play failed:', error);
+        revealText(index);
       }
       return;
     }
 
     setIsGeneratingAudio(index);
     try {
-      const { data, mimeType } = await generateSpeechAction(messages[index].text);
+      const { data, mimeType } = await withTimeout(generateSpeechAction(messages[index].text), AUDIO_TIMEOUT_MS);
       const audioUrl = pcmToWavBase64(data, mimeType);
       audioCacheRef.current.set(index, audioUrl);
-      await new Audio(audioUrl).play();
+      await withTimeout(new Audio(audioUrl).play(), AUDIO_TIMEOUT_MS);
     } catch (error) {
       console.error('[usePracticeTurn] handleListen failed:', error);
+      revealText(index);
     } finally {
       setIsGeneratingAudio(null);
     }
   };
+
+  useEffect(() => {
+    if (mode !== 'conversation') return;
+    const lastIndex = messages.length - 1;
+    if (lastIndex < 0 || messages[lastIndex].role !== 'model') return;
+    if (autoplayedRef.current.has(lastIndex)) return;
+    autoplayedRef.current.add(lastIndex);
+    const timer = setTimeout(() => {
+      void handleListen(lastIndex);
+    }, AUTOPLAY_DELAY_MS);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, messages]);
 
   const handleToggleHint = (index: number) => {
     if (!isHintAvailable(playCounts[index] ?? 0)) return;

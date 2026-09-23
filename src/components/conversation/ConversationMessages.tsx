@@ -2,7 +2,7 @@ import React from 'react';
 import { motion } from 'motion/react';
 import { Volume2, HelpCircle, Loader2, MessageSquare, BookOpen } from 'lucide-react';
 import { MessageBubble, InfoCard } from '@/components/chat';
-import type { ChatMessage } from '@/actions/gemini';
+import type { ChatMessage } from '@/actions/gemini/types';
 
 export interface ConversationMessagesProps {
   framing: string;
@@ -18,6 +18,7 @@ export interface ConversationMessagesProps {
   playAudioLabel: string;
   showHintLabel: string;
   hideTextLabel: string;
+  listenFirst: boolean;
 }
 
 export function ConversationMessages({
@@ -34,6 +35,7 @@ export function ConversationMessages({
   playAudioLabel,
   showHintLabel,
   hideTextLabel,
+  listenFirst,
 }: ConversationMessagesProps) {
   return (
     <motion.div
@@ -60,13 +62,13 @@ export function ConversationMessages({
             >
               {msg.role === 'model' ? (
                 <div className="flex flex-col space-y-2">
-                  {visibleTexts[i] ? (
-                    <p className="animate-in fade-in slide-in-from-top-1 duration-300">{msg.text}</p>
-                  ) : (
+                  {listenFirst && !visibleTexts[i] ? (
                     <div className="flex items-center space-x-2 py-1 text-gray-400">
                       <Volume2 size={16} className="animate-pulse" />
                       <span className="text-sm font-medium italic">{listenAudioLabel}</span>
                     </div>
+                  ) : (
+                    <p className="animate-in fade-in slide-in-from-top-1 duration-300">{msg.text}</p>
                   )}
                   <div className="flex items-center justify-between mt-1 pt-2 border-t border-gray-100">
                     <button
@@ -82,7 +84,7 @@ export function ConversationMessages({
                       )}
                       <span>{playCounts[i] > 0 ? repeatAudioLabel : playAudioLabel}</span>
                     </button>
-                    {playCounts[i] >= 2 && (
+                    {listenFirst && playCounts[i] >= 2 && (
                       <button
                         onClick={() => onToggleVisibleText(i)}
                         className="flex items-center space-x-1 text-bob-brand transition-colors"

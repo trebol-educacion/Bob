@@ -128,6 +128,86 @@ describe('usePracticeTurn', () => {
     expect(result.current.pendingModelAnswer).toBeNull();
   });
 
+  it('modo conversacion: el turno nuevo de Bob se escucha solo tras un breve retardo, y si el audio falla el texto se revela', async () => {
+    vi.useFakeTimers();
+    try {
+      (generateSpeechAction as ReturnType<typeof vi.fn>).mockResolvedValue({ data: 'AAAA', mimeType: 'audio/L16;rate=24000' });
+      (chatTextConversationAction as ReturnType<typeof vi.fn>).mockResolvedValue({
+        evaluation: { score: 80, feedback: 'good', transcribed_text: 'hi' },
+        ai_response: 'Nice to meet you!',
+      });
+
+      const { result } = renderHook(() => usePracticeTurn(baseArgs()));
+
+      act(() => {
+        result.current.setInputText('hi there');
+      });
+      await act(async () => {
+        await result.current.handleSendText();
+      });
+
+      const newModelIndex = result.current.messages.length - 1;
+      expect(result.current.playCounts[newModelIndex]).toBeUndefined();
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(600);
+      });
+
+      expect(result.current.playCounts[newModelIndex]).toBe(1);
+      expect(result.current.visibleTexts[newModelIndex]).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('el mensaje inicial de una sesion retomada no se reproduce solo (solo autoplay para turnos nuevos)', async () => {
+    vi.useFakeTimers();
+    try {
+      (generateSpeechAction as ReturnType<typeof vi.fn>).mockResolvedValue({ data: 'AAAA', mimeType: 'audio/L16;rate=24000' });
+
+      const { result } = renderHook(() => usePracticeTurn(baseArgs()));
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1000);
+      });
+
+      expect(result.current.playCounts[0]).toBeUndefined();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('modos situation y picture no reproducen el turno de Bob solos (sin escucha primero)', async () => {
+    vi.useFakeTimers();
+    try {
+      (generateSpeechAction as ReturnType<typeof vi.fn>).mockResolvedValue({ data: 'AAAA', mimeType: 'audio/L16;rate=24000' });
+      (chatTextConversationAction as ReturnType<typeof vi.fn>).mockResolvedValue({
+        evaluation: { score: 80, feedback: 'good', transcribed_text: 'hi' },
+        ai_response: 'Sure, go on.',
+      });
+
+      const { result } = renderHook(() => usePracticeTurn({ ...baseArgs(), mode: 'situation' }));
+
+      act(() => {
+        result.current.setInputText('hi there');
+      });
+      await act(async () => {
+        await result.current.handleSendText();
+      });
+
+      const newModelIndex = result.current.messages.length - 1;
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1000);
+      });
+
+      expect(result.current.playCounts[newModelIndex]).toBeUndefined();
+      expect(result.current.visibleTexts[newModelIndex]).toBeUndefined();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('modo picture sin sessionId (repositorio degradado) igual pide la imagen, no se queda mudo', async () => {
     (generateSpeechAction as ReturnType<typeof vi.fn>).mockResolvedValue({ data: '', mimeType: 'audio/L16;rate=24000' });
     (generatePracticeImageAction as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, imageUrl: 'data:image/png;base64,AAAA' });

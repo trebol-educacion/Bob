@@ -109,6 +109,7 @@ export function PracticeSurface({ sessionId, mode, seed, level, framing, message
           playAudioLabel={t('playAudioLabel')}
           showHintLabel={t('showHintLabel')}
           hideTextLabel={t('hideTextLabel')}
+          listenFirst={turn.mode === 'conversation'}
         />
       </div>
 

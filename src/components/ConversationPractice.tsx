@@ -188,6 +188,7 @@ export function ConversationPractice({
             playAudioLabel={t('playAudio')}
             showHintLabel={t('showHint')}
             hideTextLabel={t('hideText')}
+            listenFirst
           />
         )}
 
