@@ -1,46 +1,11 @@
 'use client';
 
-import React, { useState } from 'react';
-import Image from 'next/image';
+import React from 'react';
 import { motion } from 'motion/react';
+import { BobGreetingAvatar } from '@/components/BobGreetingAvatar';
 import { Headphones, Mic2, BookOpen, PenLine } from 'lucide-react';
 import { useOrganization } from '@/hooks/useOrganization';
 import type { Skill } from '@/lib/types/skills';
-
-function BobGreetingAvatar() {
-  const [videoEnded, setVideoEnded] = useState(false);
-  return (
-    <div className="relative w-32 h-32 sm:w-40 sm:h-40 mx-auto mb-4 overflow-hidden rounded-full bg-white shadow-lg ring-4 ring-white">
-      <motion.div
-        animate={{ rotate: videoEnded ? [0, -6, 6, -4, 0] : 0 }}
-        transition={{ delay: 0.2, duration: 1.4, ease: 'easeInOut' }}
-        className="w-full h-full relative"
-        style={{ transformOrigin: '50% 80%' }}
-      >
-        <Image
-          src="/bob_avatar.png"
-          alt="Bob"
-          fill
-          sizes="160px"
-          className="object-cover object-[50%_0%] scale-95 origin-bottom"
-        />
-      </motion.div>
-      {!videoEnded && (
-        <video
-          autoPlay
-          muted
-          playsInline
-          preload="auto"
-          onEnded={() => setVideoEnded(true)}
-          onError={() => setVideoEnded(true)}
-          className="absolute inset-0 w-full h-full object-cover object-[50%_35%]"
-        >
-          <source src="/bob_hello.mp4" type="video/mp4" />
-        </video>
-      )}
-    </div>
-  );
-}
 
 type SkillTheme = {
   skill: Skill;

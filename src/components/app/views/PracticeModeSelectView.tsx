@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
-import Image from 'next/image';
+import React from 'react';
 import { motion } from 'motion/react';
+import { BobGreetingAvatar } from '@/components/BobGreetingAvatar';
 import { useTranslations } from 'next-intl';
 import { MessageCircle, Compass, Image as ImageIcon } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
@@ -43,41 +43,6 @@ const MODE_THEMES: ModeTheme[] = [
     borderColor: 'border-purple-100',
   },
 ];
-
-function BobGreetingAvatar() {
-  const [videoEnded, setVideoEnded] = useState(false);
-  return (
-    <div className="relative w-28 h-28 sm:w-36 sm:h-36 mx-auto mb-4 overflow-hidden rounded-full bg-white shadow-lg ring-4 ring-white">
-      <motion.div
-        animate={{ rotate: videoEnded ? [0, -6, 6, -4, 0] : 0 }}
-        transition={{ delay: 0.2, duration: 1.4, ease: 'easeInOut' }}
-        className="w-full h-full relative"
-        style={{ transformOrigin: '50% 80%' }}
-      >
-        <Image
-          src="/bob_avatar.png"
-          alt="Bob"
-          fill
-          sizes="144px"
-          className="object-cover object-[50%_0%] scale-95 origin-bottom"
-        />
-      </motion.div>
-      {!videoEnded && (
-        <video
-          autoPlay
-          muted
-          playsInline
-          preload="auto"
-          onEnded={() => setVideoEnded(true)}
-          onError={() => setVideoEnded(true)}
-          className="absolute inset-0 w-full h-full object-cover object-[50%_35%]"
-        >
-          <source src="/bob_hello.mp4" type="video/mp4" />
-        </video>
-      )}
-    </div>
-  );
-}
 
 interface ModeCardProps {
   theme: ModeTheme;
@@ -143,7 +108,7 @@ export function PracticeModeSelectView({ onSelectMode }: PracticeModeSelectViewP
           animate={{ scale: 1, rotate: 0 }}
           transition={{ delay: 0.1, type: 'spring', stiffness: 200, damping: 14 }}
         >
-          <BobGreetingAvatar />
+          <BobGreetingAvatar size="md" />
         </motion.div>
         <h1 className="text-2xl md:text-3xl font-black tracking-tight text-gray-900">
           {t('heading')}
