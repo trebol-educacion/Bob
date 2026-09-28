@@ -1,48 +1,167 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
+import Image from 'next/image';
+import { motion } from 'motion/react';
 import { useTranslations } from 'next-intl';
 import { MessageCircle, Compass, Image as ImageIcon } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
 import type { PracticeActivityMode } from '@/lib/practice/types';
 
 export interface PracticeModeSelectViewProps {
   onSelectMode: (mode: PracticeActivityMode) => void;
 }
 
-const MODE_ICONS: Record<PracticeActivityMode, React.ComponentType<{ size?: number; className?: string }>> = {
-  conversation: MessageCircle,
-  situation: Compass,
-  picture: ImageIcon,
+type ModeTheme = {
+  mode: PracticeActivityMode;
+  icon: React.ComponentType<{ className?: string }>;
+  color: string;
+  bgColor: string;
+  borderColor: string;
 };
 
-const MODES: PracticeActivityMode[] = ['conversation', 'situation', 'picture'];
+const MODE_THEMES: ModeTheme[] = [
+  {
+    mode: 'conversation',
+    icon: MessageCircle,
+    color: 'text-blue-600',
+    bgColor: 'bg-blue-50',
+    borderColor: 'border-blue-100',
+  },
+  {
+    mode: 'situation',
+    icon: Compass,
+    color: 'text-emerald-600',
+    bgColor: 'bg-emerald-50',
+    borderColor: 'border-emerald-100',
+  },
+  {
+    mode: 'picture',
+    icon: ImageIcon,
+    color: 'text-purple-600',
+    bgColor: 'bg-purple-50',
+    borderColor: 'border-purple-100',
+  },
+];
+
+function BobGreetingAvatar() {
+  const [videoEnded, setVideoEnded] = useState(false);
+  return (
+    <div className="relative w-28 h-28 sm:w-36 sm:h-36 mx-auto mb-4 overflow-hidden rounded-full bg-white shadow-lg ring-4 ring-white">
+      <motion.div
+        animate={{ rotate: videoEnded ? [0, -6, 6, -4, 0] : 0 }}
+        transition={{ delay: 0.2, duration: 1.4, ease: 'easeInOut' }}
+        className="w-full h-full relative"
+        style={{ transformOrigin: '50% 80%' }}
+      >
+        <Image
+          src="/bob_avatar.png"
+          alt="Bob"
+          fill
+          sizes="144px"
+          className="object-cover object-[50%_0%] scale-95 origin-bottom"
+        />
+      </motion.div>
+      {!videoEnded && (
+        <video
+          autoPlay
+          muted
+          playsInline
+          preload="auto"
+          onEnded={() => setVideoEnded(true)}
+          onError={() => setVideoEnded(true)}
+          className="absolute inset-0 w-full h-full object-cover object-[50%_35%]"
+        >
+          <source src="/bob_hello.mp4" type="video/mp4" />
+        </video>
+      )}
+    </div>
+  );
+}
+
+interface ModeCardProps {
+  theme: ModeTheme;
+  title: string;
+  subtitle: string;
+  index: number;
+  onClick: () => void;
+}
+
+function ModeCard({ theme, title, subtitle, index, onClick }: ModeCardProps) {
+  const Icon = theme.icon;
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: index * 0.1 + 0.2 }}
+    >
+      <Card
+        role="button"
+        tabIndex={0}
+        onClick={onClick}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onClick();
+          }
+        }}
+        className={`h-full cursor-pointer hover:shadow-xl hover:-translate-y-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 transition-all duration-300 border-2 ${theme.borderColor} group overflow-hidden relative bg-white rounded-2xl py-0`}
+      >
+        <div
+          className={`absolute top-0 right-0 w-24 h-24 -mr-8 -mt-8 rounded-full opacity-5 transition-transform duration-700 group-hover:scale-150 ${theme.bgColor} pointer-events-none`}
+        />
+        <CardContent className="p-6 flex flex-col items-center text-center space-y-4">
+          <div
+            className={`p-4 shadow-sm transition-all duration-500 group-hover:scale-105 ${theme.bgColor} rounded-2xl`}
+          >
+            <Icon className={`w-8 h-8 ${theme.color}`} />
+          </div>
+          <div className="space-y-2">
+            <h3 className={`text-xl font-bold tracking-tight ${theme.color}`}>{title}</h3>
+            <p className="text-sm text-gray-500 leading-snug font-medium">{subtitle}</p>
+          </div>
+        </CardContent>
+      </Card>
+    </motion.div>
+  );
+}
 
 /** @param props PracticeModeSelectViewProps */
 export function PracticeModeSelectView({ onSelectMode }: PracticeModeSelectViewProps) {
   const t = useTranslations('practice.modeSelect');
 
   return (
-    <div className="w-full flex-1 flex flex-col items-center justify-center py-16 px-4">
-      <div className="max-w-2xl w-full text-center mb-8 space-y-2">
-        <p className="text-2xl font-black text-trebol-text">{t('heading')}</p>
-        <p className="text-sm text-trebol-text opacity-60">{t('subtitle')}</p>
-      </div>
+    <div className="w-full flex-1 flex flex-col items-center justify-center py-10 px-4">
+      <motion.div
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+        className="text-center mb-8 max-w-2xl"
+      >
+        <motion.div
+          initial={{ scale: 0, rotate: -20 }}
+          animate={{ scale: 1, rotate: 0 }}
+          transition={{ delay: 0.1, type: 'spring', stiffness: 200, damping: 14 }}
+        >
+          <BobGreetingAvatar />
+        </motion.div>
+        <h1 className="text-2xl md:text-3xl font-black tracking-tight text-gray-900">
+          {t('heading')}
+        </h1>
+        <p className="text-base text-gray-500 font-medium mt-2">{t('subtitle')}</p>
+      </motion.div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 w-full max-w-3xl">
-        {MODES.map((m) => {
-          const Icon = MODE_ICONS[m];
-          return (
-            <button
-              key={m}
-              onClick={() => onSelectMode(m)}
-              className="text-left bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow p-6 space-y-3"
-            >
-              <Icon size={28} className="text-trebol-text opacity-70" />
-              <p className="text-lg font-black text-trebol-text">{t(`${m}.title`)}</p>
-              <p className="text-sm text-trebol-text opacity-60">{t(`${m}.subtitle`)}</p>
-            </button>
-          );
-        })}
+        {MODE_THEMES.map((theme, index) => (
+          <ModeCard
+            key={theme.mode}
+            theme={theme}
+            title={t(`${theme.mode}.title`)}
+            subtitle={t(`${theme.mode}.subtitle`)}
+            index={index}
+            onClick={() => onSelectMode(theme.mode)}
+          />
+        ))}
       </div>
     </div>
   );
