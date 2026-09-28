@@ -15,7 +15,7 @@ Respond ONLY with valid JSON:
 {
   "topic_id": "string (one of: technology, environment, education, health, work, travel)",
   "topic_name": "string",
-  "topic_context": "string — 1 sentence background for context",
+  "topic_context": "string, 1 sentence background for context",
   "questions": [
     { "text": "string", "difficulty": 1, "suggested_time": 15 },
     { "text": "string", "difficulty": 2, "suggested_time": 30 },
@@ -52,7 +52,7 @@ Respond ONLY with valid JSON:
   "fluency": number (0-5),
   "vocabulary": number (0-5),
   "grammar": number (0-5),
-  "feedback": "string — 2-3 sentences specific to TOEFL performance",
-  "transcribed_text": "string — what the candidate said"
+  "feedback": "string, 2-3 sentences specific to TOEFL performance",
+  "transcribed_text": "string, what the candidate said"
 }`;
 }

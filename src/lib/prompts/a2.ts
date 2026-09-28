@@ -11,9 +11,9 @@ The A2 Key Part 1 structure:
 Respond ONLY with valid JSON:
 {
   "phase1_questions": ["q1", "q2", "q3"],
-  "topic1": "string — topic name",
+  "topic1": "string, topic name",
   "topic1_questions": ["q4", "q5", "q6", "q7"],
-  "topic2": "string — topic name",
+  "topic2": "string, topic name",
   "topic2_questions": ["q8", "q9", "q10"],
   "final_question": "string"
 }
@@ -33,7 +33,7 @@ export function buildA2ExaminerReactionPrompt(
 Question: "${question}"
 Candidate's answer: "${transcribedAnswer}"
 
-Give a brief natural reaction (under 15 words) — like "Thank you." or "That's interesting!" or "Good, thank you."
+Give a brief natural reaction (under 15 words), like "Thank you." or "That's interesting!" or "Good, thank you."
 DO NOT ask a new question. DO NOT give feedback on their English. Just a brief acknowledgement.
 Respond with ONLY the reaction text, no labels or quotes.`;
 }
@@ -65,9 +65,9 @@ Respond ONLY with valid JSON:
   "grammar": number (0-100),
   "vocabulary": number (0-100),
   "fluency": number (0-100),
-  "feedback": "string — 2 sentences specific to their A2 performance",
+  "feedback": "string, 2 sentences specific to their A2 performance",
   "strengths": ["string", "string"],
   "areas_for_improvement": ["string", "string"],
-  "cefr_level": "string — estimated level (A1/A2/B1)"
+  "cefr_level": "string, estimated level (A1/A2/B1)"
 }`;
 }

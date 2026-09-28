@@ -12,7 +12,6 @@ import { ChatInputBar } from '@/components/chat/ChatInputBar';
 import { BobAvatar } from '@/components/practice/yl/_shared';
 import { useCountdownTimer } from '@/hooks/useCountdownTimer';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
-import { validateRecordedAudio } from '@/lib/audio-guard';
 import {
   generatePETPictureDescriptionAction,
   evaluatePETPictureDescriptionAction,
@@ -22,6 +21,7 @@ import {
   type PictureDescriptionReferenceVocabulary,
 } from '@/actions/modes/pet-p2';
 import type { StoredMessage } from '@/actions/messages';
+import { resolveActivityBoot } from '@/lib/activity/boot';
 
 export interface PETPictureDescriptionPracticeProps {
   onBack: () => void;
@@ -355,7 +355,7 @@ function ModelAnswerSection({ topic, scenePrompt }: { topic: string; scenePrompt
   );
 }
 
-/** Cambridge B1 PET Speaking Part 2 — Picture Description practice component. */
+/** Cambridge B1 PET Speaking Part 2, Picture Description practice component. */
 export function PETPictureDescriptionPractice({
   onBack,
   sessionId: initialSessionId,
@@ -380,7 +380,7 @@ export function PETPictureDescriptionPractice({
     emotions: [],
     weather_setting: [],
   });
-  const [languageBank, setLanguageBank] = useState<PETPictureDescriptionResult['languageBank']>({
+  const [, setLanguageBank] = useState<PETPictureDescriptionResult['languageBank']>({
     openers: [],
     speculation: [],
     describing_people: [],
@@ -400,6 +400,9 @@ export function PETPictureDescriptionPractice({
   const initStartedRef = useRef(false);
   const recordingStartRef = useRef<number | null>(null);
 
+  void audioBlob;
+  void mimeType;
+
   const timer = useCountdownTimer({
     totalSeconds: 60,
     warnAt: 10,
@@ -413,6 +416,7 @@ export function PETPictureDescriptionPractice({
   const { isRecording, startRecording, stopRecording } = useAudioRecorder({
     onRecorded: (blob) => {
       const duration = recordingStartRef.current
+        // eslint-disable-next-line react-hooks/purity
         ? (Date.now() - recordingStartRef.current) / 1000
         : 60 - timer.seconds;
       setAudioBlob(blob);
@@ -427,35 +431,35 @@ export function PETPictureDescriptionPractice({
     },
   });
 
+  void isRecording;
+  void audioDuration;
+
   useEffect(() => {
     if (initStartedRef.current) return;
     initStartedRef.current = true;
 
     async function init() {
-      if (initialMessages && initialMessages.length > 0) {
-        const restored = tryRestore(initialMessages);
-        if (restored) {
-          setTopic(restored.plan.topic);
-          setFramingText(restored.plan.framingText);
-          setScenePrompt(restored.plan.scenePrompt);
-          setReferenceVocabulary(restored.plan.referenceVocabulary);
-          setLanguageBank(restored.plan.languageBank);
-          setImageUrl(restored.plan.imageUrl);
+      const boot = resolveActivityBoot({ initialMessages, sessionId: initialSessionId, tryRestore });
+      if (boot.kind === 'restore') {
+        const restored = boot.data;
+        setTopic(restored.plan.topic);
+        setFramingText(restored.plan.framingText);
+        setScenePrompt(restored.plan.scenePrompt);
+        setReferenceVocabulary(restored.plan.referenceVocabulary);
+        setLanguageBank(restored.plan.languageBank);
+        setImageUrl(restored.plan.imageUrl);
 
-          if (restored.feedback) {
-            setFeedback(restored.feedback);
-            setTranscript(restored.transcript);
-            setPhase('finished');
-          } else {
-            setPhase('ready');
-          }
-          return;
+        if (restored.feedback) {
+          setFeedback(restored.feedback);
+          setTranscript(restored.transcript);
+          setPhase('finished');
+        } else {
+          setPhase('ready');
         }
-      }
-
-      if (initialSessionId) {
         return;
       }
+
+      if (boot.kind === 'restore-failed') { setErrorMsg('Could not restore session. Please start a new one.'); return; }
 
       setIsNewSession(true);
       const result = await generatePETPictureDescriptionAction({ sessionId: initialSessionId });
@@ -481,7 +485,7 @@ export function PETPictureDescriptionPractice({
     }
 
     void init();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleStartRecording() {
     setAudioError(false);
@@ -812,6 +816,7 @@ export function PETPictureDescriptionPractice({
             <CelebrationCard
               score={coverageHits}
               scoreMax={8}
+              hideGrade
               feedback={t('pet.pictureDescription.celebrationFeedback')}
               onAction={onOpenDashboard}
               actionLabel={t('pet.pictureDescription.celebrationAction')}

@@ -6,7 +6,7 @@ interface IconProps {
 }
 
 /**
- * Cambridge KET (A2) — Listening skill.
+ * Cambridge KET (A2), Listening skill.
  * Headphones with organic sound waves curling outward from the right cup.
  */
 export function KETListeningIcon({ size = 28, className }: IconProps) {
@@ -33,7 +33,7 @@ export function KETListeningIcon({ size = 28, className }: IconProps) {
 }
 
 /**
- * Cambridge KET (A2) — Reading skill.
+ * Cambridge KET (A2), Reading skill.
  * Open book with a thin bookmark hanging from the right page.
  */
 export function KETReadingIcon({ size = 28, className }: IconProps) {
@@ -60,7 +60,7 @@ export function KETReadingIcon({ size = 28, className }: IconProps) {
 }
 
 /**
- * Cambridge KET (A2) — Writing skill.
+ * Cambridge KET (A2), Writing skill.
  * Pencil writing across a small sheet with a folded corner.
  */
 export function KETWritingIcon({ size = 28, className }: IconProps) {
@@ -88,7 +88,7 @@ export function KETWritingIcon({ size = 28, className }: IconProps) {
 }
 
 /**
- * Cambridge KET (A2) — Speaking skill.
+ * Cambridge KET (A2), Speaking skill.
  * Speech bubble with a small waveform pulsing inside.
  */
 export function KETSpeakingIcon({ size = 28, className }: IconProps) {

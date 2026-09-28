@@ -12,7 +12,6 @@ import { ChatInputBar } from '@/components/chat/ChatInputBar';
 import { BobAvatar } from '@/components/practice/yl/_shared';
 import { useCountdownTimer } from '@/hooks/useCountdownTimer';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
-import { validateRecordedAudio } from '@/lib/audio-guard';
 import {
   generateFCEPictureDescriptionAction,
   evaluateFCEPictureDescriptionAction,
@@ -429,7 +428,7 @@ function ModelAnswerSection({
   );
 }
 
-/** Cambridge B2 FCE Speaking Part 2 — Long Turn (Picture Description) practice component. */
+/** Cambridge B2 FCE Speaking Part 2, Long Turn (Picture Description) practice component. */
 export function FCEPictureDescriptionPractice({
   onBack,
   sessionId: initialSessionId,
@@ -455,7 +454,7 @@ export function FCEPictureDescriptionPractice({
     emotions: [],
     settings: [],
   });
-  const [languageBank, setLanguageBank] = useState<FCELongTurnResult['languageBank']>({
+  const [, setLanguageBank] = useState<FCELongTurnResult['languageBank']>({
     openers: [],
     contrast: [],
     speculation: [],
@@ -492,6 +491,7 @@ export function FCEPictureDescriptionPractice({
   const { isRecording, startRecording, stopRecording } = useAudioRecorder({
     onRecorded: (blob) => {
       const duration = recordingStartRef.current
+        // eslint-disable-next-line react-hooks/purity
         ? (Date.now() - recordingStartRef.current) / 1000
         : 60 - timer.seconds;
       setAudioBlob(blob);
@@ -569,7 +569,7 @@ export function FCEPictureDescriptionPractice({
     }
 
     void init();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleStartRecording() {
     setAudioError(false);
@@ -877,6 +877,7 @@ export function FCEPictureDescriptionPractice({
             <CelebrationCard
               score={coverageHits}
               scoreMax={6}
+              hideGrade
               feedback={t('fce.pictureDescription.celebrationFeedback')}
               onAction={onOpenDashboard}
               actionLabel={t('fce.pictureDescription.celebrationAction')}

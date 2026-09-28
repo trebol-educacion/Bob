@@ -200,6 +200,7 @@ function FeedbackPanel({
       <CelebrationCard
         score={coveredCount}
         scoreMax={4}
+        hideGrade
         feedback={t('pet.emailWriting.celebrationFeedback')}
         onAction={onOpenDashboard}
         actionLabel={t('pet.emailWriting.celebrationAction')}
@@ -253,7 +254,7 @@ function tryRestoreFromMessages(messages: StoredMessage[]): {
   return { prompt, userText, feedback };
 }
 
-/** PET Writing Part 1 — Email practice component. */
+/** PET Writing Part 1, Email practice component. */
 export function PETEmailWritingPractice({
   onBack,
   sessionId: initialSessionId,
@@ -314,7 +315,7 @@ export function PETEmailWritingPractice({
     }
 
     void init();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleSubmit() {
     if (!prompt || !text.trim()) return;

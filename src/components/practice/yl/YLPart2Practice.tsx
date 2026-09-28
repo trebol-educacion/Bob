@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * YLPart2Practice — Starters Part 2 (scene questions) / Movers Part 2 (info exchange).
+ * YLPart2Practice, Starters Part 2 (scene questions) / Movers Part 2 (info exchange).
  *
  * Starters P2: 1 contextual image. Bob asks simple scene questions. Child responds by audio.
  * Movers  P2: Info-exchange with 2 info cards. Bob asks target questions.
@@ -179,6 +179,7 @@ export function YLPart2Practice({
 
   useEffect(() => {
     if (phase === 'ready' && plan) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       void runTurn(0);
     }
   }, [phase, plan, runTurn]);

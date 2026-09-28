@@ -62,7 +62,7 @@ export async function startFCEListeningPart1Action(): Promise<
   if (!user) return { error: 'Not authenticated' };
 
   const { data: rows, error: fetchError } = await supabase
-    .from('bob_closed_items')
+    .from('closed_items')
     .select('id, variant_id, stimulus_audio_url, question, options, correct_key')
     .eq('framework', 'cambridge')
     .eq('exam_part', 'fce_listening_part1')
@@ -78,7 +78,7 @@ export async function startFCEListeningPart1Action(): Promise<
 
   const sessionResult = await createSessionAction({
     mode: 'cambridge_fce_listening_part1',
-    title: 'FCE Listening Part 1 — Short Extracts',
+    title: 'Listening Part 1, Short Extracts',
   });
 
   if (!sessionResult.data) {
@@ -123,7 +123,7 @@ export async function startFCEListeningPart1Action(): Promise<
 /**
  * Validates a single answer server-side and persists both the user answer
  * and Bob's per-turn evaluation message.
- * The correct_index is derived server-side — never sent to the client upfront.
+ * The correct_index is derived server-side, never sent to the client upfront.
  */
 export async function submitFCEListeningAnswerAction(
   session_id: string,
@@ -136,7 +136,7 @@ export async function submitFCEListeningAnswerAction(
   if (!user) return { error: 'Not authenticated' };
 
   const { data: item, error: itemError } = await supabase
-    .from('bob_closed_items')
+    .from('closed_items')
     .select('correct_key')
     .eq('id', item_id)
     .single();

@@ -13,8 +13,10 @@ export const LISTENING_CEFR_CUTOFF: ReadonlyArray<{
 ] as const;
 
 /**
- * Maps a raw listening score to a CEFR band and confidence level.
- * Normalizes score to a scale of 10 before applying the cutoff table.
+ * @deprecated Solo para el flujo de assessment por porcentaje (fallback de src/actions/placement/start.ts cuando no hay item_groups curados). El placement secuencial (T10.4, src/lib/placement/engine.ts) no usa corte por porcentaje global: corta por grupo (60%, src/lib/item-bank/scoring.ts) y por nivel (dos fallos, Q4).
+ * @param correct number
+ * @param total number
+ * @returns { band: AssessmentCefrBand; confidence: AssessmentConfidence }
  */
 export function mapListeningScoreToCefr(
   correct: number,

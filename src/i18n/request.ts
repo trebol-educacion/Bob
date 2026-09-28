@@ -14,6 +14,8 @@ const NAMESPACES = [
   'login',
   'mode_ui',
   'resultcard',
+  'placement',
+  'practice',
 ] as const;
 
 async function loadMessages(locale: string) {

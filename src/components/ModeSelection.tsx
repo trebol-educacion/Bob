@@ -1,5 +1,4 @@
-import React, { forwardRef, useState } from 'react';
-import Image from 'next/image';
+import React, { forwardRef } from 'react';
 import { motion } from 'motion/react';
 import { useTranslations } from 'next-intl';
 import {
@@ -20,6 +19,7 @@ import {
 import type { ModeKey, PracticeMode, CefrLevel, DynamicCard, CardVisibility } from '@/lib/types/practice';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import type { AvailableMode } from '@/contexts/OrganizationContext';
+import type { PracticeTrack } from '@/lib/modes';
 import { getModeIcon, getModeBadge, getModeSection, getModeTitle, getModeDescription, getModeSortWeight, getModeOfficialName, isGenericGroupedWithCambridge } from '@/lib/mode-ui';
 import { ListenAndPointIcon } from '@/components/icons/ModeIcons';
 import { LookAndAnswerIcon, TellTheStoryIcon, WhatsThisIcon, PersonalQuestionsIcon } from '@/components/icons/StartersIcons';
@@ -142,47 +142,6 @@ function ModeCard({ mode, icon, title, description, badge, officialName, visibil
   );
 }
 
-/**
- * Plays the Bob greeting video once on first load, then swaps to the
- * static avatar PNG. Avoids continuous CPU drain from looping playback.
- */
-function BobIntroAvatar() {
-  const [videoEnded, setVideoEnded] = useState(false);
-
-  return (
-    <div className="relative w-full h-full rounded-full bg-white shadow-xl ring-4 ring-white overflow-hidden">
-      <motion.div
-        animate={{ rotate: [0, -6, 6, -4, 0] }}
-        transition={{ delay: 0.7, duration: 1.4, ease: 'easeInOut' }}
-        className="w-full h-full relative"
-        style={{ transformOrigin: '50% 80%' }}
-      >
-        <Image
-          src="/bob_avatar.png"
-          alt="Bob"
-          fill
-          sizes="160px"
-          className="object-cover object-[50%_0%] scale-95 origin-bottom"
-          priority
-        />
-      </motion.div>
-      {!videoEnded && (
-        <video
-          autoPlay
-          muted
-          playsInline
-          preload="auto"
-          onEnded={() => setVideoEnded(true)}
-          onError={() => setVideoEnded(true)}
-          className="absolute inset-0 w-full h-full object-cover object-[50%_35%]"
-        >
-          <source src="/bob_hello.mp4" type="video/mp4" />
-        </video>
-      )}
-    </div>
-  );
-}
-
 interface ModeSelectionProps {
   onSelect: (mode: PracticeMode) => void;
   enabledModes?: ModeKey[];
@@ -190,23 +149,23 @@ interface ModeSelectionProps {
   cefrActiveLevel?: CefrLevel | null;
   cefrLevelLocked?: boolean;
   organizationName?: string;
+  track?: PracticeTrack;
 }
 
 export const ModeSelection = forwardRef<HTMLDivElement, ModeSelectionProps>(function ModeSelection(
-  { onSelect, cefrActiveLevel = null },
+  { onSelect, cefrActiveLevel = null, track = 'official' },
   selectorRef
 ) {
   const { allDynamicCards, resolvedCards } = useOrganization();
   const t = useTranslations('home.modeSelection');
+  const tTrack = useTranslations('mode_ui.track');
 
-  const HIDDEN_MODES = new Set<string>(['cambridge_flyers_part1']);
   const resolvedCardMap = new Map(resolvedCards.map(rc => [rc.mode_key, rc]));
 
   const visibleCards = allDynamicCards.filter(card => {
     const resolved = resolvedCardMap.get(card.mode_key);
     if (!resolved) return false;
     if (resolved.visibility !== 'enabled') return false;
-    if (HIDDEN_MODES.has(card.mode_key)) return false;
     if (card.framework === 'generic' && card.cefr_level !== null) {
       if (card.cefr_level !== cefrActiveLevel) return false;
     }
@@ -219,8 +178,6 @@ export const ModeSelection = forwardRef<HTMLDivElement, ModeSelectionProps>(func
   const frameworkCards = visibleCards.filter(
     card => card.framework !== 'generic' || isGenericGroupedWithCambridge(card),
   );
-
-  const showFreePractice = frameworkCards.length === 0;
 
   const sectionMap = new Map<string, DynamicCard[]>();
   for (const card of frameworkCards) {
@@ -270,7 +227,13 @@ export const ModeSelection = forwardRef<HTMLDivElement, ModeSelectionProps>(func
   return (
     <div className="relative w-full min-h-full overflow-y-auto bg-white">
       <div ref={selectorRef} className="relative z-10 w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-10 pt-4 pb-16 space-y-10">
-        {cefrActiveLevel && showFreePractice && genericCards.length > 0 && (
+        {track === 'free' && (
+          <p className="text-xs font-bold uppercase tracking-widest text-amber-600 bg-amber-50 border border-amber-200 rounded-xl px-4 py-2 inline-block">
+            {tTrack('disclaimer')}
+          </p>
+        )}
+
+        {cefrActiveLevel && track === 'free' && genericCards.length > 0 && (
           <motion.div
             key={`generic-${cefrActiveLevel}`}
             initial="hidden"
@@ -298,7 +261,7 @@ export const ModeSelection = forwardRef<HTMLDivElement, ModeSelectionProps>(func
           </motion.div>
         )}
 
-        {cefrActiveLevel && Array.from(sectionMap.entries()).map(([sectionName, cards], i) => (
+        {cefrActiveLevel && track === 'official' && Array.from(sectionMap.entries()).map(([sectionName, cards], i) => (
           <motion.div
             key={`${sectionName}-${cefrActiveLevel}`}
             initial="hidden"

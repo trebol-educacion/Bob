@@ -5,7 +5,7 @@ import { Type } from '@google/genai';
 import { MODELS } from '@/lib/models';
 import { FormativeFeedbackSchema, type FormativeFeedback } from '@/lib/types/practice';
 import { getPrompt } from '@/lib/prompts/db-prompts';
-import { persistMessage, readSessionMessages } from '@/lib/persist-activity';
+import { persistMessage, readSessionMessagesForCurrentOrUser } from '@/lib/persist-activity';
 import { getOrCreateCachedContent } from '@/lib/cache';
 import { callGemini, safeParseFallback } from '@/lib/gemini-client';
 
@@ -41,7 +41,7 @@ const FormativeFeedbackFallback: FormativeFeedback = {
   kind: 'formative',
   understood: false,
   highlights: [],
-  suggestions: ['Try again — we could not process your response.'],
+  suggestions: ['Try again, we could not process your response.'],
 };
 
 /** Generates a TOEFL Interview session plan with 4 progressive questions. */
@@ -119,12 +119,13 @@ The student answered this question:
 
 Listen to the audio and return ONLY a JSON object with these fields:
 - "kind": always "formative"
-- "understood": boolean — did the student communicate their main idea clearly?
+- "understood": boolean, did the student communicate their main idea clearly?
 - "highlights": array of 1-3 strings celebrating specific strengths (e.g. "Good use of examples", "Clear main idea stated at the start")
 - "suggestions": array of 1-3 specific improvement tips (e.g. "Try to elaborate more on your second point", "Use discourse markers like 'firstly' and 'however'")
 - "model_answer": one example sentence or phrase showing a strong way to open or conclude this answer
+- "rubric": an object with four integer scores 0-4 each: { "task_coverage": 0-4, "grammar": 0-4, "vocabulary": 0-4, "fluency": 0-4 }
 
-Return ONLY valid JSON. No score, no band, no percentage.`;
+Return ONLY valid JSON. No score, no band, no percentage outside the rubric object.`;
 
   const result = await callGemini(
     { promptKey: 'toefl_interview_b2_formative', model: MODELS.FLASH_LITE_PREVIEW },
@@ -139,7 +140,7 @@ Return ONLY valid JSON. No score, no band, no percentage.`;
           ],
         },
       ],
-      config: { responseMimeType: 'application/json' },
+      config: { responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
     })
   );
 
@@ -234,6 +235,7 @@ export async function persistToeflSessionSummaryAction(
       questionsAnswered: count,
       highlights: feedbacks.flatMap((f) => f.highlights),
       suggestions: feedbacks.flatMap((f) => f.suggestions),
+      is_final: true,
     },
   });
   if ('error' in result) {
@@ -246,5 +248,5 @@ export async function getToeflInterviewSessionMessagesAction(
   sessionId: string,
   userId: string
 ) {
-  return readSessionMessages(sessionId, userId);
+  return readSessionMessagesForCurrentOrUser(sessionId, userId);
 }

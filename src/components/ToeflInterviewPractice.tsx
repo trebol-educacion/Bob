@@ -6,8 +6,8 @@ import { ArrowLeft, Mic, Square, RotateCcw, ChevronRight, ClipboardList } from '
 import { CountdownTimer } from '@/components/CountdownTimer';
 import { useCountdown } from '@/hooks/useCountdown';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
-import { blobToBase64, pcmToWavBase64 } from '@/lib/audio';
-import { generateSpeechAction } from '@/actions/gemini';
+import { blobToBase64 } from '@/lib/audio';
+import { useTTS } from '@/hooks/useTTS';
 import { createSessionAction } from '@/actions/sessions';
 import {
   generateToeflInterviewAction,
@@ -80,7 +80,7 @@ function FormativeFeedbackCard({ feedback }: { feedback: FormativeFeedback }) {
           style={{ background: 'color-mix(in oklab, var(--color-bob-brand) 8%, white)' }}
         >
           <p className="text-xs font-bold text-bob-brand uppercase tracking-widest">{t('example')}</p>
-          <p className="text-sm text-gray-800 italic">"{feedback.model_answer}"</p>
+          <p className="text-sm text-gray-800 italic">&quot;{feedback.model_answer}&quot;</p>
         </div>
       )}
     </div>
@@ -102,11 +102,22 @@ export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) 
   const [error, setError] = useState<string | null>(null);
 
   const recordedBlobRef = useRef<Blob | null>(null);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const { play: playTTS, stop: stopTTS } = useTTS();
   const autoStartedRef = useRef(false);
   const sessionCreatedRef = useRef(false);
   const sessionIdRef = useRef<string | null>(null);
   const userIdRef = useRef<string | null>(null);
+
+  const { startRecording, stopRecording } = useAudioRecorder({
+    onRecorded: (blob) => {
+      recordedBlobRef.current = blob;
+      setSubPhase('evaluating');
+    },
+    onError: (err) => {
+      console.error('Recording error:', err);
+      setError(t('common.micError'));
+    },
+  });
 
   const prepCountdown = useCountdown({
     seconds: PREP_SECONDS,
@@ -121,17 +132,6 @@ export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) 
       stopRecording();
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []),
-  });
-
-  const { isRecording, startRecording, stopRecording } = useAudioRecorder({
-    onRecorded: (blob) => {
-      recordedBlobRef.current = blob;
-      setSubPhase('evaluating');
-    },
-    onError: (err) => {
-      console.error('Recording error:', err);
-      setError(t('common.micError'));
-    },
   });
 
   useEffect(() => {
@@ -151,7 +151,7 @@ export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) 
     }
     load();
     return () => { cancelled = true; };
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleStart = useCallback(async () => {
     if (!plan) return;
@@ -160,7 +160,7 @@ export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) 
       const sessionResult = await createSessionAction({
         mode: 'toefl_interview',
         topic: plan.topic_id,
-        title: `TOEFL Interview — ${plan.topic_name}`,
+        title: `TOEFL Interview, ${plan.topic_name}`,
       });
       if (sessionResult.data) {
         sessionIdRef.current = sessionResult.data.id;
@@ -184,38 +184,19 @@ export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) 
     const question = plan.questions[currentIndex];
 
     async function playQuestion() {
-      try {
-        const tts = await generateSpeechAction(question.text);
-        if (cancelled) return;
-        const wavUrl = pcmToWavBase64(tts.data, tts.mimeType);
-        const audio = new Audio(wavUrl);
-        audioRef.current = audio;
-        setSubPhase('listening');
-
-        audio.onended = () => {
-          if (!cancelled) setSubPhase('prep');
-        };
-        audio.onerror = () => {
-          if (!cancelled) setSubPhase('prep');
-        };
-        audio.play().catch(() => {
-          if (!cancelled) setSubPhase('prep');
-        });
-      } catch {
-        if (!cancelled) setSubPhase('prep');
-      }
+      await playTTS(question.text, {
+        onStart: () => {
+          if (!cancelled) setSubPhase('listening');
+        },
+      });
+      if (!cancelled) setSubPhase('prep');
     }
 
     playQuestion();
 
     return () => {
       cancelled = true;
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current.onended = null;
-        audioRef.current.onerror = null;
-        audioRef.current = null;
-      }
+      stopTTS();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, subPhase, currentIndex]);

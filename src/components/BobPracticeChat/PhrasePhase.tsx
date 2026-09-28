@@ -29,7 +29,7 @@ export function PhrasePhase({
   handleTopicSubmit,
   handleAudioStart,
   stopRecording,
-  isRecording,
+  isRecording: _isRecording,
   handleNext,
   handleRetry,
   dynamicPhrases,

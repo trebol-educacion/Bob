@@ -13,6 +13,7 @@ import {
   type PETListeningItem,
 } from '@/actions/modes/pet-listening-part2';
 import type { StoredMessage } from '@/actions/messages';
+import { resolveActivityBoot } from '@/lib/activity/boot';
 
 const ITEMS_PER_SESSION = 6;
 const MAX_PLAYS = 2;
@@ -144,7 +145,7 @@ function ProgressDots({
 }
 
 function AudioButton({
-  audioUrl,
+  audioUrl: _audioUrl,
   playsUsed,
   onPlay,
 }: {
@@ -181,7 +182,7 @@ function AudioButton({
   );
 }
 
-/** PET B1 Listening Part 2 — short monologue + 4-option multiple choice. */
+/** PET B1 Listening Part 2, short monologue + 4-option multiple choice. */
 export function PETMultipleChoicePractice({
   onBack,
   sessionId: initialSessionId,
@@ -208,24 +209,23 @@ export function PETMultipleChoicePractice({
     initStartedRef.current = true;
 
     async function init() {
-      if (initialMessages && initialMessages.length > 0) {
-        const restored = tryRestore(initialMessages);
-        if (restored) {
-          setItems(restored.items);
-          setTurns(restored.turns);
+      const boot = resolveActivityBoot({ initialMessages, sessionId: initialSessionId, tryRestore });
+      if (boot.kind === 'restore') {
+        const restored = boot.data;
+        setItems(restored.items);
+        setTurns(restored.turns);
 
-          if (restored.finalScore !== null) {
-            setFinalScore(restored.finalScore);
-            setPhase('finished');
-          } else {
-            setCurrentIdx(restored.turns.length);
-            setPhase('ready');
-          }
-          return;
+        if (restored.finalScore !== null) {
+          setFinalScore(restored.finalScore);
+          setPhase('finished');
+        } else {
+          setCurrentIdx(restored.turns.length);
+          setPhase('ready');
         }
+        return;
       }
 
-      if (initialSessionId) {
+      if (boot.kind === 'restore-failed') {
         setErrorMsg('Could not restore session. Please start a new one.');
         setPhase('error');
         return;
@@ -247,7 +247,7 @@ export function PETMultipleChoicePractice({
     }
 
     void init();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handlePlay = useCallback(() => {
     const item = items[currentIdx];

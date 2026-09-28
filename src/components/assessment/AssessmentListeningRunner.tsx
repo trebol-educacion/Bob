@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { ChevronRight, RotateCcw, Volume2 } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import { submitAssessmentListeningAction } from '@/actions/assessment';
 import { BobMascotLoader } from '@/components/chat/BobMascotLoader';
 import type { AssessmentListeningItem } from '@/actions/assessment';
@@ -17,6 +18,7 @@ interface Props {
 const MAX_PLAYS = 2;
 
 export function AssessmentListeningRunner({ assessment_id, items, onResult, onCancel }: Props) {
+  const tPlacement = useTranslations('placement');
   const [currentIdx, setCurrentIdx] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
@@ -26,6 +28,15 @@ export function AssessmentListeningRunner({ assessment_id, items, onResult, onCa
   const [failMessage, setFailMessage] = useState<string | null>(null);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+    };
+  }, []);
 
   const currentItem = items[currentIdx];
   const isLastItem = currentIdx === items.length - 1;
@@ -47,25 +58,6 @@ export function AssessmentListeningRunner({ assessment_id, items, onResult, onCa
     setSelectedKey(key);
   }, []);
 
-  const handleNext = useCallback(() => {
-    if (!selectedKey || !currentItem) return;
-
-    const updatedAnswers = { ...answers, [currentItem.id]: selectedKey };
-    setAnswers(updatedAnswers);
-
-    if (isLastItem) {
-      handleSubmit(updatedAnswers);
-    } else {
-      setCurrentIdx(prev => prev + 1);
-      setSelectedKey(null);
-      setPlaysUsed(0);
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current = null;
-      }
-    }
-  }, [selectedKey, currentItem, answers, isLastItem]);
-
   const handleSubmit = useCallback(async (finalAnswers: Record<string, string>) => {
     setSubmitting(true);
 
@@ -85,6 +77,25 @@ export function AssessmentListeningRunner({ assessment_id, items, onResult, onCa
 
     onResult(result.result);
   }, [assessment_id, onResult]);
+
+  const handleNext = useCallback(() => {
+    if (!selectedKey || !currentItem) return;
+
+    const updatedAnswers = { ...answers, [currentItem.id]: selectedKey };
+    setAnswers(updatedAnswers);
+
+    if (isLastItem) {
+      handleSubmit(updatedAnswers);
+    } else {
+      setCurrentIdx(prev => prev + 1);
+      setSelectedKey(null);
+      setPlaysUsed(0);
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+    }
+  }, [selectedKey, currentItem, answers, isLastItem, handleSubmit]);
 
   const handleRetry = useCallback(() => {
     setCurrentIdx(0);
@@ -200,7 +211,7 @@ export function AssessmentListeningRunner({ assessment_id, items, onResult, onCa
       </button>
 
       <button onClick={onCancel} className="text-sm text-gray-400 hover:text-gray-600 transition">
-        Cancel assessment
+        {tPlacement('cancelButton')}
       </button>
     </div>
   );

@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { motion } from 'motion/react';
 import { Button } from './Button';
 import { useTranslations } from 'next-intl';
 import { Zap, Coffee, ShoppingBag, Palmtree, Utensils, Plane, Briefcase, Dumbbell, GraduationCap, Users } from 'lucide-react';

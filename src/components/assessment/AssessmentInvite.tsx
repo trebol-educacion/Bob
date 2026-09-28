@@ -2,8 +2,11 @@
 
 import React from 'react';
 import { motion } from 'motion/react';
-import { ArrowLeft, Headphones, Mic2, BookOpen, PenLine } from 'lucide-react';
+import { useTranslations } from 'next-intl';
+import { ArrowLeft, Headphones, Mic2, BookOpen, PenLine, Hourglass } from 'lucide-react';
 import { useOrganization } from '@/hooks/useOrganization';
+import { resolveEffectiveLevel } from '@/lib/levels/effective-level';
+import { resolveLevelPolicy } from '@/lib/levels/level-policy';
 import type { Skill } from '@/lib/types/skills';
 import type { CefrLevel } from '@/lib/types/practice';
 
@@ -88,23 +91,33 @@ const SKILL_LABEL: Record<Skill, string> = {
 
 /** Invitation screen shown when a student has no level (or is re-evaluating) for a skill. */
 export function AssessmentInvite({ skill, onStartAssessment, onPickLevel, onBack }: Props) {
-  const { skillLevels, assessmentCooldownDays } = useOrganization();
+  const { skillLevels, assessmentCooldownDays, pendingAssessments, cefrActiveLevel, cefrLevelLocked } = useOrganization();
+  const t = useTranslations('home.assessmentInvite');
+  const tPlacement = useTranslations('placement');
+
+  const levelPolicy = resolveLevelPolicy({ cefrLevelLocked, cefrActiveLevel, testerOverrideEnabled: false });
+  const { placementPending, locked } = resolveEffectiveLevel(
+    skillLevels, cefrActiveLevel, skill, pendingAssessments, levelPolicy,
+  );
+  const allowManualSelection = !locked || levelPolicy.allowManualSelection;
 
   const existingLevel = skillLevels?.[skill];
   const hasExistingLevel = Boolean(existingLevel?.cefr_level);
+
+  const [now] = React.useState(() => Date.now());
 
   const cooldownActive = (() => {
     if (!existingLevel?.last_assessment_at) return false;
     const lastAt = new Date(existingLevel.last_assessment_at).getTime();
     const cooldownMs = assessmentCooldownDays * 24 * 60 * 60 * 1000;
-    return Date.now() - lastAt < cooldownMs;
+    return now - lastAt < cooldownMs;
   })();
 
   const cooldownInfo = (() => {
     if (!cooldownActive || !existingLevel?.last_assessment_at) return { days: 0, availableAt: null as Date | null };
     const lastAt = new Date(existingLevel.last_assessment_at).getTime();
     const cooldownMs = assessmentCooldownDays * 24 * 60 * 60 * 1000;
-    const remaining = lastAt + cooldownMs - Date.now();
+    const remaining = lastAt + cooldownMs - now;
     const days = Math.ceil(remaining / (24 * 60 * 60 * 1000));
     return { days, availableAt: new Date(lastAt + cooldownMs) };
   })();
@@ -148,57 +161,71 @@ export function AssessmentInvite({ skill, onStartAssessment, onPickLevel, onBack
             </h2>
             <p className="text-sm text-gray-500 leading-snug font-medium">
               {hasExistingLevel
-                ? `Your current level is ${existingLevel!.cefr_level.toUpperCase()}. Do a short assessment to see if you've improved.`
-                : `Complete a short assessment so Bob can personalise your practice for ${skillLabel}.`}
+                ? `Your current level is ${existingLevel!.cefr_level.toUpperCase()}. Do a short level test to see if you've improved.`
+                : `Complete a short level test so Bob can personalise your practice for ${skillLabel}.`}
             </p>
           </div>
 
           <div className="flex flex-col gap-3 pt-1">
-            <motion.button
-              onClick={cooldownActive ? undefined : onStartAssessment}
-              disabled={cooldownActive}
-              whileHover={cooldownActive ? {} : { scale: 1.02 }}
-              whileTap={cooldownActive ? {} : { scale: 0.98 }}
-              className={[
-                'w-full py-3 px-5 rounded-2xl font-bold text-sm transition-colors shadow-sm text-white',
-                cooldownActive
-                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                  : theme.button,
-              ].join(' ')}
-            >
-              {cooldownActive
-                ? daysRemaining > 14 && cooldownInfo.availableAt
-                  ? `Available on ${cooldownInfo.availableAt.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`
-                  : `Available in ${daysRemaining} day${daysRemaining !== 1 ? 's' : ''}`
-                : 'Start Assessment'}
-            </motion.button>
-
-            {hasExistingLevel ? (
-              <button
-                onClick={() => onPickLevel(existingLevel!.cefr_level as CefrLevel)}
-                className={`w-full py-2.5 px-5 rounded-2xl font-semibold text-sm text-gray-600 ${theme.buttonHover} ${theme.textHover} transition-colors border border-gray-200 ${theme.borderHover}`}
-              >
-                Keep current level ({existingLevel!.cefr_level.toUpperCase()})
-              </button>
-            ) : (
-              <div className="space-y-2">
-                <p className="text-xs font-bold text-gray-400 text-center uppercase tracking-wide">
-                  or start at a level
-                </p>
-                <div className="grid grid-cols-5 gap-2">
-                  {PICKABLE_LEVELS.map((lvl) => (
-                    <motion.button
-                      key={lvl}
-                      whileHover={{ scale: 1.04 }}
-                      whileTap={{ scale: 0.96 }}
-                      onClick={() => onPickLevel(lvl)}
-                      className={`py-2 rounded-xl font-bold text-xs text-gray-700 bg-white ${theme.buttonHover} ${theme.textHover} border border-gray-200 ${theme.borderHover} transition-colors`}
-                    >
-                      {LEVEL_LABEL[lvl]}
-                    </motion.button>
-                  ))}
+            {placementPending ? (
+              <div className="flex items-start gap-3 rounded-2xl border border-gray-200 bg-gray-50 p-4">
+                <Hourglass className="w-5 h-5 text-gray-400 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <p className="text-sm font-bold text-gray-700">{t('pendingTitle')}</p>
+                  <p className="text-xs text-gray-500 leading-snug">{t('pendingBody')}</p>
                 </div>
               </div>
+            ) : (
+              <>
+                <motion.button
+                  onClick={cooldownActive ? undefined : onStartAssessment}
+                  disabled={cooldownActive}
+                  whileHover={cooldownActive ? {} : { scale: 1.02 }}
+                  whileTap={cooldownActive ? {} : { scale: 0.98 }}
+                  className={[
+                    'w-full py-3 px-5 rounded-2xl font-bold text-sm transition-colors shadow-sm text-white',
+                    cooldownActive
+                      ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                      : theme.button,
+                  ].join(' ')}
+                >
+                  {cooldownActive
+                    ? daysRemaining > 14 && cooldownInfo.availableAt
+                      ? `Available on ${cooldownInfo.availableAt.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`
+                      : `Available in ${daysRemaining} day${daysRemaining !== 1 ? 's' : ''}`
+                    : tPlacement('startButton')}
+                </motion.button>
+
+                {allowManualSelection && (
+                  hasExistingLevel ? (
+                    <button
+                      onClick={() => onPickLevel(existingLevel!.cefr_level as CefrLevel)}
+                      className={`w-full py-2.5 px-5 rounded-2xl font-semibold text-sm text-gray-600 ${theme.buttonHover} ${theme.textHover} transition-colors border border-gray-200 ${theme.borderHover}`}
+                    >
+                      Keep current level ({existingLevel!.cefr_level.toUpperCase()})
+                    </button>
+                  ) : (
+                    <div className="space-y-2">
+                      <p className="text-xs font-bold text-gray-400 text-center uppercase tracking-wide">
+                        or start at a level
+                      </p>
+                      <div className="grid grid-cols-5 gap-2">
+                        {PICKABLE_LEVELS.map((lvl) => (
+                          <motion.button
+                            key={lvl}
+                            whileHover={{ scale: 1.04 }}
+                            whileTap={{ scale: 0.96 }}
+                            onClick={() => onPickLevel(lvl)}
+                            className={`py-2 rounded-xl font-bold text-xs text-gray-700 bg-white ${theme.buttonHover} ${theme.textHover} border border-gray-200 ${theme.borderHover} transition-colors`}
+                          >
+                            {LEVEL_LABEL[lvl]}
+                          </motion.button>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                )}
+              </>
             )}
           </div>
         </motion.div>

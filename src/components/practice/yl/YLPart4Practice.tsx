@@ -1,11 +1,11 @@
 'use client';
 
 /**
- * YLPart4Practice — Personal questions. No images.
+ * YLPart4Practice, Personal questions. No images.
  *
  * Covers:
- *   - Starters Part 4: 4–5 simple personal questions (What's your name? How old are you?)
- *   - Movers   Part 4: 4–5 personal questions with more detail
+ *   - Starters Part 4: 4-5 simple personal questions (What's your name? How old are you?)
+ *   - Movers   Part 4: 4-5 personal questions with more detail
  *   - Movers   Part 5: 5 personal questions A1 level (describe a picture verbally)
  *
  * `part` prop distinguishes prompt key used by the server action.
@@ -175,6 +175,7 @@ export function YLPart4Practice({
 
   useEffect(() => {
     if (phase === 'ready' && plan) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       void runTurn(0);
     }
   }, [phase, plan, runTurn]);
@@ -269,7 +270,7 @@ export function YLPart4Practice({
     if (exam === 'starters' && part === 4) return t('part4.startersPersonalLabel');
     if (exam === 'movers' && part === 4) return t('part4.moversPersonalLabel');
     if (exam === 'movers' && part === 5) return t('part4.moversDescribeLabel');
-    return `Cambridge ${exam} Part ${part}`;
+    return `Part ${part}`;
   })();
 
   const headerTitle = (() => {

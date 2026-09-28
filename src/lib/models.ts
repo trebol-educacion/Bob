@@ -1,12 +1,12 @@
 /**
  * Gemini model identifiers used across the application.
- * Kept as separate constants — do NOT unify; each model has distinct capabilities.
+ * Kept as separate constants, do NOT unify; each model has distinct capabilities.
  */
 
 /** Display label shown in the chat footer badge: "BOB • Basado en {ACTIVE_MODEL_LABEL}" */
 export const ACTIVE_MODEL_LABEL = 'Gemini 2.5 Flash';
 
-/** TTS model — generates native audio output */
+/** TTS model, generates native audio output */
 export const MODELS = {
   TTS: 'gemini-2.5-flash-preview-tts',
 
@@ -22,6 +22,13 @@ export const MODELS = {
    * Kept as a distinct constant for now; converges with FLASH_LITE_PREVIEW in B6.
    */
   FLASH_LITE_LATEST: 'gemini-2.5-flash',
+
+  /**
+   * Genuinely low-latency text model for simple structured exercise generation.
+   * Used to keep activity generation off the critical path; do NOT use for
+   * grading or pronunciation where full Flash accuracy matters.
+   */
+  FLASH_LITE: 'gemini-2.5-flash-lite',
 
   /** Image generation via generateContent + IMAGE modality. */
   IMAGE: 'gemini-2.5-flash-image',

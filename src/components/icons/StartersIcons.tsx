@@ -6,7 +6,7 @@ interface IconProps {
 }
 
 /**
- * "Look and Answer" — Cambridge YL Starters Part 2.
+ * "Look and Answer", Cambridge YL Starters Part 2.
  * A friendly eye with a small question mark floating beside it.
  */
 export function LookAndAnswerIcon({ size = 28, className }: IconProps) {
@@ -33,7 +33,7 @@ export function LookAndAnswerIcon({ size = 28, className }: IconProps) {
 }
 
 /**
- * "Tell the Story" — Cambridge YL Starters Part 3.
+ * "Tell the Story", Cambridge YL Starters Part 3.
  * Four small comic-strip panels in a row with a forward arrow underneath.
  */
 export function TellTheStoryIcon({ size = 28, className }: IconProps) {
@@ -64,7 +64,7 @@ export function TellTheStoryIcon({ size = 28, className }: IconProps) {
 }
 
 /**
- * "What's This?" — Cambridge YL Starters Part 3.
+ * "What's This?", Cambridge YL Starters Part 3.
  * A hand holding an object card with a floating question mark.
  */
 export function WhatsThisIcon({ size = 28, className }: IconProps) {
@@ -91,7 +91,7 @@ export function WhatsThisIcon({ size = 28, className }: IconProps) {
 }
 
 /**
- * "Personal Questions" — Cambridge YL Starters Part 4.
+ * "Personal Questions", Cambridge YL Starters Part 4.
  * A chat bubble with a small child silhouette inside, suggesting "tell me about you".
  */
 export function PersonalQuestionsIcon({ size = 28, className }: IconProps) {

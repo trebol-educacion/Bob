@@ -18,7 +18,7 @@ export async function getOrganizationForUser(userId: string): Promise<Organizati
   const supabase = createSupabaseBrowser();
 
   const { data: profile } = await supabase
-    .from('profiles')
+    .schema('public').from('profiles')
     .select('organization_id')
     .eq('id', userId)
     .single();
@@ -26,7 +26,7 @@ export async function getOrganizationForUser(userId: string): Promise<Organizati
   if (!profile?.organization_id) return null;
 
   const { data: org } = await supabase
-    .from('organizations')
+    .schema('public').from('organizations')
     .select(
       'id, name, slug, logo_url, primary_color, secondary_color, accent_color, background_color, text_color, is_bob_enabled, is_mia_enabled'
     )

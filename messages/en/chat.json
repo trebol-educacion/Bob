@@ -3,8 +3,8 @@
     "poweredBy": "BOB • Powered by {modelName}"
   },
   "conversation": {
-    "headerTitleChat": "Bob — Chat",
-    "headerTitleConversation": "Bob — Conversation",
+    "headerTitleChat": "Bob, Chat",
+    "headerTitleConversation": "Bob, Conversation",
     "modeLabelEvaluation": "COMPREHENSION EVALUATION",
     "modeLabelConversation": "CONVERSATION",
     "placeholderTopic": "Type your topic here…",
@@ -38,7 +38,8 @@
     "errors": {
       "microphoneAccess": "Please allow microphone access.",
       "conversationError": "Conversation error. Please try again.",
-      "sendMessageError": "Error sending the message. Please try again."
+      "sendMessageError": "Error sending the message. Please try again.",
+      "topicNotAppropriate": "Let's pick a different topic for our conversation."
     }
   },
   "tipsModal": {
@@ -80,11 +81,11 @@
   "bobPractice": {
     "backAriaLabel": "Go back",
     "headerImage": {
-      "title": "Bob — Images",
+      "title": "Bob, Images",
       "subtitle": "DESCRIBE WHAT YOU SEE"
     },
     "headerSituation": {
-      "title": "Bob — Situations",
+      "title": "Bob, Situations",
       "subtitle": "PRONUNCIATION IN ENGLISH"
     },
     "footerModeImage": "IMAGE MODE ACTIVE",

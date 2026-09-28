@@ -27,7 +27,6 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { GoogleGenAI } from '@google/genai';
-import * as fs from 'fs';
 import * as path from 'path';
 import * as dotenv from 'dotenv';
 
@@ -71,11 +70,13 @@ function pcmToWav(pcm: Buffer, sampleRate: number, channels: number, bitDepth: n
 }
 
 async function main() {
-  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
+    db: { schema: 'bob' },
+  });
   const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
 
   const { data: items, error } = await supabase
-    .from('bob_closed_items')
+    .from('closed_items')
     .select('id, variant_id, cefr_level, stimulus_audio_url, transcript, metadata')
     .eq('skill', 'listening')
     .eq('status', 'enabled')

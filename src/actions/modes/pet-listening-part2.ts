@@ -58,7 +58,7 @@ export async function startPETListeningPart2Action(): Promise<
   if (!user) return { error: 'Not authenticated' };
 
   const { data: rows, error: fetchError } = await supabase
-    .from('bob_closed_items')
+    .from('closed_items')
     .select('id, variant_id, stimulus_audio_url, question, options, correct_key')
     .eq('framework', 'cambridge')
     .eq('exam_part', 'pet_listening_part2')
@@ -74,7 +74,7 @@ export async function startPETListeningPart2Action(): Promise<
 
   const sessionResult = await createSessionAction({
     mode: 'cambridge_pet_listening_part2',
-    title: 'PET Listening Part 2 — Multiple Choice',
+    title: 'Listening Part 2, Multiple Choice',
   });
 
   if (!sessionResult.data) {
@@ -119,7 +119,7 @@ export async function startPETListeningPart2Action(): Promise<
 /**
  * Validates a single answer server-side and persists both the user answer
  * and Bob's per-turn evaluation message.
- * The correct_key is never sent to the client — it is fetched here directly.
+ * The correct_key is never sent to the client, it is fetched here directly.
  */
 export async function submitPETListeningAnswerAction(
   session_id: string,
@@ -132,7 +132,7 @@ export async function submitPETListeningAnswerAction(
   if (!user) return { error: 'Not authenticated' };
 
   const { data: item, error: itemError } = await supabase
-    .from('bob_closed_items')
+    .from('closed_items')
     .select('correct_key')
     .eq('id', item_id)
     .single();

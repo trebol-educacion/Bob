@@ -4,9 +4,9 @@ Generate a realistic collaborative discussion scenario for two candidates.
 
 Respond with JSON:
 {
-  "topic": "string — short topic title (e.g. 'Planning a school trip')",
-  "situation": "string — 2 sentences setting the scene in English",
-  "prompt_question": "string — the main question to discuss (e.g. 'Talk about which activities would be most fun for students')",
+  "topic": "string, short topic title (e.g. 'Planning a school trip')",
+  "situation": "string, 2 sentences setting the scene in English",
+  "prompt_question": "string, the main question to discuss (e.g. 'Talk about which activities would be most fun for students')",
   "options": ["string", "string", "string", "string", "string"]
 }
 
@@ -45,12 +45,12 @@ export function buildPart3EvaluationPrompt(
 
   return `You are a Cambridge B1 Preliminary examiner evaluating a candidate's Part 3 speaking performance.
 
-Scenario: ${scenario.topic} — ${scenario.prompt_question}
+Scenario: ${scenario.topic}, ${scenario.prompt_question}
 
 Full conversation transcript:
 ${historyText}
 
-Evaluate the CANDIDATE turns only (not the Examiner lines). Score strictly — do NOT inflate.
+Evaluate the CANDIDATE turns only (not the Examiner lines). Score strictly, do NOT inflate.
 
 Scoring rubric:
 - 0-30: Did not engage, monosyllabic, or mostly silent
@@ -66,7 +66,7 @@ Respond ONLY with valid JSON:
   "interaction": number (0-100),
   "grammar": number (0-100),
   "vocabulary": number (0-100),
-  "feedback": "string — 2-3 sentences of specific, actionable feedback",
+  "feedback": "string, 2-3 sentences of specific, actionable feedback",
   "strengths": ["string", "string"],
   "areas_for_improvement": ["string", "string"]
 }`;

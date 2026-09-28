@@ -6,9 +6,9 @@ interface IconProps {
 }
 
 /**
- * "Listen and Point" — Cambridge YL Starters Part 1.
+ * "Listen and Point", Cambridge YL Starters Part 1.
  * A pointing hand with a small sparkle, in a friendly thick-line style.
- * Custom artwork — not a generic lucide glyph.
+ * Custom artwork, not a generic lucide glyph.
  */
 export function ListenAndPointIcon({ size = 28, className }: IconProps) {
   return (

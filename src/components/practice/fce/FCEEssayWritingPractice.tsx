@@ -252,6 +252,7 @@ function FeedbackPanel({
       <CelebrationCard
         score={coveredCount}
         scoreMax={3}
+        hideGrade
         feedback={t('fce.essay.celebrationFeedback')}
         onAction={onOpenDashboard}
         actionLabel={t('fce.essay.celebrationAction')}
@@ -309,7 +310,7 @@ function tryRestoreFromMessages(messages: StoredMessage[]): {
   return { prompt, userText, feedback };
 }
 
-/** FCE Writing Part 1 — Compulsory Essay practice component. */
+/** FCE Writing Part 1, Compulsory Essay practice component. */
 export function FCEEssayWritingPractice({
   onBack,
   sessionId: initialSessionId,
@@ -373,7 +374,7 @@ export function FCEEssayWritingPractice({
     }
 
     void init();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleSubmit() {
     if (!prompt || !text.trim()) return;

@@ -1,0 +1,77 @@
+{
+  "home": {
+    "heading": "Hi! What shall we do today?",
+    "subtitle": "Pick where you want to start.",
+    "exam": {
+      "title": "Exam",
+      "subtitle": "Cambridge and TOEFL, by skill and part.",
+      "level": "Your level: {level}"
+    },
+    "practice": {
+      "title": "Practice",
+      "subtitle": "Talk, listen and describe, any topic, straight away."
+    }
+  },
+  "starting": "Bob is getting ready...",
+  "scenarioTitle": "Scenario",
+  "listenAudioLabel": "Listen to hear the message",
+  "repeatAudioLabel": "Listen again",
+  "playAudioLabel": "Listen",
+  "showHintLabel": "Show hint",
+  "hideTextLabel": "Hide text",
+  "image": {
+    "loading": "Picture is loading...",
+    "unavailable": "Picture unavailable, let's keep talking"
+  },
+  "controls": {
+    "placeholder": "Type your answer...",
+    "modelAnswer": "Show me an answer",
+    "exit": "Exit",
+    "finish": "Finish",
+    "recording": "Recording"
+  },
+  "pendingTurn": {
+    "processingVoice": "Processing your voice...",
+    "stillWorking": "Still working on it, thanks for waiting..."
+  },
+  "modes": {
+    "conversation": "Conversation",
+    "situation": "Situation",
+    "picture": "Picture"
+  },
+  "modeSelect": {
+    "heading": "Choose how to practice",
+    "subtitle": "Pick a mode and start talking with Bob right away.",
+    "conversation": {
+      "title": "Conversation",
+      "subtitle": "Chat about anything, at your own pace."
+    },
+    "situation": {
+      "title": "Situation",
+      "subtitle": "Step into a scenario and react in English."
+    },
+    "picture": {
+      "title": "Picture",
+      "subtitle": "Describe what you see and keep the story going."
+    }
+  },
+  "errors": {
+    "conversationError": "Something went wrong with that turn.",
+    "sendMessageError": "Bob couldn't answer just now.",
+    "startError": "Bob couldn't start practice just now.",
+    "retry": "Try again",
+    "dismiss": "Dismiss"
+  },
+  "finished": {
+    "title": "Practice finished",
+    "scoreLabel": "This is practice, it doesn't count towards your level.",
+    "again": "Practice again",
+    "home": "Back home",
+    "criteria": {
+      "participation": "Speaking",
+      "fluency": "Fluency",
+      "independence": "Independence",
+      "comprehension": "Depth"
+    }
+  }
+}

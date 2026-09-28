@@ -1,0 +1,14 @@
+# Configuracion del CLI de Supabase para este repo.
+#
+# Bob NO es dueño del esquema: las migraciones viven en noobe-hub
+# (ver supabase/MIGRACIONES.md). Aqui solo se declara la Edge Function, para que
+# `supabase functions deploy` no cambie su configuracion por omision.
+
+project_id = "ftdhbnvbjxyaqoruprcn"
+
+[functions.assessment-eval-worker]
+# La invoca un trigger de la base (notify_assessment_eval_worker) mandando en
+# Authorization el JWT guardado en bob.app_config -> worker_auth, asi que la
+# verificacion de JWT debe quedar activa. Sin este bloque, el CLI la fijaba a
+# gusto en cada deploy: la v7 estaba en false y la v8 paso a true sin intencion.
+verify_jwt = true

@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * YLPointingPractice — Cambridge Starters Part 1 (Pointing).
+ * YLPointingPractice, Cambridge Starters Part 1 (Pointing).
  *
  * El alumno ESCUCHA una nota de voz ("Point to the doll") y CLICA la imagen
  * correcta entre 4 opciones. No hay grabación de audio: la interacción es
@@ -9,7 +9,6 @@
  */
 
 import React, { useEffect, useRef, useState } from 'react';
-import { motion } from 'motion/react';
 import { ArrowLeft } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { ListenAndPointIcon } from '@/components/icons/ModeIcons';
@@ -28,16 +27,12 @@ import type { YLExam, YLPlan } from '@/lib/types/yl';
 import type { EvalResponse, ModeKey } from '@/lib/types/practice';
 import { ChatShell } from '@/components/ChatShell';
 import {
-  playTTS,
   stopCurrentAudio,
   YLLoadingScreen,
   YLErrorScreen,
   YLVoiceNote,
   YLBobTextMessage,
   YLUserTextMessage,
-  YLScoreDisplay,
-  YLFeedbackCard,
-  YLResultsHeader,
   YLReadOnlyMessage,
 } from './_shared';
 
@@ -190,6 +185,7 @@ export function YLPointingPractice({
     }
 
     if (isReadOnly) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setPhase('finished');
       return;
     }
@@ -315,6 +311,7 @@ export function YLPointingPractice({
             ? 'Good job! Next time try to get them all right.'
             : "Let's practice the vocabulary a little more.",
       };
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setFinalEval(result);
       setPhase('finished');
 
@@ -331,9 +328,6 @@ export function YLPointingPractice({
     return <YLLoadingScreen message={t('common.gettingPracticeReady')} />;
   if (phase === 'evaluating')
     return <YLLoadingScreen message={t('common.calculatingFinalScore')} />;
-
-  const partLabel = 'Starters Part 1 — Point to the picture';
-  const progress = Math.round(((cueIndex + (phase === 'answered' ? 1 : 0)) / totalCues) * 100);
 
   const backButton = (
     <button
@@ -408,7 +402,7 @@ export function YLPointingPractice({
         )}
         {sourceMessages
           // Exclude rows that are pure audio cache (yl_tts) or scene
-          // images saved separately — they would duplicate the conversation.
+          // images saved separately, they would duplicate the conversation.
           .filter((m) => m.msg_type !== 'evaluation' && m.msg_type !== 'yl_tts' && m.msg_type !== 'image_scene')
           .flatMap((m): React.ReactElement[] => {
             // For user_audio rows, the cue lives in content_json.cue.
@@ -495,7 +489,7 @@ export function YLPointingPractice({
 
   return (
     <ChatShell
-      headerConfig={{ icon: ListenAndPointIcon, title: t('pointing.title'), subtitle: `Ages 6–8 · Round ${cueIndex + 1}/${totalCues}`, accentColor: 'violet', leftSlot: backButton, rightSlot: <div className="flex items-center gap-3">{progressDots}{partBadge}</div>, online: true }}
+      headerConfig={{ icon: ListenAndPointIcon, title: t('pointing.title'), subtitle: `Ages 6-8 · Round ${cueIndex + 1}/${totalCues}`, accentColor: 'violet', leftSlot: backButton, rightSlot: <div className="flex items-center gap-3">{progressDots}{partBadge}</div>, online: true }}
       footerConfig={{ modeLabel: t('pointing.footerLabel'), modelName: ACTIVE_MODEL_LABEL }}
       inputSlot={bottomBar}
       animationKey="yl-pointing"

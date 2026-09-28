@@ -87,7 +87,7 @@ export async function generateFCEClozeAction(input: {
   if (!sessionId) {
     const result = await createSessionAction({
       mode: 'cambridge_fce_reading_part1',
-      title: 'FCE Reading Part 1 — Multiple-Choice Cloze',
+      title: 'Reading Part 1, Multiple-Choice Cloze',
     });
     if (!result.data) {
       return { error: result.error ?? 'Could not create session' };
@@ -107,7 +107,7 @@ export async function generateFCEClozeAction(input: {
     getPrompt('cambridge_fce_reading_part1_b2_generation').catch(() => null),
     getPrompt('cambridge_fce_reading_part1_b2_framing').catch(
       () =>
-        'You will read a short text with 8 missing words. For each gap, choose the best option from A, B, C, or D. Read the WHOLE sentence — sometimes the answer depends on the words around the gap.'
+        'You will read a short text with 8 missing words. For each gap, choose the best option from A, B, C, or D. Read the WHOLE sentence, sometimes the answer depends on the words around the gap.'
     ),
   ]);
 
@@ -121,7 +121,7 @@ export async function generateFCEClozeAction(input: {
       ai.models.generateContent({
         model: MODELS.FLASH_LITE_PREVIEW,
         contents: [{ role: 'user', parts: [{ text: generationPrompt }] }],
-        config: { responseMimeType: 'application/json' },
+        config: { responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
       })
   );
 

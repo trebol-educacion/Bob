@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { RotateCcw, ChevronRight } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import { submitAssessmentWritingAction } from '@/actions/assessment';
 import { BobMascotLoader } from '@/components/chat/BobMascotLoader';
 import type { AssessmentWritingTask } from '@/actions/assessment';
@@ -20,9 +21,20 @@ function countWords(text: string): number {
 }
 
 export function AssessmentWritingRunner({ assessment_id, task, onQueued, onCancel }: Props) {
+  const tPlacement = useTranslations('placement');
   const [text, setText] = useState('');
   const [phase, setPhase] = useState<'writing' | 'submitting' | 'sent' | 'failed'>('writing');
   const [failMessage, setFailMessage] = useState<string | null>(null);
+  const queuedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (queuedTimeoutRef.current) {
+        clearTimeout(queuedTimeoutRef.current);
+        queuedTimeoutRef.current = null;
+      }
+    };
+  }, []);
 
   const wordCount = countWords(text);
   const canSubmit = wordCount >= MIN_WORDS;
@@ -40,7 +52,10 @@ export function AssessmentWritingRunner({ assessment_id, task, onQueued, onCance
     }
 
     setPhase('sent');
-    setTimeout(() => onQueued(), 2_000);
+    queuedTimeoutRef.current = setTimeout(() => {
+      queuedTimeoutRef.current = null;
+      onQueued();
+    }, 2_000);
   }, [canSubmit, assessment_id, text, onQueued]);
 
   const handleRetry = useCallback(() => {
@@ -49,7 +64,7 @@ export function AssessmentWritingRunner({ assessment_id, task, onQueued, onCance
   }, []);
 
   if (phase === 'sent') {
-    return <BobMascotLoader size="lg" message="Writing sent! Bob will evaluate it in the background — check your dashboard in a moment." />;
+    return <BobMascotLoader size="lg" message="Writing sent! Bob will evaluate it in the background, check your dashboard in a moment." />;
   }
 
   if (phase === 'submitting') {
@@ -132,7 +147,7 @@ export function AssessmentWritingRunner({ assessment_id, task, onQueued, onCance
       </button>
 
       <button onClick={onCancel} className="text-sm text-gray-400 hover:text-gray-600 transition">
-        Cancel assessment
+        {tPlacement('cancelButton')}
       </button>
     </div>
   );

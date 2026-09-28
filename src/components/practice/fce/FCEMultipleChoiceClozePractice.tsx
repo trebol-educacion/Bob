@@ -299,7 +299,7 @@ function GapResultRow({
   );
 }
 
-/** FCE Reading & Use of English Part 1 — Multiple-Choice Cloze practice component. */
+/** FCE Reading & Use of English Part 1, Multiple-Choice Cloze practice component. */
 export function FCEMultipleChoiceClozePractice({
   onBack,
   sessionId: initialSessionId,
@@ -377,7 +377,7 @@ export function FCEMultipleChoiceClozePractice({
     }
 
     void init();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleSelect(gapNumber: number, optionId: 'A' | 'B' | 'C' | 'D') {
     setAnswers((prev) => ({ ...prev, [gapNumber]: optionId }));

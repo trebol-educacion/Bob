@@ -30,7 +30,7 @@ const CONFIG: Record<
   cambridge_pet_writing_part1: {
     framework: 'cambridge',
     exam_part: 'cambridge_pet_writing_part1',
-    modeTitle: 'PET Writing — Part 1 Email',
+    modeTitle: 'Writing, Part 1 Email',
     instructions: 'You have received an email from your English-speaking friend. Read the email and write a reply. Write about 100 words.',
     bullets: ['Thank your friend', 'Answer their questions', 'Invite them to visit'],
     targetWordCount: [80, 100],
@@ -38,8 +38,8 @@ const CONFIG: Record<
   toefl_writing_email: {
     framework: 'toefl',
     exam_part: 'toefl_writing_email',
-    modeTitle: 'TOEFL Writing — Email Task',
-    instructions: 'Read the situation below and write an email response. Write 80–100 words.',
+    modeTitle: 'TOEFL Writing, Email Task',
+    instructions: 'Read the situation below and write an email response. Write 80-100 words.',
     bullets: ['Introduce yourself', 'State your request clearly', 'Close politely'],
     targetWordCount: [80, 100],
   },

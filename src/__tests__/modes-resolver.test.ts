@@ -7,11 +7,11 @@ const b1SkillLevels: SkillLevelMap = {
 };
 
 const mockCards: DynamicCard[] = [
-  { framework: 'cambridge', exam_part: 'starters_p1', cefr_level: 'a1', label: 'Starters P1', description: null, mode_key: 'cambridge_starters_p1', status: 'enabled' },
-  { framework: 'cambridge', exam_part: 'ket_p1', cefr_level: 'b1', label: 'KET P1', description: null, mode_key: 'cambridge_ket_p1', status: 'enabled' },
-  { framework: 'toefl', exam_part: 'listen_repeat', cefr_level: 'b1', label: 'Listen & Repeat', description: null, mode_key: 'toefl_listen_repeat', status: 'enabled' },
-  { framework: 'generic', exam_part: 'conversation', cefr_level: null, label: 'Free Conversation', description: null, mode_key: 'generic_conversation', status: 'enabled' },
-  { framework: 'generic', exam_part: 'vocab', cefr_level: 'b1', label: 'Vocabulary B1', description: null, mode_key: 'generic_vocab_b1', status: 'enabled' },
+  { framework: 'cambridge', exam_part: 'starters_p1', cefr_level: 'a1', label: 'Starters P1', description: null, mode_key: 'cambridge_starters_p1', status: 'enabled', skill: 'speaking' },
+  { framework: 'cambridge', exam_part: 'ket_p1', cefr_level: 'b1', label: 'KET P1', description: null, mode_key: 'cambridge_ket_p1', status: 'enabled', skill: 'speaking' },
+  { framework: 'toefl', exam_part: 'listen_repeat', cefr_level: 'b1', label: 'Listen & Repeat', description: null, mode_key: 'toefl_listen_repeat', status: 'enabled', skill: 'speaking' },
+  { framework: 'generic', exam_part: 'conversation', cefr_level: null, label: 'Free Conversation', description: null, mode_key: 'generic_conversation', status: 'enabled', skill: 'speaking' },
+  { framework: 'generic', exam_part: 'vocab', cefr_level: 'b1', label: 'Vocabulary B1', description: null, mode_key: 'generic_vocab_b1', status: 'enabled', skill: 'speaking' },
 ];
 
 describe('resolveEnabledModes', () => {
@@ -68,5 +68,69 @@ describe('resolveEnabledModes', () => {
     const enabledKeys = result.filter(c => c.visibility === 'enabled').map(c => c.mode_key);
     expect(enabledKeys).toContain('generic_conversation');
     expect(enabledKeys).not.toContain('generic_vocab_b1');
+  });
+});
+
+describe('resolveEnabledModes track (D9-18)', () => {
+  const trackCards: DynamicCard[] = [
+    { framework: 'cambridge', exam_part: 'ket_p1', cefr_level: 'b1', label: 'KET P1', description: null, mode_key: 'cambridge_ket_p1', status: 'enabled', skill: 'speaking' },
+    { framework: 'generic', exam_part: 'conversation', cefr_level: null, label: 'Free Conversation', description: null, mode_key: 'generic_conversation', status: 'enabled', skill: 'speaking' },
+    { framework: 'generic', exam_part: 'situation', cefr_level: 'b1', label: 'Phrase Practice B1', description: null, mode_key: 'generic_situation', status: 'enabled', skill: 'speaking' },
+    { framework: 'generic', exam_part: 'image', cefr_level: 'b1', label: 'Free Image B1', description: null, mode_key: 'generic_image', status: 'enabled', skill: 'speaking' },
+  ];
+
+  it('official track hides generic cards except the always-visible ones when a framework is assigned', () => {
+    const result = resolveEnabledModes({
+      isBobEnabled: true,
+      selectedSkill: 'speaking',
+      skillLevels: b1SkillLevels,
+      studentFrameworks: ['cambridge'],
+      orgFrameworks: ['cambridge'],
+      allDynamicCards: trackCards,
+      track: 'official',
+    });
+    const keys = result.map(c => c.mode_key);
+    expect(keys).toContain('cambridge_ket_p1');
+    expect(keys).toContain('generic_situation');
+    expect(keys).not.toContain('generic_conversation');
+    expect(keys).not.toContain('generic_image');
+  });
+
+  it('free track shows every generic card by level match even with a framework assigned', () => {
+    const result = resolveEnabledModes({
+      isBobEnabled: true,
+      selectedSkill: 'speaking',
+      skillLevels: b1SkillLevels,
+      studentFrameworks: ['cambridge'],
+      orgFrameworks: ['cambridge'],
+      allDynamicCards: trackCards,
+      track: 'free',
+    });
+    const keys = result.map(c => c.mode_key);
+    expect(keys).toContain('generic_conversation');
+    expect(keys).toContain('generic_situation');
+    expect(keys).toContain('generic_image');
+  });
+
+  it('without an assigned framework the track has no effect', () => {
+    const official = resolveEnabledModes({
+      isBobEnabled: true,
+      selectedSkill: 'speaking',
+      skillLevels: b1SkillLevels,
+      studentFrameworks: [],
+      orgFrameworks: [],
+      allDynamicCards: trackCards,
+      track: 'official',
+    });
+    const free = resolveEnabledModes({
+      isBobEnabled: true,
+      selectedSkill: 'speaking',
+      skillLevels: b1SkillLevels,
+      studentFrameworks: [],
+      orgFrameworks: [],
+      allDynamicCards: trackCards,
+      track: 'free',
+    });
+    expect(official.map(c => c.mode_key).sort()).toEqual(free.map(c => c.mode_key).sort());
   });
 });

@@ -27,7 +27,7 @@ interface CefrLevelSelectorProps {
 }
 
 /**
- * @deprecated Global CEFR level picker — superseded by the skill-first flow
+ * @deprecated Global CEFR level picker, superseded by the skill-first flow
  * introduced in `bob-skill-first-assessment`. Will be removed in `bob-cleanup-legacy-cefr`.
  * The only remaining call site is `ModeSelection.tsx` (legacy mode-selection state).
  */

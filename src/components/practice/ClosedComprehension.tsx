@@ -17,7 +17,7 @@ export interface ClosedComprehensionProps {
   onComplete?: (results: ClosedEvaluation[]) => void;
 }
 
-/** Generic closed-comprehension activity — listening, reading, or image-based. Deterministic scoring; no LLM involved. */
+/** Generic closed-comprehension activity, listening, reading, or image-based. Deterministic scoring; no LLM involved. */
 export function ClosedComprehension({ items, sessionId, userId, onComplete }: ClosedComprehensionProps) {
   const t = useTranslations('resultcard');
   const [index, setIndex] = useState(0);
@@ -40,7 +40,7 @@ export function ClosedComprehension({ items, sessionId, userId, onComplete }: Cl
               : <XCircle size={16} className="text-red-400 shrink-0" />}
             <span className="text-gray-700">
               {t('youChose')} <strong>{r.selected}</strong>
-              {!r.correct && <> — {t('expected')} <strong>{r.expected}</strong></>}
+              {!r.correct && <>, {t('expected')} <strong>{r.expected}</strong></>}
             </span>
           </div>
         ))}

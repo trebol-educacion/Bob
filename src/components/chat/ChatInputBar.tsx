@@ -3,6 +3,7 @@
 import { Mic, Square, Send, Paperclip } from 'lucide-react';
 import { motion } from 'motion/react';
 import type { ChangeEvent, KeyboardEvent } from 'react';
+import { Textarea } from '@/components/ui/textarea';
 
 type MicProps = {
   variant: 'mic';
@@ -73,7 +74,7 @@ function TextBar({ value, placeholder, disabled, onChange, onSend, onAttach }: T
 
   return (
     <div className="shrink-0 border-t border-gray-100 bg-white px-4 py-3">
-      <div className="flex items-end gap-2">
+      <div className="flex items-end gap-2 rounded-2xl border border-gray-200 bg-white px-2 py-1 transition-all focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary">
         {onAttach && (
           <button
             type="button"
@@ -85,14 +86,14 @@ function TextBar({ value, placeholder, disabled, onChange, onSend, onAttach }: T
             <Paperclip size={18} strokeWidth={2.2} />
           </button>
         )}
-        <textarea
+        <Textarea
           value={value}
           onChange={(e: ChangeEvent<HTMLTextAreaElement>) => onChange(e.target.value)}
           onKeyDown={handleKeyDown}
           disabled={disabled}
           placeholder={placeholder}
           rows={1}
-          className="flex-1 resize-none bg-transparent text-sm text-gray-800 placeholder:text-gray-400 outline-none py-2 px-2 max-h-32"
+          className="flex-1 min-h-0 h-auto resize-none border-none shadow-none bg-transparent text-base text-gray-800 placeholder:text-gray-400 outline-none focus-visible:ring-0 py-2 px-2 max-h-32"
         />
         <motion.button
           type="button"
