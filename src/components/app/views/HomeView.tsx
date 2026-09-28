@@ -3,6 +3,8 @@
 import React from 'react';
 import { useTranslations } from 'next-intl';
 import { GraduationCap, Sparkles } from 'lucide-react';
+import { BobHeading } from '@/components/choice/BobHeading';
+import { ChoiceCard, type ChoiceCardTheme } from '@/components/choice/ChoiceCard';
 import type { Organization } from '@/lib/organization';
 import type { CefrLevel } from '@/lib/types/practice';
 
@@ -12,6 +14,18 @@ export interface HomeViewProps {
   onSelectExam: () => void;
   onSelectPractice: () => void;
 }
+
+const EXAM_THEME: ChoiceCardTheme = {
+  color: 'text-amber-600',
+  bgColor: 'bg-amber-50',
+  borderColor: 'border-amber-100',
+};
+
+const PRACTICE_THEME: ChoiceCardTheme = {
+  color: 'text-blue-600',
+  bgColor: 'bg-blue-50',
+  borderColor: 'border-blue-100',
+};
 
 /** @param props HomeViewProps */
 export function HomeView({ organization, cefrActiveLevel, onSelectExam, onSelectPractice }: HomeViewProps) {
@@ -30,31 +44,33 @@ export function HomeView({ organization, cefrActiveLevel, onSelectExam, onSelect
   }
 
   return (
-    <div className="w-full flex-1 flex flex-col items-center justify-center py-16 px-4">
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 w-full max-w-2xl">
-        <button
-          onClick={onSelectExam}
-          className="text-left bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow p-6 space-y-3"
-        >
-          <GraduationCap size={28} className="text-trebol-text opacity-70" />
-          <p className="text-xl font-black text-trebol-text">{tp('exam.title')}</p>
-          <p className="text-sm text-trebol-text opacity-60">{tp('exam.subtitle')}</p>
-          {cefrActiveLevel && (
-            <p className="text-xs font-bold uppercase tracking-wide text-trebol-text opacity-40">
-              {tp('exam.level', { level: cefrActiveLevel.toUpperCase() })}
-            </p>
-          )}
-        </button>
+    <div className="w-full flex-1 flex flex-col items-center justify-center py-10 px-4">
+      <BobHeading size="md" className="max-w-2xl" title={tp('heading')} subtitle={tp('subtitle')} />
 
-        <button
-          onClick={onSelectPractice}
-          className="text-left rounded-2xl shadow-sm hover:shadow-md transition-shadow p-6 space-y-3 text-white"
-          style={{ background: 'var(--color-bob-brand)' }}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 w-full max-w-2xl">
+        <ChoiceCard
+          theme={EXAM_THEME}
+          icon={GraduationCap}
+          title={tp('exam.title')}
+          subtitle={tp('exam.subtitle')}
+          index={0}
+          onClick={onSelectExam}
         >
-          <Sparkles size={28} className="opacity-90" />
-          <p className="text-xl font-black">{tp('practice.title')}</p>
-          <p className="text-sm opacity-90">{tp('practice.subtitle')}</p>
-        </button>
+          {cefrActiveLevel && (
+            <span className={`text-xs font-bold tracking-wide ${EXAM_THEME.color}`}>
+              {tp('exam.level', { level: cefrActiveLevel.toUpperCase() })}
+            </span>
+          )}
+        </ChoiceCard>
+
+        <ChoiceCard
+          theme={PRACTICE_THEME}
+          icon={Sparkles}
+          title={tp('practice.title')}
+          subtitle={tp('practice.subtitle')}
+          index={1}
+          onClick={onSelectPractice}
+        />
       </div>
     </div>
   );

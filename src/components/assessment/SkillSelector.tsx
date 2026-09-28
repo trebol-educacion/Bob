@@ -1,20 +1,17 @@
 'use client';
 
 import React from 'react';
-import { motion } from 'motion/react';
-import { BobGreetingAvatar } from '@/components/BobGreetingAvatar';
 import { Headphones, Mic2, BookOpen, PenLine } from 'lucide-react';
+import { BobHeading } from '@/components/choice/BobHeading';
+import { ChoiceCard, type ChoiceCardTheme } from '@/components/choice/ChoiceCard';
 import { useOrganization } from '@/hooks/useOrganization';
 import type { Skill } from '@/lib/types/skills';
 
-type SkillTheme = {
+type SkillTheme = ChoiceCardTheme & {
   skill: Skill;
   title: string;
   description: string;
   icon: React.ComponentType<{ className?: string }>;
-  color: string;
-  bgColor: string;
-  borderColor: string;
 };
 
 const SKILL_THEMES: SkillTheme[] = [
@@ -62,71 +59,6 @@ function formatCefrLevel(level: string): string {
   return level.toUpperCase();
 }
 
-interface SkillCardProps {
-  theme: SkillTheme;
-  cefrLevel: string | null;
-  index: number;
-  onClick: () => void;
-}
-
-function SkillCard({ theme, cefrLevel, index, onClick }: SkillCardProps) {
-  const Icon = theme.icon;
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.1 + 0.2 }}
-    >
-      <div
-        onClick={onClick}
-        role="button"
-        tabIndex={0}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            onClick();
-          }
-        }}
-        className={`h-full cursor-pointer hover:shadow-xl hover:-translate-y-1 transition-all duration-300 border-2 ${theme.borderColor} group overflow-hidden relative bg-white rounded-2xl`}
-      >
-        <div
-          className={`absolute top-0 right-0 w-24 h-24 -mr-8 -mt-8 rounded-full opacity-5 transition-transform duration-700 group-hover:scale-150 ${theme.bgColor} pointer-events-none`}
-        />
-        <div className="p-6 flex flex-col items-center text-center space-y-4">
-          <div
-            className={`p-4 shadow-sm transition-all duration-500 group-hover:scale-105 ${theme.bgColor} rounded-2xl`}
-          >
-            <Icon className={`w-8 h-8 ${theme.color}`} />
-          </div>
-
-          <div className="space-y-2">
-            <h3 className={`text-xl font-bold tracking-tight ${theme.color}`}>{theme.title}</h3>
-            <p className="text-sm text-gray-500 leading-snug font-medium">{theme.description}</p>
-          </div>
-
-          <div className="min-h-[1.5rem] flex items-center justify-center">
-            {cefrLevel ? (
-              <span className={`text-xs font-bold tracking-wide ${theme.color}`}>
-                Level {formatCefrLevel(cefrLevel)}
-              </span>
-            ) : (
-              <span className="text-xs text-gray-400 font-medium">No level yet</span>
-            )}
-          </div>
-
-          <button
-            type="button"
-            tabIndex={-1}
-            className={`mt-2 w-full py-2 px-3 rounded-lg group-hover:bg-gray-50 border border-transparent group-hover:border-gray-100 font-bold transition-all cursor-pointer ${theme.color}`}
-          >
-            Explore
-          </button>
-        </div>
-      </div>
-    </motion.div>
-  );
-}
-
 interface Props {
   onSelect: (skill: Skill) => void;
 }
@@ -137,39 +69,48 @@ export function SkillSelector({ onSelect }: Props) {
 
   return (
     <div className="flex flex-col items-center justify-center min-h-full py-10 px-4">
-      <motion.div
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
-        className="text-center mb-8"
-      >
-        <motion.div
-          initial={{ scale: 0, rotate: -20 }}
-          animate={{ scale: 1, rotate: 0 }}
-          transition={{ delay: 0.1, type: 'spring', stiffness: 200, damping: 14 }}
-        >
-          <BobGreetingAvatar />
-        </motion.div>
-        <h1 className="text-3xl md:text-4xl font-black tracking-tight text-gray-900">
-          Hi! <span className="inline-block">👋</span>
-        </h1>
-        <p className="text-base text-gray-500 font-medium mt-2">
-          What would you like to practice today? Choose a skill:
-        </p>
-      </motion.div>
+      <BobHeading
+        size="lg"
+        title={
+          <>
+            Hi! <span className="inline-block">👋</span>
+          </>
+        }
+        subtitle="What would you like to practice today? Choose a skill:"
+      />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 w-full max-w-5xl mx-auto">
         {SKILL_THEMES.map((theme, idx) => {
           const levelEntry = skillLevels?.[theme.skill];
           const cefrLevel = levelEntry?.cefr_level ?? null;
           return (
-            <SkillCard
+            <ChoiceCard
               key={theme.skill}
               theme={theme}
-              cefrLevel={cefrLevel}
+              icon={theme.icon}
+              title={theme.title}
+              subtitle={theme.description}
               index={idx}
               onClick={() => onSelect(theme.skill)}
-            />
+            >
+              <div className="min-h-[1.5rem] flex items-center justify-center">
+                {cefrLevel ? (
+                  <span className={`text-xs font-bold tracking-wide ${theme.color}`}>
+                    Level {formatCefrLevel(cefrLevel)}
+                  </span>
+                ) : (
+                  <span className="text-xs text-gray-400 font-medium">No level yet</span>
+                )}
+              </div>
+
+              <button
+                type="button"
+                tabIndex={-1}
+                className={`mt-2 w-full py-2 px-3 rounded-lg group-hover:bg-gray-50 border border-transparent group-hover:border-gray-100 font-bold transition-all cursor-pointer ${theme.color}`}
+              >
+                Explore
+              </button>
+            </ChoiceCard>
           );
         })}
       </div>
