@@ -4,6 +4,8 @@ import React, { useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
 import type { LucideIcon } from 'lucide-react';
 import { useTranslations } from 'next-intl';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
 
 type ChatIcon = LucideIcon | React.FC<{ size?: number; className?: string }>;
 
@@ -29,7 +31,7 @@ export type ChatHeaderConfig = {
 export type ChatFooterConfig = {
   /** Badge text: "SITUACIONES" | "CONVERSACIÓN" | "YL PART 1" */
   modeLabel: string;
-  /** Model display name — import from ACTIVE_MODEL_LABEL in gemini.ts */
+  /** Model display name, import from ACTIVE_MODEL_LABEL in gemini.ts */
   modelName: string;
   /** Optional helper text rendered as a third line */
   helperText?: string;
@@ -38,13 +40,13 @@ export type ChatFooterConfig = {
 export type ChatShellProps = {
   headerConfig: ChatHeaderConfig;
   footerConfig: ChatFooterConfig;
-  /** Message list, cards, images — the scrollable body */
+  /** Message list, cards, images, the scrollable body */
   children: React.ReactNode;
-  /** Mode-specific mic bar, text input, send button — rendered above <ChatFooter> */
+  /** Mode-specific mic bar, text input, send button, rendered above <ChatFooter> */
   inputSlot: React.ReactNode;
   /** Key for motion.section re-mount animation. Pass mode string. */
   animationKey?: string;
-  /** Tailwind max-w-* class for the chat container. Defaults to 'max-w-2xl'. Pass 'max-w-full' to stretch. */
+  /** Tailwind max-w-* class for the chat container. Defaults to 'max-w-4xl'. Pass 'max-w-full' to stretch. */
   maxWidthClass?: string;
 };
 
@@ -73,11 +75,14 @@ function AssistantAvatar({
   const a = ACCENT[accentColor];
   return (
     <div className="relative shrink-0">
-      <div
-        className={`w-10 h-10 rounded-2xl flex items-center justify-center shadow-inner border ${a.avatarBg} ${a.avatarBorder}`}
+      <Avatar
+        className={`w-12 h-12 rounded-2xl shadow-inner border ${a.avatarBg} ${a.avatarBorder}`}
       >
-        <Icon size={18} className={a.avatarIcon} />
-      </div>
+        <AvatarImage src="/bob_avatar.png" alt="Bob" className="rounded-2xl" />
+        <AvatarFallback className={`rounded-2xl bg-transparent ${a.avatarIcon}`}>
+          <Icon size={20} />
+        </AvatarFallback>
+      </Avatar>
       {online && (
         <span className="absolute -bottom-1 -right-1 w-2.5 h-2.5 bg-green-500 rounded-full animate-pulse" />
       )}
@@ -120,11 +125,11 @@ function ChatFooter({
   return (
     <div className="flex-none px-4 py-2 bg-white border-t border-gray-100 flex flex-col items-center gap-1">
       <div className="flex items-center gap-2">
-        <span
+        <Badge
           className={`text-[9px] uppercase tracking-tighter font-extrabold rounded-md px-2 py-1 ${a.badgeBg} ${a.badgeText}`}
         >
           {modeLabel}
-        </span>
+        </Badge>
       </div>
       <p className="text-[10px] text-gray-400">
         {t('shell.poweredBy', { modelName })}
@@ -143,7 +148,7 @@ export function ChatShell({
   children,
   inputSlot,
   animationKey,
-  maxWidthClass = 'max-w-2xl',
+  maxWidthClass = 'max-w-4xl',
 }: ChatShellProps) {
   const bodyRef = useRef<HTMLDivElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
@@ -161,13 +166,13 @@ export function ChatShell({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -12 }}
       transition={{ duration: 0.25, ease: 'easeOut' }}
-      className={`relative w-full ${maxWidthClass} mx-auto flex flex-col h-full bg-white rounded-sm shadow-xl overflow-hidden`}
+      className={`relative w-full ${maxWidthClass} mx-auto flex flex-col h-full bg-white rounded-2xl shadow-lg overflow-hidden`}
     >
       <ChatHeader {...header} />
 
       <div
         ref={bodyRef}
-        className="flex-1 overflow-y-auto bg-white px-4 py-4 space-y-3"
+        className="flex-1 overflow-y-auto bg-slate-50/30 px-4 py-4 space-y-3"
       >
         {children}
         <div ref={endRef} />

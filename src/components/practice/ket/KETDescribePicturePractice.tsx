@@ -49,7 +49,7 @@ const EMPTY_MEDIA: PictureDescMedia = {
   image_url: '',
 };
 
-/** KET Speaking Part 3 — Describe the Picture (two-phase loading). */
+/** KET Speaking Part 3, Describe the Picture (two-phase loading). */
 export function KETDescribePicturePractice({
   onBack, sessionId: initialSessionId, initialMessages, onSessionCreated, onSessionFinished, onOpenDashboard,
 }: KETDescribePicturePracticeProps) {
@@ -111,7 +111,7 @@ export function KETDescribePicturePractice({
       }
     }
     void init();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (errorMsg) return (
     <div className="flex flex-col items-center justify-center gap-4 p-8 text-center min-h-[40vh]">

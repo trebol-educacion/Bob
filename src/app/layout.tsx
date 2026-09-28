@@ -3,6 +3,7 @@ import { Poppins, Nunito, Kalam } from "next/font/google";
 import "./globals.css";
 import { OrganizationProvider } from '@/contexts/OrganizationContext';
 import { BrandingProvider } from '@/components/BrandingProvider';
+import { EcosystemFrame } from '@/components/ecosystem/EcosystemFrame';
 import { NextIntlClientProvider } from 'next-intl';
 import { getLocale, getMessages } from 'next-intl/server';
 
@@ -52,9 +53,11 @@ export default async function RootLayout({
       <body className="font-sans antialiased h-full">
         <NextIntlClientProvider messages={messages}>
           <OrganizationProvider>
-            <BrandingProvider>
-              {children}
-            </BrandingProvider>
+            <EcosystemFrame>
+              <BrandingProvider>
+                {children}
+              </BrandingProvider>
+            </EcosystemFrame>
           </OrganizationProvider>
         </NextIntlClientProvider>
       </body>

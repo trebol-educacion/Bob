@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * YLWhatsThisPractice — Cambridge Starters Part 3 "What's This?".
+ * YLWhatsThisPractice, Cambridge Starters Part 3 "What's This?".
  *
  * Bob shows 4 object cards one at a time. For each card the child answers
  * 2 spoken questions: "What's this?" and "Have you got a [X]?".
@@ -236,6 +236,7 @@ export function YLWhatsThisPractice({
     }
 
     if (isReadOnly) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setPhase('finished');
       return;
     }
@@ -273,7 +274,7 @@ export function YLWhatsThisPractice({
           for (const card of p.object_cards) {
             reactionTexts.push(`That's right! It's a ${card.word}. Well done!`);
             reactionTexts.push(`Good try! It's a ${card.word}.`);
-            reactionTexts.push(`Great job! Yes or no — you did it!`);
+            reactionTexts.push(`Great job! Yes or no, you did it!`);
             reactionTexts.push(`Good try! Keep going!`);
           }
           const allTexts = [...questionTexts, ...reactionTexts];
@@ -302,6 +303,7 @@ export function YLWhatsThisPractice({
           ? 'Great job! Keep practising!'
           : "Let's keep practising the words!",
     };
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setFinalEval(result);
     setPhase('finished');
     void saveYLFinalEvalAction(sessionId, result)
@@ -342,6 +344,7 @@ export function YLWhatsThisPractice({
 
     if (!sessionId || !currentQuestion || !currentCard) return;
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setPhase('processing');
 
     void (async () => {
@@ -429,7 +432,7 @@ export function YLWhatsThisPractice({
 
   const partBadge = (
     <span className="text-xs font-bold bg-white ring-1 ring-violet-200 text-violet-700 px-2 py-1 rounded-md">
-      WHAT'S THIS?
+      WHAT&apos;S THIS?
     </span>
   );
 
@@ -609,7 +612,7 @@ export function YLWhatsThisPractice({
       headerConfig={{
         icon: WhatsThisIcon,
         title: t('whatsThis.title'),
-        subtitle: `Ages 6–8 · Card ${cardIndex + 1}/${totalCards} · Q${questionIndex + 1}/2`,
+        subtitle: `Ages 6-8 · Card ${cardIndex + 1}/${totalCards} · Q${questionIndex + 1}/2`,
         accentColor: 'violet',
         leftSlot: backButton,
         rightSlot: (

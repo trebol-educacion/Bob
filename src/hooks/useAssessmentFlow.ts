@@ -2,7 +2,8 @@
 
 import { useCallback, useState } from 'react';
 import { startAssessmentAction } from '@/actions/assessment';
-import { applyDefaultSkillLevelAction, resetOwnSkillLevelAction } from '@/actions/skills';
+import { pickInitialSkillLevelAction, resetOwnSkillLevelAction } from '@/actions/skills';
+import { resolveLevelPolicy } from '@/lib/levels/level-policy';
 import type { AssessmentPrompt, AssessmentListeningItem, AssessmentReadingItem, AssessmentWritingTask } from '@/actions/assessment';
 import type { AppState } from '@/lib/routing';
 import type { CefrLevel } from '@/lib/types/practice';
@@ -27,6 +28,8 @@ export interface UseAssessmentFlowParams {
   skillLevels: SkillLevelMap | null;
   refreshSkillLevels: () => Promise<void>;
   setAppState: React.Dispatch<React.SetStateAction<AppState>>;
+  cefrLevelLocked: boolean;
+  cefrActiveLevel: CefrLevel | null;
 }
 
 export function useAssessmentFlow({
@@ -35,6 +38,8 @@ export function useAssessmentFlow({
   skillLevels,
   refreshSkillLevels,
   setAppState,
+  cefrLevelLocked,
+  cefrActiveLevel,
 }: UseAssessmentFlowParams) {
   const [assessmentId, setAssessmentId] = useState<string | null>(null);
   const [assessmentPrompts, setAssessmentPrompts] = useState<AssessmentPrompt[]>([]);
@@ -49,10 +54,15 @@ export function useAssessmentFlow({
     const level = skillLevels?.[skill];
     if (level?.cefr_level) {
       setAppState('catalog-filtered');
-    } else {
-      setAppState('assessment-invite');
+      return;
     }
-  }, [skillLevels, setSelectedSkill, setAppState]);
+    const policy = resolveLevelPolicy({
+      cefrLevelLocked,
+      cefrActiveLevel,
+      testerOverrideEnabled: false,
+    });
+    setAppState(policy.skipPlacement ? 'catalog-filtered' : 'assessment-invite');
+  }, [skillLevels, setSelectedSkill, setAppState, cefrLevelLocked, cefrActiveLevel]);
 
   const handleAssessmentStart = useCallback(async () => {
     if (!selectedSkill) return;
@@ -101,7 +111,7 @@ export function useAssessmentFlow({
     if (!selectedSkill) return;
     const existing = skillLevels?.[selectedSkill]?.cefr_level;
     if (existing !== level) {
-      const result = await applyDefaultSkillLevelAction(selectedSkill, level);
+      const result = await pickInitialSkillLevelAction(selectedSkill, level);
       if (result.ok) {
         await refreshSkillLevels();
       }

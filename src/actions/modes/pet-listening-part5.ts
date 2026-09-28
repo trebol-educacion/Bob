@@ -217,7 +217,7 @@ export async function generatePETListeningTrueFalseJustifyAudioAction(input: {
  * Evaluates answers deterministically against the server-side keys re-read from
  * the persisted plan, then persists results. No LLM involved. Scoring convention:
  * each statement is worth 1 point for a true statement (correct verdict), and 2
- * points for a false statement — 1 for the correct verdict plus 1 for the correct
+ * points for a false statement, 1 for the correct verdict plus 1 for the correct
  * justification, only awarded when the verdict was also right. correct_count
  * counts statements fully right (verdict, and justification when false).
  */

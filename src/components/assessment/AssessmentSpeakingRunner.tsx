@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Mic, StopCircle, ChevronRight, RotateCcw } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import { BobMascotLoader } from '@/components/chat/BobMascotLoader';
 import { submitAssessmentSpeakingAction } from '@/actions/assessment';
 import type { AssessmentPrompt } from '@/actions/assessment';
@@ -28,6 +29,7 @@ const MAX_TURN_MS_DEFAULT = 20_000;
 const MAX_TURN_MS_YL = 10_000;
 
 export function AssessmentSpeakingRunner({ assessment_id, prompts, is_yl = false, onQueued, onCancel }: Props) {
+  const tPlacement = useTranslations('placement');
   const MAX_TURN_MS = is_yl ? MAX_TURN_MS_YL : MAX_TURN_MS_DEFAULT;
   const [currentTurnIdx, setCurrentTurnIdx] = useState(0);
   const [turnState, setTurnState] = useState<TurnState>('idle');
@@ -41,6 +43,7 @@ export function AssessmentSpeakingRunner({ assessment_id, prompts, is_yl = false
   const chunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startTimeRef = useRef<number>(0);
+  const queuedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const clearTimer = useCallback(() => {
     if (timerRef.current) {
@@ -52,6 +55,10 @@ export function AssessmentSpeakingRunner({ assessment_id, prompts, is_yl = false
   useEffect(() => {
     return () => {
       clearTimer();
+      if (queuedTimeoutRef.current) {
+        clearTimeout(queuedTimeoutRef.current);
+        queuedTimeoutRef.current = null;
+      }
       if (mediaRecorderRef.current?.state === 'recording') {
         mediaRecorderRef.current.stop();
       }
@@ -115,16 +122,7 @@ export function AssessmentSpeakingRunner({ assessment_id, prompts, is_yl = false
         stopRecording();
       }
     }, 250);
-  }, [stopRecording]);
-
-  const handleNext = useCallback(() => {
-    if (currentTurnIdx < prompts.length - 1) {
-      setCurrentTurnIdx((i) => i + 1);
-      setTurnState('idle');
-    } else {
-      handleSubmit();
-    }
-  }, [currentTurnIdx, prompts.length]);
+  }, [stopRecording, MAX_TURN_MS]);
 
   const handleSubmit = useCallback(async () => {
     setPhase('submitting');
@@ -146,8 +144,20 @@ export function AssessmentSpeakingRunner({ assessment_id, prompts, is_yl = false
     }
 
     setPhase('sent');
-    setTimeout(() => onQueued(), 2_000);
+    queuedTimeoutRef.current = setTimeout(() => {
+      queuedTimeoutRef.current = null;
+      onQueued();
+    }, 2_000);
   }, [assessment_id, recordedTurns, prompts.length, onQueued]);
+
+  const handleNext = useCallback(() => {
+    if (currentTurnIdx < prompts.length - 1) {
+      setCurrentTurnIdx((i) => i + 1);
+      setTurnState('idle');
+    } else {
+      handleSubmit();
+    }
+  }, [currentTurnIdx, prompts.length, handleSubmit]);
 
   const handleRetry = useCallback(() => {
     setPhase('turns');
@@ -180,7 +190,7 @@ export function AssessmentSpeakingRunner({ assessment_id, prompts, is_yl = false
   }
 
   if (phase === 'sent') {
-    return <BobMascotLoader size="lg" message="Recording sent! Bob will evaluate it in the background — check your dashboard in a moment." />;
+    return <BobMascotLoader size="lg" message="Recording sent! Bob will evaluate it in the background, check your dashboard in a moment." />;
   }
 
   if (phase === 'submitting') {
@@ -197,7 +207,7 @@ export function AssessmentSpeakingRunner({ assessment_id, prompts, is_yl = false
           onClick={handleRetry}
           className="flex items-center gap-2 px-5 py-2.5 bg-trebol-primary text-white rounded-xl font-semibold text-sm hover:opacity-90 transition"
         >
-          <RotateCcw size={16} /> Try the assessment again
+          <RotateCcw size={16} /> {tPlacement('retryButton')}
         </button>
         <button onClick={onCancel} className="text-sm text-gray-400 hover:text-gray-600 transition">
           Cancel
@@ -250,7 +260,7 @@ export function AssessmentSpeakingRunner({ assessment_id, prompts, is_yl = false
         <div className="flex flex-col items-center gap-4 w-full">
           <div className="flex items-center gap-2 text-red-500 font-semibold text-sm">
             <span className="inline-block w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
-            Recording — {elapsed}s / {MAX_TURN_MS / 1000}s
+            Recording, {elapsed}s / {MAX_TURN_MS / 1000}s
           </div>
           <div className="w-full h-2 rounded-full bg-gray-100">
             <div

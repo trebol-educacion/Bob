@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { StudentStatsPanel } from '@/components/StudentStatsPanel';
-import { applyDefaultSkillLevelAction, promoteSkillLevelAction } from '@/actions/skills';
+import { changeSkillLevelAction, promoteSkillLevelAction } from '@/actions/skills';
 import type { AppState } from '@/lib/routing';
 import type { CefrLevel } from '@/lib/types/practice';
 import type { Skill } from '@/lib/types/skills';
@@ -31,7 +31,7 @@ export function DashboardView({
         setAppState('assessment-invite');
       }}
       onChangeLevel={async (skill, level) => {
-        const result = await applyDefaultSkillLevelAction(skill, level as CefrLevel);
+        const result = await changeSkillLevelAction(skill, level as CefrLevel);
         if (result.ok) {
           await refreshSkillLevels();
         }

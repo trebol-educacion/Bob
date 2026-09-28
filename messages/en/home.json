@@ -14,5 +14,15 @@
   },
   "cefrBanner": {
     "message": "Select your CEFR level to access more activities"
+  },
+  "assessmentInvite": {
+    "pendingTitle": "Bob is evaluating your test",
+    "pendingBody": "This can take a few minutes. You can keep practicing with your current level while you wait."
+  },
+  "confirmLeave": {
+    "title": "Leave the assessment?",
+    "body": "Your answers so far will be lost if you leave now.",
+    "stay": "Stay",
+    "leave": "Leave"
   }
 }

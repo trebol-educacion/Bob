@@ -28,11 +28,11 @@ export function buildImageScenePrompt(
 
   if (level === 'b2') {
     return `${base}
-    IMPORTANT — B2 FIRST LEVEL REQUIREMENTS:
+    IMPORTANT, B2 FIRST LEVEL REQUIREMENTS:
     - The scene MUST show a complex situation with multiple subjects (2-4 people) in a meaningful interaction
     - Include visual details that imply an unspoken story or relationship between subjects
     - The setting should provide contextual clues (workplace, public space, special occasion)
-    - Avoid simple or static compositions — the image must spark comparison or inference
+    - Avoid simple or static compositions, the image must spark comparison or inference
     `;
   }
 
@@ -40,5 +40,5 @@ export function buildImageScenePrompt(
 }
 
 export function buildB2ImageEvaluationContext(): string {
-  return `IMPORTANT — Evaluate at B2 First level. Deduct 10 points per significant grammatical error. Award bonus points (up to 5) for B2+ vocabulary (advanced adjectives, complex structures). Require minimum 60 seconds of description (penalize very short answers). B2 candidates should identify relationships between subjects and make inferences.`;
+  return `IMPORTANT, Evaluate at B2 First level. Deduct 10 points per significant grammatical error. Award bonus points (up to 5) for B2+ vocabulary (advanced adjectives, complex structures). Require minimum 60 seconds of description (penalize very short answers). B2 candidates should identify relationships between subjects and make inferences.`;
 }

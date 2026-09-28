@@ -19,6 +19,12 @@
     "hoursAgo": "{count}h ago",
     "daysAgo": "{count}d ago"
   },
+  "ecosystem": {
+    "ariaLabel": "Noobe Ecosystem shortcuts",
+    "show": "Show Noobe Ecosystem shortcuts",
+    "hide": "Hide Noobe Ecosystem shortcuts",
+    "goTo": "Go to {name}"
+  },
   "accessDenied": {
     "backToLogin": "Back to login",
     "reasons": {

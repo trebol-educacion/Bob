@@ -51,7 +51,7 @@ const EMPTY_MEDIA: HobbyTalkMedia = {
   image_url: '',
 };
 
-/** KET Speaking Part 2 — Talk About a Hobby (two-phase loading). */
+/** KET Speaking Part 2, Talk About a Hobby (two-phase loading). */
 export function KETHobbyTalkPractice({
   onBack, sessionId: initialSessionId, initialMessages, onSessionCreated, onSessionFinished, onOpenDashboard,
 }: KETHobbyTalkPracticeProps) {
@@ -104,7 +104,7 @@ export function KETHobbyTalkPractice({
       void loadMedia(result);
     }
     void init();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (errorMsg) return (
     <div className="flex flex-col items-center justify-center gap-4 p-8 text-center min-h-[40vh]">

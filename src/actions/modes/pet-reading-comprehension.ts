@@ -55,7 +55,7 @@ const GenerationSchema = z
 
 type GeneratedQuestion = z.infer<typeof QuestionSchema>;
 
-/** A question as delivered to the client before answering — answer key and per-option feedback stripped. */
+/** A question as delivered to the client before answering, answer key and per-option feedback stripped. */
 export type PETReadingClientQuestion =
   | {
       number: number;
@@ -163,7 +163,7 @@ export async function generatePETReadingComprehensionAction(input: {
   if (!sessionId) {
     const result = await createSessionAction({
       mode: 'cambridge_pet_reading_comprehension',
-      title: 'Reading — Comprehensive Text',
+      title: 'Reading, Comprehensive Text',
     });
     if (!result.data) return { error: result.error ?? 'Could not create session' };
     sessionId = result.data.id;

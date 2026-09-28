@@ -1,6 +1,7 @@
 'use server';
 
 import { createSupabaseServer } from '@/lib/supabase/server';
+import { loadStudentFrameworks } from '@/lib/organization/student-frameworks';
 import type { AssessmentResultSpeaking, AssessmentCefrBand, AssessmentConfidence } from '@/lib/types/skills';
 import type { SubmitSpeakingTurn, SubmitSpeakingResult } from './types';
 import { resolveCooldownUntil } from './shared';
@@ -30,8 +31,15 @@ export async function submitAssessmentSpeakingAction(
   const [profileResult, skillLevelResult, studentFwResult] = await Promise.all([
     supabase.schema('public').from('profiles').select('organization_id, cefr_active_level').eq('id', user.id).single(),
     supabase.from('skill_levels').select('cefr_level').eq('user_id', user.id).eq('skill', 'speaking').maybeSingle(),
-    supabase.schema('public').from('student_english_frameworks').select('framework_id, pedagogical_frameworks(name)').eq('student_id', user.id),
+    loadStudentFrameworks(supabase, user.id),
   ]);
+
+  if (studentFwResult.error) {
+    const { table, schema, code, message } = studentFwResult.error;
+    console.error(
+      `[submitAssessmentSpeakingAction] student frameworks resolution failed: table=${table} schema=${schema} code=${code ?? 'unknown'} message=${message}`,
+    );
+  }
 
   const profile = profileResult.data;
 
@@ -46,11 +54,7 @@ export async function submitAssessmentSpeakingAction(
   const allowVoiceStorage = org?.allow_voice_storage === true;
 
   const speakingLevel = skillLevelResult.data?.cefr_level ?? profile?.cefr_active_level ?? 'a2';
-  const fwNames = (studentFwResult.data ?? []).map((r: Record<string, unknown>) => {
-    const pf = r.pedagogical_frameworks as { name?: string } | null;
-    return pf?.name ?? '';
-  });
-  const isYl = fwNames.some((n: string) => n === 'Cambridge English') && (speakingLevel === 'pre_a1' || speakingLevel === 'a1');
+  const isYl = studentFwResult.frameworks.includes('cambridge') && (speakingLevel === 'pre_a1' || speakingLevel === 'a1');
 
   const { data: session, error: sessionError } = await supabase
     .from('sessions')

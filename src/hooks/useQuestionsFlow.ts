@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Question, EvaluationResult } from '@/actions/gemini';
 
-interface UseQuestionsFlowReturn {
+export interface UseQuestionsFlowReturn {
   questions: Question[];
   currentQuestionIndex: number;
   questionAnswers: Record<number, EvaluationResult>;

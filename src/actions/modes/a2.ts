@@ -2,7 +2,7 @@
 
 import { z } from 'zod';
 import { MODELS } from '@/lib/models';
-import { CambridgeEvaluationSchema, type CambridgeEvaluation, FormativeFeedbackSchema, type FormativeFeedback } from '@/lib/types/practice';
+import { FormativeFeedbackSchema, type FormativeFeedback } from '@/lib/types/practice';
 import { getPrompt } from '@/lib/prompts/db-prompts';
 import { persistMessage, readSessionMessagesForCurrentOrUser } from '@/lib/persist-activity';
 import { getOrCreateCachedContent } from '@/lib/cache';
@@ -28,21 +28,11 @@ const A2SessionPlanFallback: A2SessionPlan = {
   final_question: 'What do you want to do when you grow up?',
 };
 
-const CambridgeEvaluationFallback: CambridgeEvaluation = {
-  score: 0,
-  grammar: 0,
-  vocabulary: 0,
-  fluency: 0,
-  feedback: 'Unable to evaluate at this time. Please try again.',
-  strengths: [],
-  areas_for_improvement: [],
-};
-
 const FormativeFeedbackFallback: FormativeFeedback = {
   kind: 'formative',
   understood: false,
   highlights: [],
-  suggestions: ['Try again — we could not process your response.'],
+  suggestions: ['Try again, we could not process your response.'],
 };
 
 /** Generate an A2 session plan and persist it as a 'phrase' message in bob_messages. */
@@ -172,7 +162,7 @@ export async function evaluateA2FinalAction(
 
 Analyse this speaking interview transcript and return ONLY a JSON object with these fields:
 - "kind": always "formative"
-- "understood": boolean — did the student generally communicate successfully?
+- "understood": boolean, did the student generally communicate successfully?
 - "highlights": array of 1-3 strings celebrating specific things the student did well (e.g. "Used past tense correctly", "Good vocabulary for hobbies")
 - "suggestions": array of 1-3 friendly, concrete improvement tips (e.g. "Try to give longer answers with 'because'", "Remember to use 'there is/are' for descriptions")
 - "model_answer": one short example sentence showing a strong answer to any one question

@@ -2,12 +2,15 @@
 
 import React from 'react';
 import { motion } from 'motion/react';
+import { useTranslations } from 'next-intl';
 import { ModeSelection } from '@/components/ModeSelection';
+import { TrackTabs } from '@/components/catalog/TrackTabs';
 import type { AppState } from '@/lib/routing';
 import type { Organization } from '@/lib/organization';
 import type { PracticeMode, CefrLevel, ModeKey } from '@/lib/types/practice';
 import type { Skill, SkillLevelMap } from '@/lib/types/skills';
 import type { AvailableMode } from '@/lib/organization/types';
+import type { PracticeTrack } from '@/lib/modes';
 
 export interface CatalogViewProps {
   setAppState: React.Dispatch<React.SetStateAction<AppState>>;
@@ -21,6 +24,8 @@ export interface CatalogViewProps {
   cefrActiveLevel: CefrLevel | null;
   cefrLevelLocked: boolean;
   organization: Organization | null;
+  track: PracticeTrack;
+  setTrack: (track: PracticeTrack) => void;
 }
 
 export function CatalogView({
@@ -35,7 +40,10 @@ export function CatalogView({
   cefrActiveLevel,
   cefrLevelLocked,
   organization,
+  track,
+  setTrack,
 }: CatalogViewProps) {
+  const tPlacement = useTranslations('placement');
   return (
     <>
       <div className="px-4 pt-4">
@@ -54,17 +62,18 @@ export function CatalogView({
             <div>
               <p className="text-sm font-black text-green-800">Ready to level up?</p>
               <p className="text-xs text-green-600 font-medium mt-0.5">
-                Your recent sessions show strong accuracy. Take an Assessment to confirm your next level.
+                {tPlacement('readyToLevelUpBody')}
               </p>
             </div>
             <button
               onClick={() => setAppState('assessment-invite')}
               className="shrink-0 px-3 py-1.5 rounded-xl bg-green-600 text-white text-xs font-black hover:bg-green-700 transition-colors shadow-sm"
             >
-              Take Assessment
+              {tPlacement('takeTestButton')}
             </button>
           </motion.div>
         )}
+        <TrackTabs track={track} onChange={setTrack} />
       </div>
       <ModeSelection
         ref={cefrSelectorRef}
@@ -74,6 +83,7 @@ export function CatalogView({
         cefrActiveLevel={(selectedSkill ? skillLevels?.[selectedSkill]?.cefr_level : null) ?? cefrActiveLevel}
         cefrLevelLocked={cefrLevelLocked}
         organizationName={organization?.name}
+        track={track}
       />
     </>
   );

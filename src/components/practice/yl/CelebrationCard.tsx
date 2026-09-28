@@ -12,11 +12,11 @@ export interface CelebrationCardProps {
   feedback?: string;
   onAction?: () => void;
   actionLabel?: string;
-  /** When false, the dopaminergic effects (confetti, count-up) are skipped — useful in history view. */
+  /** When false, the dopaminergic effects (confetti, count-up) are skipped, useful in history view. */
   animate?: boolean;
   /**
    * Hides the numeric grade (score out of 10). Required for open Speaking and
-   * Writing tasks, which give qualitative formative feedback only — never an
+   * Writing tasks, which give qualitative formative feedback only, never an
    * exam-style score (decision D-D2). The trophy, stars and feedback remain.
    */
   hideGrade?: boolean;
@@ -55,6 +55,7 @@ function useCountUp(target: number, durationMs: number, enabled: boolean) {
   const [value, setValue] = React.useState(enabled ? 0 : target);
   useEffect(() => {
     if (!enabled) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setValue(target);
       return;
     }

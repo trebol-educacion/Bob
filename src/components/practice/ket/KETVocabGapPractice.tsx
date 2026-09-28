@@ -14,6 +14,7 @@ import {
   type VocabGapItem,
 } from '@/actions/modes/ket-reading-part4';
 import type { StoredMessage } from '@/actions/messages';
+import { resolveActivityBoot } from '@/lib/activity/boot';
 
 const ACCENT = '#469E7B';
 const ACCENT_DARK = '#37795E';
@@ -223,7 +224,7 @@ function ResultText({
         const item = items.find((it) => it.number === n);
         const r = results.find((res) => res.number === n);
         if (!item || !r) return <span key={i} className="text-red-400">[?]</span>;
-        const chosenWord = r.chosen ? item.options[r.chosen] : '—';
+        const chosenWord = r.chosen ? item.options[r.chosen] : '-';
         const correctWord = item.options[r.correct_answer];
         if (r.is_correct) {
           return (
@@ -245,7 +246,7 @@ function ResultText({
   );
 }
 
-/** KET Reading Part 4 — Vocabulary Gap-Fill practice in focus mode. */
+/** KET Reading Part 4, Vocabulary Gap-Fill practice in focus mode. */
 export function KETVocabGapPractice({
   onBack,
   sessionId: initialSessionId,
@@ -272,25 +273,24 @@ export function KETVocabGapPractice({
     if (initRef.current) return;
     initRef.current = true;
     async function init() {
-      if (initialMessages?.length) {
-        const r = tryRestore(initialMessages);
-        if (r) {
-          setExercise(r.exercise);
-          setFramingText(r.framingText);
-          if (r.results) {
-            setResults(r.results);
-            setCorrectCount(r.correctCount);
-            setPhase('finished');
-          } else {
-            const { createSupabaseBrowser } = await import('@/lib/supabase/browser-client');
-            const { data: { user } } = await createSupabaseBrowser().auth.getUser();
-            if (user) setUserId(user.id);
-            setPhase('ready');
-          }
-          return;
+      const boot = resolveActivityBoot({ initialMessages, sessionId: initialSessionId, tryRestore });
+      if (boot.kind === 'restore') {
+        const r = boot.data;
+        setExercise(r.exercise);
+        setFramingText(r.framingText);
+        if (r.results) {
+          setResults(r.results);
+          setCorrectCount(r.correctCount);
+          setPhase('finished');
+        } else {
+          const { createSupabaseBrowser } = await import('@/lib/supabase/browser-client');
+          const { data: { user } } = await createSupabaseBrowser().auth.getUser();
+          if (user) setUserId(user.id);
+          setPhase('ready');
         }
+        return;
       }
-      if (initialSessionId) return;
+      if (boot.kind === 'restore-failed') { setErrorMsg('Could not restore session. Please start a new one.'); return; }
       setIsNewSession(true);
       setPhase('generating');
       const result = await generateKETVocabGapAction({ sessionId: initialSessionId });
@@ -306,7 +306,7 @@ export function KETVocabGapPractice({
       setPhase('ready');
     }
     void init();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleSelect(itemNumber: number, key: OptionKey) {
     if (!exercise) return;

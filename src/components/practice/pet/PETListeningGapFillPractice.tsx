@@ -16,6 +16,7 @@ import {
   type PETGapFillGapResult,
 } from '@/actions/modes/pet-listening-part3';
 import type { StoredMessage } from '@/actions/messages';
+import { resolveActivityBoot } from '@/lib/activity/boot';
 
 const ACCENT = '#10B981';
 const ACCENT_DARK = '#0E9F6E';
@@ -364,9 +365,9 @@ function GapResultSlot({ number, result }: { number: number; result: PETGapFillG
       </span>
       <span className="border-b-2 px-1 font-kalam text-base" style={{ borderColor }}>
         {correct ? (
-          <span className="text-green-700 font-semibold">{result.user_input || '—'}</span>
+          <span className="text-green-700 font-semibold">{result.user_input || '-'}</span>
         ) : (
-          <span className="text-rose-500 line-through">{result.user_input || '—'}</span>
+          <span className="text-rose-500 line-through">{result.user_input || '-'}</span>
         )}
       </span>
       {!correct && (
@@ -381,7 +382,7 @@ function GapResultSlot({ number, result }: { number: number; result: PETGapFillG
   );
 }
 
-/** PET Listening Part 3 — Interactive Gap-Fill practice component. */
+/** PET Listening Part 3, Interactive Gap-Fill practice component. */
 export function PETListeningGapFillPractice({
   onBack,
   sessionId: initialSessionId,
@@ -390,7 +391,6 @@ export function PETListeningGapFillPractice({
   onSessionFinished,
   onOpenDashboard,
 }: PETListeningGapFillPracticeProps) {
-  const reduceMotion = useReducedMotion();
   const [phase, setPhase] = useState<Phase>('loading');
   const [sessionId, setSessionId] = useState<string | undefined>(initialSessionId);
   const [userId, setUserId] = useState<string | undefined>();
@@ -413,26 +413,25 @@ export function PETListeningGapFillPractice({
     initStartedRef.current = true;
 
     async function init() {
-      if (initialMessages && initialMessages.length > 0) {
-        const restored = tryRestore(initialMessages);
-        if (restored) {
-          setExercise(restored.exercise);
-          setFramingText(restored.framingText);
-          if (restored.gapResults) {
-            setGapResults(restored.gapResults);
-            setCorrectCount(restored.correctCount);
-            setPhase('finished');
-          } else {
-            const { createSupabaseBrowser } = await import('@/lib/supabase/browser-client');
-            const { data: { user } } = await createSupabaseBrowser().auth.getUser();
-            if (user) setUserId(user.id);
-            setPhase('ready');
-          }
-          return;
+      const boot = resolveActivityBoot({ initialMessages, sessionId: initialSessionId, tryRestore });
+      if (boot.kind === 'restore') {
+        const restored = boot.data;
+        setExercise(restored.exercise);
+        setFramingText(restored.framingText);
+        if (restored.gapResults) {
+          setGapResults(restored.gapResults);
+          setCorrectCount(restored.correctCount);
+          setPhase('finished');
+        } else {
+          const { createSupabaseBrowser } = await import('@/lib/supabase/browser-client');
+          const { data: { user } } = await createSupabaseBrowser().auth.getUser();
+          if (user) setUserId(user.id);
+          setPhase('ready');
         }
+        return;
       }
 
-      if (initialSessionId) return;
+      if (boot.kind === 'restore-failed') { setErrorMsg('Could not restore session. Please start a new one.'); return; }
 
       setIsNewSession(true);
       setPhase('generating');
@@ -453,7 +452,7 @@ export function PETListeningGapFillPractice({
     }
 
     void init();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (audioStartedRef.current) return;

@@ -78,7 +78,7 @@ export async function startFCEListeningPart1Action(): Promise<
 
   const sessionResult = await createSessionAction({
     mode: 'cambridge_fce_listening_part1',
-    title: 'Listening Part 1 — Short Extracts',
+    title: 'Listening Part 1, Short Extracts',
   });
 
   if (!sessionResult.data) {
@@ -123,7 +123,7 @@ export async function startFCEListeningPart1Action(): Promise<
 /**
  * Validates a single answer server-side and persists both the user answer
  * and Bob's per-turn evaluation message.
- * The correct_index is derived server-side — never sent to the client upfront.
+ * The correct_index is derived server-side, never sent to the client upfront.
  */
 export async function submitFCEListeningAnswerAction(
   session_id: string,

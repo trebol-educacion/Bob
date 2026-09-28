@@ -43,7 +43,7 @@ export function ResultCard({ result, onNext }: ResultCardProps) {
               <span>{t('whatYouSaid')}</span>
             </h3>
             <div className="bg-trebol-bg p-4 rounded-sm border-2 border-trebol-border italic text-trebol-text font-medium leading-relaxed">
-              "{transcribed_text}"
+              &quot;{transcribed_text}&quot;
             </div>
           </div>
 

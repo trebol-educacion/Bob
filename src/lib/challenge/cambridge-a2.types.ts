@@ -1,5 +1,5 @@
 /**
- * Cambridge A2 Key challenge — type contracts.
+ * Cambridge A2 Key challenge, type contracts.
  *
  * Pure type declarations shared by the exam data and the runtime logic.
  */

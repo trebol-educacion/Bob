@@ -94,7 +94,7 @@ function safeParse<T>(schema: z.ZodType<T>, raw: string): T | null {
 }
 
 function fallbackFeedback(): PictureDescFeedback {
-  return { understood: false, highlights: [], suggestions: ['Try again — we could not process your response.'], model_answer: null };
+  return { understood: false, highlights: [], suggestions: ['Try again, we could not process your response.'], model_answer: null };
 }
 
 async function generatePlanText(userId?: string): Promise<z.infer<typeof GenerationSchema> | null> {
@@ -167,7 +167,7 @@ export async function replenishPicturePool(target = 3): Promise<void> {
 }
 
 /**
- * Phase 1 — fast: tries the pre-generation pool first. A pooled hit returns the
+ * Phase 1, fast: tries the pre-generation pool first. A pooled hit returns the
  * full exercise (image + audio already generated) for instant entry. On a miss
  * it generates the text-only plan live (~1.5s) and the component loads TTS +
  * image in the background via generateKETPictureDescMediaAction. In both cases
@@ -180,7 +180,7 @@ export async function generateKETPictureDescPlanAction(input: {
   let userId: string | undefined;
 
   if (!sessionId) {
-    const result = await createSessionAction({ mode: 'cambridge_ket_part3', title: 'Speaking Part 3 — Describe the Picture' });
+    const result = await createSessionAction({ mode: 'cambridge_ket_part3', title: 'Speaking Part 3, Describe the Picture' });
     if (!result.data) return { error: result.error ?? 'Could not create session' };
     sessionId = result.data.id;
     userId = result.data.user_id;
@@ -229,7 +229,7 @@ export async function generateKETPictureDescPlanAction(input: {
   };
 }
 
-/** Phase 2 — generates TTS + image in parallel (~7s, cached). */
+/** Phase 2, generates TTS + image in parallel (~7s, cached). */
 export async function generateKETPictureDescMediaAction(input: {
   instruction: string;
   image_prompt: string;
@@ -254,7 +254,7 @@ export async function generateKETPictureDescAction(input: {
   let userId: string | undefined;
 
   if (!sessionId) {
-    const result = await createSessionAction({ mode: 'cambridge_ket_part3', title: 'Speaking Part 3 — Describe the Picture' });
+    const result = await createSessionAction({ mode: 'cambridge_ket_part3', title: 'Speaking Part 3, Describe the Picture' });
     if (!result.data) return { error: result.error ?? 'Could not create session' };
     sessionId = result.data.id;
     userId = result.data.user_id;

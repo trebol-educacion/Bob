@@ -68,7 +68,7 @@ export function ToeflListenRepeatPractice({ onBack }: ToeflListenRepeatPracticeP
     },
   });
 
-  const { isRecording, startRecording, stopRecording } = useAudioRecorder({
+  const { startRecording, stopRecording } = useAudioRecorder({
     onRecorded: (blob) => {
       recordedBlobRef.current = blob;
       setPhase('evaluating');
@@ -127,7 +127,7 @@ export function ToeflListenRepeatPractice({ onBack }: ToeflListenRepeatPracticeP
 
     load();
     return () => { cancelled = true; };
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (phase !== 'play') return;

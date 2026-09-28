@@ -62,6 +62,7 @@ export function restoreMessages(stored: StoredMessage[]): ChatMsg[] {
             Describe what you see in this image in English. You have 60 seconds.
           </p>
           {m.content_text ? (
+            // eslint-disable-next-line @next/next/no-img-element
             <img
               src={m.content_text}
               alt="Scene to describe"
@@ -127,6 +128,7 @@ export function renderScene(scene: ImageScene & { image_data?: string }): React.
         Describe what you see in this image in English. You have 60 seconds.
       </p>
       {scene.image_data && (
+        // eslint-disable-next-line @next/next/no-img-element
         <img
           src={scene.image_data}
           alt="Scene to describe"

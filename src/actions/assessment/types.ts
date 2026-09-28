@@ -1,8 +1,8 @@
 /**
- * Assessment — shared type contracts.
+ * Assessment, shared type contracts.
  */
 
-import type { Skill, AssessmentCefrBand, AssessmentConfidence, AssessmentResultSpeaking, AssessmentResultListening, AssessmentResultReading, AssessmentResultWriting, AssessmentWritingFeedback } from '@/lib/types/skills';
+import type { Skill, AssessmentResultListening, AssessmentResultReading } from '@/lib/types/skills';
 
 export interface AssessmentPrompt {
   turn_number: number;
@@ -35,6 +35,7 @@ export type StartAssessmentResult =
   | { status: 'ok'; skill: 'reading'; assessment_id: string; items: AssessmentReadingItem[] }
   | { status: 'ok'; skill: 'writing'; assessment_id: string; task: AssessmentWritingTask }
   | { status: 'cooldown'; days_remaining: number; available_at: string }
+  | { status: 'pending' }
   | { status: 'error'; code: 'unauthenticated' | 'db_error' | 'no_prompts' | 'no_items' };
 
 export interface SubmitSpeakingTurn {

@@ -3,8 +3,6 @@
 import { z } from 'zod';
 import { MODELS } from '@/lib/models';
 import {
-  CollaborativeEvaluationSchema,
-  type CollaborativeEvaluation,
   FormativeFeedbackSchema,
   type FormativeFeedback,
 } from '@/lib/types/practice';
@@ -46,22 +44,11 @@ const ScenarioFallback: Part3Scenario = {
   options: ['the beach', 'a museum', 'a theme park', 'the countryside', 'a sports centre'],
 };
 
-const EvaluationFallback: CollaborativeEvaluation = {
-  score: 0,
-  task_achievement: 0,
-  interaction: 0,
-  grammar: 0,
-  vocabulary: 0,
-  feedback: 'Unable to evaluate at this time. Please try again.',
-  strengths: [],
-  areas_for_improvement: [],
-};
-
 const FormativeFeedbackFallback: FormativeFeedback = {
   kind: 'formative',
   understood: false,
   highlights: [],
-  suggestions: ['Try again — we could not process your response.'],
+  suggestions: ['Try again, we could not process your response.'],
 };
 
 async function resolveUserId(): Promise<string | null> {
@@ -265,7 +252,7 @@ ${historyText}
 
 Return ONLY a JSON object with these fields:
 - "kind": always "formative"
-- "understood": boolean — did the candidate communicate their ideas clearly?
+- "understood": boolean, did the candidate communicate their ideas clearly?
 - "highlights": array of 1-3 strings celebrating specific strengths (e.g. "Good use of linking words like 'however'", "Gave clear reasons for your choices")
 - "suggestions": array of 1-3 specific improvement tips (e.g. "Try to use comparative adjectives when comparing options", "Remember to ask the examiner's opinion too")
 - "model_answer": one example sentence demonstrating a strong way to express an opinion on this topic

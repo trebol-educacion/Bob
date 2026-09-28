@@ -6,22 +6,27 @@ import { getPrompt } from '@/lib/prompts/db-prompts';
 import { callGemini } from '@/lib/gemini-client';
 import { ChatTurnSchema, InitialChatResponse, SimulatedConversationResponse, QuestionsResponse } from '@/lib/types/gemini';
 import type { ChatMessage, ChatTurnResult, InitialChatResult, Question } from './types';
-import { generateSpeechAction } from './speech';
+import type { CefrLevel } from '@/lib/types/practice';
 
 /**
  * Generates a structured initial framing and first message for the simulation.
- * Falls back gracefully — intentional fallback, do NOT convert to throw.
+ * Falls back gracefully, intentional fallback, do NOT convert to throw.
  */
-export async function generateInitialChatAction(topic: string): Promise<InitialChatResult> {
+export async function generateInitialChatAction(
+  topic: string,
+  level: CefrLevel = 'b1',
+  promptKey: string = 'generic_conversation_shared_initial',
+  extraParams: Record<string, string> = {}
+): Promise<InitialChatResult> {
   const defaultResult: InitialChatResult = {
     framing: 'La conversación está lista.',
     message: "Hello! I'm ready to start when you are.",
   };
 
-  const prompt = await getPrompt('generic_conversation_shared_initial', { TOPIC: topic, CEFR_LEVEL: 'b1' });
+  const prompt = await getPrompt(promptKey, { TOPIC: topic, CEFR_LEVEL: level, ...extraParams });
 
   const result = await callGemini(
-    { promptKey: 'generic_conversation_shared_initial', model: MODELS.FLASH_LITE_PREVIEW },
+    { promptKey, model: MODELS.FLASH_LITE_PREVIEW },
     (ai) => ai.models.generateContent({
       model: MODELS.FLASH_LITE_PREVIEW,
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
@@ -52,13 +57,14 @@ export async function generateInitialChatAction(topic: string): Promise<InitialC
 
 /**
  * Simulates the remaining turns of a conversation if it was finished early.
- * Falls back gracefully — intentional fallback, do NOT convert to throw.
+ * Falls back gracefully, intentional fallback, do NOT convert to throw.
  */
 export async function simulateConversationAction(
   history: ChatMessage[],
-  topic: string
+  topic: string,
+  level: CefrLevel = 'b1'
 ): Promise<ChatMessage[]> {
-  const prompt = await getPrompt('generic_conversation_shared_simulate', { TOPIC: topic, CEFR_LEVEL: 'b1', USER_TURN: '', HISTORY: '' });
+  const prompt = await getPrompt('generic_conversation_shared_simulate', { TOPIC: topic, CEFR_LEVEL: level, USER_TURN: '', HISTORY: '' });
 
   const result = await callGemini(
     { promptKey: 'generic_conversation_shared_simulate', model: MODELS.FLASH_LITE_PREVIEW },
@@ -101,14 +107,15 @@ export async function simulateConversationAction(
 
 /**
  * Generates comprehension questions based on the conversation history.
- * Falls back gracefully — intentional fallback, do NOT convert to throw.
+ * Falls back gracefully, intentional fallback, do NOT convert to throw.
  */
 export async function generateQuestionsAction(
   history: ChatMessage[],
-  topic: string
+  topic: string,
+  level: CefrLevel = 'b1'
 ): Promise<Question[]> {
   const historyText = history.map(m => `${m.role}: ${m.text}`).join('\n');
-  const prompt = await getPrompt('generic_conversation_shared_questions', { TRANSCRIPT: historyText, CEFR_LEVEL: 'b1' });
+  const prompt = await getPrompt('generic_conversation_shared_questions', { TRANSCRIPT: historyText, CEFR_LEVEL: level });
 
   const result = await callGemini(
     { promptKey: 'generic_conversation_shared_questions', model: MODELS.FLASH_LITE_PREVIEW },
@@ -152,13 +159,14 @@ export async function generateQuestionsAction(
 
 /**
  * Simulates a response from the user's perspective to continue the conversation.
- * Falls back gracefully — intentional fallback, do NOT convert to throw.
+ * Falls back gracefully, intentional fallback, do NOT convert to throw.
  */
 export async function simulateUserResponseAction(
   history: ChatMessage[],
-  topic: string
+  topic: string,
+  level: CefrLevel = 'b1'
 ): Promise<string> {
-  const prompt = await getPrompt('generic_conversation_shared_simulate_user', { TOPIC: topic, CEFR_LEVEL: 'b1', LAST_TURN: '' });
+  const prompt = await getPrompt('generic_conversation_shared_simulate_user', { TOPIC: topic, CEFR_LEVEL: level, LAST_TURN: '' });
 
   const result = await callGemini(
     { promptKey: 'generic_conversation_shared_simulate_user', model: MODELS.FLASH_LITE_PREVIEW },
@@ -184,14 +192,15 @@ export async function simulateUserResponseAction(
 export async function chatTextConversationAction(
   userText: string,
   history: ChatMessage[],
-  topic: string
+  topic: string,
+  level: CefrLevel = 'b1'
 ): Promise<ChatTurnResult> {
   const fallback: ChatTurnResult = {
     evaluation: { score: 0, feedback: 'Unable to evaluate. Please try again.', transcribed_text: userText },
     ai_response: "I'm sorry, I couldn't process that. Could you try again?",
   };
 
-  const prompt = await getPrompt('generic_conversation_shared_eval_audio', { TOPIC: topic, CEFR_LEVEL: 'b1' });
+  const prompt = await getPrompt('generic_conversation_shared_eval_audio', { TOPIC: topic, CEFR_LEVEL: level });
 
   const result = await callGemini(
     { promptKey: 'generic_conversation_shared_eval_audio', model: MODELS.FLASH_LITE_PREVIEW },
@@ -238,12 +247,9 @@ export async function chatTextConversationAction(
   const validated = ChatTurnSchema.safeParse(parsed);
   if (!validated.success) return fallback;
 
-  const speech = await generateSpeechAction(validated.data.ai_response);
-
   return {
     evaluation: { ...validated.data.evaluation, transcribed_text: userText },
     ai_response: validated.data.ai_response,
-    ai_audio: speech.data ? speech : undefined,
   };
 }
 
@@ -254,14 +260,15 @@ export async function chatConversationAction(
   audioBase64: string,
   mimeType: string,
   history: ChatMessage[],
-  topic: string
+  topic: string,
+  level: CefrLevel = 'b1'
 ): Promise<ChatTurnResult> {
   const fallback: ChatTurnResult = {
     evaluation: { score: 0, feedback: 'Unable to evaluate. Please try again.', transcribed_text: '' },
     ai_response: "I'm sorry, I couldn't process that. Could you try again?",
   };
 
-  const prompt = await getPrompt('generic_conversation_shared_eval_audio', { TOPIC: topic, CEFR_LEVEL: 'b1' });
+  const prompt = await getPrompt('generic_conversation_shared_eval_audio', { TOPIC: topic, CEFR_LEVEL: level });
 
   const result = await callGemini(
     { promptKey: 'generic_conversation_shared_eval_audio', model: MODELS.FLASH_LITE_PREVIEW },
@@ -314,12 +321,9 @@ export async function chatConversationAction(
   const validated = ChatTurnSchema.safeParse(parsed);
   if (!validated.success) return fallback;
 
-  const speech = await generateSpeechAction(validated.data.ai_response);
-
   return {
     evaluation: validated.data.evaluation,
     ai_response: validated.data.ai_response,
-    ai_audio: speech.data ? speech : undefined,
   };
 }
 

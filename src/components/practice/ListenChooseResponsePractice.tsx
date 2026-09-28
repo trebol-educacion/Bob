@@ -28,7 +28,7 @@ export function ListenChooseResponsePractice({ onBack }: ListenChooseResponsePra
     async function init() {
       const sessionResult = await createSessionAction({
         mode: 'toefl_listen_choose_response',
-        title: 'TOEFL Listening — Choose a Response',
+        title: 'TOEFL Listening, Choose a Response',
       });
 
       if (!sessionResult.data) {

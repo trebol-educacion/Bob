@@ -89,7 +89,7 @@ function FormativeFeedbackPanel({ feedback }: { feedback: FormativeFeedback }) {
   return (
     <div className="space-y-4">
       <div className={`text-center py-3 px-4 rounded-xl font-bold text-sm ${feedback.understood ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'}`}>
-        {feedback.understood ? 'Great discussion — your ideas came through clearly!' : 'Good effort — keep practising!'}
+        {feedback.understood ? 'Great discussion, your ideas came through clearly!' : 'Good effort, keep practising!'}
       </div>
       {feedback.highlights.length > 0 && (
         <InfoCard title="What went well" icon={CheckCircle2}>
@@ -128,14 +128,14 @@ function FormativeFeedbackPanel({ feedback }: { feedback: FormativeFeedback }) {
           }}
         >
           <p className="text-xs font-bold text-bob-brand uppercase tracking-widest">Example phrase</p>
-          <p className="text-sm text-gray-800 italic">"{feedback.model_answer}"</p>
+          <p className="text-sm text-gray-800 italic">&quot;{feedback.model_answer}&quot;</p>
         </div>
       )}
     </div>
   );
 }
 
-/** B1 Collaborative Task — Cambridge B1 Preliminary Part 3. */
+/** B1 Collaborative Task, Cambridge B1 Preliminary Part 3. */
 export function B1CollaborativePractice({ onBack, sessionId: initialSessionId }: B1CollaborativePracticeProps) {
   const t = useTranslations('cambridge');
   const [phase, setPhase] = useState<Phase>('intro');

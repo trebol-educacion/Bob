@@ -79,7 +79,6 @@ function ShortTextCard({
   onSelect: (id: 'A' | 'B' | 'C') => void;
   disabled: boolean;
 }) {
-  const t = useTranslations('cambridge');
   const emoji = textContextEmoji(item.text_context);
 
   return (
@@ -237,7 +236,7 @@ function ResultCard({
   );
 }
 
-/** PET Reading Part 1 — Short Texts practice component. */
+/** PET Reading Part 1, Short Texts practice component. */
 export function PETShortTextsPractice({
   onBack,
   sessionId: initialSessionId,
@@ -309,7 +308,7 @@ export function PETShortTextsPractice({
     }
 
     void init();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleSelect(itemNumber: number, optionId: 'A' | 'B' | 'C') {
     setAnswers((prev) => ({ ...prev, [itemNumber]: optionId }));

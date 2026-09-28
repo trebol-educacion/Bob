@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'motion/react';
 import { LogOut, User, BarChart3, Menu, Headphones, Mic2, BookOpen, PenLine } from 'lucide-react';
@@ -36,7 +37,10 @@ export function Navbar({ userEmail, onOpenDashboard, onToggleSidebar, onGoHome }
   const [open, setOpen] = useState(false);
   const { organization, selectedSkill, skillLevels } = useOrganization();
   const [mounted, setMounted] = useState(false);
-  useEffect(() => { setMounted(true); }, []);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMounted(true);
+  }, []);
   const currentLevel = selectedSkill ? skillLevels?.[selectedSkill]?.cefr_level ?? null : null;
   const SkillIcon = selectedSkill ? SKILL_ICON[selectedSkill] : null;
   const t = useTranslations('shell.navbar');
@@ -76,15 +80,18 @@ export function Navbar({ userEmail, onOpenDashboard, onToggleSidebar, onGoHome }
             className="flex items-center rounded-lg p-1 -m-1 hover:bg-white/10 transition-colors disabled:cursor-default disabled:hover:bg-transparent cursor-pointer"
           >
             {organization?.logo_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={organization.logo_url}
                 alt={organization.name}
                 className="h-8 w-auto object-contain"
               />
             ) : (
-              <img
+              <Image
                 src="/bob_logo.png"
                 alt="BOB"
+                width={607}
+                height={323}
                 className="h-8 w-auto object-contain"
               />
             )}
@@ -102,7 +109,7 @@ export function Navbar({ userEmail, onOpenDashboard, onToggleSidebar, onGoHome }
                 {SKILL_LABEL[selectedSkill]}
               </span>
               <span className="text-xs font-black uppercase tracking-wide text-white px-1.5 py-0.5 rounded-md bg-white/20">
-                {currentLevel ?? '—'}
+                {currentLevel ?? '-'}
               </span>
             </div>
           )}

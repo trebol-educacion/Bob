@@ -1,5 +1,5 @@
 /**
- * Skill levels — shared type contracts.
+ * Skill levels, shared type contracts.
  */
 
 import type { SkillLevelMap } from '@/lib/types/skills';

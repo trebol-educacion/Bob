@@ -42,8 +42,8 @@ Respond ONLY with valid JSON:
   "score": number (0-5),
   "accuracy": number (0-5),
   "pronunciation": number (0-5),
-  "feedback": "string — 1-2 sentences specific to their repetition",
-  "transcribed_text": "string — what the candidate actually said",
+  "feedback": "string, 1-2 sentences specific to their repetition",
+  "transcribed_text": "string, what the candidate actually said",
   "original_text": "${originalText}"
 }`;
 }

@@ -226,7 +226,7 @@ function ResultCard({
   result,
   index,
   animate,
-  reduceMotion,
+  reduceMotion: _reduceMotion,
   explanationLabel,
   imageUrl,
 }: {
@@ -316,7 +316,7 @@ function ResultCard({
   );
 }
 
-/** KET Reading Part 1 — Signs and Notices practice component. */
+/** KET Reading Part 1, Signs and Notices practice component. */
 export function KETSignsAndNoticesPractice({
   onBack,
   sessionId: initialSessionId,
@@ -392,7 +392,7 @@ export function KETSignsAndNoticesPractice({
     }
 
     void init();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => () => {
     if (advanceRef.current) clearTimeout(advanceRef.current);

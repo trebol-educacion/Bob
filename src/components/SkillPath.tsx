@@ -79,7 +79,7 @@ type Item =
  * Sample `n` evenly-spaced points (by arc length) along a vertical sine curve, so
  * nodes stay equidistant however wide the swing is. The wavelength scales with the
  * amplitude (constant gentle slope), so the curve reads as one smooth harmonic wave
- * at any width — on mobile and desktop alike.
+ * at any width, on mobile and desktop alike.
  */
 function buildPoints(n: number, width: number): { pts: Array<{ x: number; y: number }>; amp: number } {
   const amp = Math.max(64, Math.min(230, width * 0.21));
@@ -143,7 +143,7 @@ function ScoreRing({ pct, active, color, soft }: { pct: number; active: boolean;
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center leading-none">
         <span className="text-lg font-black tabular-nums" style={{ color: active ? color : '#cbd5e1' }}>
-          {active ? (pct / 10).toFixed(1) : '—'}
+          {active ? (pct / 10).toFixed(1) : '-'}
         </span>
         {active && <span className="text-[9px] font-bold tracking-wider text-trebol-text/40">/10</span>}
       </div>
@@ -271,7 +271,7 @@ export function SkillPath({
                   className="px-1.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider leading-none"
                   style={on ? { background: 'rgba(255,255,255,.25)', color: '#fff' } : { background: sp.soft, color: sp.c }}
                 >
-                  {s.cefrValue ? s.cefrValue.replace('_', ' ') : '—'}
+                  {s.cefrValue ? s.cefrValue.replace('_', ' ') : '-'}
                 </span>
               </button>
             );

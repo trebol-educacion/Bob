@@ -2,8 +2,12 @@
 
 import { createSupabaseServer } from '@/lib/supabase/server';
 import { getPrompt } from '@/lib/prompts/db-prompts';
+import { fetchOpenTasks } from '@/actions/item-bank/repository';
+import { loadStudentFrameworks } from '@/lib/organization/student-frameworks';
+import { hasPendingAssessment } from './queue-guard';
+import { FALLBACK_SPEAKING_PROMPTS, openTaskQuestionsToPrompts } from './speaking-fallback';
 import type { Skill } from '@/lib/types/skills';
-import type { AssessmentPrompt, AssessmentListeningItem, AssessmentReadingItem, AssessmentWritingTask, StartAssessmentResult } from './types';
+import type { AssessmentListeningItem, AssessmentReadingItem, StartAssessmentResult } from './types';
 
 /**
  * Starts an Assessment session for the given skill.
@@ -14,6 +18,10 @@ export async function startAssessmentAction(skill: Skill): Promise<StartAssessme
   const supabase = await createSupabaseServer();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { status: 'error', code: 'unauthenticated' };
+
+  if (await hasPendingAssessment(supabase, user.id, skill)) {
+    return { status: 'pending' };
+  }
 
   const [profileResult, historyResult] = await Promise.all([
     supabase.schema('public').from('profiles').select('organization_id, cefr_active_level').eq('id', user.id).single(),
@@ -142,61 +150,48 @@ export async function startAssessmentAction(skill: Skill): Promise<StartAssessme
 
   const currentLevel = skillLevel?.cefr_level ?? profile.cefr_active_level ?? 'a2';
 
-  const { data: studentFwRows } = await supabase
-    .schema('public').from('student_english_frameworks')
-    .select('framework_id, pedagogical_frameworks(name)')
-    .eq('student_id', user.id);
+  const studentFwResult = await loadStudentFrameworks(supabase, user.id);
+  if (studentFwResult.error) {
+    const { table, schema, code, message } = studentFwResult.error;
+    console.error(
+      `[startAssessmentAction] student frameworks resolution failed: table=${table} schema=${schema} code=${code ?? 'unknown'} message=${message}`,
+    );
+  }
 
-  const frameworkNames = (studentFwRows ?? [])
-    .map((r: Record<string, unknown>) => {
-      const pf = r.pedagogical_frameworks as { name?: string } | null;
-      return pf?.name ?? '';
-    });
-
-  const hasCambridge = frameworkNames.some((n: string) => n === 'Cambridge English');
+  const hasCambridge = studentFwResult.frameworks.includes('cambridge');
   const isYlLevel = currentLevel === 'pre_a1' || currentLevel === 'a1';
   const isYl = hasCambridge && isYlLevel;
 
   let promptKey: string;
+  let openTasksLevel: string;
   if (isYl) {
     promptKey = currentLevel === 'pre_a1'
       ? 'cefr_assessment_speaking_yl_pre_a1_generation'
       : 'cefr_assessment_speaking_yl_a1_generation';
+    openTasksLevel = currentLevel;
   } else {
     const isHigherRange = currentLevel === 'b1' || currentLevel === 'b2';
     promptKey = isHigherRange
       ? 'cefr_assessment_speaking_b1_b2_generation'
       : 'cefr_assessment_speaking_a1_a2_generation';
+    openTasksLevel = isHigherRange ? 'b1' : 'a2';
   }
 
   const promptText = await getPrompt(promptKey);
-
-  const hardcodedPrompts: Record<string, AssessmentPrompt[]> = {
-    'cefr_assessment_speaking_a1_a2_generation': [
-      { turn_number: 1, prompt_text: 'Tell me about your school — what do you study and which subject do you like best?' },
-      { turn_number: 2, prompt_text: 'Describe what you usually do on weekends.' },
-      { turn_number: 3, prompt_text: 'Imagine you are in a park with friends. Tell me what is happening.' },
-    ],
-    'cefr_assessment_speaking_b1_b2_generation': [
-      { turn_number: 1, prompt_text: 'Tell me about a memorable trip or outing you have taken. Where did you go and what made it special?' },
-      { turn_number: 2, prompt_text: 'Describe how technology has changed the way young people study or communicate.' },
-      { turn_number: 3, prompt_text: 'A friend is nervous about an important exam and asks for your advice. What would you say to them and why?' },
-    ],
-    'cefr_assessment_speaking_yl_pre_a1_generation': [
-      { turn_number: 1, prompt_text: 'Hi! What is your name?' },
-      { turn_number: 2, prompt_text: 'How old are you? And what is your favourite colour? 🎨' },
-      { turn_number: 3, prompt_text: 'Tell me about your family. How many people are in your family? 👨‍👩‍👧' },
-    ],
-    'cefr_assessment_speaking_yl_a1_generation': [
-      { turn_number: 1, prompt_text: 'What do you like to do after school? ⭐' },
-      { turn_number: 2, prompt_text: 'Tell me about your favourite animal. What does it look like? 🐾' },
-      { turn_number: 3, prompt_text: 'What is the weather like today? Do you like this kind of weather? ☀️' },
-    ],
-  };
-
   void promptText;
 
-  const prompts = hardcodedPrompts[promptKey] ?? [];
+  const openTasksResult = await fetchOpenTasks({
+    exam: 'cefr',
+    skill: 'speaking',
+    cefr_level: openTasksLevel,
+    purpose: 'placement',
+  });
+
+  const curatedTask = openTasksResult.ok ? openTasksResult.data[0] : undefined;
+  const prompts = curatedTask
+    ? openTaskQuestionsToPrompts(curatedTask.questions)
+    : FALLBACK_SPEAKING_PROMPTS[promptKey] ?? [];
+
   if (prompts.length === 0) return { status: 'error', code: 'no_prompts' };
 
   return { status: 'ok', skill: 'speaking', assessment_id, prompts, is_yl: isYl };

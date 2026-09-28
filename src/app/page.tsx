@@ -7,11 +7,14 @@ import { createSupabaseBrowser } from '@/lib/supabase/browser-client';
 import { useSessionState } from '@/hooks/useSessionState';
 import { useOrganization } from '@/hooks/useOrganization';
 import { useAssessmentFlow } from '@/hooks/useAssessmentFlow';
+import { useUsageHeartbeat } from '@/hooks/useUsageHeartbeat';
+import { isBrandNewStudent } from '@/lib/placement/first-entry-gate';
 import { isConversationMode, isExamMode, type AppState } from '@/lib/routing';
 import type { PracticeMode } from '@/lib/types/practice';
+import type { PracticeActivityMode } from '@/lib/practice/types';
 
 export default function App() {
-  const [appState, setAppState] = useState<AppState>('skill-selection');
+  const [appState, setAppState] = useState<AppState>('home');
   const [userEmail, setUserEmail] = useState<string | undefined>();
   const {
     organization,
@@ -25,6 +28,7 @@ export default function App() {
     selectedSkill,
     setSelectedSkill,
     refreshSkillLevels,
+    refreshPendingAssessments,
     sustainedImprovementDetected,
     checkSustainedImprovement,
   } = useOrganization();
@@ -40,10 +44,14 @@ export default function App() {
 
   const [mode, setMode] = useState<PracticeMode>(null);
   const [topic, setTopic] = useState('');
+  const [practiceMode, setPracticeMode] = useState<PracticeActivityMode>('conversation');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  useUsageHeartbeat(mode);
 
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 767px)');
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (mq.matches) setSidebarCollapsed(true);
     const handler = (e: MediaQueryListEvent) => {
       if (e.matches) setSidebarCollapsed(true);
@@ -58,12 +66,38 @@ export default function App() {
     }
   }, [appState, checkSustainedImprovement]);
 
+  useEffect(() => {
+    if (appState !== 'skill-selection' && appState !== 'dashboard') return;
+    void refreshSkillLevels();
+    void refreshPendingAssessments();
+  }, [appState, refreshSkillLevels, refreshPendingAssessments]);
+
+  const firstEntryGateAttemptedRef = useRef(false);
+
+  useEffect(() => {
+    if (appState !== 'skill-selection') return;
+    if (orgLoading) return;
+    if (firstEntryGateAttemptedRef.current) return;
+    if (!isBrandNewStudent(skillLevels)) return;
+
+    firstEntryGateAttemptedRef.current = true;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setAppState('placement-required');
+  }, [appState, orgLoading, skillLevels]);
+
   const resetToSkillSelection = useCallback(() => {
     setAppState('skill-selection');
     setSelectedSkill(null);
     setMode(null);
     setTopic('');
   }, [setSelectedSkill]);
+
+  const onSelectExam = useCallback(() => setAppState('skill-selection'), []);
+  const onSelectPractice = useCallback(() => setAppState('practice-mode-select'), []);
+  const onSelectPracticeMode = useCallback((selected: PracticeActivityMode) => {
+    setPracticeMode(selected);
+    setAppState('practice-session');
+  }, []);
 
   const {
     sessions,
@@ -72,14 +106,18 @@ export default function App() {
     selectedMessages,
     setSessions,
     setActiveSessionId,
-    setSelectedMessages,
-    setSelectedSession,
+    clearActiveSession,
     handleNewSession,
     handleSelectSession,
     handleDeleteSession,
     handleConversationSessionStart,
     refreshSessions,
   } = useSessionState(userEmail);
+
+  const leavePractice = useCallback((target: AppState) => {
+    clearActiveSession();
+    setAppState(target);
+  }, [clearActiveSession]);
 
   const onNewSession = useCallback(() => {
     handleNewSession(resetToSkillSelection);
@@ -120,10 +158,11 @@ export default function App() {
   }, [handleConversationSessionStart]);
 
   const onFinish = useCallback(() => {
-    setSelectedMessages([]);
-    setSelectedSession(null);
-    resetToSkillSelection();
-  }, [resetToSkillSelection, setSelectedMessages, setSelectedSession]);
+    leavePractice('home');
+    setSelectedSkill(null);
+    setMode(null);
+    setTopic('');
+  }, [leavePractice, setSelectedSkill]);
 
   const assessment = useAssessmentFlow({
     selectedSkill,
@@ -131,6 +170,8 @@ export default function App() {
     skillLevels,
     refreshSkillLevels,
     setAppState,
+    cefrLevelLocked,
+    cefrActiveLevel,
   });
 
   if (!orgLoading && accessDenialReason) {
@@ -163,6 +204,11 @@ export default function App() {
       onNewSession={onNewSession}
       onDeleteSession={onDeleteSession}
       onFinish={onFinish}
+      leavePractice={leavePractice}
+      onSelectExam={onSelectExam}
+      onSelectPractice={onSelectPractice}
+      practiceMode={practiceMode}
+      onSelectPracticeMode={onSelectPracticeMode}
       handleSkillSelect={assessment.handleSkillSelect}
       handleModeSelect={handleModeSelect}
       handleAssessmentStart={assessment.handleAssessmentStart}
@@ -170,6 +216,7 @@ export default function App() {
       onConversationSessionStart={onConversationSessionStart}
       refreshSessions={refreshSessions}
       refreshSkillLevels={refreshSkillLevels}
+      refreshPendingAssessments={refreshPendingAssessments}
       setActiveSessionId={setActiveSessionId}
       setSessions={setSessions}
       cefrSelectorRef={cefrSelectorRef}

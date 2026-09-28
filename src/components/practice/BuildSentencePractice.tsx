@@ -36,7 +36,7 @@ function evaluate(ordered: string[], target: string): boolean {
   return normalize(ordered.join(' ')) === normalize(target);
 }
 
-/** TOEFL Writing — Build a Sentence: drag tokens into order, deterministic scoring. */
+/** TOEFL Writing, Build a Sentence: drag tokens into order, deterministic scoring. */
 export function BuildSentencePractice({ onBack }: BuildSentencePracticeProps) {
   const t = useTranslations('resultcard');
   const tErrors = useTranslations('errors');
@@ -57,7 +57,7 @@ export function BuildSentencePractice({ onBack }: BuildSentencePracticeProps) {
     async function init() {
       const sessionResult = await createSessionAction({
         mode: 'toefl_writing_build_sentence',
-        title: 'TOEFL Writing — Build a Sentence',
+        title: 'TOEFL Writing, Build a Sentence',
       });
       if (!sessionResult.data) {
         setLoadError(sessionResult.error ?? 'Failed to create session');
@@ -157,7 +157,7 @@ export function BuildSentencePractice({ onBack }: BuildSentencePracticeProps) {
               : <XCircle size={16} className="text-red-400 shrink-0 mt-0.5" />}
             <span className="text-gray-700">
               {t('yourAnswer')} <em>{r.ordered_tokens.join(' ')}</em>
-              {!r.correct && <> — {t('expected')} <em>{r.expected}</em></>}
+              {!r.correct && <>, {t('expected')} <em>{r.expected}</em></>}
             </span>
           </div>
         ))}

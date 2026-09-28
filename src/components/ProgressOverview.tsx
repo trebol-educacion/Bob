@@ -186,7 +186,7 @@ function BarChart({ buckets, height }: { buckets: Bucket[]; height: number }) {
 /**
  * Gamification overview band mounted above the skill path: activity-over-time
  * chart, current-week mini chart, per-skill progress and a small stat row.
- * Presentational — every number arrives pre-derived from real student data.
+ * Presentational, every number arrives pre-derived from real student data.
  */
 export function ProgressOverview({
   sessionDates,
@@ -343,7 +343,7 @@ export function ProgressOverview({
                       className="px-1.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider leading-none shrink-0"
                       style={{ background: p.soft, color: p.c }}
                     >
-                      {s.cefr ? s.cefr.replace('_', ' ') : '—'}
+                      {s.cefr ? s.cefr.replace('_', ' ') : '-'}
                     </span>
                     <span className="ml-auto text-[11px] font-black tabular-nums text-trebol-text/55 shrink-0">
                       {s.done}/{s.total}

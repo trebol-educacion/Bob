@@ -3,7 +3,7 @@ import type { EvalResponse } from '@/lib/types/practice';
 
 export type YLExam = 'starters' | 'movers';
 
-/** Plan returned by Gemini for Parts 1–5. Shape varies by part. */
+/** Plan returned by Gemini for Parts 1-5. Shape varies by part. */
 export const PointingCueSchema = z.object({
   target_index: z.number().int().min(0),
   text: z.string(),

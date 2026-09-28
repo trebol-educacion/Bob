@@ -1,5 +1,5 @@
 /**
- * Gemini actions — shared type contracts.
+ * Gemini actions, shared type contracts.
  */
 
 export interface EvaluationResult {
@@ -23,7 +23,6 @@ export interface ChatMessage {
 export interface ChatTurnResult {
   evaluation: EvaluationResult;
   ai_response: string;
-  ai_audio?: { data: string; mimeType: string };
 }
 
 export interface ImageScene {

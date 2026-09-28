@@ -45,7 +45,7 @@ export interface HobbyTalkPrompt {
   image_url: string;
 }
 
-/** Plan without media — returned by the fast first-phase action. */
+/** Plan without media, returned by the fast first-phase action. */
 export interface HobbyTalkPlan {
   sessionId: string;
   userId: string;
@@ -75,11 +75,11 @@ function safeParse<T>(schema: z.ZodType<T>, raw: string): T | null {
 }
 
 function fallbackFeedback(): HobbyTalkFeedback {
-  return { understood: false, highlights: [], suggestions: ['Try again — we could not process your response.'], model_answer: null };
+  return { understood: false, highlights: [], suggestions: ['Try again, we could not process your response.'], model_answer: null };
 }
 
 /**
- * Phase 1 — fast (~1.5s): generates text only (hobby, instruction, bullets,
+ * Phase 1, fast (~1.5s): generates text only (hobby, instruction, bullets,
  * image prompt). The component renders immediately and loads TTS + image in
  * the background via generateKETHobbyTalkMediaAction.
  */
@@ -90,7 +90,7 @@ export async function generateKETHobbyTalkPlanAction(input: {
   let userId: string | undefined;
 
   if (!sessionId) {
-    const result = await createSessionAction({ mode: 'cambridge_ket_part2', title: 'Speaking Part 2 — Talk About a Hobby' });
+    const result = await createSessionAction({ mode: 'cambridge_ket_part2', title: 'Speaking Part 2, Talk About a Hobby' });
     if (!result.data) return { error: result.error ?? 'Could not create session' };
     sessionId = result.data.id;
     userId = result.data.user_id;
@@ -134,7 +134,7 @@ export async function generateKETHobbyTalkPlanAction(input: {
   };
 }
 
-/** Phase 2 — generates TTS + image in parallel (~7s, cached). */
+/** Phase 2, generates TTS + image in parallel (~7s, cached). */
 export async function generateKETHobbyTalkMediaAction(input: {
   instruction: string;
   image_prompt: string;
@@ -159,7 +159,7 @@ export async function generateKETHobbyTalkAction(input: {
   let userId: string | undefined;
 
   if (!sessionId) {
-    const result = await createSessionAction({ mode: 'cambridge_ket_part2', title: 'Speaking Part 2 — Talk About a Hobby' });
+    const result = await createSessionAction({ mode: 'cambridge_ket_part2', title: 'Speaking Part 2, Talk About a Hobby' });
     if (!result.data) return { error: result.error ?? 'Could not create session' };
     sessionId = result.data.id;
     userId = result.data.user_id;

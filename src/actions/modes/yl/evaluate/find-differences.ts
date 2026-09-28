@@ -22,7 +22,7 @@ export async function evaluateFindDifferencesAnswerAction(input: {
       score_max: 1,
       cefr_band: 'a1',
       correct: false,
-      reaction: "I didn't hear you — try again!",
+      reaction: "I didn't hear you, try again!",
       feedback: undefined,
       transcript_used: '',
       transcript: '',

@@ -23,7 +23,7 @@ export function ImagePhase({
   handleAudioStart,
   stopRecording,
   handleNextImage,
-  isRecording,
+  isRecording: _isRecording,
   onStopRecording,
   handleRetry,
 }: ImagePhaseProps) {

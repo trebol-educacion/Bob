@@ -102,7 +102,7 @@ export async function generateKETListenDecideAction(input: {
   const [generationPrompt, framingText] = await Promise.all([
     getPrompt('cambridge_ket_listening_part3_a2_generation').catch(() => null),
     getPrompt('cambridge_ket_listening_part3_a2_framing').catch(
-      () => 'You will hear a conversation between two people. Listen carefully and choose the best answer — A, B or C — for each question.'
+      () => 'You will hear a conversation between two people. Listen carefully and choose the best answer, A, B or C, for each question.'
     ),
   ]);
 

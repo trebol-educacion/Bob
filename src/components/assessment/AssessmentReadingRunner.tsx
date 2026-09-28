@@ -2,6 +2,7 @@
 
 import React, { useState, useCallback } from 'react';
 import { ChevronRight, RotateCcw } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import { submitAssessmentReadingAction } from '@/actions/assessment';
 import { BobMascotLoader } from '@/components/chat/BobMascotLoader';
 import type { AssessmentReadingItem } from '@/actions/assessment';
@@ -15,6 +16,7 @@ interface Props {
 }
 
 export function AssessmentReadingRunner({ assessment_id, items, onResult, onCancel }: Props) {
+  const tPlacement = useTranslations('placement');
   const [currentIdx, setCurrentIdx] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
@@ -28,20 +30,6 @@ export function AssessmentReadingRunner({ assessment_id, items, onResult, onCanc
   const handleSelectOption = useCallback((key: string) => {
     setSelectedKey(key);
   }, []);
-
-  const handleNext = useCallback(() => {
-    if (!selectedKey || !currentItem) return;
-
-    const updatedAnswers = { ...answers, [currentItem.id]: selectedKey };
-    setAnswers(updatedAnswers);
-
-    if (isLastItem) {
-      handleSubmit(updatedAnswers);
-    } else {
-      setCurrentIdx(prev => prev + 1);
-      setSelectedKey(null);
-    }
-  }, [selectedKey, currentItem, answers, isLastItem]);
 
   const handleSubmit = useCallback(async (finalAnswers: Record<string, string>) => {
     setSubmitting(true);
@@ -62,6 +50,20 @@ export function AssessmentReadingRunner({ assessment_id, items, onResult, onCanc
 
     onResult(result.result);
   }, [assessment_id, onResult]);
+
+  const handleNext = useCallback(() => {
+    if (!selectedKey || !currentItem) return;
+
+    const updatedAnswers = { ...answers, [currentItem.id]: selectedKey };
+    setAnswers(updatedAnswers);
+
+    if (isLastItem) {
+      handleSubmit(updatedAnswers);
+    } else {
+      setCurrentIdx(prev => prev + 1);
+      setSelectedKey(null);
+    }
+  }, [selectedKey, currentItem, answers, isLastItem, handleSubmit]);
 
   const handleRetry = useCallback(() => {
     setCurrentIdx(0);
@@ -159,7 +161,7 @@ export function AssessmentReadingRunner({ assessment_id, items, onResult, onCanc
       </button>
 
       <button onClick={onCancel} className="text-sm text-gray-400 hover:text-gray-600 transition">
-        Cancel assessment
+        {tPlacement('cancelButton')}
       </button>
     </div>
   );

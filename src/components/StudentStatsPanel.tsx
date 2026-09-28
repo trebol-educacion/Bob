@@ -74,13 +74,6 @@ const MODE_LABEL: Record<string, string> = {
   generic_image: 'Free Practice · Picture',
 };
 
-const SKILL_META: Record<Skill, { color: string; soft: string; ring: string }> = {
-  speaking: { color: '#3660AB', soft: '#dde4f2', ring: 'shadow-blue-200' },
-  reading: { color: '#469E7B', soft: '#dcebe3', ring: 'shadow-emerald-200' },
-  listening: { color: '#F8AC37', soft: '#fde9c8', ring: 'shadow-amber-200' },
-  writing: { color: '#9333EA', soft: '#f3e8ff', ring: 'shadow-purple-200' },
-};
-
 const SKILL_LABEL_KEY: Record<Skill, string> = {
   speaking: 'skillSpeaking',
   reading: 'skillReading',
@@ -355,6 +348,7 @@ export function StudentStatsPanel({ onBack, onTakeAssessment, onChangeLevel, onL
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();
   }, [load]);
 
@@ -418,7 +412,7 @@ export function StudentStatsPanel({ onBack, onTakeAssessment, onChangeLevel, onL
       return {
         key: skill,
         label: t(SKILL_LABEL_KEY[skill]),
-        level: currentLabel ?? '—',
+        level: currentLabel ?? '-',
         goalLevel: nextLevelLabel(current ?? 'a1'),
         cefrValue: current,
         done: Math.min(stat.sessions, target),

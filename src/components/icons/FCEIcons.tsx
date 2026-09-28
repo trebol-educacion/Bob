@@ -6,7 +6,7 @@ interface IconProps {
 }
 
 /**
- * Cambridge FCE (B2) — Listening skill.
+ * Cambridge FCE (B2), Listening skill.
  * Podcast-style rounded square with a centered play triangle and rising waveform bars.
  */
 export function FCEListeningIcon({ size = 28, className }: IconProps) {
@@ -33,7 +33,7 @@ export function FCEListeningIcon({ size = 28, className }: IconProps) {
 }
 
 /**
- * Cambridge FCE (B2) — Reading & Use of English skill.
+ * Cambridge FCE (B2), Reading & Use of English skill.
  * Stack of three books with a small bookmark ribbon on the top volume.
  */
 export function FCEReadingIcon({ size = 28, className }: IconProps) {
@@ -59,7 +59,7 @@ export function FCEReadingIcon({ size = 28, className }: IconProps) {
 }
 
 /**
- * Cambridge FCE (B2) — Writing skill.
+ * Cambridge FCE (B2), Writing skill.
  * Quill pen angled across the canvas with a tiny ink droplet near the nib.
  */
 export function FCEWritingIcon({ size = 28, className }: IconProps) {
@@ -85,7 +85,7 @@ export function FCEWritingIcon({ size = 28, className }: IconProps) {
 }
 
 /**
- * Cambridge FCE (B2) — Speaking skill.
+ * Cambridge FCE (B2), Speaking skill.
  * Studio microphone with curved sound waves on each side.
  */
 export function FCESpeakingIcon({ size = 28, className }: IconProps) {

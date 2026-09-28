@@ -17,7 +17,6 @@ import type { StoredMessage } from '@/actions/messages';
 import { useTranslations } from 'next-intl';
 
 const ACCENT = '#469E7B';
-const ACCENT_DARK = '#37795E';
 const ACCENT_TEXT = '#2F6B52';
 const ACCENT_TINT = 'color-mix(in oklab, #469E7B 14%, white)';
 const CARD_SURFACE = '#FAFAF8';
@@ -206,7 +205,7 @@ function tryRestoreFromMessages(messages: StoredMessage[]): {
   return { prompt, userText, feedback };
 }
 
-/** KET Writing Part 6 — Short Message focus-mode practice component. */
+/** KET Writing Part 6, Short Message focus-mode practice component. */
 export function KETShortMessagePractice({
   onBack,
   sessionId: initialSessionId,
@@ -270,7 +269,7 @@ export function KETShortMessagePractice({
     }
 
     void init();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleSubmit() {
     if (!prompt || !text.trim() || wordCount < MIN_WORDS) return;

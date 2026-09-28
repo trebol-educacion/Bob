@@ -1,6 +1,8 @@
 'use server';
 
 import { createSupabaseServer } from '@/lib/supabase/server';
+import { getSkillLevelsAction } from '@/actions/skills/read';
+import { mustTakePlacement, requiresPlacementGate } from '@/lib/levels/level-policy';
 import type { PracticeMode } from '@/lib/types/practice';
 
 /** @deprecated Use PracticeMode from '@/lib/types/practice' directly. */
@@ -32,6 +34,14 @@ export async function createSessionAction(input: {
     const supabase = await createSupabaseServer();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return { data: null, error: 'unauthenticated' };
+
+    const gatedSkill = input.mode ? requiresPlacementGate(input.mode) : null;
+    if (gatedSkill) {
+      const skillLevels = await getSkillLevelsAction(user.id);
+      if (skillLevels !== null && mustTakePlacement(skillLevels, gatedSkill)) {
+        return { data: null, error: 'placement_required' };
+      }
+    }
 
     const { data, error } = await supabase
       .from('sessions')

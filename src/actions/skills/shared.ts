@@ -1,5 +1,5 @@
 /**
- * Skill levels — constants and caller helpers shared by readers/writers.
+ * Skill levels, constants and caller helpers shared by readers/writers.
  */
 
 import { createSupabaseServer } from '@/lib/supabase/server';

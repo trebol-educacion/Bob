@@ -102,7 +102,7 @@ export async function generatePETListeningAttitudeAction(input: {
     getPrompt('cambridge_pet_listening_part4_b1_generation').catch(() => null),
     getPrompt('cambridge_pet_listening_part4_b1_framing').catch(
       () =>
-        'Vas a escuchar a varias personas hablando solas. Después de cada una, decide cómo se siente, qué opina o qué quiere hacer y elige la respuesta correcta — A, B o C.'
+        'Vas a escuchar a varias personas hablando solas. Después de cada una, decide cómo se siente, qué opina o qué quiere hacer y elige la respuesta correcta, A, B o C.'
     ),
   ]);
 

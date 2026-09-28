@@ -24,16 +24,26 @@ export interface StudentStatsResult {
   activities: StudentActivityEntry[];
 }
 
-export async function getStudentStatsAction(): Promise<StudentStatsResult> {
+export interface StudentStatsPeriod {
+  from?: string;
+  to?: string;
+}
+
+export async function getStudentStatsAction(period?: StudentStatsPeriod): Promise<StudentStatsResult> {
   const supabase = await createSupabaseServer();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { rows: [], total_sessions: 0, global_avg: null, session_dates: [], activities: [] };
 
-  const { data: activityRows } = await supabase
+  let query = supabase
     .from('activity_results')
     .select('mode, score_10, created_at')
     .eq('user_id', user.id)
     .order('created_at', { ascending: false });
+
+  if (period?.from) query = query.gte('created_at', period.from);
+  if (period?.to) query = query.lte('created_at', period.to);
+
+  const { data: activityRows } = await query;
 
   const results = activityRows ?? [];
 

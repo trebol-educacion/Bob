@@ -41,7 +41,7 @@ const FormativeFeedbackFallback: FormativeFeedback = {
   kind: 'formative',
   understood: false,
   highlights: [],
-  suggestions: ['Try again — we could not process your response.'],
+  suggestions: ['Try again, we could not process your response.'],
 };
 
 /** Generates a TOEFL Interview session plan with 4 progressive questions. */
@@ -119,7 +119,7 @@ The student answered this question:
 
 Listen to the audio and return ONLY a JSON object with these fields:
 - "kind": always "formative"
-- "understood": boolean — did the student communicate their main idea clearly?
+- "understood": boolean, did the student communicate their main idea clearly?
 - "highlights": array of 1-3 strings celebrating specific strengths (e.g. "Good use of examples", "Clear main idea stated at the start")
 - "suggestions": array of 1-3 specific improvement tips (e.g. "Try to elaborate more on your second point", "Use discourse markers like 'firstly' and 'however'")
 - "model_answer": one example sentence or phrase showing a strong way to open or conclude this answer

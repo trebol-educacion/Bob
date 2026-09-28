@@ -3,7 +3,7 @@
  * Source: src/actions/modes/part3.ts (was inline at lines 77-83).
  *
  * Seed key: b1_part3_chat_audio
- * No dynamic params — plain static string.
+ * No dynamic params, plain static string.
  */
 
 export const PART3_CHAT_AUDIO_PROMPT = `Listen to the candidate's audio. First transcribe exactly what they said, then generate your next examiner response based on the conversation context.

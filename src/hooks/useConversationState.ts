@@ -18,7 +18,7 @@ interface ConversationState {
   inputText: string;
 }
 
-interface UseConversationStateReturn extends ConversationState {
+export interface UseConversationStateReturn extends ConversationState {
   setPhase: (phase: Phase) => void;
   setInternalTopic: (topic: string) => void;
   setTopicInput: (input: string) => void;
@@ -33,11 +33,11 @@ interface UseConversationStateReturn extends ConversationState {
   setInputText: (text: string) => void;
 }
 
-export function useConversationState(topicProp: string): UseConversationStateReturn {
-  const [phase, setPhase] = useState<Phase>(topicProp ? 'conversation' : 'topic-input');
+export function useConversationState(topicProp: string, initialMessages: ChatMessage[] = []): UseConversationStateReturn {
+  const [phase, setPhase] = useState<Phase>(initialMessages.length > 0 || topicProp ? 'conversation' : 'topic-input');
   const [internalTopic, setInternalTopic] = useState(topicProp);
   const [topicInput, setTopicInput] = useState('');
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
   const [framing, setFraming] = useState<string>('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [isGeneratingAudio, setIsGeneratingAudio] = useState<number | null>(null);

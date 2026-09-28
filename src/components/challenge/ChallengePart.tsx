@@ -406,7 +406,7 @@ export function ChallengePart({ part, answers, onChange }: Props) {
       {part.format === 'speaking_interview' && (
         <div className="space-y-3">
           <div className="rounded-2xl bg-[#dcebe3]/60 border border-[#469E7B]/30 p-3 text-sm font-semibold text-trebol-text/80">
-            Read each question, then speak your answer aloud. There is no exam score — you will get supportive,
+            Read each question, then speak your answer aloud. There is no exam score, you will get supportive,
             qualitative feedback.
           </div>
           {part.questions.map((q, i) => (
@@ -432,7 +432,7 @@ export function ChallengePart({ part, answers, onChange }: Props) {
       {part.format === 'speaking_collaborative' && (
         <div className="space-y-3">
           <div className="rounded-2xl bg-[#dcebe3]/60 border border-[#469E7B]/30 p-3 text-sm font-semibold text-trebol-text/80">
-            Talk about the picture out loud using the points below. There is no exam score — you will get
+            Talk about the picture out loud using the points below. There is no exam score, you will get
             supportive, qualitative feedback.
           </div>
           <p className="text-sm font-bold text-trebol-text">{part.prompt}</p>

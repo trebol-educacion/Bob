@@ -4,7 +4,7 @@ type IconProps = {
 };
 
 /**
- * PET Listening icon — headphones with a small music note between the cups.
+ * PET Listening icon, headphones with a small music note between the cups.
  */
 export function PETListeningIcon({ size = 24, className }: IconProps) {
   return (
@@ -33,7 +33,7 @@ export function PETListeningIcon({ size = 24, className }: IconProps) {
 }
 
 /**
- * PET Reading icon — open book with multiple page lines suggesting a longer text.
+ * PET Reading icon, open book with multiple page lines suggesting a longer text.
  */
 export function PETReadingIcon({ size = 24, className }: IconProps) {
   return (
@@ -63,7 +63,7 @@ export function PETReadingIcon({ size = 24, className }: IconProps) {
 }
 
 /**
- * PET Writing icon — fountain pen nib above a paper sheet with a signature line.
+ * PET Writing icon, fountain pen nib above a paper sheet with a signature line.
  */
 export function PETWritingIcon({ size = 24, className }: IconProps) {
   return (
@@ -91,7 +91,7 @@ export function PETWritingIcon({ size = 24, className }: IconProps) {
 }
 
 /**
- * PET Speaking icon — two overlapping speech bubbles indicating a two-way conversation.
+ * PET Speaking icon, two overlapping speech bubbles indicating a two-way conversation.
  */
 export function PETSpeakingIcon({ size = 24, className }: IconProps) {
   return (

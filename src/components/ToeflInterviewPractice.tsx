@@ -80,7 +80,7 @@ function FormativeFeedbackCard({ feedback }: { feedback: FormativeFeedback }) {
           style={{ background: 'color-mix(in oklab, var(--color-bob-brand) 8%, white)' }}
         >
           <p className="text-xs font-bold text-bob-brand uppercase tracking-widest">{t('example')}</p>
-          <p className="text-sm text-gray-800 italic">"{feedback.model_answer}"</p>
+          <p className="text-sm text-gray-800 italic">&quot;{feedback.model_answer}&quot;</p>
         </div>
       )}
     </div>
@@ -108,6 +108,17 @@ export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) 
   const sessionIdRef = useRef<string | null>(null);
   const userIdRef = useRef<string | null>(null);
 
+  const { startRecording, stopRecording } = useAudioRecorder({
+    onRecorded: (blob) => {
+      recordedBlobRef.current = blob;
+      setSubPhase('evaluating');
+    },
+    onError: (err) => {
+      console.error('Recording error:', err);
+      setError(t('common.micError'));
+    },
+  });
+
   const prepCountdown = useCountdown({
     seconds: PREP_SECONDS,
     onComplete: useCallback(() => {
@@ -121,17 +132,6 @@ export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) 
       stopRecording();
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []),
-  });
-
-  const { isRecording, startRecording, stopRecording } = useAudioRecorder({
-    onRecorded: (blob) => {
-      recordedBlobRef.current = blob;
-      setSubPhase('evaluating');
-    },
-    onError: (err) => {
-      console.error('Recording error:', err);
-      setError(t('common.micError'));
-    },
   });
 
   useEffect(() => {
@@ -151,7 +151,7 @@ export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) 
     }
     load();
     return () => { cancelled = true; };
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleStart = useCallback(async () => {
     if (!plan) return;
@@ -160,7 +160,7 @@ export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) 
       const sessionResult = await createSessionAction({
         mode: 'toefl_interview',
         topic: plan.topic_id,
-        title: `TOEFL Interview — ${plan.topic_name}`,
+        title: `TOEFL Interview, ${plan.topic_name}`,
       });
       if (sessionResult.data) {
         sessionIdRef.current = sessionResult.data.id;

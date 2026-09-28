@@ -1,5 +1,5 @@
 /**
- * db-prompts.ts — Supabase-backed prompt cache for Bob.
+ * db-prompts.ts, Supabase-backed prompt cache for Bob.
  *
  * Fetches prompt text from the `bob_prompts` table and caches it in-process
  * for 5 minutes. On DB failure, falls back to FALLBACK_PROMPTS so Bob keeps
@@ -10,9 +10,13 @@
  */
 
 import { createSupabaseServer } from '@/lib/supabase/server'
-import { FALLBACK_PROMPTS } from './fallback-prompts'
+import { FALLBACK_PROMPTS as BASE_FALLBACK_PROMPTS } from './fallback-prompts'
+import { PRACTICE_FALLBACK_PROMPTS } from './fallback-prompts-practice'
 
-export { FALLBACK_PROMPTS } from './fallback-prompts'
+export const FALLBACK_PROMPTS: Record<string, string> = {
+  ...BASE_FALLBACK_PROMPTS,
+  ...PRACTICE_FALLBACK_PROMPTS,
+}
 
 type PromptRow = {
   prompt_key: string
@@ -87,8 +91,8 @@ function substituteParams(
  * Retrieves a prompt by key, substituting {NAME} placeholders with `params`.
  *
  * Resolution order:
- *   1. In-process cache (TTL: 5 min) — refreshed from `bob_prompts` table
- *   2. FALLBACK_PROMPTS — used when DB is unreachable or key is missing from DB
+ *   1. In-process cache (TTL: 5 min), refreshed from `bob_prompts` table
+ *   2. FALLBACK_PROMPTS, used when DB is unreachable or key is missing from DB
  *
  * @throws Error if `key` is not found in either cache or FALLBACK_PROMPTS
  */
@@ -114,7 +118,7 @@ export async function getPrompt(
     template = FALLBACK_PROMPTS[key]
     if (template !== undefined) {
       console.warn(
-        `[getPrompt] Key '${key}' not found in DB cache — using fallback prompt`
+        `[getPrompt] Key '${key}' not found in DB cache, using fallback prompt`
       )
     }
   }

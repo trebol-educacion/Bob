@@ -1,5 +1,5 @@
 /**
- * Assessment — cooldown resolution shared across skills.
+ * Assessment, cooldown resolution shared across skills.
  */
 
 import { createSupabaseServer } from '@/lib/supabase/server';

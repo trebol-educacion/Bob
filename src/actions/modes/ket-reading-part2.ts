@@ -80,7 +80,7 @@ export async function generateKETMatchQuestionAction(input: {
 
   const [generationPrompt, framingText] = await Promise.all([
     getPrompt('cambridge_ket_reading_part2_a2_generation').catch(() => null),
-    getPrompt('cambridge_ket_reading_part2_a2_framing').catch(() => 'Read the three texts. Then match each question to the correct person — A, B or C.'),
+    getPrompt('cambridge_ket_reading_part2_a2_framing').catch(() => 'Read the three texts. Then match each question to the correct person, A, B or C.'),
   ]);
 
   if (!generationPrompt) return { error: 'Could not load generation prompt' };

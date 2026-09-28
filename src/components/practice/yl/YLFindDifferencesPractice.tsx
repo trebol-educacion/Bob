@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * YLFindDifferencesPractice — Cambridge Movers Part 1 "Find the Differences".
+ * YLFindDifferencesPractice, Cambridge Movers Part 1 "Find the Differences".
  *
  * Bob shows his picture (A) and describes one property of an object.
  * The child describes the same object in their picture (B) with the difference.
@@ -234,6 +234,7 @@ export function YLFindDifferencesPractice({
     }
 
     if (isReadOnly) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setPhase('finished');
       return;
     }
@@ -267,7 +268,7 @@ export function YLFindDifferencesPractice({
           const cueTexts = diffs.map((d) => d.examiner_cue);
           const reactionTexts = diffs.flatMap((d) => [
             `Yes! Well spotted!`,
-            `Almost — ${d.expected_answer} Good try!`,
+            `Almost, ${d.expected_answer} Good try!`,
           ]);
           void pregenerateYLCueAudiosAction(sid, [...cueTexts, ...reactionTexts]);
         }
@@ -294,6 +295,7 @@ export function YLFindDifferencesPractice({
           ? 'Great job! Keep practising!'
           : "Let's keep practising the differences!",
     };
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setFinalEval(result);
     setPhase('finished');
     void saveYLFinalEvalAction(sessionId, result)
@@ -334,6 +336,7 @@ export function YLFindDifferencesPractice({
 
     if (!sessionId || !currentDiff) return;
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setPhase('processing');
 
     void (async () => {
@@ -619,7 +622,7 @@ export function YLFindDifferencesPractice({
       headerConfig={{
         icon: FindTheDifferencesIcon,
         title: t('findDifferences.title'),
-        subtitle: `Ages 8–11 · Turn ${turnIndex + 1}/${TOTAL_TURNS}`,
+        subtitle: `Ages 8-11 · Turn ${turnIndex + 1}/${TOTAL_TURNS}`,
         accentColor: 'amber',
         leftSlot: backButton,
         rightSlot: (

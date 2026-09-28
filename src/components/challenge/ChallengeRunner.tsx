@@ -123,7 +123,7 @@ export function ChallengeRunner({ onExit }: Props) {
                       </span>
                     ) : (
                       <span className="text-xs font-black text-[#469E7B] text-right max-w-[140px]">
-                        Submitted — qualitative feedback
+                        Submitted, qualitative feedback
                       </span>
                     )}
                   </div>

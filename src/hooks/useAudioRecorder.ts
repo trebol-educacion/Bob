@@ -22,6 +22,7 @@ interface UseAudioRecorderOptions {
 
 interface UseAudioRecorderReturn {
   isRecording: boolean;
+  elapsedSeconds: number;
   startRecording: () => Promise<void>;
   stopRecording: () => void;
 }
@@ -32,9 +33,11 @@ export function useAudioRecorder({
   minSizeBytes = 512,
 }: UseAudioRecorderOptions): UseAudioRecorderReturn {
   const [isRecording, setIsRecording] = useState(false);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
+  const elapsedIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     return () => {
@@ -42,8 +45,20 @@ export function useAudioRecorder({
         streamRef.current.getTracks().forEach((track) => track.stop());
         streamRef.current = null;
       }
+      if (elapsedIntervalRef.current) {
+        clearInterval(elapsedIntervalRef.current);
+        elapsedIntervalRef.current = null;
+      }
     };
   }, []);
+
+  const stopElapsedTimer = () => {
+    if (elapsedIntervalRef.current) {
+      clearInterval(elapsedIntervalRef.current);
+      elapsedIntervalRef.current = null;
+    }
+    setElapsedSeconds(0);
+  };
 
   const startRecording = async (): Promise<void> => {
     try {
@@ -65,6 +80,7 @@ export function useAudioRecorder({
       mediaRecorder.onstop = () => {
         stream.getTracks().forEach((track) => track.stop());
         streamRef.current = null;
+        stopElapsedTimer();
 
         const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
         if (blob.size < minSizeBytes) {
@@ -83,6 +99,10 @@ export function useAudioRecorder({
 
       mediaRecorder.start();
       setIsRecording(true);
+      const startedAt = Date.now();
+      elapsedIntervalRef.current = setInterval(() => {
+        setElapsedSeconds(Math.floor((Date.now() - startedAt) / 1000));
+      }, 1000);
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));
       if (onError) {
@@ -99,5 +119,5 @@ export function useAudioRecorder({
     }
   };
 
-  return { isRecording, startRecording, stopRecording };
+  return { isRecording, elapsedSeconds, startRecording, stopRecording };
 }

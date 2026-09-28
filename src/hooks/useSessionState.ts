@@ -12,6 +12,7 @@ interface UseSessionStateReturn {
   setActiveSessionId: (id: string | null) => void;
   setSelectedMessages: (messages: StoredMessage[]) => void;
   setSelectedSession: (session: BobSession | null) => void;
+  clearActiveSession: () => void;
   handleNewSession: (resetToModeSelection: () => void) => void;
   handleSelectSession: (id: string, onSelected: (mode: string, topic: string) => void) => Promise<void>;
   handleDeleteSession: (id: string, activeSessionId: string | null, resetToModeSelection: () => void) => Promise<void>;
@@ -46,12 +47,16 @@ export function useSessionState(userEmail: string | undefined): UseSessionStateR
     return () => { cancelled = true; };
   }, [userEmail]);
 
-  const handleNewSession = useCallback((resetToModeSelection: () => void) => {
+  const clearActiveSession = useCallback(() => {
     setActiveSessionId(null);
     setSelectedMessages([]);
     setSelectedSession(null);
-    resetToModeSelection();
   }, []);
+
+  const handleNewSession = useCallback((resetToModeSelection: () => void) => {
+    clearActiveSession();
+    resetToModeSelection();
+  }, [clearActiveSession]);
 
   const handleSelectSession = useCallback(async (
     id: string,
@@ -73,10 +78,10 @@ export function useSessionState(userEmail: string | undefined): UseSessionStateR
   ) => {
     const snapshot = sessions;
     setSessions(s => s.filter(x => x.id !== id));
-    if (currentActiveId === id) { setActiveSessionId(null); resetToModeSelection(); }
+    if (currentActiveId === id) { clearActiveSession(); resetToModeSelection(); }
     const { error } = await deleteSessionAction(id);
     if (error) { console.error('deleteSessionAction:', error); setSessions(snapshot); }
-  }, [sessions]);
+  }, [sessions, clearActiveSession]);
 
   const handleConversationSessionStart = useCallback((topic: string) => {
     createSessionAction({ mode: 'generic_conversation', topic, title: topic.slice(0, 60) || 'Conversación' })
@@ -95,6 +100,7 @@ export function useSessionState(userEmail: string | undefined): UseSessionStateR
     setActiveSessionId,
     setSelectedMessages,
     setSelectedSession,
+    clearActiveSession,
     handleNewSession,
     handleSelectSession,
     handleDeleteSession,

@@ -17,6 +17,7 @@ import {
   type WhyKey,
 } from '@/actions/modes/pet-listening-part5';
 import type { StoredMessage } from '@/actions/messages';
+import { resolveActivityBoot } from '@/lib/activity/boot';
 import type { YLRenderProps } from '@/lib/routing';
 
 const ACCENT = '#10B981';
@@ -426,7 +427,7 @@ function ResultStatementCard({
   result,
   index,
   animate,
-  reduceMotion,
+  reduceMotion: _reduceMotion,
 }: {
   result: PETJustifyStatementResult;
   index: number;
@@ -468,7 +469,7 @@ function ResultStatementCard({
           ].join(' ')}
         >
           <span>
-            You said {result.chosen_verdict === 'T' ? 'True' : result.chosen_verdict === 'F' ? 'False' : '—'}
+            You said {result.chosen_verdict === 'T' ? 'True' : result.chosen_verdict === 'F' ? 'False' : '-'}
           </span>
           <span className="text-xs font-bold">
             Answer: {result.correct_verdict === 'T' ? 'True' : 'False'}
@@ -513,7 +514,7 @@ function ResultStatementCard({
   );
 }
 
-/** PET Listening Part 5 — True or False with Justification practice component. */
+/** PET Listening Part 5, True or False with Justification practice component. */
 export function PETListeningTrueFalseJustifyPractice({
   onBack,
   sessionId: initialSessionId,
@@ -544,28 +545,27 @@ export function PETListeningTrueFalseJustifyPractice({
     initStartedRef.current = true;
 
     async function init() {
-      if (initialMessages && initialMessages.length > 0) {
-        const restored = tryRestore(initialMessages);
-        if (restored) {
-          setStatements(restored.statements);
-          setAudio(restored.audio);
-          setFramingText(restored.framingText);
-          if (restored.statementResults) {
-            setStatementResults(restored.statementResults);
-            setScore(restored.score);
-            setScoreMax(restored.scoreMax);
-            setPhase('finished');
-          } else {
-            const { createSupabaseBrowser } = await import('@/lib/supabase/browser-client');
-            const { data: { user } } = await createSupabaseBrowser().auth.getUser();
-            if (user) setUserId(user.id);
-            setPhase('ready');
-          }
-          return;
+      const boot = resolveActivityBoot({ initialMessages, sessionId: initialSessionId, tryRestore });
+      if (boot.kind === 'restore') {
+        const restored = boot.data;
+        setStatements(restored.statements);
+        setAudio(restored.audio);
+        setFramingText(restored.framingText);
+        if (restored.statementResults) {
+          setStatementResults(restored.statementResults);
+          setScore(restored.score);
+          setScoreMax(restored.scoreMax);
+          setPhase('finished');
+        } else {
+          const { createSupabaseBrowser } = await import('@/lib/supabase/browser-client');
+          const { data: { user } } = await createSupabaseBrowser().auth.getUser();
+          if (user) setUserId(user.id);
+          setPhase('ready');
         }
+        return;
       }
 
-      if (initialSessionId) return;
+      if (boot.kind === 'restore-failed') { setErrorMsg('Could not restore session. Please start a new one.'); return; }
 
       setIsNewSession(true);
       setPhase('generating');
@@ -587,7 +587,7 @@ export function PETListeningTrueFalseJustifyPractice({
     }
 
     void init();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (audioStartedRef.current) return;

@@ -15,6 +15,7 @@ import {
   type PETAttitudeItemResult,
 } from '@/actions/modes/pet-listening-part4';
 import type { StoredMessage } from '@/actions/messages';
+import { resolveActivityBoot } from '@/lib/activity/boot';
 
 const ACCENT = '#10B981';
 const ACCENT_DARK = '#0E9F6E';
@@ -513,7 +514,7 @@ function ResultQuestionCard({
   );
 }
 
-/** PET Listening Part 4 — Attitude & Opinion Detection practice component. */
+/** PET Listening Part 4, Attitude & Opinion Detection practice component. */
 export function PETListeningAttitudePractice({
   onBack,
   sessionId: initialSessionId,
@@ -542,26 +543,25 @@ export function PETListeningAttitudePractice({
     initStartedRef.current = true;
 
     async function init() {
-      if (initialMessages && initialMessages.length > 0) {
-        const restored = tryRestore(initialMessages);
-        if (restored) {
-          setItems(restored.items);
-          setFramingText(restored.framingText);
-          if (restored.itemResults) {
-            setItemResults(restored.itemResults);
-            setCorrectCount(restored.correctCount);
-            setPhase('finished');
-          } else {
-            const { createSupabaseBrowser } = await import('@/lib/supabase/browser-client');
-            const { data: { user } } = await createSupabaseBrowser().auth.getUser();
-            if (user) setUserId(user.id);
-            setPhase('ready');
-          }
-          return;
+      const boot = resolveActivityBoot({ initialMessages, sessionId: initialSessionId, tryRestore });
+      if (boot.kind === 'restore') {
+        const restored = boot.data;
+        setItems(restored.items);
+        setFramingText(restored.framingText);
+        if (restored.itemResults) {
+          setItemResults(restored.itemResults);
+          setCorrectCount(restored.correctCount);
+          setPhase('finished');
+        } else {
+          const { createSupabaseBrowser } = await import('@/lib/supabase/browser-client');
+          const { data: { user } } = await createSupabaseBrowser().auth.getUser();
+          if (user) setUserId(user.id);
+          setPhase('ready');
         }
+        return;
       }
 
-      if (initialSessionId) return;
+      if (boot.kind === 'restore-failed') { setErrorMsg('Could not restore session. Please start a new one.'); return; }
 
       setIsNewSession(true);
       setPhase('generating');
@@ -582,7 +582,7 @@ export function PETListeningAttitudePractice({
     }
 
     void init();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (audioStartedRef.current) return;
@@ -590,6 +590,7 @@ export function PETListeningAttitudePractice({
     if (!items.length) return;
     audioStartedRef.current = true;
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setAudioByItem(
       Object.fromEntries(
         items.map((item) => [item.number, { b64: '', mime: 'audio/L16;codec=pcm;rate=24000', status: 'loading' as AudioStatus }])

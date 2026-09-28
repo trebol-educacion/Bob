@@ -13,6 +13,7 @@ import {
   type FCEShortExtractsItem,
 } from '@/actions/modes/fce-listening-part1';
 import type { StoredMessage } from '@/actions/messages';
+import { resolveActivityBoot } from '@/lib/activity/boot';
 
 const ITEMS_PER_SESSION = 8;
 const MAX_PLAYS = 2;
@@ -144,7 +145,7 @@ function ProgressDots({
 }
 
 function AudioButton({
-  audioUrl,
+  audioUrl: _audioUrl,
   playsUsed,
   onPlay,
 }: {
@@ -181,7 +182,7 @@ function AudioButton({
   );
 }
 
-/** FCE B2 Listening Part 1 — 8 short extracts, 3-option multiple choice. */
+/** FCE B2 Listening Part 1, 8 short extracts, 3-option multiple choice. */
 export function FCEShortExtractsPractice({
   onBack,
   sessionId: initialSessionId,
@@ -208,24 +209,23 @@ export function FCEShortExtractsPractice({
     initStartedRef.current = true;
 
     async function init() {
-      if (initialMessages && initialMessages.length > 0) {
-        const restored = tryRestore(initialMessages);
-        if (restored) {
-          setItems(restored.items);
-          setTurns(restored.turns);
+      const boot = resolveActivityBoot({ initialMessages, sessionId: initialSessionId, tryRestore });
+      if (boot.kind === 'restore') {
+        const restored = boot.data;
+        setItems(restored.items);
+        setTurns(restored.turns);
 
-          if (restored.finalScore !== null) {
-            setFinalScore(restored.finalScore);
-            setPhase('finished');
-          } else {
-            setCurrentIdx(restored.turns.length);
-            setPhase('ready');
-          }
-          return;
+        if (restored.finalScore !== null) {
+          setFinalScore(restored.finalScore);
+          setPhase('finished');
+        } else {
+          setCurrentIdx(restored.turns.length);
+          setPhase('ready');
         }
+        return;
       }
 
-      if (initialSessionId) {
+      if (boot.kind === 'restore-failed') {
         setErrorMsg('Could not restore session. Please start a new one.');
         setPhase('error');
         return;
@@ -247,7 +247,7 @@ export function FCEShortExtractsPractice({
     }
 
     void init();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handlePlay = useCallback(() => {
     const item = items[currentIdx];
@@ -605,7 +605,7 @@ function Header({
         <Volume2 size={18} className="text-indigo-600" />
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-bold text-gray-800 truncate">Listening Part 1 — Short Extracts</p>
+        <p className="text-sm font-bold text-gray-800 truncate">Listening Part 1, Short Extracts</p>
         <p className="text-xs text-gray-400">Multiple Choice</p>
       </div>
       <div className="shrink-0 flex items-center gap-2">

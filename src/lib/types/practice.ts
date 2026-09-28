@@ -53,18 +53,18 @@ export const RepetitionObjectiveFeedbackSchema = z.object({
 
 export type ModeFramework = 'generic' | 'cambridge' | 'toefl';
 
-// PracticeMode — open string type. Valid keys follow the {framework}_{exam_part}
+// PracticeMode, open string type. Valid keys follow the {framework}_{exam_part}
 // pattern (e.g. 'cambridge_pet_p3', 'toefl_listen_repeat').
 // Runtime source of truth: bob_prompts (BD). See decisions.md D-R1, D9-1.
 // Previously a closed literal union backed by a static catalog; opened in B2
 // (T2.1) of bob-core so adding a new exam does not require touching types.
 export type PracticeMode = string | null;
 
-/** Alias — non-nullable mode key (used as Record key, component prop, etc.). */
+/** Alias, non-nullable mode key (used as Record key, component prop, etc.). */
 export type ModeKey = string;
 
 /**
- * DynamicCard — single row derived from bob_prompts (BD).
+ * DynamicCard, single row derived from bob_prompts (BD).
  * Source of truth for what activities are visible to a student.
  * Filled by OrganizationContext via the §2.2 query of spec.md.
  * `cefr_level` is nullable to allow universal activities (e.g. generic_conversation).
@@ -130,7 +130,7 @@ export const CollaborativeEvaluationSchema = z.object({
   areas_for_improvement: z.array(z.string()),
 });
 
-/** Unified EvalResponse — new shape per spec Domain 2. */
+/** Unified EvalResponse, new shape per spec Domain 2. */
 export const EvalResponseSchema = z.object({
   score: z.number().min(0),
   score_max: z.number().min(0),
@@ -186,6 +186,8 @@ export const ClosedItemSchema = z.object({
   correct_key: z.string(),
   explanation: z.string().nullable(),
   source: z.enum(['curated', 'official', 'generated_then_curated']),
+  group_id: z.string().nullable().optional(),
+  group_order: z.number().int().nullable().optional(),
 });
 
 /** Single row from bob_closed_items; shape mirrors the Zod schema above. */
@@ -208,7 +210,7 @@ export interface WritingResponse {
   time_spent_ms: number;
 }
 
-/** Formative (non-graded) feedback for open writing tasks — no numeric score. */
+/** Formative (non-graded) feedback for open writing tasks, no numeric score. */
 export interface WritingFormativeFeedback {
   kind: 'writing_formative';
   understood: boolean;

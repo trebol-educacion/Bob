@@ -16,6 +16,7 @@ import {
   type GapResult,
 } from '@/actions/modes/ket-listening-part2';
 import type { StoredMessage } from '@/actions/messages';
+import { resolveActivityBoot } from '@/lib/activity/boot';
 
 const ACCENT = '#F8AC37';
 const ACCENT_DARK = '#D8881C';
@@ -361,11 +362,11 @@ function GapResultRow({ result, animate }: { result: GapResult; animate: boolean
         >
           {correct ? (
             <>
-              <span className="text-base text-green-700 font-semibold">{result.user_input || '—'}</span>
+              <span className="text-base text-green-700 font-semibold">{result.user_input || '-'}</span>
               <ResultCheck animate={animate} />
             </>
           ) : (
-            <span className="text-base text-rose-500 line-through">{result.user_input || '—'}</span>
+            <span className="text-base text-rose-500 line-through">{result.user_input || '-'}</span>
           )}
         </span>
         {!correct && (
@@ -386,7 +387,7 @@ function GapResultRow({ result, animate }: { result: GapResult; animate: boolean
   );
 }
 
-/** KET Listening Part 2 — Listen and Complete practice component. */
+/** KET Listening Part 2, Listen and Complete practice component. */
 export function KETListenAndCompletePractice({
   onBack,
   sessionId: initialSessionId,
@@ -432,26 +433,25 @@ export function KETListenAndCompletePractice({
     initStartedRef.current = true;
 
     async function init() {
-      if (initialMessages && initialMessages.length > 0) {
-        const restored = tryRestore(initialMessages);
-        if (restored) {
-          setExercise(restored.exercise);
-          setFramingText(restored.framingText);
-          if (restored.gapResults) {
-            setGapResults(restored.gapResults);
-            setCorrectCount(restored.correctCount);
-            setPhase('finished');
-          } else {
-            const { createSupabaseBrowser } = await import('@/lib/supabase/browser-client');
-            const { data: { user } } = await createSupabaseBrowser().auth.getUser();
-            if (user) setUserId(user.id);
-            setPhase('ready');
-          }
-          return;
+      const boot = resolveActivityBoot({ initialMessages, sessionId: initialSessionId, tryRestore });
+      if (boot.kind === 'restore') {
+        const restored = boot.data;
+        setExercise(restored.exercise);
+        setFramingText(restored.framingText);
+        if (restored.gapResults) {
+          setGapResults(restored.gapResults);
+          setCorrectCount(restored.correctCount);
+          setPhase('finished');
+        } else {
+          const { createSupabaseBrowser } = await import('@/lib/supabase/browser-client');
+          const { data: { user } } = await createSupabaseBrowser().auth.getUser();
+          if (user) setUserId(user.id);
+          setPhase('ready');
         }
+        return;
       }
 
-      if (initialSessionId) return;
+      if (boot.kind === 'restore-failed') { setErrorMsg('Could not restore session. Please start a new one.'); return; }
 
       setIsNewSession(true);
       setPhase('generating');
@@ -472,7 +472,7 @@ export function KETListenAndCompletePractice({
     }
 
     void init();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (audioStartedRef.current) return;

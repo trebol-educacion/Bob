@@ -34,12 +34,12 @@
     "listenToExaminer": "Listen to the examiner…"
   },
   "part2": {
-    "startersLabel": "Starters Part 2 — Scene questions",
-    "moversLabel": "Movers Part 2 — Info exchange",
-    "startersHeaderTitle": "Starters — Listening",
-    "moversHeaderTitle": "Movers — Image",
-    "startersHeaderSubtitle": "Ages 6–8 · Part 2",
-    "moversHeaderSubtitle": "Ages 7–9 · Part 2",
+    "startersLabel": "Starters Part 2, Scene questions",
+    "moversLabel": "Movers Part 2, Info exchange",
+    "startersHeaderTitle": "Starters, Listening",
+    "moversHeaderTitle": "Movers, Image",
+    "startersHeaderSubtitle": "Ages 6-8 · Part 2",
+    "moversHeaderSubtitle": "Ages 7-9 · Part 2",
     "yourInfoCard": "Your info card",
     "yourCard": "Your card",
     "sceneImage": "Scene image",
@@ -47,15 +47,15 @@
     "recordingIn": "Recording in"
   },
   "part4": {
-    "startersPersonalLabel": "Starters Part 4 — Personal questions",
-    "moversPersonalLabel": "Movers Part 4 — Personal questions",
-    "moversDescribeLabel": "Movers Part 5 — Describe the picture",
-    "startersHeaderTitle": "Starters — Personal",
-    "moversDescribeHeaderTitle": "Movers — Describe",
-    "moversPersonalHeaderTitle": "Movers — Personal",
-    "startersHeaderSubtitle": "Ages 6–8 · Part 4",
-    "moversPart4HeaderSubtitle": "Ages 7–9 · Part 4",
-    "moversPart5HeaderSubtitle": "Ages 7–9 · Part 5",
+    "startersPersonalLabel": "Starters Part 4, Personal questions",
+    "moversPersonalLabel": "Movers Part 4, Personal questions",
+    "moversDescribeLabel": "Movers Part 5, Describe the picture",
+    "startersHeaderTitle": "Starters, Personal",
+    "moversDescribeHeaderTitle": "Movers, Describe",
+    "moversPersonalHeaderTitle": "Movers, Personal",
+    "startersHeaderSubtitle": "Ages 6-8 · Part 4",
+    "moversPart4HeaderSubtitle": "Ages 7-9 · Part 4",
+    "moversPart5HeaderSubtitle": "Ages 7-9 · Part 5",
     "questionsComplete": "Questions complete!",
     "listeningToQuestion": "Listen to the question…",
     "recordingIn": "Recording in"
@@ -97,8 +97,8 @@
     "pictureOf": "Picture {current} of {total}",
     "seeResults": "See results",
     "next": "Next",
-    "storyIntroSubtitle": "Ages 8–11 · Story intro",
-    "pictureSubtitle": "Ages 8–11 · Picture {current}/{total}",
+    "storyIntroSubtitle": "Ages 8-11 · Story intro",
+    "pictureSubtitle": "Ages 8-11 · Picture {current}/{total}",
     "turnOf": "Turn {current} of {total}",
     "showText": "👁 Show text",
     "hideText": "Hide text"
@@ -115,7 +115,7 @@
     "questionOf": "Question {current} of {total}",
     "seeResults": "See results",
     "next": "Next",
-    "cardSubtitle": "Ages 6–8 · Card {card}/{totalCards} · Q{q}/2",
+    "cardSubtitle": "Ages 6-8 · Card {card}/{totalCards} · Q{q}/2",
     "turnOf": "Turn {current} of {total}"
   },
   "celebration": {
@@ -125,7 +125,7 @@
     },
     "great": {
       "heading": "Great job!",
-      "sub": "Almost perfect — keep going!"
+      "sub": "Almost perfect, keep going!"
     },
     "good": {
       "heading": "Good work!",
@@ -133,7 +133,7 @@
     },
     "keep": {
       "heading": "Keep practising!",
-      "sub": "Try again — you will get there."
+      "sub": "Try again, you will get there."
     },
     "pointsLabel": "points",
     "defaultActionLabel": "Back to activities"
