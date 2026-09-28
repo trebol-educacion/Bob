@@ -11,7 +11,7 @@ let cached: EcosystemLauncherConfig | null = null;
 let cachedAt = 0;
 let inflight: Promise<EcosystemLauncherConfig> | null = null;
 
-async function fetchEcosystemLauncherConfig(): Promise<EcosystemLauncherConfig> {
+async function fetchEcosystemLauncherConfig(): Promise<EcosystemLauncherConfig | null> {
   const supabase = await createSupabaseServer();
   const { data, error } = await supabase
     .schema('public')
@@ -21,7 +21,7 @@ async function fetchEcosystemLauncherConfig(): Promise<EcosystemLauncherConfig> 
 
   if (error) {
     console.error('[ecosystem] platform_config query failed:', error);
-    return {};
+    return null;
   }
 
   const config: EcosystemLauncherConfig = {};
@@ -37,7 +37,12 @@ export async function getEcosystemLauncherConfigAction(): Promise<EcosystemLaunc
   if (inflight) return inflight;
 
   inflight = fetchEcosystemLauncherConfig()
+    .catch((error: unknown) => {
+      console.error('[ecosystem] platform_config unavailable:', error);
+      return null;
+    })
     .then((config) => {
+      if (!config) return {};
       cached = config;
       cachedAt = Date.now();
       return config;
