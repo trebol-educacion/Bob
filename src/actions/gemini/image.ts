@@ -12,13 +12,11 @@ import type { ImageScene } from './types';
  * Generates an image using Gemini Image model.
  */
 export async function generateImageAction(prompt: string): Promise<string> {
-  const fullPrompt = await getPrompt('generic_image_b1_image_gen', { SCENE_DESCRIPTION: prompt });
-
   const result = await callGemini(
     { promptKey: 'generic_image_b1_image_gen', model: MODELS.IMAGE },
     (ai) => ai.models.generateContent({
       model: MODELS.IMAGE,
-      contents: [{ role: 'user', parts: [{ text: fullPrompt }] }],
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
       config: { responseModalities: ['IMAGE'] },
     })
   );
@@ -32,7 +30,7 @@ export async function generateImageAction(prompt: string): Promise<string> {
   const imagePart = candidate?.content?.parts?.find((p: Part) => p.inlineData);
 
   if (!imagePart?.inlineData?.data) {
-    console.error(JSON.stringify({ event: 'generateImageAction', error: 'no image data' }));
+    console.error(JSON.stringify({ event: 'generateImageAction', error: 'no image data', finishReason: candidate?.finishReason ?? null }));
     return '';
   }
 
