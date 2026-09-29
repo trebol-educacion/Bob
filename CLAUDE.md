@@ -239,8 +239,10 @@ materiales oficiales.
 - `TOELF/toefl-full-length-practice-test1.pdf` — test completo con answer
   keys
 - `TOELF/speaking-rubrics.pdf`, `writing-rubrics.pdf` — rúbricas oficiales
-- `CAMBRIDGE B1 PARA MIA.docx` y `CAMBRIDGE B2 PARA MIA.docx` — specs
-  completas con ejemplos de generación
+- `CAMBRIDGE B1 PARA MIA.docx` y `CAMBRIDGE B2 PARA MIA.pdf` — specs
+  completas con ejemplos de generación. El PDF B2 es la fuente vigente
+  (Batch 14); `CAMBRIDGE B2 PARA MIA_v1.docx` es la versión anterior y no
+  se usa para seedear
 - `A2/A2 Vocabulary list.pdf` — vocabulario oficial UCLES por temas
 - `A2/A2 Key sample tests Speaking.pdf` + `assessing-speaking-performance.pdf`
   — tests reales + rúbrica
