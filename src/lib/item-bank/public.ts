@@ -15,5 +15,6 @@ export function toPublicItem(item: BankItem): PublicBankItem {
 /** @param group */
 export function toPublicGroup(group: ItemGroup): PublicItemGroup {
   const { reviewed_by: _reviewed_by, reviewed_at: _reviewed_at, source_ref: _source_ref, ...publicGroup } = group;
-  return publicGroup;
+  const { transcript: _transcript, ...publicMetadata } = publicGroup.metadata ?? {};
+  return { ...publicGroup, metadata: publicMetadata };
 }

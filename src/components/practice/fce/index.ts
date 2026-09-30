@@ -14,3 +14,7 @@ export { FCEDiscussionPractice } from './FCEDiscussionPractice';
 export type { FCEDiscussionPracticeProps } from './FCEDiscussionPractice';
 export { FCEGroupedReadingPractice } from './grouped/FCEGroupedReadingPractice';
 export type { FCEGroupedReadingPracticeProps } from './grouped/FCEGroupedReadingPractice';
+export { FCEReadingMatchingPractice } from './FCEReadingMatchingPractice';
+export type { FCEReadingMatchingPracticeProps } from './FCEReadingMatchingPractice';
+export { FCEListeningMatchingPractice } from './FCEListeningMatchingPractice';
+export type { FCEListeningMatchingPracticeProps } from './FCEListeningMatchingPractice';

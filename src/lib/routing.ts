@@ -55,6 +55,8 @@ import {
   FCEInterviewPractice,
   FCECollaborativePractice,
   FCEDiscussionPractice,
+  FCEReadingMatchingPractice,
+  FCEListeningMatchingPractice,
   FCEGroupedReadingPractice,
 } from '@/components/practice/fce';
 
@@ -385,6 +387,16 @@ export const EXAM_PART_COMPONENT_MAP: Record<ModeKey, RouteEntry> = {
     appState: 'exam-practicing',
     kind: 'yl',
     render: (p) => React.createElement(FCEPictureDescriptionPractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
+  },
+  cambridge_fce_reading_part7: {
+    appState: 'exam-practicing',
+    kind: 'yl',
+    render: (p) => React.createElement(FCEReadingMatchingPractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
+  },
+  cambridge_fce_listening_part3: {
+    appState: 'exam-practicing',
+    kind: 'yl',
+    render: (p) => React.createElement(FCEListeningMatchingPractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
   },
   cambridge_fce_listening_part1: {
     appState: 'exam-practicing',
