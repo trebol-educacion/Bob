@@ -11,8 +11,6 @@ import {
 } from '@/lib/speaking/collaborative';
 import type { Part3ChatMessage, Part3Scenario } from '@/lib/speaking/types';
 
-export type { Part3ChatMessage, Part3Scenario };
-
 const PET_P3_CONFIG: CollaborativeConfig = {
   promptPrefix: 'cambridge_pet_p3_b1',
   scenarioCacheKey: 'cambridge-pet-p3-b1-scenario',

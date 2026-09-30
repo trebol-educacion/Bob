@@ -7,8 +7,8 @@ import {
   chatPart3TextAction,
   evaluatePart3Action,
   getB1SessionMessagesAction,
-  type Part3Scenario,
 } from '@/actions/modes/part3';
+import type { Part3Scenario } from '@/lib/speaking/types';
 import {
   CollaborativePractice,
   type CollaborativePracticeConfig,
