@@ -18,3 +18,7 @@ export { FCEReadingMatchingPractice } from './FCEReadingMatchingPractice';
 export type { FCEReadingMatchingPracticeProps } from './FCEReadingMatchingPractice';
 export { FCEListeningMatchingPractice } from './FCEListeningMatchingPractice';
 export type { FCEListeningMatchingPracticeProps } from './FCEListeningMatchingPractice';
+export { FCEListeningGapFillPractice } from './FCEListeningGapFillPractice';
+export type { FCEListeningGapFillPracticeProps } from './FCEListeningGapFillPractice';
+export { FCEListeningInterviewPractice } from './FCEListeningInterviewPractice';
+export type { FCEListeningInterviewPracticeProps } from './FCEListeningInterviewPractice';
