@@ -192,7 +192,7 @@ export async function submitPETListeningAttitudeAction(input: {
   const supabase = await createSupabaseServer();
 
   const { data: planRow, error } = await supabase
-    .from('bob_messages')
+    .from('messages')
     .select('content_json')
     .eq('session_id', input.sessionId)
     .eq('user_id', input.userId)
