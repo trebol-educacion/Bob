@@ -9,6 +9,7 @@ import { createSessionAction } from '@/actions/sessions';
 import { createSupabaseServer } from '@/lib/supabase/server';
 import { generateSpeechAction } from '@/actions/gemini';
 import { MODELS } from '@/lib/models';
+import { isAcceptedAnswer } from '@/lib/answer-match';
 
 const GapSchema = z.object({
   number: z.number().int().min(1).max(6),
@@ -66,21 +67,9 @@ export interface PETListeningGapFillSubmitResult {
   gap_results: PETGapFillGapResult[];
 }
 
-function normalize(s: string): string {
-  return s
-    .toLowerCase()
-    .trim()
-    .replace(/\s+/g, ' ')
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '');
-}
-
 /** Accepts the input if it equals the canonical answer or any listed alternative, case- and accent-insensitive. */
 function isAccepted(userInput: string, gap: GenerationGap): boolean {
-  const candidate = normalize(userInput);
-  if (candidate === '') return false;
-  if (candidate === normalize(gap.answer)) return true;
-  return gap.accept.some((alt) => normalize(alt) === candidate);
+  return isAcceptedAnswer(userInput, [gap.answer, ...gap.accept]);
 }
 
 function safeParse<T>(schema: z.ZodType<T>, raw: string): T | null {

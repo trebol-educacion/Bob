@@ -55,6 +55,7 @@ import {
   FCEInterviewPractice,
   FCECollaborativePractice,
   FCEDiscussionPractice,
+  FCEGroupedReadingPractice,
 } from '@/components/practice/fce';
 
 export type AppState =
@@ -339,6 +340,31 @@ export const EXAM_PART_COMPONENT_MAP: Record<ModeKey, RouteEntry> = {
     appState: 'exam-practicing',
     kind: 'yl',
     render: (p) => React.createElement(FCEMultipleChoiceClozePractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
+  },
+  cambridge_fce_reading_part2: {
+    appState: 'exam-practicing',
+    kind: 'yl',
+    render: (p) => React.createElement(FCEGroupedReadingPractice, { key: ylInstanceKey(p as YLRenderProps), part: 'fce_reading_part2', ...(p as YLRenderProps) }),
+  },
+  cambridge_fce_reading_part3: {
+    appState: 'exam-practicing',
+    kind: 'yl',
+    render: (p) => React.createElement(FCEGroupedReadingPractice, { key: ylInstanceKey(p as YLRenderProps), part: 'fce_reading_part3', ...(p as YLRenderProps) }),
+  },
+  cambridge_fce_reading_part4: {
+    appState: 'exam-practicing',
+    kind: 'yl',
+    render: (p) => React.createElement(FCEGroupedReadingPractice, { key: ylInstanceKey(p as YLRenderProps), part: 'fce_reading_part4', ...(p as YLRenderProps) }),
+  },
+  cambridge_fce_reading_part5: {
+    appState: 'exam-practicing',
+    kind: 'yl',
+    render: (p) => React.createElement(FCEGroupedReadingPractice, { key: ylInstanceKey(p as YLRenderProps), part: 'fce_reading_part5', ...(p as YLRenderProps) }),
+  },
+  cambridge_fce_reading_part6: {
+    appState: 'exam-practicing',
+    kind: 'yl',
+    render: (p) => React.createElement(FCEGroupedReadingPractice, { key: ylInstanceKey(p as YLRenderProps), part: 'fce_reading_part6', ...(p as YLRenderProps) }),
   },
   cambridge_fce_p1: {
     appState: 'exam-practicing',

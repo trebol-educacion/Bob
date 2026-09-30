@@ -12,3 +12,5 @@ export { FCECollaborativePractice } from './FCECollaborativePractice';
 export type { FCECollaborativePracticeProps } from './FCECollaborativePractice';
 export { FCEDiscussionPractice } from './FCEDiscussionPractice';
 export type { FCEDiscussionPracticeProps } from './FCEDiscussionPractice';
+export { FCEGroupedReadingPractice } from './grouped/FCEGroupedReadingPractice';
+export type { FCEGroupedReadingPracticeProps } from './grouped/FCEGroupedReadingPractice';

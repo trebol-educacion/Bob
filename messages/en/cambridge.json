@@ -156,6 +156,57 @@
       "celebrationFeedback": "Well done! Keep practising collocations and phrasal verbs to master B2 vocabulary.",
       "celebrationAction": "See my activities"
     },
+    "grouped": {
+      "back": "Back",
+      "retry": "Try again",
+      "preparingExercise": "Loading your exercise…",
+      "checkingAnswers": "Checking your answers…",
+      "answeredCount": "{answered} / {total} answered",
+      "submitAnswers": "Submit answers",
+      "gapLabel": "Gap {number}",
+      "yourAnswer": "Your answer",
+      "correctAnswerLabel": "Correct answer:",
+      "correctBadge": "Correct",
+      "incorrectBadge": "Incorrect",
+      "keywordLabel": "Keyword",
+      "keywordHint": "Use the keyword unchanged. Write between 2 and 5 words.",
+      "sentenceBankTitle": "Missing sentences",
+      "markLabel": "Mark: {score} / 10",
+      "celebrationFeedback": "Review the corrections above and try another exercise to keep improving.",
+      "celebrationAction": "See my activities",
+      "parts": {
+        "fce_reading_part2": {
+          "title": "Open Cloze",
+          "subtitle": "Reading & Use of English Part 2",
+          "badge": "PART 2",
+          "instructions": "Read the text and think of the word which best fits each gap. Use only one word in each gap."
+        },
+        "fce_reading_part3": {
+          "title": "Word Formation",
+          "subtitle": "Reading & Use of English Part 3",
+          "badge": "PART 3",
+          "instructions": "Use the word in capitals at the end of some lines to form a word that fits in the gap in the same line."
+        },
+        "fce_reading_part4": {
+          "title": "Key Word Transformation",
+          "subtitle": "Reading & Use of English Part 4",
+          "badge": "PART 4",
+          "instructions": "Complete the second sentence so that it has a similar meaning to the first, using the word given. Do not change the word given."
+        },
+        "fce_reading_part5": {
+          "title": "Multiple Choice",
+          "subtitle": "Reading & Use of English Part 5",
+          "badge": "PART 5",
+          "instructions": "Read the text and choose the best answer (A, B, C or D) for each question."
+        },
+        "fce_reading_part6": {
+          "title": "Gapped Text",
+          "subtitle": "Reading & Use of English Part 6",
+          "badge": "PART 6",
+          "instructions": "Six sentences have been removed from the text. Choose from the sentences A-G the one which fits each gap. There is one extra sentence you do not need to use."
+        }
+      }
+    },
     "essay": {
       "back": "Back",
       "headerTitle": "Essay",
