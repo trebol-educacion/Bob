@@ -131,7 +131,8 @@ export function WritingPractice({
         variant="text"
         value={text}
         placeholder={t('writeAnswerPlaceholder')}
-        disabled={submitting || wordCount < minWords}
+        disabled={submitting}
+        sendDisabled={wordCount < minWords}
         onChange={setText}
         onSend={handleSubmit}
       />

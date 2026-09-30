@@ -227,8 +227,8 @@ export async function evaluateFCEEssayAction(input: {
     .map((n) => `${n.id}. ${n.label}: ${n.description}`)
     .join('\n');
 
-  const persistFallback = () => {
-    persistMessage({
+  const persistFallback = async () => {
+    await persistMessage({
       sessionId: input.sessionId,
       userId: input.userId,
       role: 'bob',
@@ -275,7 +275,7 @@ export async function evaluateFCEEssayAction(input: {
     fceRubric,
   };
 
-  persistMessage({
+  await persistMessage({
     sessionId: input.sessionId,
     userId: input.userId,
     role: 'bob',

@@ -378,7 +378,8 @@ export function FCEEssayWritingPractice({
             variant="text"
             value={text}
             placeholder={t('fce.essay.placeholder')}
-            disabled={phase !== 'ready' || wordCount < MIN_WORDS}
+            disabled={phase !== 'ready'}
+            sendDisabled={wordCount < MIN_WORDS}
             onChange={setText}
             onSend={handleSubmit}
           />

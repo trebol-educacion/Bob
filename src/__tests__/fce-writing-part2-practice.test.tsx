@@ -12,12 +12,12 @@ vi.mock('@/components/chat/BobMascotLoader', () => ({
   BobMascotLoader: ({ message }: { message: string }) => <div>{message}</div>,
 }));
 vi.mock('@/components/chat/ChatInputBar', () => ({
-  ChatInputBar: ({ value, disabled, onChange, onSend }: {
-    value: string; disabled: boolean; onChange: (v: string) => void; onSend: () => void;
+  ChatInputBar: ({ value, disabled, sendDisabled, onChange, onSend }: {
+    value: string; disabled?: boolean; sendDisabled?: boolean; onChange: (v: string) => void; onSend: () => void;
   }) => (
     <div>
-      <textarea aria-label="text" value={value} onChange={(e) => onChange(e.target.value)} />
-      <button type="button" disabled={disabled} onClick={onSend}>send</button>
+      <textarea aria-label="text" disabled={disabled} value={value} onChange={(e) => onChange(e.target.value)} />
+      <button type="button" disabled={disabled || sendDisabled} onClick={onSend}>send</button>
     </div>
   ),
 }));
