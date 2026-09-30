@@ -3,11 +3,11 @@
 import React from 'react';
 import { startFCEReadingPart7Action, submitFCEReadingPart7Action } from '@/actions/modes/fce-reading-part7';
 import { GroupExerciseFrame } from '@/components/practice/group-exercise/GroupExerciseFrame';
-import { toMatchingReview, type GroupPracticeProps } from '@/components/practice/group-exercise/types';
-import { useGroupExercise, type GroupExerciseApi } from '@/components/practice/group-exercise/useGroupExercise';
+import { toMatchingReview, type GroupPracticeProps, choiceGroupApi } from '@/components/practice/group-exercise/types';
+import { useGroupExercise } from '@/components/practice/group-exercise/useGroupExercise';
 import { MatchingBoard } from '@/components/practice/matching';
 
-const API: GroupExerciseApi = { start: startFCEReadingPart7Action, submit: submitFCEReadingPart7Action };
+const API = choiceGroupApi(startFCEReadingPart7Action, submitFCEReadingPart7Action);
 
 export type FCEReadingMatchingPracticeProps = GroupPracticeProps;
 

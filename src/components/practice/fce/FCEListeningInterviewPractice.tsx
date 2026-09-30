@@ -5,10 +5,10 @@ import { startFCEListeningPart4Action, submitFCEListeningPart4Action } from '@/a
 import { ChoiceQuestionList } from '@/components/practice/group-exercise/ChoiceQuestionList';
 import { GroupAudioPlayer } from '@/components/practice/group-exercise/GroupAudioPlayer';
 import { GroupExerciseFrame } from '@/components/practice/group-exercise/GroupExerciseFrame';
-import { resultsByItem, type GroupPracticeProps } from '@/components/practice/group-exercise/types';
-import { useGroupExercise, type GroupExerciseApi } from '@/components/practice/group-exercise/useGroupExercise';
+import { resultsByItem, type GroupPracticeProps, choiceGroupApi } from '@/components/practice/group-exercise/types';
+import { useGroupExercise } from '@/components/practice/group-exercise/useGroupExercise';
 
-const API: GroupExerciseApi = { start: startFCEListeningPart4Action, submit: submitFCEListeningPart4Action };
+const API = choiceGroupApi(startFCEListeningPart4Action, submitFCEListeningPart4Action);
 
 export type FCEListeningInterviewPracticeProps = GroupPracticeProps;
 

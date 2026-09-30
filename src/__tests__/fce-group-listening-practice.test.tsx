@@ -65,7 +65,7 @@ const props = { onBack: vi.fn() };
 
 describe('FCEListeningGapFillPractice (Listening P2)', () => {
   it('un input por hueco, corrige con accepted[] y muestra nota', async () => {
-    startMocks.l2.mockResolvedValue({ session_id: 's4', exercise: l2 });
+    startMocks.l2.mockResolvedValue({ sessionId: 's4', exercise: l2 });
     submitMocks.l2.mockImplementation(async (_s: string, answers: Record<string, string>) =>
       gradeGroupAnswers(L2_ITEMS, answers, matchesAcceptedText),
     );
@@ -85,7 +85,7 @@ describe('FCEListeningGapFillPractice (Listening P2)', () => {
 
 describe('FCEListeningInterviewPractice (Listening P4)', () => {
   it('audio largo, preguntas de tres opciones, revision con la clave tras corregir', async () => {
-    startMocks.l4.mockResolvedValue({ session_id: 's5', exercise: l4 });
+    startMocks.l4.mockResolvedValue({ sessionId: 's5', exercise: l4 });
     submitMocks.l4.mockImplementation(async (_s: string, answers: Record<string, string>) =>
       gradeGroupAnswers(L4_ITEMS, answers, matchesLetterKey),
     );

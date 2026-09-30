@@ -5,11 +5,11 @@ import { startFCEListeningPart2Action, submitFCEListeningPart2Action } from '@/a
 import { GapText, splitGapText, type GapReview } from '@/components/practice/gap-text';
 import { GroupAudioPlayer } from '@/components/practice/group-exercise/GroupAudioPlayer';
 import { GroupExerciseFrame } from '@/components/practice/group-exercise/GroupExerciseFrame';
-import { resultsByItem, type GroupPracticeProps } from '@/components/practice/group-exercise/types';
-import { useGroupExercise, type GroupExerciseApi } from '@/components/practice/group-exercise/useGroupExercise';
+import { resultsByItem, type GroupPracticeProps, choiceGroupApi } from '@/components/practice/group-exercise/types';
+import { useGroupExercise } from '@/components/practice/group-exercise/useGroupExercise';
 import type { GroupItemResult, GroupQuestion } from '@/lib/item-bank/group-types';
 
-const API: GroupExerciseApi = { start: startFCEListeningPart2Action, submit: submitFCEListeningPart2Action };
+const API = choiceGroupApi(startFCEListeningPart2Action, submitFCEListeningPart2Action);
 
 export type FCEListeningGapFillPracticeProps = GroupPracticeProps;
 

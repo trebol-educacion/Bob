@@ -94,7 +94,6 @@ describe.each(CASES)('FCEGroupedReadingPractice $part', ({ part, group, items, a
     expect(submitMock).toHaveBeenCalledWith({
       sessionId: 'session-1',
       part,
-      groupId: exercise.groupId,
       answers,
     });
     expect(screen.getByText(`fce.grouped.markLabel:{"score":${expected.score10}}`)).toBeInTheDocument();

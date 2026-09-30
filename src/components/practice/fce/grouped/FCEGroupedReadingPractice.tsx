@@ -10,7 +10,8 @@ import { FCE_GROUPED_ANSWER_KIND, type FCEGroupedPart } from '@/lib/reading/fce-
 import { GapTextBody } from './GapTextBody';
 import { KeyWordBody } from './KeyWordBody';
 import { MultipleChoiceBody } from './MultipleChoiceBody';
-import { useGroupedExercise } from './useGroupedExercise';
+import { useGroupExercise } from '@/components/practice/group-exercise/useGroupExercise';
+import { GROUPED_API_BY_PART } from './api';
 import type { GroupedBodyProps } from './types';
 
 export interface FCEGroupedReadingPracticeProps {
@@ -40,8 +41,15 @@ export function FCEGroupedReadingPractice({
   onOpenDashboard,
 }: FCEGroupedReadingPracticeProps) {
   const t = useTranslations('cambridge');
-  const state = useGroupedExercise({ part, sessionId, initialMessages, onSessionCreated, onSessionFinished });
-  const { phase, exercise, answers, results, score } = state;
+  const state = useGroupExercise({
+    api: GROUPED_API_BY_PART[part],
+    sessionId,
+    initialMessages,
+    onSessionCreated,
+    onSessionFinished,
+  });
+  const { phase, exercise, answers, result: score } = state;
+  const results = score?.results ?? null;
   const Body = BODY_BY_KIND[FCE_GROUPED_ANSWER_KIND[part]];
   const answeredCount = Object.values(answers).filter((value) => value.trim() !== '').length;
   const total = exercise?.items.length ?? 0;
@@ -128,6 +136,11 @@ export function FCEGroupedReadingPractice({
 
       {phase === 'ready' && (
         <div className="shrink-0 border-t border-gray-100 bg-white px-4 py-3 flex items-center gap-3">
+          {state.errorMessage && (
+            <p role="alert" className="text-xs text-red-600 flex-1">
+              {state.errorMessage}
+            </p>
+          )}
           <p className="text-xs text-gray-400 flex-1">
             {t('fce.grouped.answeredCount', { answered: answeredCount, total })}
           </p>

@@ -1,19 +1,9 @@
 import {
   GROUP_EVALUATION_KIND,
   GROUP_PLAN_KIND,
-  type GroupExercisePayload,
-  type GroupSubmitResult,
-} from './group-types';
-
-export interface RestorableMessage {
-  role: string;
-  content_json?: unknown;
-}
-
-export interface RestoredGroupSession {
-  exercise: GroupExercisePayload;
-  result: GroupSubmitResult | null;
-}
+  type RestorableMessage,
+  type RestoredGroupSession,
+} from './group-session-types';
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -21,23 +11,27 @@ function asRecord(value: unknown): Record<string, unknown> | null {
     : null;
 }
 
-export function restoreGroupSession(messages: RestorableMessage[]): RestoredGroupSession | null {
-  let exercise: GroupExercisePayload | null = null;
-  let result: GroupSubmitResult | null = null;
+/**
+ * @template E
+ * @template R
+ * @param messages
+ * @param examPart
+ * @returns persisted plan and final result, or null without a plan
+ */
+export function restoreGroupSession<E, R>(
+  messages: RestorableMessage[],
+  examPart?: string,
+): RestoredGroupSession<E, R> | null {
+  let exercise: E | null = null;
+  let result: R | null = null;
 
   for (const message of messages) {
     const json = asRecord(message.content_json);
     if (!json || message.role !== 'bob') continue;
-    if (json.kind === GROUP_PLAN_KIND && asRecord(json.exercise)) {
-      exercise = json.exercise as unknown as GroupExercisePayload;
-    }
-    if (json.kind === GROUP_EVALUATION_KIND && json.is_final === true && Array.isArray(json.results)) {
-      result = {
-        correct: Number(json.score),
-        total: Number(json.score_max),
-        score_10: Number(json.score_10),
-        results: json.results as GroupSubmitResult['results'],
-      };
+    if (examPart !== undefined && json.exam_part !== examPart) continue;
+    if (json.kind === GROUP_PLAN_KIND && asRecord(json.exercise)) exercise = json.exercise as E;
+    if (json.kind === GROUP_EVALUATION_KIND && json.is_final === true && asRecord(json.result)) {
+      result = json.result as R;
     }
   }
 

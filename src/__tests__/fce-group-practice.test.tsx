@@ -4,7 +4,7 @@ import '@testing-library/jest-dom/vitest';
 import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react';
 import { toGroupPayload } from '@/lib/item-bank/group-payload';
 import { gradeGroupAnswers, matchesLetterKey } from '@/lib/item-bank/group-grading';
-import { GROUP_EVALUATION_KIND, GROUP_PLAN_KIND } from '@/lib/item-bank/group-types';
+import { GROUP_EVALUATION_KIND, GROUP_PLAN_KIND } from '@/lib/item-bank/group-session-types';
 import type { StoredMessage } from '@/actions/messages';
 import {
   L3_GROUP, L3_ITEMS, R7_GROUP, R7_ITEMS,
@@ -67,7 +67,7 @@ const props = { onBack: vi.fn() };
 
 describe('FCEReadingMatchingPractice (Reading P7)', () => {
   it('muestra cuatro secciones y 10 preguntas, admite repetir letra, corrige y muestra nota', async () => {
-    startMocks.r7.mockResolvedValue({ session_id: 's1', exercise: r7 });
+    startMocks.r7.mockResolvedValue({ sessionId: 's1', exercise: r7 });
     submitMocks.r7.mockImplementation(async (_s: string, answers: Record<string, string>) =>
       gradeGroupAnswers(R7_ITEMS, answers, matchesLetterKey),
     );
@@ -91,7 +91,7 @@ describe('FCEReadingMatchingPractice (Reading P7)', () => {
 
   it('sin contenido muestra mensaje claro y reintenta', async () => {
     startMocks.r7.mockResolvedValueOnce({ error: 'Could not load exercise' });
-    startMocks.r7.mockResolvedValueOnce({ session_id: 's2', exercise: r7 });
+    startMocks.r7.mockResolvedValueOnce({ sessionId: 's2', exercise: r7 });
     render(<FCEReadingMatchingPractice {...props} />);
 
     await screen.findByText('Could not load exercise');
@@ -107,8 +107,11 @@ describe('FCEReadingMatchingPractice (Reading P7)', () => {
         role: 'bob',
         msg_type: 'evaluation',
         content_json: {
-          kind: GROUP_EVALUATION_KIND, score: 4, score_max: 10, score_10: 4, is_final: true,
-          results: r7.questions.map((q, i) => ({ item_id: q.id, given: 'A', correct_key: R7_ITEMS[i].correct_key, is_correct: i < 4, explanation: null })),
+          kind: GROUP_EVALUATION_KIND, is_final: true,
+          result: {
+            correct: 4, total: 10, score_10: 4,
+            results: r7.questions.map((q, i) => ({ item_id: q.id, given: 'A', correct_key: R7_ITEMS[i].correct_key, is_correct: i < 4, explanation: null })),
+          },
         },
       },
     ] as unknown as StoredMessage[];
@@ -120,7 +123,7 @@ describe('FCEReadingMatchingPractice (Reading P7)', () => {
 
 describe('FCEListeningMatchingPractice (Listening P3)', () => {
   it('cinco clips con audio individual, ocho opciones A-H y tres sobrantes', async () => {
-    startMocks.l3.mockResolvedValue({ session_id: 's3', exercise: l3 });
+    startMocks.l3.mockResolvedValue({ sessionId: 's3', exercise: l3 });
     submitMocks.l3.mockImplementation(async (_s: string, answers: Record<string, string>) =>
       gradeGroupAnswers(L3_ITEMS, answers, matchesLetterKey),
     );
@@ -142,7 +145,7 @@ describe('FCEListeningMatchingPractice (Listening P3)', () => {
   });
 
   it('fallo de audio muestra mensaje y permite reintentar', async () => {
-    startMocks.l3.mockResolvedValue({ session_id: 's3', exercise: l3 });
+    startMocks.l3.mockResolvedValue({ sessionId: 's3', exercise: l3 });
     render(<FCEListeningMatchingPractice {...props} />);
     await screen.findByText(l3.intro as string);
 

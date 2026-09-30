@@ -2,7 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { toPublicExercise } from '@/lib/reading/fce-grouped-public';
 import { gradeExercise, isItemCorrect, toScore10 } from '@/lib/reading/fce-grouped-grading';
 import { pickGroup } from '@/lib/reading/pick-group';
-import { restoreGroupedExercise } from '@/components/practice/fce/grouped/restore';
+import { restoreGroupSession } from '@/lib/item-bank/group-restore';
+import type { FCEGroupedExercise, FCEGroupedSubmitResult } from '@/lib/reading/fce-grouped-types';
 import * as fx from './fce-grouped-fixtures';
 
 const SENSITIVE = ['without', 'although', 'frustration', 'is said to be', 'Secret explanation', 'extra_key', 'accepted', 'correct_key'];
@@ -132,35 +133,39 @@ describe('pickGroup', () => {
   });
 });
 
-describe('restoreGroupedExercise', () => {
+describe('restoreGroupSession for grouped Reading', () => {
   const exercise = toPublicExercise('fce_reading_part5', fx.MULTIPLE_CHOICE_GROUP, fx.MULTIPLE_CHOICE_ITEMS);
-  const plan = { role: 'bob', content_json: { kind: 'fce_grouped_plan', part: 'fce_reading_part5', exercise } };
+  const plan = { role: 'bob', content_json: { kind: 'fce_group_plan', exam_part: 'fce_reading_part5', exercise } };
+  const restore = (messages: unknown[], part: string) =>
+    restoreGroupSession<FCEGroupedExercise, FCEGroupedSubmitResult>(messages as never, part);
 
   it('restores an unfinished exercise', () => {
-    const restored = restoreGroupedExercise('fce_reading_part5', [plan]);
+    const restored = restore([plan], 'fce_reading_part5');
     expect(restored?.exercise.groupId).toBe(exercise.groupId);
-    expect(restored?.results).toBeNull();
+    expect(restored?.result).toBeNull();
   });
 
   it('restores the final result', () => {
     const evaluation = {
       role: 'bob',
       content_json: {
-        kind: 'fce_grouped_evaluation',
-        part: 'fce_reading_part5',
-        score: 1,
-        score_max: 2,
-        score_10: 5,
+        kind: 'fce_group_evaluation',
+        exam_part: 'fce_reading_part5',
         is_final: true,
-        results: [{ number: 31, given: 'A', expected: 'A', isCorrect: true }],
+        result: {
+          correct: 1,
+          total: 2,
+          score10: 5,
+          results: [{ number: 31, given: 'A', expected: 'A', isCorrect: true }],
+        },
       },
     };
-    const restored = restoreGroupedExercise('fce_reading_part5', [plan, evaluation]);
-    expect(restored?.score).toEqual({ correct: 1, total: 2, score10: 5 });
+    const restored = restore([plan, evaluation], 'fce_reading_part5');
+    expect(restored?.result).toMatchObject({ correct: 1, total: 2, score10: 5 });
   });
 
   it('returns null without a plan or for another part', () => {
-    expect(restoreGroupedExercise('fce_reading_part5', [])).toBeNull();
-    expect(restoreGroupedExercise('fce_reading_part2', [plan])).toBeNull();
+    expect(restore([], 'fce_reading_part5')).toBeNull();
+    expect(restore([plan], 'fce_reading_part2')).toBeNull();
   });
 });

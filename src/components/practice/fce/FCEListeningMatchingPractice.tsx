@@ -4,11 +4,11 @@ import React from 'react';
 import { startFCEListeningPart3Action, submitFCEListeningPart3Action } from '@/actions/modes/fce-listening-part3';
 import { GroupAudioPlayer } from '@/components/practice/group-exercise/GroupAudioPlayer';
 import { GroupExerciseFrame } from '@/components/practice/group-exercise/GroupExerciseFrame';
-import { toMatchingReview, type GroupPracticeProps } from '@/components/practice/group-exercise/types';
-import { useGroupExercise, type GroupExerciseApi } from '@/components/practice/group-exercise/useGroupExercise';
+import { toMatchingReview, type GroupPracticeProps, choiceGroupApi } from '@/components/practice/group-exercise/types';
+import { useGroupExercise } from '@/components/practice/group-exercise/useGroupExercise';
 import { MatchingBoard } from '@/components/practice/matching';
 
-const API: GroupExerciseApi = { start: startFCEListeningPart3Action, submit: submitFCEListeningPart3Action };
+const API = choiceGroupApi(startFCEListeningPart3Action, submitFCEListeningPart3Action);
 
 export type FCEListeningMatchingPracticeProps = GroupPracticeProps;
 

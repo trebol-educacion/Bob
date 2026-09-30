@@ -4,10 +4,10 @@ import React from 'react';
 import { ChevronRight, RotateCcw } from 'lucide-react';
 import { BobMascotLoader } from '@/components/chat/BobMascotLoader';
 import { CelebrationCard } from '@/components/practice/yl/CelebrationCard';
-import type { GroupExerciseController } from './useGroupExercise';
+import type { ChoiceGroupController } from './types';
 
 export interface GroupExerciseFrameProps {
-  controller: GroupExerciseController;
+  controller: ChoiceGroupController;
   title: string;
   subtitle: string;
   onBack: () => void;

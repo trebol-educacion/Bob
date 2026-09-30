@@ -1,6 +1,8 @@
 import type { StoredMessage } from '@/actions/messages';
 import type { MatchingReview } from '@/components/practice/matching';
-import type { GroupSubmitResult, GroupItemResult } from '@/lib/item-bank/group-types';
+import { restoreGroupSession } from '@/lib/item-bank/group-restore';
+import type { GroupExercisePayload, GroupItemResult, GroupSubmitResult } from '@/lib/item-bank/group-types';
+import type { GroupExerciseApi, GroupExerciseController } from './useGroupExercise';
 
 export interface GroupPracticeProps {
   onBack: () => void;
@@ -24,4 +26,17 @@ export function toMatchingReview(result: GroupSubmitResult | null): Record<strin
       { isCorrect: entry.is_correct, correctKey: entry.correct_key },
     ]),
   );
+}
+
+export type ChoiceGroupApi = GroupExerciseApi<GroupExercisePayload, string, GroupSubmitResult>;
+
+export type ChoiceGroupController = GroupExerciseController<GroupExercisePayload, string, GroupSubmitResult>;
+
+/**
+ * @param start
+ * @param submit
+ * @returns api for parts answered by item id
+ */
+export function choiceGroupApi(start: ChoiceGroupApi['start'], submit: ChoiceGroupApi['submit']): ChoiceGroupApi {
+  return { start, submit, restore: (messages) => restoreGroupSession(messages) };
 }

@@ -1,5 +1,3 @@
-export const GROUP_PLAN_KIND = 'fce_group_plan';
-export const GROUP_EVALUATION_KIND = 'fce_group_evaluation';
 
 export interface GroupChoice {
   key: string;
@@ -41,7 +39,3 @@ export interface GroupSubmitResult {
 }
 
 export type GroupAnswers = Record<string, string>;
-
-export type GroupStartResult = { session_id: string; exercise: GroupExercisePayload } | { error: string };
-
-export type GroupSubmitOutcome = GroupSubmitResult | { error: string };

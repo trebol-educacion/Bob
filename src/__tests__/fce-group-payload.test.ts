@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { toGroupPayload } from '@/lib/item-bank/group-payload';
 import { matchesAcceptedText, matchesLetterKey, gradeGroupAnswers, scoreOutOfTen } from '@/lib/item-bank/group-grading';
 import { restoreGroupSession } from '@/lib/item-bank/group-restore';
-import { GROUP_EVALUATION_KIND, GROUP_PLAN_KIND } from '@/lib/item-bank/group-types';
+import { GROUP_EVALUATION_KIND, GROUP_PLAN_KIND } from '@/lib/item-bank/group-session-types';
 import { inferSkillFromMode } from '@/lib/skill-from-mode';
 import {
   L2_GROUP, L2_ITEMS, L3_GROUP, L3_ITEMS, L4_GROUP, L4_ITEMS, R7_GROUP, R7_ITEMS,
@@ -98,7 +98,7 @@ describe('restoreGroupSession', () => {
   it('recupera la nota persistida', () => {
     const restored = restoreGroupSession([
       { role: 'bob', content_json: { kind: GROUP_PLAN_KIND, exercise } },
-      { role: 'bob', content_json: { kind: GROUP_EVALUATION_KIND, score: 2, score_max: 3, score_10: 6.7, results: [], is_final: true } },
+      { role: 'bob', content_json: { kind: GROUP_EVALUATION_KIND, is_final: true, result: { correct: 2, total: 3, score_10: 6.7, results: [] } } },
     ]);
     expect(restored?.result).toMatchObject({ correct: 2, total: 3, score_10: 6.7 });
   });

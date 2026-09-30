@@ -7,29 +7,21 @@ const persistMock = vi.fn();
 const fetchGroupsMock = vi.fn();
 const fetchGroupItemsMock = vi.fn();
 const createSessionMock = vi.fn();
-const state = { sessionFound: true, finalExists: false };
+const readMessagesMock = vi.fn();
 
 function messagesQuery() {
   const query: Record<string, unknown> = {};
   query.select = () => query;
   query.eq = () => query;
   query.order = () => query;
-  query.limit = () => Promise.resolve({ data: state.finalExists ? [{ id: 'm' }] : [], error: null });
-  return query;
-}
-
-function sessionsQuery() {
-  const query: Record<string, unknown> = {};
-  query.select = () => query;
-  query.eq = () => query;
-  query.maybeSingle = () => Promise.resolve({ data: state.sessionFound ? { id: 's1' } : null });
+  query.limit = () => Promise.resolve({ data: [], error: null });
   return query;
 }
 
 vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServer: async () => ({
     auth: { getUser: async () => ({ data: { user: { id: 'user-1' } } }) },
-    from: (table: string) => (table === 'sessions' ? sessionsQuery() : messagesQuery()),
+    from: () => messagesQuery(),
   }),
 }));
 vi.mock('@/actions/item-bank/repository', () => ({
@@ -37,7 +29,10 @@ vi.mock('@/actions/item-bank/repository', () => ({
   fetchGroupItems: (...a: unknown[]) => fetchGroupItemsMock(...a),
 }));
 vi.mock('@/actions/sessions', () => ({ createSessionAction: (...a: unknown[]) => createSessionMock(...a) }));
-vi.mock('@/lib/persist-activity', () => ({ persistMessage: (...a: unknown[]) => persistMock(...a) }));
+vi.mock('@/lib/persist-activity', () => ({
+  persistMessage: (...a: unknown[]) => persistMock(...a),
+  readSessionMessagesForCurrentOrUser: (...a: unknown[]) => readMessagesMock(...a),
+}));
 
 import {
   startFCEReadingExerciseAction,
@@ -49,8 +44,7 @@ beforeEach(() => {
   fetchGroupsMock.mockReset().mockResolvedValue({ ok: true, data: [fx.KEY_WORD_GROUP] });
   fetchGroupItemsMock.mockReset().mockResolvedValue({ ok: true, data: fx.KEY_WORD_ITEMS });
   createSessionMock.mockReset().mockResolvedValue({ data: { id: 's1', user_id: 'user-1' }, error: null });
-  state.sessionFound = true;
-  state.finalExists = false;
+  readMessagesMock.mockReset().mockResolvedValue([]);
 });
 
 describe('startFCEReadingExerciseAction', () => {
@@ -84,26 +78,37 @@ describe('submitFCEReadingExerciseAction', () => {
   const input = {
     sessionId: 's1',
     part: 'fce_reading_part4',
-    groupId: 'group-fce_reading_part4',
     answers: { 25: 'is said to be', 26: 'have difficulty' },
+  };
+  const plan = {
+    role: 'bob',
+    content_json: {
+      kind: 'fce_group_plan',
+      exam_part: 'fce_reading_part4',
+      exercise: { groupId: 'group-fce_reading_part4' },
+    },
   };
 
   it('grades server-side and persists a final 0-10 evaluation', async () => {
+    readMessagesMock.mockResolvedValue([plan]);
     const result = await submitFCEReadingExerciseAction(input);
     expect(result).toMatchObject({ correct: 1, total: 2, score10: 5 });
     const evaluation = persistMock.mock.calls.map((c) => c[0]).find((m) => m.msgType === 'evaluation');
     expect(evaluation.contentJson).toMatchObject({ is_final: true, score: 1, score_max: 2, score_10: 5 });
   });
 
-  it('rejects a session that does not belong to the user or mode', async () => {
-    state.sessionFound = false;
-    expect(await submitFCEReadingExerciseAction(input)).toEqual({ error: 'Session not found' });
+  it('rejects a session without a plan of this part for the user', async () => {
+    expect(await submitFCEReadingExerciseAction(input)).toEqual({ error: 'Could not load exercise' });
     expect(persistMock).not.toHaveBeenCalled();
   });
 
-  it('does not grade twice', async () => {
-    state.finalExists = true;
-    expect(await submitFCEReadingExerciseAction(input)).toEqual({ error: 'Already submitted' });
+  it('does not grade twice and returns the stored result', async () => {
+    const stored = { correct: 2, total: 2, score10: 10, results: [] };
+    readMessagesMock.mockResolvedValue([
+      plan,
+      { role: 'bob', content_json: { kind: 'fce_group_evaluation', exam_part: 'fce_reading_part4', is_final: true, result: stored } },
+    ]);
+    expect(await submitFCEReadingExerciseAction(input)).toEqual(stored);
     expect(persistMock).not.toHaveBeenCalled();
   });
 });

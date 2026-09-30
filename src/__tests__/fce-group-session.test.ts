@@ -27,7 +27,8 @@ vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServer: async () => ({ auth: { getUser }, from: () => chain }),
 }));
 
-import { startGroupSession, submitGroupSession, type GroupPartConfig } from '@/lib/item-bank/group-session';
+import { startGroupSession, submitGroupSession } from '@/lib/item-bank/group-session';
+import { createGroupStrategy, type GroupPartConfig } from '@/lib/item-bank/group-strategy';
 import { matchesLetterKey } from '@/lib/item-bank/group-grading';
 
 const CONFIG: GroupPartConfig = {
@@ -37,6 +38,7 @@ const CONFIG: GroupPartConfig = {
   title: 'Listening Part 3',
   matcher: matchesLetterKey,
 };
+const STRATEGY = createGroupStrategy(CONFIG);
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -49,7 +51,7 @@ beforeEach(() => {
 
 describe('startGroupSession', () => {
   it('carga el ejercicio pregenerado sin clave ni transcript y lo persiste', async () => {
-    const started = await startGroupSession(CONFIG);
+    const started = await startGroupSession(STRATEGY);
     expect('error' in started).toBe(false);
     const serialized = JSON.stringify(started);
     expect(serialized).not.toContain(SECRET_TRANSCRIPT);
@@ -63,19 +65,19 @@ describe('startGroupSession', () => {
 
   it('sin contenido devuelve un error claro y no crea sesion', async () => {
     fetchGroups.mockResolvedValue({ ok: true, data: [] });
-    expect(await startGroupSession(CONFIG)).toEqual({ error: 'Could not load exercise' });
+    expect(await startGroupSession(STRATEGY)).toEqual({ error: 'No exercise available' });
     expect(createSessionAction).not.toHaveBeenCalled();
   });
 
   it('sin usuario devuelve error', async () => {
     getUser.mockResolvedValue({ data: { user: null } });
-    expect(await startGroupSession(CONFIG)).toEqual({ error: 'Not authenticated' });
+    expect(await startGroupSession(STRATEGY)).toEqual({ error: 'Not authenticated' });
   });
 });
 
 describe('submitGroupSession', () => {
   const planMessage = async () => {
-    const started = await startGroupSession(CONFIG);
+    const started = await startGroupSession(STRATEGY);
     if ('error' in started) throw new Error('start failed');
     const contentJson = persistMessage.mock.calls[0][0].contentJson;
     persistMessage.mockClear();
@@ -87,7 +89,7 @@ describe('submitGroupSession', () => {
     readSessionMessagesForCurrentOrUser.mockResolvedValue([plan]);
 
     const answers = { 'l3-item-1': 'E', 'l3-item-2': 'B', 'l3-item-3': 'H', 'l3-item-4': 'G', 'l3-item-5': 'A' };
-    const graded = await submitGroupSession(CONFIG, 'session-1', answers);
+    const graded = await submitGroupSession(STRATEGY, 'session-1', answers);
 
     expect(graded).toMatchObject({ correct: 3, total: 5, score_10: 6 });
     const evaluation = persistMessage.mock.calls[0][0];
@@ -99,23 +101,28 @@ describe('submitGroupSession', () => {
     const plan = await planMessage();
     const evaluation = {
       role: 'bob',
-      content_json: { kind: 'fce_group_evaluation', score: 5, score_max: 5, score_10: 10, results: [], is_final: true },
+      content_json: {
+        kind: 'fce_group_evaluation',
+        exam_part: 'fce_listening_part3',
+        is_final: true,
+        result: { correct: 5, total: 5, score_10: 10, results: [] },
+      },
     };
     readSessionMessagesForCurrentOrUser.mockResolvedValue([plan, evaluation]);
-    const outcome = await submitGroupSession(CONFIG, 'session-1', {});
+    const outcome = await submitGroupSession(STRATEGY, 'session-1', {});
     expect(outcome).toMatchObject({ correct: 5, score_10: 10 });
     expect(persistMessage).not.toHaveBeenCalled();
   });
 
   it('sin plan en la sesion devuelve error', async () => {
     readSessionMessagesForCurrentOrUser.mockResolvedValue([]);
-    expect(await submitGroupSession(CONFIG, 'session-x', {})).toEqual({ error: 'Could not load exercise' });
+    expect(await submitGroupSession(STRATEGY, 'session-x', {})).toEqual({ error: 'Could not load exercise' });
   });
 
   it('si no se puede guardar el resultado devuelve error para reintentar', async () => {
     const plan = await planMessage();
     readSessionMessagesForCurrentOrUser.mockResolvedValue([plan]);
     persistMessage.mockResolvedValue({ error: 'db' });
-    expect(await submitGroupSession(CONFIG, 'session-1', {})).toEqual({ error: 'Could not save result' });
+    expect(await submitGroupSession(STRATEGY, 'session-1', {})).toEqual({ error: 'Could not save result' });
   });
 });
