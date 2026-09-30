@@ -1,6 +1,8 @@
 import React from 'react';
 import type { ModeKey } from '@/lib/types/practice';
 import type { StoredMessage } from '@/actions/messages';
+import { FCE_ROUTES } from '@/lib/routing-fce';
+import { ylInstanceKey } from '@/lib/route-instance-key';
 import {
   YLPart2Practice,
   YLPart4Practice,
@@ -47,21 +49,6 @@ import {
   PETListeningTrueFalseJustifyPractice,
   PETReadingComprehensionPractice,
 } from '@/components/practice/pet';
-import {
-  FCEMultipleChoiceClozePractice,
-  FCEPictureDescriptionPractice,
-  FCEEssayWritingPractice,
-  FCEWritingPart2Practice,
-  FCEShortExtractsPractice,
-  FCEInterviewPractice,
-  FCECollaborativePractice,
-  FCEDiscussionPractice,
-  FCEListeningGapFillPractice,
-  FCEListeningInterviewPractice,
-  FCEReadingMatchingPractice,
-  FCEListeningMatchingPractice,
-  FCEGroupedReadingPractice,
-} from '@/components/practice/fce';
 
 export type AppState =
   | 'home'
@@ -103,24 +90,12 @@ export interface RouteEntry {
 }
 
 /**
- * Key used to force remount of a YL component when switching between two
- * persisted sessions (history-history). Returns 'new' while the session has
- * no persisted messages, including the moment right after creation, before
- * the new session has any messages stored, so we don't remount and lose
- * the freshly-generated plan/images.
- */
-function ylInstanceKey(p: YLRenderProps): string {
-  return p.initialMessages && p.initialMessages.length > 0
-    ? p.sessionId ?? 'new'
-    : 'new';
-}
-
-/**
  * Single source of truth for mode-key → component mapping.
  * Indexed by full mode_key (not exam_part) because different frameworks
  * reuse part numbers (e.g. starters_part1 ≠ flyers_part1 ≠ ket_part1).
  */
 export const EXAM_PART_COMPONENT_MAP: Record<ModeKey, RouteEntry> = {
+  ...FCE_ROUTES,
   cambridge_starters_part1: {
     appState: 'exam-practicing',
     kind: 'yl',
@@ -241,16 +216,6 @@ export const EXAM_PART_COMPONENT_MAP: Record<ModeKey, RouteEntry> = {
     kind: 'exam',
     render: (p) => React.createElement(AcademicWritingPractice, { mode: 'toefl_writing_academic_discussion', onBack: (p as ExamRenderProps).onBack }),
   },
-  cambridge_fce_writing_part1: {
-    appState: 'exam-practicing',
-    kind: 'yl',
-    render: (p) => React.createElement(FCEEssayWritingPractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
-  },
-  cambridge_fce_writing_part2: {
-    appState: 'exam-practicing',
-    kind: 'yl',
-    render: (p) => React.createElement(FCEWritingPart2Practice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
-  },
   cambridge_ket_writing_part6: {
     appState: 'exam-practicing',
     kind: 'yl',
@@ -345,81 +310,6 @@ export const EXAM_PART_COMPONENT_MAP: Record<ModeKey, RouteEntry> = {
     appState: 'exam-practicing',
     kind: 'yl',
     render: (p) => React.createElement(PETListeningTrueFalseJustifyPractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
-  },
-  cambridge_fce_reading_part1: {
-    appState: 'exam-practicing',
-    kind: 'yl',
-    render: (p) => React.createElement(FCEMultipleChoiceClozePractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
-  },
-  cambridge_fce_reading_part2: {
-    appState: 'exam-practicing',
-    kind: 'yl',
-    render: (p) => React.createElement(FCEGroupedReadingPractice, { key: ylInstanceKey(p as YLRenderProps), part: 'fce_reading_part2', ...(p as YLRenderProps) }),
-  },
-  cambridge_fce_reading_part3: {
-    appState: 'exam-practicing',
-    kind: 'yl',
-    render: (p) => React.createElement(FCEGroupedReadingPractice, { key: ylInstanceKey(p as YLRenderProps), part: 'fce_reading_part3', ...(p as YLRenderProps) }),
-  },
-  cambridge_fce_reading_part4: {
-    appState: 'exam-practicing',
-    kind: 'yl',
-    render: (p) => React.createElement(FCEGroupedReadingPractice, { key: ylInstanceKey(p as YLRenderProps), part: 'fce_reading_part4', ...(p as YLRenderProps) }),
-  },
-  cambridge_fce_reading_part5: {
-    appState: 'exam-practicing',
-    kind: 'yl',
-    render: (p) => React.createElement(FCEGroupedReadingPractice, { key: ylInstanceKey(p as YLRenderProps), part: 'fce_reading_part5', ...(p as YLRenderProps) }),
-  },
-  cambridge_fce_reading_part6: {
-    appState: 'exam-practicing',
-    kind: 'yl',
-    render: (p) => React.createElement(FCEGroupedReadingPractice, { key: ylInstanceKey(p as YLRenderProps), part: 'fce_reading_part6', ...(p as YLRenderProps) }),
-  },
-  cambridge_fce_p1: {
-    appState: 'exam-practicing',
-    kind: 'exam',
-    render: (p) => React.createElement(FCEInterviewPractice, { onBack: (p as ExamRenderProps).onBack }),
-  },
-  cambridge_fce_p3: {
-    appState: 'exam-practicing',
-    kind: 'exam',
-    render: (p) => React.createElement(FCECollaborativePractice, { onBack: (p as ExamRenderProps).onBack }),
-  },
-  cambridge_fce_p4: {
-    appState: 'exam-practicing',
-    kind: 'exam',
-    render: (p) => React.createElement(FCEDiscussionPractice, { onBack: (p as ExamRenderProps).onBack }),
-  },
-  cambridge_fce_p2: {
-    appState: 'exam-practicing',
-    kind: 'yl',
-    render: (p) => React.createElement(FCEPictureDescriptionPractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
-  },
-  cambridge_fce_reading_part7: {
-    appState: 'exam-practicing',
-    kind: 'yl',
-    render: (p) => React.createElement(FCEReadingMatchingPractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
-  },
-  cambridge_fce_listening_part3: {
-    appState: 'exam-practicing',
-    kind: 'yl',
-    render: (p) => React.createElement(FCEListeningMatchingPractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
-  },
-  cambridge_fce_listening_part2: {
-    appState: 'exam-practicing',
-    kind: 'yl',
-    render: (p) => React.createElement(FCEListeningGapFillPractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
-  },
-  cambridge_fce_listening_part4: {
-    appState: 'exam-practicing',
-    kind: 'yl',
-    render: (p) => React.createElement(FCEListeningInterviewPractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
-  },
-  cambridge_fce_listening_part1: {
-    appState: 'exam-practicing',
-    kind: 'yl',
-    render: (p) => React.createElement(FCEShortExtractsPractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
   },
 };
 
