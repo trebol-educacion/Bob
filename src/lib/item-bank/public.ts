@@ -2,7 +2,13 @@ import type { BankItem, ItemGroup, PublicBankItem, PublicItemGroup } from './typ
 
 /** @param item */
 export function toPublicItem(item: BankItem): PublicBankItem {
-  const { correct_key: _correct_key, explanation: _explanation, ...publicItem } = item;
+  const {
+    correct_key: _correct_key,
+    explanation: _explanation,
+    transcript: _transcript,
+    metadata: _metadata,
+    ...publicItem
+  } = item;
   return publicItem;
 }
 

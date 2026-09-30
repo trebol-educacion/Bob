@@ -28,6 +28,9 @@ export interface ItemGroup {
   difficulty: ItemBankDifficulty | null;
   purpose: ItemBankPurpose;
   module_code: string | null;
+  exam_part: string | null;
+  variant_id: string | null;
+  metadata: Record<string, unknown>;
   stimulus_text: string | null;
   stimulus_audio_url: string | null;
   stimulus_image_url: string | null;
@@ -41,7 +44,7 @@ export interface ItemGroup {
 
 export type BankItem = ClosedItem;
 
-export type PublicBankItem = Omit<BankItem, 'correct_key' | 'explanation'>;
+export type PublicBankItem = Omit<BankItem, 'correct_key' | 'explanation' | 'transcript' | 'metadata'>;
 
 export type PublicItemGroup = Omit<ItemGroup, 'reviewed_by' | 'reviewed_at' | 'source_ref'>;
 

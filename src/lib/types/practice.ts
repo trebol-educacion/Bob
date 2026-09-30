@@ -177,6 +177,10 @@ export interface ClosedEvaluation {
   explanation: string | null;
 }
 
+export const ClosedItemMetadataSchema = z
+  .object({ accepted: z.array(z.string()).optional() })
+  .passthrough();
+
 /** Schema for a single row in bob_closed_items. */
 export const ClosedItemSchema = z.object({
   id: z.string(),
@@ -197,9 +201,11 @@ export const ClosedItemSchema = z.object({
   ),
   correct_key: z.string(),
   explanation: z.string().nullable(),
-  source: z.enum(['curated', 'official', 'generated_then_curated']),
+  source: z.enum(['curated', 'official', 'generated_then_curated', 'generated']),
   group_id: z.string().nullable().optional(),
   group_order: z.number().int().nullable().optional(),
+  transcript: z.string().nullable().optional(),
+  metadata: ClosedItemMetadataSchema.nullable().optional(),
 });
 
 /** Single row from bob_closed_items; shape mirrors the Zod schema above. */
