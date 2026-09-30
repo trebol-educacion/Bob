@@ -22,3 +22,5 @@ export { FCEListeningGapFillPractice } from './FCEListeningGapFillPractice';
 export type { FCEListeningGapFillPracticeProps } from './FCEListeningGapFillPractice';
 export { FCEListeningInterviewPractice } from './FCEListeningInterviewPractice';
 export type { FCEListeningInterviewPracticeProps } from './FCEListeningInterviewPractice';
+export { FCEWritingPart2Practice } from './writing2/FCEWritingPart2Practice';
+export type { FCEWritingPart2PracticeProps } from './writing2/FCEWritingPart2Practice';

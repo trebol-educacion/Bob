@@ -51,6 +51,7 @@ import {
   FCEMultipleChoiceClozePractice,
   FCEPictureDescriptionPractice,
   FCEEssayWritingPractice,
+  FCEWritingPart2Practice,
   FCEShortExtractsPractice,
   FCEInterviewPractice,
   FCECollaborativePractice,
@@ -244,6 +245,11 @@ export const EXAM_PART_COMPONENT_MAP: Record<ModeKey, RouteEntry> = {
     appState: 'exam-practicing',
     kind: 'yl',
     render: (p) => React.createElement(FCEEssayWritingPractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
+  },
+  cambridge_fce_writing_part2: {
+    appState: 'exam-practicing',
+    kind: 'yl',
+    render: (p) => React.createElement(FCEWritingPart2Practice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
   },
   cambridge_ket_writing_part6: {
     appState: 'exam-practicing',

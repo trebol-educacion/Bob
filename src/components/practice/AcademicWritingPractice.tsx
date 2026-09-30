@@ -12,9 +12,8 @@ export interface ForumPost {
   text: string;
 }
 
-/** Routes to the right exam_part config based on mode. */
 export interface AcademicWritingPracticeProps {
-  mode: 'toefl_writing_academic_discussion' | 'cambridge_fce_writing_part1';
+  mode: 'toefl_writing_academic_discussion';
   onBack: () => void;
 }
 
@@ -42,17 +41,8 @@ const CONFIG: Record<string, AcademicConfig> = {
       { author: 'James (classmate)', text: 'I disagree, not everyone can afford it. Universities should offer virtual exchange programs instead.' },
     ],
   },
-  cambridge_fce_writing_part1: {
-    framework: 'cambridge',
-    exam_part: 'cambridge_fce_writing_part1',
-    modeTitle: 'Writing, Part 1 Essay',
-    instructions: 'In your English class you have been talking about technology. Now your teacher has asked you to write an essay. Write your essay using all the notes and give reasons for your point of view.',
-    bullets: ['Social media and communication', 'Online privacy', 'Your own idea'],
-    targetWordCount: [140, 190],
-  },
 };
 
-/** Academic discussion and essay writing activity for TOEFL Academic Discussion and FCE Essay. */
 export function AcademicWritingPractice({ mode, onBack }: AcademicWritingPracticeProps) {
   const [sessionId, setSessionId] = useState('');
   const [userId, setUserId] = useState('');

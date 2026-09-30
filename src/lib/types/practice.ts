@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { FceRubric } from '@/lib/writing/fce-rubric';
 
 /** CEFR proficiency level. */
 export type CefrLevel = 'pre_a1' | 'a1' | 'a2' | 'b1' | 'b2' | 'c1' | 'c2';
@@ -236,6 +237,8 @@ export interface WritingFormativeFeedback {
   suggestions: string[];
   model_answer?: string;
   rubric?: RubricCriteria;
+  score_10?: number;
+  fce_rubric?: FceRubric;
   indicators: {
     word_count: number;
     target_word_count_range: [number, number];

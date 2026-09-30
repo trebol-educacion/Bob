@@ -298,6 +298,36 @@
       "celebrationFeedback": "Nice work comparing the pictures! Keep practising to cover all 6 points fluently.",
       "celebrationAction": "See my progress",
       "finishedTitle": "Long Turn complete"
+    },
+    "score": {
+      "title": "Your mark",
+      "criteria": {
+        "content": "Content",
+        "communicative_achievement": "Communicative achievement",
+        "organisation": "Organisation",
+        "language": "Language"
+      }
+    },
+    "writing2": {
+      "back": "Back",
+      "headerTitle": "Choice task",
+      "headerSubtitle": "Writing Part 2",
+      "partBadge": "PART 2",
+      "preparingExercise": "Preparing your tasks…",
+      "chooseTitle": "Choose one task",
+      "chooseHint": "Pick the one you feel most confident about. Write 140-190 words.",
+      "taskNumber": "Question {number}",
+      "registerLabel": "Register",
+      "chooseAction": "Write this one",
+      "changeTask": "Choose another task",
+      "retry": "Try again",
+      "types": {
+        "article": "Article",
+        "email_letter": "Email / letter",
+        "report": "Report",
+        "review": "Review"
+      },
+      "yourText": "Your text"
     }
   },
   "pet": {

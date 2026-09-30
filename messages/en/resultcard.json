@@ -36,5 +36,6 @@
   "correctSentence": "Correct sentence:",
   "wellDoneChose": "Well done, you chose {label}.",
   "choseWrong": "You chose {label}.",
-  "theAnswerIs": "The answer is {key}"
+  "theAnswerIs": "The answer is {key}",
+  "reviewingText": "Bob is reviewing your text…"
 }
