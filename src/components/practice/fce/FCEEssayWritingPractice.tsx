@@ -18,7 +18,7 @@ import {
 import type { StoredMessage } from '@/actions/messages';
 import { EssayBriefCard } from '@/components/practice/fce/essay/EssayBriefCard';
 import { tryRestoreFromMessages } from '@/components/practice/fce/essay/restore';
-import { FceScoreCard } from '@/components/practice/writing/FceScoreCard';
+import { FceScoreCard, ScoreHeadline } from '@/components/practice/writing/FceScoreCard';
 import { countWords } from '@/lib/writing/word-count';
 import { useTranslations } from 'next-intl';
 
@@ -95,7 +95,7 @@ function FeedbackPanel({
             <XCircle size={18} className="text-amber-500 shrink-0" />
           )}
           <span className="text-sm font-semibold text-gray-700">
-            {feedback.understood ? t('fce.essay.youDidIt') : t('fce.essay.reviewYourEssay')}
+            <ScoreHeadline score10={feedback.score10} fallback={feedback.understood ? t('fce.essay.youDidIt') : t('fce.essay.reviewYourEssay')} />
           </span>
         </div>
 

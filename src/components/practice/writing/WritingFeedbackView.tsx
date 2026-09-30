@@ -5,7 +5,7 @@ import { motion } from 'motion/react';
 import { CheckCircle } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { InfoCard } from '@/components/chat';
-import { FceScoreCard } from '@/components/practice/writing/FceScoreCard';
+import { FceScoreCard, ScoreHeadline } from '@/components/practice/writing/FceScoreCard';
 import type { WritingFormativeFeedback } from '@/lib/types/practice';
 
 export interface WritingFeedbackViewProps {
@@ -24,7 +24,7 @@ export function WritingFeedbackView({ feedback }: WritingFeedbackViewProps) {
       <div className="flex items-center gap-2">
         <CheckCircle size={20} className="text-green-500 shrink-0" />
         <span className="text-sm font-semibold text-gray-700">
-          {feedback.understood ? t('wellDone') : t('submitted')}
+          <ScoreHeadline score10={feedback.score_10} fallback={feedback.understood ? t('wellDone') : t('submitted')} />
         </span>
       </div>
 

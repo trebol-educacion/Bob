@@ -3,6 +3,7 @@
 import React from 'react';
 import { useTranslations } from 'next-intl';
 import { FCE_CRITERIA, type FceRubric } from '@/lib/writing/fce-rubric';
+import { scoreHeadlineTier } from '@/lib/writing/score-headline';
 
 export interface FceScoreCardProps {
   score10: number;
@@ -41,4 +42,15 @@ export function FceScoreCard({ score10, rubric }: FceScoreCardProps) {
       </ul>
     </div>
   );
+}
+
+export interface ScoreHeadlineProps {
+  score10: number | null | undefined;
+  fallback: string;
+}
+
+export function ScoreHeadline({ score10, fallback }: ScoreHeadlineProps) {
+  const t = useTranslations('cambridge');
+  if (score10 === null || score10 === undefined) return <>{fallback}</>;
+  return <>{t(`fce.score.headline.${scoreHeadlineTier(score10)}`)}</>;
 }

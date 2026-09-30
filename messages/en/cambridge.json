@@ -301,6 +301,12 @@
     },
     "score": {
       "title": "Your mark",
+      "headline": {
+        "excellent": "Excellent work!",
+        "good": "Good job!",
+        "fair": "Getting there",
+        "keepGoing": "Keep practising"
+      },
       "criteria": {
         "content": "Content",
         "communicative_achievement": "Communicative achievement",
