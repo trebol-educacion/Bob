@@ -11,12 +11,14 @@ import { CollaborativeFeedbackPanel } from './CollaborativeFeedbackPanel';
 
 interface ResultProps {
   feedback: FormativeFeedback;
+  translationScope: string;
   onTryAgain: () => void;
   onBack: () => void;
 }
 
-export function CollaborativeResult({ feedback, onTryAgain, onBack }: ResultProps) {
-  const t = useTranslations('cambridge');
+export function CollaborativeResult({ feedback, translationScope, onTryAgain, onBack }: ResultProps) {
+  const tc = useTranslations('cambridge');
+  const t = (key: string) => tc(`${translationScope}.${key}`);
 
   const inputSlot = (
     <div className="flex-none border-t border-gray-100 bg-white px-4 py-4 flex gap-3">
@@ -25,13 +27,13 @@ export function CollaborativeResult({ feedback, onTryAgain, onBack }: ResultProp
         className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-trebol-primary text-trebol-primary font-bold hover:bg-trebol-primary/5 transition-colors"
       >
         <RotateCcw size={16} />
-        {t('common.tryAgain')}
+        {tc('common.tryAgain')}
       </button>
       <button
         onClick={onBack}
         className="flex-1 py-3 rounded-xl bg-trebol-primary text-white font-bold hover:opacity-90 transition-opacity"
       >
-        {t('common.backToModes')}
+        {tc('common.backToModes')}
       </button>
     </div>
   );
@@ -40,13 +42,13 @@ export function CollaborativeResult({ feedback, onTryAgain, onBack }: ResultProp
     <ChatShell
       headerConfig={{
         icon: MessageSquare,
-        title: t('b1.collaborative.feedbackTitle'),
-        subtitle: t('b1.collaborative.headerSubtitle'),
+        title: t('feedbackTitle'),
+        subtitle: t('headerSubtitle'),
         accentColor: 'blue',
         online: false,
         leftSlot: <CollaborativeBackButton onBack={onBack} />,
       }}
-      footerConfig={{ modeLabel: t('b1.collaborative.footerFeedbackLabel'), modelName: ACTIVE_MODEL_LABEL }}
+      footerConfig={{ modeLabel: t('footerFeedbackLabel'), modelName: ACTIVE_MODEL_LABEL }}
       inputSlot={inputSlot}
       animationKey="b1-result"
     >

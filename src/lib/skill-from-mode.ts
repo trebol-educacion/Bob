@@ -22,7 +22,9 @@ export function inferSkillFromMode(mode: string): Skill | null {
     mode.includes('assessment_speaking') ||
     mode === 'cambridge_ket_part2' ||
     mode === 'cambridge_ket_part3' ||
+    mode === 'cambridge_fce_p1' ||
     mode === 'cambridge_fce_p2' ||
+    mode === 'cambridge_fce_p4' ||
     mode === 'cambridge_pet_p2'
   ) return 'speaking';
   return null;

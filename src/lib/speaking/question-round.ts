@@ -4,6 +4,7 @@ import { getPrompt } from '@/lib/prompts/db-prompts';
 import { persistMessage, readSessionMessagesForCurrentOrUser } from '@/lib/persist-activity';
 import { getOrCreateCachedContent } from '@/lib/cache';
 import { callGemini, safeParseFallback } from '@/lib/gemini-client';
+import { toExaminerFeedback } from './examiner-score';
 import type { SpeakingQA } from './types';
 
 export interface QuestionRoundSchema<TPlan> {
@@ -18,6 +19,8 @@ export interface QuestionRoundConfig<TPlan extends object> {
   planFallback: TPlan;
   logTag: string;
   eventName: string;
+  examinerReaction?: boolean;
+  scoredEvaluation?: boolean;
 }
 
 const FormativeFeedbackFallback: FormativeFeedback = {
@@ -55,12 +58,13 @@ export async function generateQuestionRoundPlan<TPlan extends object>(
   config: QuestionRoundConfig<TPlan>,
   sessionId: string,
   userId: string,
+  variables: Record<string, string> = {},
 ): Promise<TPlan> {
   const generationKey = `${config.promptPrefix}_generation`;
   const cached = await getOrCreateCachedContent<TPlan>(
-    { kind: 'plan', promptKey: config.planCacheKey, inputs: {} },
+    { kind: 'plan', promptKey: config.planCacheKey, inputs: variables },
     async () => {
-      const planPromptText = await getPrompt(generationKey);
+      const planPromptText = await getPrompt(generationKey, variables);
       const result = await callGemini(
         { promptKey: generationKey, model: MODELS.FLASH_LITE_PREVIEW, userId },
         (ai) => ai.models.generateContent({
@@ -146,6 +150,8 @@ export async function processQuestionRoundAnswer<TPlan extends object>(
     console.error(`[${config.logTag} persist] user_audio:`, persistResult.error);
   }
 
+  if (config.examinerReaction === false) return { transcribed, reaction: '' };
+
   const reactionKey = `${config.promptPrefix}_examiner_reaction`;
   const reactionPromptText = await getPrompt(reactionKey, {
     USER_TRANSCRIPT: transcribed,
@@ -199,7 +205,9 @@ export async function evaluateQuestionRound<TPlan extends object>(
     return FormativeFeedbackFallback;
   }
 
-  const feedback = safeParseFallback(FormativeFeedbackSchema, parsed, FormativeFeedbackFallback);
+  const scored = config.scoredEvaluation ? toExaminerFeedback(parsed) : null;
+  if (config.scoredEvaluation && !scored) return FormativeFeedbackFallback;
+  const feedback = scored ?? safeParseFallback(FormativeFeedbackSchema, parsed, FormativeFeedbackFallback);
 
   const persistResult = await persistMessage({
     sessionId,

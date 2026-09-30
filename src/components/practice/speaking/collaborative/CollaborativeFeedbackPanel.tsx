@@ -4,10 +4,12 @@ import React from 'react';
 import { CheckCircle2, ChevronRight } from 'lucide-react';
 import { InfoCard } from '@/components/chat';
 import type { FormativeFeedback } from '@/lib/types/practice';
+import { ScoreCard } from '../ScoreCard';
 
 export function CollaborativeFeedbackPanel({ feedback }: { feedback: FormativeFeedback }) {
   return (
     <div className="space-y-4">
+      <ScoreCard feedback={feedback} />
       <div className={`text-center py-3 px-4 rounded-xl font-bold text-sm ${feedback.understood ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'}`}>
         {feedback.understood ? 'Great discussion, your ideas came through clearly!' : 'Good effort, keep practising!'}
       </div>

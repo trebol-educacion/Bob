@@ -9,8 +9,11 @@ import { CollaborativeResult } from './CollaborativeResult';
 import { useCollaborativeSession } from './useCollaborativeSession';
 import type { CollaborativePracticeProps } from './types';
 
+const DEFAULT_SCOPE = 'b1.collaborative';
+
 export function CollaborativePractice({ config, onBack, sessionId }: CollaborativePracticeProps) {
   const t = useTranslations('cambridge');
+  const translationScope = config.translationScope ?? DEFAULT_SCOPE;
   const session = useCollaborativeSession(config, sessionId);
 
   if (session.phase === 'intro') {
@@ -20,6 +23,7 @@ export function CollaborativePractice({ config, onBack, sessionId }: Collaborati
         scenario={session.scenario}
         loadingScenario={session.loadingScenario}
         maxTurns={config.maxTurns}
+        translationScope={translationScope}
         onSelectPreset={session.selectScenario}
         onSurpriseMe={session.handleSurpriseMe}
         onStart={session.handleStart}
@@ -29,11 +33,11 @@ export function CollaborativePractice({ config, onBack, sessionId }: Collaborati
   }
 
   if (session.phase === 'evaluating') {
-    return <BobMascotLoader message={t('b1.collaborative.evaluatingPerformance')} />;
+    return <BobMascotLoader message={t(`${translationScope}.evaluatingPerformance`)} />;
   }
 
   if (session.phase === 'result' && session.evaluation) {
-    return <CollaborativeResult feedback={session.evaluation} onTryAgain={session.handleTryAgain} onBack={onBack} />;
+    return <CollaborativeResult feedback={session.evaluation} translationScope={translationScope} onTryAgain={session.handleTryAgain} onBack={onBack} />;
   }
 
   return (
@@ -44,6 +48,7 @@ export function CollaborativePractice({ config, onBack, sessionId }: Collaborati
       userTurns={session.userTurns}
       maxTurns={config.maxTurns}
       finishEarlyAfterTurns={config.finishEarlyAfterTurns}
+      translationScope={translationScope}
       isProcessing={session.isProcessing}
       isRecording={session.isRecording}
       ttsLoading={session.ttsLoading}

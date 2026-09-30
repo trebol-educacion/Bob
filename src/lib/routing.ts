@@ -52,6 +52,9 @@ import {
   FCEPictureDescriptionPractice,
   FCEEssayWritingPractice,
   FCEShortExtractsPractice,
+  FCEInterviewPractice,
+  FCECollaborativePractice,
+  FCEDiscussionPractice,
 } from '@/components/practice/fce';
 
 export type AppState =
@@ -337,6 +340,21 @@ export const EXAM_PART_COMPONENT_MAP: Record<ModeKey, RouteEntry> = {
     kind: 'yl',
     render: (p) => React.createElement(FCEMultipleChoiceClozePractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
   },
+  cambridge_fce_p1: {
+    appState: 'exam-practicing',
+    kind: 'exam',
+    render: (p) => React.createElement(FCEInterviewPractice, { onBack: (p as ExamRenderProps).onBack }),
+  },
+  cambridge_fce_p3: {
+    appState: 'exam-practicing',
+    kind: 'exam',
+    render: (p) => React.createElement(FCECollaborativePractice, { onBack: (p as ExamRenderProps).onBack }),
+  },
+  cambridge_fce_p4: {
+    appState: 'exam-practicing',
+    kind: 'exam',
+    render: (p) => React.createElement(FCEDiscussionPractice, { onBack: (p as ExamRenderProps).onBack }),
+  },
   cambridge_fce_p2: {
     appState: 'exam-practicing',
     kind: 'yl',
@@ -368,9 +386,4 @@ export function isConversationMode(mode: string): boolean {
 export function isYLMode(mode: string): boolean {
   const entry = EXAM_PART_COMPONENT_MAP[mode];
   return entry?.kind === 'yl';
-}
-
-/** True when the mode uses BobPracticeChat in B2 image mode (FCE Part 1). */
-export function isFceImageMode(mode: string): boolean {
-  return mode === 'cambridge_fce_p1';
 }

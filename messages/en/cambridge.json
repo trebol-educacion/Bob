@@ -114,6 +114,31 @@
     }
   },
   "fce": {
+    "collaborative": {
+      "headerTitle": "B2 Collaborative Task",
+      "headerSubtitle": "B2 · Part 3",
+      "conversationSubtitle": "B2 · Part 3",
+      "feedbackTitle": "Your Feedback",
+      "evaluatingPerformance": "Evaluating your performance…",
+      "howItWorks": "How it works",
+      "howItWorksLine1": "You discuss 5 ideas with an AI examiner: about 2 minutes on each option, then 1 minute to decide (up to {maxTurns} turns)",
+      "howItWorksLine2": "Give reasons, compare the ideas and react to your partner",
+      "howItWorksLine3": "After finishing, you get your grade out of 10 and detailed feedback",
+      "startDiscussion": "Start Task",
+      "finishEvaluate": "Finish & Evaluate",
+      "finishEarly": "Finish early",
+      "typeInstead": "Type instead",
+      "hideText": "Hide text",
+      "generatingScenario": "Generating scenario…",
+      "surpriseMe": "Surprise me (AI generated)",
+      "turnOf": "Turn {current} of {max}",
+      "optionsSidebarLabel": "Ideas",
+      "examiner": "Examiner",
+      "examinerResponding": "Examiner is responding…",
+      "footerModeLabel": "B2 PART 3",
+      "footerFeedbackLabel": "FEEDBACK",
+      "footerCollaborativeLabel": "COLLABORATIVE TASK"
+    },
     "cloze": {
       "back": "Back",
       "headerTitle": "Multiple-Choice Cloze",

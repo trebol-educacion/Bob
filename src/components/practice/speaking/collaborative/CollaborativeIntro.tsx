@@ -15,6 +15,7 @@ interface IntroProps {
   scenario: Part3Scenario | null;
   loadingScenario: boolean;
   maxTurns: number;
+  translationScope: string;
   onSelectPreset: (preset: Part3Scenario) => void;
   onSurpriseMe: () => void;
   onStart: () => void;
@@ -22,7 +23,8 @@ interface IntroProps {
 }
 
 export function CollaborativeIntro(props: IntroProps) {
-  const t = useTranslations('cambridge');
+  const tc = useTranslations('cambridge');
+  const t = (key: string, values?: Record<string, string | number>) => tc(`${props.translationScope}.${key}`, values);
   const { presets, scenario, loadingScenario } = props;
 
   const inputSlot = (
@@ -52,7 +54,7 @@ export function CollaborativeIntro(props: IntroProps) {
         <span className="flex items-center justify-center w-4 h-4">
           {loadingScenario ? <Loader2 size={16} className="animate-spin" /> : <Shuffle size={16} />}
         </span>
-        {loadingScenario ? t('b1.collaborative.generatingScenario') : t('b1.collaborative.surpriseMe')}
+        {loadingScenario ? t('generatingScenario') : t('surpriseMe')}
       </button>
 
       <AnimatePresence>
@@ -77,7 +79,7 @@ export function CollaborativeIntro(props: IntroProps) {
               onClick={props.onStart}
               className="w-full bg-trebol-primary text-white font-bold py-3 rounded-xl hover:opacity-90 transition-opacity"
             >
-              {t('b1.collaborative.startDiscussion')}
+              {t('startDiscussion')}
             </button>
           </motion.div>
         )}
@@ -88,19 +90,19 @@ export function CollaborativeIntro(props: IntroProps) {
   const body = (
     <div className="space-y-4">
       <MessageBubble variant="assistant" icon={MessageSquare} accentColor="blue" noAnimate>
-        <p className="font-semibold">{t('b1.collaborative.howItWorks')}</p>
+        <p className="font-semibold">{t('howItWorks')}</p>
         <ul className="mt-2 space-y-1 text-sm">
           <li className="flex items-start gap-2">
             <ChevronRight size={14} className="mt-0.5 shrink-0" />
-            {t('b1.collaborative.howItWorksLine1', { maxTurns: props.maxTurns })}
+            {t('howItWorksLine1', { maxTurns: props.maxTurns })}
           </li>
           <li className="flex items-start gap-2">
             <ChevronRight size={14} className="mt-0.5 shrink-0" />
-            {t('b1.collaborative.howItWorksLine2')}
+            {t('howItWorksLine2')}
           </li>
           <li className="flex items-start gap-2">
             <ChevronRight size={14} className="mt-0.5 shrink-0" />
-            {t('b1.collaborative.howItWorksLine3')}
+            {t('howItWorksLine3')}
           </li>
         </ul>
       </MessageBubble>
@@ -118,13 +120,13 @@ export function CollaborativeIntro(props: IntroProps) {
     <ChatShell
       headerConfig={{
         icon: MessageSquare,
-        title: t('b1.collaborative.headerTitle'),
-        subtitle: t('b1.collaborative.headerSubtitle'),
+        title: t('headerTitle'),
+        subtitle: t('headerSubtitle'),
         accentColor: 'blue',
         online: true,
         leftSlot: <CollaborativeBackButton onBack={props.onBack} />,
       }}
-      footerConfig={{ modeLabel: t('b1.collaborative.footerModeLabel'), modelName: ACTIVE_MODEL_LABEL }}
+      footerConfig={{ modeLabel: t('footerModeLabel'), modelName: ACTIVE_MODEL_LABEL }}
       inputSlot={inputSlot}
       animationKey="b1-intro"
     >

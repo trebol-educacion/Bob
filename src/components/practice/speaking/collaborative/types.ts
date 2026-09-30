@@ -6,6 +6,7 @@ export interface CollaborativePracticeConfig {
   presets: Part3Scenario[];
   maxTurns: number;
   finishEarlyAfterTurns: number;
+  translationScope?: string;
   actions: CollaborativeActions;
 }
 

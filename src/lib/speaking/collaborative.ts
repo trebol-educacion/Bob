@@ -7,7 +7,14 @@ import { persistMessage, readSessionMessagesForCurrentOrUser } from '@/lib/persi
 import type { PersistMessageInput } from '@/lib/persist-activity';
 import { getOrCreateCachedContent } from '@/lib/cache';
 import { callGemini, safeParseFallback } from '@/lib/gemini-client';
+import { toExaminerFeedback } from './examiner-score';
 import type { Part3ChatMessage, Part3Scenario } from './types';
+
+export interface CollaborativeTemplateContext {
+  scenario: Part3Scenario;
+  history: Part3ChatMessage[];
+  userTurn: string;
+}
 
 export interface CollaborativeConfig {
   promptPrefix: string;
@@ -15,6 +22,9 @@ export interface CollaborativeConfig {
   scenarioFallback: Part3Scenario;
   examLabel: string;
   logTag: string;
+  scenarioSchema?: { safeParse: (x: unknown) => { success: boolean; data?: Part3Scenario; error?: unknown } };
+  templateVariables?: (context: CollaborativeTemplateContext) => Record<string, string>;
+  scoredEvaluation?: boolean;
 }
 
 export const Part3ScenarioSchema = z.object({
@@ -64,12 +74,25 @@ async function persistForCurrentUser(
   }
 }
 
-function formatHistory(history: Part3ChatMessage[]): string {
+export function formatHistory(history: Part3ChatMessage[]): string {
   return history.map((h) => `${h.role === 'examiner' ? 'Examiner' : 'Candidate'}: ${h.text}`).join('\n');
 }
 
+function extractExaminerLine(raw: string): string {
+  const stripped = raw.replace(/```[a-z]*\s*/gi, '').replace(/```/g, '').trim();
+  if (!stripped.startsWith('{')) return stripped;
+  try {
+    const obj = JSON.parse(stripped) as Record<string, unknown>;
+    const line = [obj.partner_turn, obj.examiner_response, obj.examiner_prompt].find((v) => typeof v === 'string');
+    return typeof line === 'string' ? line.trim() : '';
+  } catch {
+    return '';
+  }
+}
+
 function partnerTurnPrompt(config: CollaborativeConfig, history: Part3ChatMessage[], scenario: Part3Scenario) {
-  return getPrompt(`${config.promptPrefix}_partner_turn`, {
+  const variables = config.templateVariables?.({ scenario, history, userTurn: '' });
+  return getPrompt(`${config.promptPrefix}_partner_turn`, variables ?? {
     SCENE_TOPIC: scenario.topic,
     SCENE_SITUATION: scenario.situation,
     SCENE_QUESTION: scenario.prompt_question,
@@ -107,7 +130,7 @@ export async function generateCollaborativeScenario(
       } catch {
         return config.scenarioFallback;
       }
-      return safeParseFallback(Part3ScenarioSchema, parsed, config.scenarioFallback);
+      return safeParseFallback(config.scenarioSchema ?? Part3ScenarioSchema, parsed, config.scenarioFallback);
     },
     { storeAs: 'json' }
   );
@@ -133,7 +156,12 @@ export async function chatCollaborativeAudio(
   sessionId?: string,
 ): Promise<{ transcribed: string; examinerResponse: string }> {
   const systemInstruction = await partnerTurnPrompt(config, history, scenario);
-  const prompt = await getPrompt(`${config.promptPrefix}_partner_turn_audio`);
+  const audioVariables = config.templateVariables?.({
+    scenario,
+    history,
+    userTurn: 'the attached audio recording',
+  });
+  const prompt = await getPrompt(`${config.promptPrefix}_partner_turn_audio`, audioVariables);
 
   const result = await callGemini(
     { promptKey: `${config.promptPrefix}_partner_turn`, model: MODELS.FLASH_LITE_PREVIEW },
@@ -205,7 +233,8 @@ Respond with ONLY your next examiner line (no labels, no quotes, under 30 words)
     })
   );
 
-  const examinerResponse = result.ok ? (result.data.text ?? '').trim() : FALLBACK_EXAMINER_LINE;
+  const extracted = result.ok ? extractExaminerLine(result.data.text ?? '') : '';
+  const examinerResponse = extracted || FALLBACK_EXAMINER_LINE;
 
   await persistForCurrentUser(config, sessionId, [
     { role: 'user', msgType: 'text', contentText: text },
@@ -215,13 +244,12 @@ Respond with ONLY your next examiner line (no labels, no quotes, under 30 words)
   return { examinerResponse };
 }
 
-export async function evaluateCollaborative(
+function inlineEvaluationPrompt(
   config: CollaborativeConfig,
   history: Part3ChatMessage[],
   scenario: Part3Scenario,
-  sessionId?: string,
-): Promise<FormativeFeedback> {
-  const prompt = `You are a supportive ${config.examLabel} examiner giving formative feedback.
+): string {
+  return `You are a supportive ${config.examLabel} examiner giving formative feedback.
 
 Topic: "${scenario.topic}"
 Task question: "${scenario.prompt_question}"
@@ -238,6 +266,26 @@ Return ONLY a JSON object with these fields:
 - "rubric": an object with four integer scores 0-4 each: { "task_coverage": 0-4, "grammar": 0-4, "vocabulary": 0-4, "fluency": 0-4 }
 
 Return ONLY valid JSON. No score, no band, no percentage outside the rubric object.`;
+}
+
+async function buildEvaluationPrompt(
+  config: CollaborativeConfig,
+  history: Part3ChatMessage[],
+  scenario: Part3Scenario,
+): Promise<string> {
+  if (!config.scoredEvaluation) return inlineEvaluationPrompt(config, history, scenario);
+  const variables = config.templateVariables?.({ scenario, history, userTurn: '' });
+  const template = await getPrompt(`${config.promptPrefix}_evaluation`, variables);
+  return `${template}\n\nTRANSCRIPT:\n${formatHistory(history)}`;
+}
+
+export async function evaluateCollaborative(
+  config: CollaborativeConfig,
+  history: Part3ChatMessage[],
+  scenario: Part3Scenario,
+  sessionId?: string,
+): Promise<FormativeFeedback> {
+  const prompt = await buildEvaluationPrompt(config, history, scenario);
 
   const result = await callGemini(
     { promptKey: `${config.promptPrefix}_formative`, model: MODELS.FLASH_LITE_PREVIEW },
@@ -260,7 +308,9 @@ Return ONLY valid JSON. No score, no band, no percentage outside the rubric obje
     return FormativeFeedbackFallback;
   }
 
-  const feedback = safeParseFallback(FormativeFeedbackSchema, parsed, FormativeFeedbackFallback);
+  const scored = config.scoredEvaluation ? toExaminerFeedback(parsed) : null;
+  if (config.scoredEvaluation && !scored) return FormativeFeedbackFallback;
+  const feedback = scored ?? safeParseFallback(FormativeFeedbackSchema, parsed, FormativeFeedbackFallback);
 
   await persistForCurrentUser(config, sessionId, [
     {

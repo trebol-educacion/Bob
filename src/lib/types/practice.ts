@@ -21,6 +21,12 @@ export interface FormativeFeedback {
   suggestions: string[];
   model_answer?: string;
   rubric?: RubricCriteria;
+  score10?: number;
+  score?: number;
+  score_max?: number;
+  cefr_band?: string;
+  band_per_criterion?: Record<string, number>;
+  feedback?: string;
 }
 
 export const FormativeFeedbackSchema = z.object({
@@ -30,6 +36,12 @@ export const FormativeFeedbackSchema = z.object({
   suggestions:  z.array(z.string()),
   model_answer: z.string().optional(),
   rubric:       RubricCriteriaSchema.optional(),
+  score10:      z.number().min(0).max(10).optional(),
+  score:        z.number().min(0).optional(),
+  score_max:    z.number().min(0).optional(),
+  cefr_band:    z.string().optional(),
+  band_per_criterion: z.record(z.string(), z.number()).optional(),
+  feedback:     z.string().optional(),
 });
 
 /** Objective feedback for Listen & Repeat: word-level metrics, no subjective score. */

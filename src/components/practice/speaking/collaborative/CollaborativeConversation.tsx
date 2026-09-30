@@ -17,6 +17,7 @@ interface ConversationProps {
   userTurns: number;
   maxTurns: number;
   finishEarlyAfterTurns: number;
+  translationScope: string;
   isProcessing: boolean;
   isRecording: boolean;
   ttsLoading: boolean;
@@ -32,11 +33,12 @@ interface ConversationProps {
   onBack: () => void;
 }
 
-function OptionsSidebar({ scenario, discussedOptions }: Pick<ConversationProps, 'scenario' | 'discussedOptions'>) {
-  const t = useTranslations('cambridge');
+function OptionsSidebar({ scenario, discussedOptions, translationScope }: Pick<ConversationProps, 'scenario' | 'discussedOptions' | 'translationScope'>) {
+  const tc = useTranslations('cambridge');
+  const t = (key: string) => tc(`${translationScope}.${key}`);
   return (
     <div className="hidden md:flex flex-col gap-2 w-44 shrink-0 border-r border-gray-100 bg-gray-50 overflow-y-auto p-3">
-      <p className="text-xs font-bold text-trebol-text/50 uppercase tracking-widest mb-1">{t('b1.collaborative.optionsSidebarLabel')}</p>
+      <p className="text-xs font-bold text-trebol-text/50 uppercase tracking-widest mb-1">{t('optionsSidebarLabel')}</p>
       {scenario?.options.map((option, index) => (
         <div
           key={option}
@@ -59,7 +61,8 @@ function OptionsSidebar({ scenario, discussedOptions }: Pick<ConversationProps, 
 }
 
 function ConversationControls(props: ConversationProps) {
-  const t = useTranslations('cambridge');
+  const tc = useTranslations('cambridge');
+  const t = (key: string, values?: Record<string, string | number>) => tc(`${props.translationScope}.${key}`, values);
   const { userTurns, maxTurns, isProcessing, isRecording, ttsLoading, showTextInput, textInput } = props;
 
   return (
@@ -99,7 +102,7 @@ function ConversationControls(props: ConversationProps) {
               disabled={!textInput.trim() || isProcessing}
               className="bg-trebol-primary text-white px-4 py-2 rounded-xl text-sm font-bold disabled:opacity-50 hover:opacity-90 transition-opacity"
             >
-              {t('common.send')}
+              {tc('common.send')}
             </button>
           </motion.div>
         )}
@@ -113,7 +116,7 @@ function ConversationControls(props: ConversationProps) {
             className="flex-1 max-w-xs bg-green-500 text-white font-bold py-3 rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
           >
             <CheckCircle2 size={18} />
-            {t('b1.collaborative.finishEvaluate')}
+            {t('finishEvaluate')}
           </button>
         )}
 
@@ -136,7 +139,7 @@ function ConversationControls(props: ConversationProps) {
               disabled={isRecording || isProcessing}
               className="text-xs text-trebol-text/50 hover:text-trebol-text transition-colors font-medium disabled:opacity-30"
             >
-              {showTextInput ? t('b1.collaborative.hideText') : t('b1.collaborative.typeInstead')}
+              {showTextInput ? t('hideText') : t('typeInstead')}
             </button>
 
             {userTurns >= props.finishEarlyAfterTurns && (
@@ -145,7 +148,7 @@ function ConversationControls(props: ConversationProps) {
                 disabled={isProcessing || isRecording}
                 className="text-xs text-trebol-text/40 hover:text-trebol-primary transition-colors font-medium disabled:opacity-30"
               >
-                {t('b1.collaborative.finishEarly')}
+                {t('finishEarly')}
               </button>
             )}
           </>
@@ -160,11 +163,12 @@ function ConversationControls(props: ConversationProps) {
 }
 
 export function CollaborativeConversation(props: ConversationProps) {
-  const t = useTranslations('cambridge');
+  const tc = useTranslations('cambridge');
+  const t = (key: string, values?: Record<string, string | number>) => tc(`${props.translationScope}.${key}`, values);
 
   const body = (
     <div className="flex min-h-0 gap-0">
-      <OptionsSidebar scenario={props.scenario} discussedOptions={props.discussedOptions} />
+      <OptionsSidebar scenario={props.scenario} discussedOptions={props.discussedOptions} translationScope={props.translationScope} />
       <div className="flex-1 space-y-3 min-w-0">
         {props.history.map((msg, index) => (
           <MessageBubble
@@ -175,7 +179,7 @@ export function CollaborativeConversation(props: ConversationProps) {
             noAnimate
           >
             {msg.role === 'examiner' && (
-              <p className="text-[10px] font-bold opacity-50 mb-1 uppercase tracking-wider">{t('b1.collaborative.examiner')}</p>
+              <p className="text-[10px] font-bold opacity-50 mb-1 uppercase tracking-wider">{t('examiner')}</p>
             )}
             <p className="leading-relaxed">{msg.text}</p>
           </MessageBubble>
@@ -185,7 +189,7 @@ export function CollaborativeConversation(props: ConversationProps) {
           <MessageBubble variant="assistant" icon={MessageSquare} accentColor="blue">
             <div className="flex items-center gap-2">
               <Loader2 size={14} className="animate-spin" />
-              <span className="text-xs opacity-60">{t('b1.collaborative.examinerResponding')}</span>
+              <span className="text-xs opacity-60">{t('examinerResponding')}</span>
             </div>
           </MessageBubble>
         )}
@@ -198,17 +202,17 @@ export function CollaborativeConversation(props: ConversationProps) {
       headerConfig={{
         icon: MessageSquare,
         title: props.scenario?.topic ?? 'Collaborative Task',
-        subtitle: t('b1.collaborative.conversationSubtitle'),
+        subtitle: t('conversationSubtitle'),
         accentColor: 'blue',
         online: true,
         leftSlot: <CollaborativeBackButton onBack={props.onBack} />,
         rightSlot: (
           <span className="text-xs font-bold text-trebol-primary bg-trebol-secondary/20 px-3 py-1 rounded-full">
-            {t('b1.collaborative.turnOf', { current: props.userTurns, max: props.maxTurns })}
+            {t('turnOf', { current: props.userTurns, max: props.maxTurns })}
           </span>
         ),
       }}
-      footerConfig={{ modeLabel: t('b1.collaborative.footerCollaborativeLabel'), modelName: ACTIVE_MODEL_LABEL }}
+      footerConfig={{ modeLabel: t('footerCollaborativeLabel'), modelName: ACTIVE_MODEL_LABEL }}
       inputSlot={<ConversationControls {...props} />}
       animationKey="b1-conversation"
     >
