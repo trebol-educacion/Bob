@@ -36,8 +36,8 @@ export const CollaborativeScenarioSchema = z
 export const FCE_COLLABORATIVE_FALLBACK: Part3Scenario = {
   topic: 'What could a town do to encourage people to use public transport?',
   situation:
-    'Talk together for two minutes about how each idea could encourage people to use public transport. Then, for one minute, decide which idea would be the most effective.',
-  prompt_question: 'Which idea would be the most effective in encouraging people to use public transport?',
+    'Talk together about how each of these ideas could encourage people to use public transport.',
+  prompt_question: 'What are the advantages of these ideas?',
   options: ['Cheaper tickets', 'More frequent services', 'Better bus stops', 'Free parking outside the centre', 'A clear mobile app'],
 };
 
@@ -46,15 +46,15 @@ export const FCE_COLLABORATIVE_PRESETS: Part3Scenario[] = [
   {
     topic: 'How can a school help students to stay healthy?',
     situation:
-      'Talk together for two minutes about how each idea could help students to stay healthy. Then, for one minute, decide which idea would be the most useful.',
-    prompt_question: 'Which idea would help students to stay healthy the most?',
+      'Talk together about how each of these ideas could help students to stay healthy.',
+    prompt_question: 'What are the advantages of these ideas?',
     options: ['Healthier canteen meals', 'Longer sports lessons', 'Quiet relaxation areas', 'Talks about sleep', 'A walk-to-school programme'],
   },
   {
     topic: 'What would make a new local museum attractive to young people?',
     situation:
-      'Talk together for two minutes about how each idea could attract young people to a new museum. Then, for one minute, decide which idea would work best.',
-    prompt_question: 'Which idea would attract most young visitors to the museum?',
+      'Talk together about how each of these ideas could attract young people to a new museum.',
+    prompt_question: 'What are the advantages of these ideas?',
     options: ['Interactive screens', 'Free entry for students', 'Evening events', 'A social media challenge', 'Workshops with local artists'],
   },
 ];
