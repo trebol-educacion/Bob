@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { FceRubric } from '@/lib/writing/fce-rubric';
 
 /** CEFR proficiency level. */
 export type CefrLevel = 'pre_a1' | 'a1' | 'a2' | 'b1' | 'b2' | 'c1' | 'c2';
@@ -21,6 +22,12 @@ export interface FormativeFeedback {
   suggestions: string[];
   model_answer?: string;
   rubric?: RubricCriteria;
+  score10?: number;
+  score?: number;
+  score_max?: number;
+  cefr_band?: string;
+  band_per_criterion?: Record<string, number>;
+  feedback?: string;
 }
 
 export const FormativeFeedbackSchema = z.object({
@@ -30,6 +37,12 @@ export const FormativeFeedbackSchema = z.object({
   suggestions:  z.array(z.string()),
   model_answer: z.string().optional(),
   rubric:       RubricCriteriaSchema.optional(),
+  score10:      z.number().min(0).max(10).optional(),
+  score:        z.number().min(0).optional(),
+  score_max:    z.number().min(0).optional(),
+  cefr_band:    z.string().optional(),
+  band_per_criterion: z.record(z.string(), z.number()).optional(),
+  feedback:     z.string().optional(),
 });
 
 /** Objective feedback for Listen & Repeat: word-level metrics, no subjective score. */
@@ -165,6 +178,10 @@ export interface ClosedEvaluation {
   explanation: string | null;
 }
 
+export const ClosedItemMetadataSchema = z
+  .object({ accepted: z.array(z.string()).optional() })
+  .passthrough();
+
 /** Schema for a single row in bob_closed_items. */
 export const ClosedItemSchema = z.object({
   id: z.string(),
@@ -185,9 +202,11 @@ export const ClosedItemSchema = z.object({
   ),
   correct_key: z.string(),
   explanation: z.string().nullable(),
-  source: z.enum(['curated', 'official', 'generated_then_curated']),
+  source: z.enum(['curated', 'official', 'generated_then_curated', 'generated']),
   group_id: z.string().nullable().optional(),
   group_order: z.number().int().nullable().optional(),
+  transcript: z.string().nullable().optional(),
+  metadata: ClosedItemMetadataSchema.nullable().optional(),
 });
 
 /** Single row from bob_closed_items; shape mirrors the Zod schema above. */
@@ -218,6 +237,8 @@ export interface WritingFormativeFeedback {
   suggestions: string[];
   model_answer?: string;
   rubric?: RubricCriteria;
+  score_10?: number;
+  fce_rubric?: FceRubric;
   indicators: {
     word_count: number;
     target_word_count_range: [number, number];

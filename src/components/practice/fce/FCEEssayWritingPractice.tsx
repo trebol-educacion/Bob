@@ -16,6 +16,10 @@ import {
   type EssayNote,
 } from '@/actions/modes/fce-writing-part1';
 import type { StoredMessage } from '@/actions/messages';
+import { EssayBriefCard } from '@/components/practice/fce/essay/EssayBriefCard';
+import { tryRestoreFromMessages } from '@/components/practice/fce/essay/restore';
+import { FceScoreCard, ScoreHeadline } from '@/components/practice/writing/FceScoreCard';
+import { countWords } from '@/lib/writing/word-count';
 import { useTranslations } from 'next-intl';
 
 export interface FCEEssayWritingPracticeProps {
@@ -31,10 +35,6 @@ type Phase = 'loading' | 'ready' | 'evaluating' | 'finished';
 
 type BandValue = 'OK' | 'Good' | 'Excellent';
 
-function countWords(text: string): number {
-  return text.trim() === '' ? 0 : text.trim().split(/\s+/).length;
-}
-
 function BandPill({ label, value, t }: { label: string; value: BandValue; t: ReturnType<typeof useTranslations<'cambridge'>> }) {
   const colorMap: Record<BandValue, string> = {
     OK: 'bg-gray-100 text-gray-600',
@@ -47,66 +47,6 @@ function BandPill({ label, value, t }: { label: string; value: BandValue; t: Ret
       <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${colorMap[value]}`}>
         {t(`fce.essay.bandLabel.${value}` as Parameters<typeof t>[0])}
       </span>
-    </div>
-  );
-}
-
-function EssayBriefCard({
-  prompt,
-  t,
-}: {
-  prompt: FCEEssayPrompt;
-  t: ReturnType<typeof useTranslations<'cambridge'>>;
-}) {
-  return (
-    <div
-      className="rounded-2xl px-4 py-4 space-y-3"
-      style={{
-        background: 'color-mix(in oklab, var(--color-bob-brand) 6%, white)',
-        border: '1px solid color-mix(in oklab, var(--color-bob-brand) 15%, white)',
-      }}
-    >
-      <p className="text-xs text-gray-400 italic leading-snug">{prompt.context}</p>
-
-      <div
-        className="pl-3"
-        style={{ borderLeft: '4px solid color-mix(in oklab, var(--color-bob-brand) 25%, white)' }}
-      >
-        <h2 className="text-base font-bold text-gray-800 leading-snug">{prompt.title}</h2>
-        <p className="text-xs text-gray-500 mt-0.5">{prompt.essayQuestion}</p>
-      </div>
-
-      <div className="space-y-1.5">
-        <p className="text-xs font-bold uppercase tracking-widest text-bob-brand">
-          {t('fce.essay.notesLabel')}
-        </p>
-        {prompt.notes.map((note, i) => (
-          <div key={note.id} className="flex items-start gap-2 text-sm">
-            <span
-              className="mt-0.5 shrink-0 w-5 h-5 rounded-full text-bob-brand text-xs font-bold flex items-center justify-center"
-              style={{ background: 'color-mix(in oklab, var(--color-bob-brand) 14%, white)' }}
-            >
-              {i + 1}
-            </span>
-            <div className="flex-1 min-w-0">
-              <span className="font-semibold text-gray-700">{note.label}</span>
-              {note.label.toLowerCase() === 'your own idea' && (
-                <span className="ml-1.5 inline-block px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[10px] font-bold uppercase tracking-wide">
-                  {t('fce.essay.yourOwnIdeaBadge')}
-                </span>
-              )}
-              <p className="text-xs text-gray-500 leading-snug mt-0.5">{note.description}</p>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <p
-        className="text-[11px] text-gray-400 pt-2"
-        style={{ borderTop: '1px solid color-mix(in oklab, var(--color-bob-brand) 15%, white)' }}
-      >
-        {t('fce.essay.words')} 140-190
-      </p>
     </div>
   );
 }
@@ -143,6 +83,10 @@ function FeedbackPanel({
         <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{userText}</p>
       </div>
 
+      {feedback.score10 !== null && feedback.fceRubric && (
+        <FceScoreCard score10={feedback.score10} rubric={feedback.fceRubric} />
+      )}
+
       <div className="rounded-2xl bg-white border border-gray-100 shadow-sm px-4 py-3 space-y-3">
         <div className="flex items-center gap-2">
           {feedback.understood ? (
@@ -151,7 +95,7 @@ function FeedbackPanel({
             <XCircle size={18} className="text-amber-500 shrink-0" />
           )}
           <span className="text-sm font-semibold text-gray-700">
-            {feedback.understood ? t('fce.essay.youDidIt') : t('fce.essay.reviewYourEssay')}
+            <ScoreHeadline score10={feedback.score10} fallback={feedback.understood ? t('fce.essay.youDidIt') : t('fce.essay.reviewYourEssay')} />
           </span>
         </div>
 
@@ -260,54 +204,6 @@ function FeedbackPanel({
       />
     </motion.div>
   );
-}
-
-function tryRestoreFromMessages(messages: StoredMessage[]): {
-  prompt: FCEEssayPrompt | null;
-  userText: string | null;
-  feedback: FCEEssayFeedback | null;
-} {
-  let prompt: FCEEssayPrompt | null = null;
-  let userText: string | null = null;
-  let feedback: FCEEssayFeedback | null = null;
-
-  for (const msg of messages) {
-    const cj = msg.content_json as Record<string, unknown> | null;
-    if (!cj) continue;
-
-    if (msg.role === 'bob' && cj.kind === 'essay_prompt') {
-      const rawNotes = cj.notes as EssayNote[] | null;
-      if (rawNotes && rawNotes.length === 3) {
-        prompt = {
-          sessionId: msg.session_id ?? '',
-          userId: msg.user_id ?? '',
-          title: String(cj.title ?? ''),
-          essayQuestion: String(cj.essay_question ?? ''),
-          context: String(cj.context ?? ''),
-          notes: rawNotes as [EssayNote, EssayNote, EssayNote],
-          wordTargetMin: 140,
-          wordTargetMax: 190,
-          framingText: String(cj.framing_text ?? ''),
-        };
-      }
-    }
-    if (msg.role === 'user' && cj.kind === 'writing_submission') {
-      userText = String(cj.text ?? '');
-    }
-    if (msg.role === 'bob' && msg.msg_type === 'evaluation' && cj.is_final === true) {
-      feedback = {
-        understood: Boolean(cj.understood),
-        highlights: (cj.highlights as string[]) ?? [],
-        suggestions: (cj.suggestions as string[]) ?? [],
-        notesCovered: (cj.notesCovered as [boolean, boolean, boolean]) ?? [false, false, false],
-        organization: (cj.organization as FCEEssayFeedback['organization']) ?? 'OK',
-        register: (cj.register as FCEEssayFeedback['register']) ?? 'OK',
-        modelAnswer: (cj.modelAnswer as string | null) ?? null,
-      };
-    }
-  }
-
-  return { prompt, userText, feedback };
 }
 
 /** FCE Writing Part 1, Compulsory Essay practice component. */
@@ -482,7 +378,8 @@ export function FCEEssayWritingPractice({
             variant="text"
             value={text}
             placeholder={t('fce.essay.placeholder')}
-            disabled={phase !== 'ready' || wordCount < MIN_WORDS}
+            disabled={phase !== 'ready'}
+            sendDisabled={wordCount < MIN_WORDS}
             onChange={setText}
             onSend={handleSubmit}
           />

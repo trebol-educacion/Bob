@@ -97,6 +97,7 @@ const MODE_ICON: Record<NonNullable<SessionMode>, React.ElementType> = {
   cambridge_pet_writing_part1: PETWritingIcon,
   cambridge_pet_listening_part2: PETListeningIcon,
   cambridge_fce_writing_part1: FCEWritingIcon,
+  cambridge_fce_writing_part2: FCEWritingIcon,
   cambridge_fce_reading_part1: FCEReadingIcon,
   cambridge_fce_listening_part1: Headphones,
 };

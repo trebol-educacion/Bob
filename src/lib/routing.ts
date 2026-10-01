@@ -1,6 +1,8 @@
 import React from 'react';
 import type { ModeKey } from '@/lib/types/practice';
 import type { StoredMessage } from '@/actions/messages';
+import { FCE_ROUTES } from '@/lib/routing-fce';
+import { ylInstanceKey } from '@/lib/route-instance-key';
 import {
   YLPart2Practice,
   YLPart4Practice,
@@ -47,12 +49,6 @@ import {
   PETListeningTrueFalseJustifyPractice,
   PETReadingComprehensionPractice,
 } from '@/components/practice/pet';
-import {
-  FCEMultipleChoiceClozePractice,
-  FCEPictureDescriptionPractice,
-  FCEEssayWritingPractice,
-  FCEShortExtractsPractice,
-} from '@/components/practice/fce';
 
 export type AppState =
   | 'home'
@@ -94,24 +90,12 @@ export interface RouteEntry {
 }
 
 /**
- * Key used to force remount of a YL component when switching between two
- * persisted sessions (history-history). Returns 'new' while the session has
- * no persisted messages, including the moment right after creation, before
- * the new session has any messages stored, so we don't remount and lose
- * the freshly-generated plan/images.
- */
-function ylInstanceKey(p: YLRenderProps): string {
-  return p.initialMessages && p.initialMessages.length > 0
-    ? p.sessionId ?? 'new'
-    : 'new';
-}
-
-/**
  * Single source of truth for mode-key → component mapping.
  * Indexed by full mode_key (not exam_part) because different frameworks
  * reuse part numbers (e.g. starters_part1 ≠ flyers_part1 ≠ ket_part1).
  */
 export const EXAM_PART_COMPONENT_MAP: Record<ModeKey, RouteEntry> = {
+  ...FCE_ROUTES,
   cambridge_starters_part1: {
     appState: 'exam-practicing',
     kind: 'yl',
@@ -232,11 +216,6 @@ export const EXAM_PART_COMPONENT_MAP: Record<ModeKey, RouteEntry> = {
     kind: 'exam',
     render: (p) => React.createElement(AcademicWritingPractice, { mode: 'toefl_writing_academic_discussion', onBack: (p as ExamRenderProps).onBack }),
   },
-  cambridge_fce_writing_part1: {
-    appState: 'exam-practicing',
-    kind: 'yl',
-    render: (p) => React.createElement(FCEEssayWritingPractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
-  },
   cambridge_ket_writing_part6: {
     appState: 'exam-practicing',
     kind: 'yl',
@@ -332,21 +311,6 @@ export const EXAM_PART_COMPONENT_MAP: Record<ModeKey, RouteEntry> = {
     kind: 'yl',
     render: (p) => React.createElement(PETListeningTrueFalseJustifyPractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
   },
-  cambridge_fce_reading_part1: {
-    appState: 'exam-practicing',
-    kind: 'yl',
-    render: (p) => React.createElement(FCEMultipleChoiceClozePractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
-  },
-  cambridge_fce_p2: {
-    appState: 'exam-practicing',
-    kind: 'yl',
-    render: (p) => React.createElement(FCEPictureDescriptionPractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
-  },
-  cambridge_fce_listening_part1: {
-    appState: 'exam-practicing',
-    kind: 'yl',
-    render: (p) => React.createElement(FCEShortExtractsPractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
-  },
 };
 
 /** Returns the RouteEntry for the given mode key, or undefined if not in the map. */
@@ -368,9 +332,4 @@ export function isConversationMode(mode: string): boolean {
 export function isYLMode(mode: string): boolean {
   const entry = EXAM_PART_COMPONENT_MAP[mode];
   return entry?.kind === 'yl';
-}
-
-/** True when the mode uses BobPracticeChat in B2 image mode (FCE Part 1). */
-export function isFceImageMode(mode: string): boolean {
-  return mode === 'cambridge_fce_p1';
 }

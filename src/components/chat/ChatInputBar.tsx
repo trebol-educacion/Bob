@@ -19,6 +19,7 @@ type TextProps = {
   value: string;
   placeholder: string;
   disabled?: boolean;
+  sendDisabled?: boolean;
   onChange: (next: string) => void;
   onSend: () => void;
   onAttach?: () => void;
@@ -62,8 +63,8 @@ function MicBar({ placeholder, recording, disabled, onStart, onStop }: MicProps)
   );
 }
 
-function TextBar({ value, placeholder, disabled, onChange, onSend, onAttach }: TextProps) {
-  const canSend = value.trim().length > 0 && !disabled;
+function TextBar({ value, placeholder, disabled, sendDisabled, onChange, onSend, onAttach }: TextProps) {
+  const canSend = value.trim().length > 0 && !disabled && !sendDisabled;
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {

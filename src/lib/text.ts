@@ -5,7 +5,7 @@
  */
 export function stripDashes(text: string): string {
   return text
-    .replace(/\s*[--―]\s*/g, ', ')
+    .replace(/\s*[\u2013\u2014\u2015]\s*/g, ', ')
     .replace(/\s*,\s*,/g, ', ')
     .replace(/\s+([,.;:!?])/g, '$1')
     .trim();

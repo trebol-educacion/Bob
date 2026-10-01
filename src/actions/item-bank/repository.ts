@@ -2,7 +2,7 @@ import 'server-only';
 
 import { createSupabaseServer } from '@/lib/supabase/server';
 import { ClosedItemSchema } from '@/lib/types/practice';
-import type { BankItem, ItemGroup, ItemBankExam, ItemBankPurpose, ItemBankSkill, OpenTask } from '@/lib/item-bank/types';
+import type { BankItem, ItemGroup, ItemBankExam, ItemBankPurpose, ItemBankSkill, ItemBankStatus, OpenTask } from '@/lib/item-bank/types';
 
 export type ItemBankErrorCode = 'unauthenticated' | 'db_error' | 'invalid_input';
 
@@ -11,6 +11,9 @@ export type ItemBankResult<T> =
   | { ok: false; code: ItemBankErrorCode };
 
 export interface FetchGroupsFilter {
+  id?: string;
+  exam_part?: string;
+  status?: ItemBankStatus;
   exam?: ItemBankExam;
   skill?: ItemBankSkill;
   cefr_level?: string | null;
@@ -31,6 +34,9 @@ export async function fetchGroups(filter: FetchGroupsFilter = {}): Promise<ItemB
     const supabase = await createSupabaseServer();
 
     let query = supabase.from('item_groups').select('*');
+    if (filter.id !== undefined) query = query.eq('id', filter.id);
+    if (filter.exam_part !== undefined) query = query.eq('exam_part', filter.exam_part);
+    if (filter.status !== undefined) query = query.eq('status', filter.status);
     if (filter.exam !== undefined) query = query.eq('exam', filter.exam);
     if (filter.skill !== undefined) query = query.eq('skill', filter.skill);
     if (filter.cefr_level !== undefined) query = query.eq('cefr_level', filter.cefr_level);
