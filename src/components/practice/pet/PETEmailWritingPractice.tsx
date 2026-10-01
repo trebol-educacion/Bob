@@ -426,7 +426,7 @@ export function PETEmailWritingPractice({
             variant="text"
             value={text}
             placeholder={t('pet.emailWriting.placeholder')}
-            disabled={phase !== 'ready' || wordCount < MIN_WORDS}
+            disabled={phase !== 'ready'} sendDisabled={wordCount < MIN_WORDS}
             onChange={setText}
             onSend={handleSubmit}
           />

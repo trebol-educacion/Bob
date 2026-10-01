@@ -32,6 +32,9 @@ const baseGroup: ItemGroup = {
   difficulty: 2,
   purpose: 'practice',
   module_code: null,
+  exam_part: null,
+  variant_id: null,
+  metadata: {},
   stimulus_text: null,
   stimulus_audio_url: null,
   stimulus_image_url: null,
@@ -48,6 +51,8 @@ describe('toPublicItem', () => {
     const publicItem = toPublicItem(baseItem);
     expect(publicItem).not.toHaveProperty('correct_key');
     expect(publicItem).not.toHaveProperty('explanation');
+    expect(publicItem).not.toHaveProperty('transcript');
+    expect(publicItem).not.toHaveProperty('metadata');
     expect(publicItem.id).toBe('item-1');
     expect(publicItem.question).toBe(baseItem.question);
   });

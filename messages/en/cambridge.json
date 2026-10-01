@@ -114,6 +114,31 @@
     }
   },
   "fce": {
+    "collaborative": {
+      "headerTitle": "B2 Collaborative Task",
+      "headerSubtitle": "B2 · Part 3",
+      "conversationSubtitle": "B2 · Part 3",
+      "feedbackTitle": "Your Feedback",
+      "evaluatingPerformance": "Evaluating your performance…",
+      "howItWorks": "How it works",
+      "howItWorksLine1": "You discuss 5 ideas with an AI examiner: about 2 minutes on each option, then 1 minute to decide (up to {maxTurns} turns)",
+      "howItWorksLine2": "Give reasons, compare the ideas and react to your partner",
+      "howItWorksLine3": "After finishing, you get your grade out of 10 and detailed feedback",
+      "startDiscussion": "Start Task",
+      "finishEvaluate": "Finish & Evaluate",
+      "finishEarly": "Finish early",
+      "typeInstead": "Type instead",
+      "hideText": "Hide text",
+      "generatingScenario": "Generating scenario…",
+      "surpriseMe": "Surprise me (AI generated)",
+      "turnOf": "Turn {current} of {max}",
+      "optionsSidebarLabel": "Ideas",
+      "examiner": "Examiner",
+      "examinerResponding": "Examiner is responding…",
+      "footerModeLabel": "B2 PART 3",
+      "footerFeedbackLabel": "FEEDBACK",
+      "footerCollaborativeLabel": "COLLABORATIVE TASK"
+    },
     "cloze": {
       "back": "Back",
       "headerTitle": "Multiple-Choice Cloze",
@@ -130,6 +155,57 @@
       "explanationLabel": "Why:",
       "celebrationFeedback": "Well done! Keep practising collocations and phrasal verbs to master B2 vocabulary.",
       "celebrationAction": "See my activities"
+    },
+    "grouped": {
+      "back": "Back",
+      "retry": "Try again",
+      "preparingExercise": "Loading your exercise…",
+      "checkingAnswers": "Checking your answers…",
+      "answeredCount": "{answered} / {total} answered",
+      "submitAnswers": "Submit answers",
+      "gapLabel": "Gap {number}",
+      "yourAnswer": "Your answer",
+      "correctAnswerLabel": "Correct answer:",
+      "correctBadge": "Correct",
+      "incorrectBadge": "Incorrect",
+      "keywordLabel": "Keyword",
+      "keywordHint": "Use the keyword unchanged. Write between 2 and 5 words.",
+      "sentenceBankTitle": "Missing sentences",
+      "markLabel": "Mark: {score} / 10",
+      "celebrationFeedback": "Review the corrections above and try another exercise to keep improving.",
+      "celebrationAction": "See my activities",
+      "parts": {
+        "fce_reading_part2": {
+          "title": "Open Cloze",
+          "subtitle": "Reading & Use of English Part 2",
+          "badge": "PART 2",
+          "instructions": "Read the text and think of the word which best fits each gap. Use only one word in each gap."
+        },
+        "fce_reading_part3": {
+          "title": "Word Formation",
+          "subtitle": "Reading & Use of English Part 3",
+          "badge": "PART 3",
+          "instructions": "Use the word in capitals at the end of some lines to form a word that fits in the gap in the same line."
+        },
+        "fce_reading_part4": {
+          "title": "Key Word Transformation",
+          "subtitle": "Reading & Use of English Part 4",
+          "badge": "PART 4",
+          "instructions": "Complete the second sentence so that it has a similar meaning to the first, using the word given. Do not change the word given."
+        },
+        "fce_reading_part5": {
+          "title": "Multiple Choice",
+          "subtitle": "Reading & Use of English Part 5",
+          "badge": "PART 5",
+          "instructions": "Read the text and choose the best answer (A, B, C or D) for each question."
+        },
+        "fce_reading_part6": {
+          "title": "Gapped Text",
+          "subtitle": "Reading & Use of English Part 6",
+          "badge": "PART 6",
+          "instructions": "Six sentences have been removed from the text. Choose from the sentences A-G the one which fits each gap. There is one extra sentence you do not need to use."
+        }
+      }
     },
     "essay": {
       "back": "Back",
@@ -222,6 +298,42 @@
       "celebrationFeedback": "Nice work comparing the pictures! Keep practising to cover all 6 points fluently.",
       "celebrationAction": "See my progress",
       "finishedTitle": "Long Turn complete"
+    },
+    "score": {
+      "title": "Your mark",
+      "headline": {
+        "excellent": "Excellent work!",
+        "good": "Good job!",
+        "fair": "Getting there",
+        "keepGoing": "Keep practising"
+      },
+      "criteria": {
+        "content": "Content",
+        "communicative_achievement": "Communicative achievement",
+        "organisation": "Organisation",
+        "language": "Language"
+      }
+    },
+    "writing2": {
+      "back": "Back",
+      "headerTitle": "Choice task",
+      "headerSubtitle": "Writing Part 2",
+      "partBadge": "PART 2",
+      "preparingExercise": "Preparing your tasks…",
+      "chooseTitle": "Choose one task",
+      "chooseHint": "Pick the one you feel most confident about. Write 140-190 words.",
+      "taskNumber": "Question {number}",
+      "registerLabel": "Register",
+      "chooseAction": "Write this one",
+      "changeTask": "Choose another task",
+      "retry": "Try again",
+      "types": {
+        "article": "Article",
+        "email_letter": "Email / letter",
+        "report": "Report",
+        "review": "Review"
+      },
+      "yourText": "Your text"
     }
   },
   "pet": {

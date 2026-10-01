@@ -7,6 +7,9 @@ import { persistMessage } from '@/lib/persist-activity';
 import { createSessionAction } from '@/actions/sessions';
 import { createSupabaseServer } from '@/lib/supabase/server';
 import { MODELS } from '@/lib/models';
+import { requestFceEvaluation } from '@/lib/writing/fce-evaluation';
+import { countWords } from '@/lib/writing/word-count';
+import { buildFceScorePayload, parseFceRubric, type FceRubric } from '@/lib/writing/fce-rubric';
 
 export interface EssayNote {
   id: number;
@@ -35,6 +38,8 @@ export interface FCEEssayFeedback {
   register: 'OK' | 'Good' | 'Excellent';
   modelAnswer: string | null;
   rubric?: z.infer<typeof RubricSchema>;
+  score10: number | null;
+  fceRubric: FceRubric | null;
 }
 
 const GenerationSchema = z.object({
@@ -72,6 +77,7 @@ const EvaluationSchema = z.object({
   register:      z.enum(['OK', 'Good', 'Excellent']),
   model_answer:  z.string().nullable().optional(),
   rubric:        RubricSchema,
+  fce_rubric:    z.unknown().optional(),
 });
 
 function safeParse<T>(schema: z.ZodType<T>, raw: string): T | null {
@@ -98,6 +104,8 @@ function buildFallbackFeedback(): FCEEssayFeedback {
     organization: 'OK',
     register: 'OK',
     modelAnswer: null,
+    score10: null,
+    fceRubric: null,
   };
 }
 
@@ -206,7 +214,6 @@ export async function generateFCEEssayAction(input: {
   };
 }
 
-/** Evaluates the student's essay and persists qualitative formative feedback. */
 export async function evaluateFCEEssayAction(input: {
   sessionId: string;
   userId: string;
@@ -215,28 +222,13 @@ export async function evaluateFCEEssayAction(input: {
   userText: string;
 }): Promise<FCEEssayFeedback | { error: string }> {
   const fallback = buildFallbackFeedback();
-
-  const wordCount = input.userText.trim() === ''
-    ? 0
-    : input.userText.trim().split(/\s+/).length;
-
+  const wordCount = countWords(input.userText);
   const notesJoined = input.notes
     .map((n) => `${n.id}. ${n.label}: ${n.description}`)
     .join('\n');
 
-  let evalPromptText: string;
-  try {
-    evalPromptText = await getPrompt(
-      'cambridge_fce_writing_part1_b2_evaluation',
-      {
-        ESSAY_TITLE: input.title,
-        NOTES_JOINED: notesJoined,
-        USER_TEXT: input.userText,
-        WORD_COUNT: String(wordCount),
-      }
-    );
-  } catch {
-    persistMessage({
+  const persistFallback = async () => {
+    await persistMessage({
       sessionId: input.sessionId,
       userId: input.userId,
       role: 'bob',
@@ -244,9 +236,22 @@ export async function evaluateFCEEssayAction(input: {
       contentJson: { ...fallback, is_final: true },
     }).catch(() => undefined);
     return fallback;
-  }
+  };
 
-  persistMessage({
+  const parsed = await requestFceEvaluation({
+    promptKey: 'cambridge_fce_writing_part1_b2_evaluation',
+    variables: {
+      ESSAY_TITLE: input.title,
+      NOTES_JOINED: notesJoined,
+      USER_TEXT: input.userText,
+      WORD_COUNT: String(wordCount),
+    },
+    userId: input.userId,
+    schema: EvaluationSchema,
+  });
+  if (!parsed) return persistFallback();
+
+  await persistMessage({
     sessionId: input.sessionId,
     userId: input.userId,
     role: 'user',
@@ -255,46 +260,8 @@ export async function evaluateFCEEssayAction(input: {
     contentJson: { kind: 'writing_submission', text: input.userText },
   }).catch(() => undefined);
 
-  const result = await callGemini(
-    {
-      promptKey: 'cambridge_fce_writing_part1_b2_evaluation',
-      model: MODELS.FLASH_LITE_PREVIEW,
-      userId: input.userId,
-    },
-    (ai) =>
-      ai.models.generateContent({
-        model: MODELS.FLASH_LITE_PREVIEW,
-        contents: [{ role: 'user', parts: [{ text: evalPromptText }] }],
-        config: { responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
-      })
-  );
-
-  if (!isOk(result)) {
-    persistMessage({
-      sessionId: input.sessionId,
-      userId: input.userId,
-      role: 'bob',
-      msgType: 'evaluation',
-      contentJson: { ...fallback, is_final: true },
-    }).catch(() => undefined);
-    return fallback;
-  }
-
-  const rawText =
-    result.data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
-  const parsed = safeParse(EvaluationSchema, rawText);
-
-  if (!parsed) {
-    persistMessage({
-      sessionId: input.sessionId,
-      userId: input.userId,
-      role: 'bob',
-      msgType: 'evaluation',
-      contentJson: { ...fallback, is_final: true },
-    }).catch(() => undefined);
-    return fallback;
-  }
-
+  const fceRubric = parseFceRubric(parsed.fce_rubric);
+  const scorePayload = fceRubric ? buildFceScorePayload(fceRubric) : null;
   const feedback: FCEEssayFeedback = {
     understood: parsed.understood,
     highlights: parsed.highlights,
@@ -304,14 +271,16 @@ export async function evaluateFCEEssayAction(input: {
     register: parsed.register,
     modelAnswer: parsed.model_answer ?? null,
     rubric: parsed.rubric,
+    score10: scorePayload?.score_10 ?? null,
+    fceRubric,
   };
 
-  persistMessage({
+  await persistMessage({
     sessionId: input.sessionId,
     userId: input.userId,
     role: 'bob',
     msgType: 'evaluation',
-    contentJson: { ...feedback, rubric: parsed.rubric ?? null, is_final: true },
+    contentJson: { ...feedback, rubric: parsed.rubric ?? null, ...scorePayload, is_final: true },
   }).catch(() => undefined);
 
   return feedback;

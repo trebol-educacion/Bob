@@ -368,7 +368,7 @@ export function PETWritingChallengePractice({
             variant="text"
             value={text}
             placeholder="Write your text in English..."
-            disabled={phase !== 'ready' || wordCount < minWords}
+            disabled={phase !== 'ready'} sendDisabled={wordCount < minWords}
             onChange={setText}
             onSend={handleSubmit}
           />

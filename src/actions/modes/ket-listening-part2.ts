@@ -9,6 +9,7 @@ import { createSessionAction } from '@/actions/sessions';
 import { createSupabaseServer } from '@/lib/supabase/server';
 import { generateSpeechAction } from '@/actions/gemini';
 import { MODELS } from '@/lib/models';
+import { normalizeAnswer } from '@/lib/answer-match';
 
 const GapSchema = z.object({
   number: z.number().int().min(1).max(5),
@@ -72,19 +73,10 @@ function levenshtein(a: string, b: string): number {
   return dp[m][n];
 }
 
-function normalize(s: string): string {
-  return s
-    .toLowerCase()
-    .trim()
-    .replace(/\s+/g, ' ')
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '');
-}
-
 /** Accepts exact matches and minor typos (distance ≤ 1 for short answers, ≤ 2 for longer). */
 function isAccepted(userInput: string, answer: string): boolean {
-  const a = normalize(userInput);
-  const b = normalize(answer);
+  const a = normalizeAnswer(userInput);
+  const b = normalizeAnswer(answer);
   if (a === b) return true;
   const maxDistance = b.length <= 5 ? 1 : 2;
   return levenshtein(a, b) <= maxDistance;
