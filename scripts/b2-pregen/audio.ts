@@ -1,5 +1,6 @@
 import type { GoogleGenAI } from '@google/genai';
 import type { Db } from './env';
+import { wavToMp3 } from './ffmpeg';
 import { relabel, synthesize } from './tts';
 import { audioPath } from './variant';
 import type { Payload } from './schemas';
@@ -15,7 +16,8 @@ export interface AudioPlan {
 }
 
 async function upload(db: Db, path: string, wav: Buffer): Promise<string> {
-  const { error } = await db.storage.from(BUCKET).upload(path.slice(1), wav, { contentType: 'audio/wav', upsert: true });
+  const mp3 = await wavToMp3(wav);
+  const { error } = await db.storage.from(BUCKET).upload(path.slice(1), mp3, { contentType: 'audio/mpeg', upsert: true });
   if (error) throw new Error(`Upload ${path} failed: ${error.message}`);
   return path;
 }

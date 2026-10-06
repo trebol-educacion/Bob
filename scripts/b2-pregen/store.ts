@@ -1,34 +1,100 @@
 import type { Db } from './env';
 import type { AudioPlan } from './audio';
 import type { Payload } from './schemas';
+import { normalizeTitle } from './semantic-rules';
 import { itemVariantId } from './variant';
 
 const FRAMEWORK = 'cambridge';
 const EXAM = 'fce';
 const CEFR = 'b2';
 
+export interface SlotState {
+  all: Set<string>;
+  published: Set<string>;
+  titles: Set<string>;
+}
+
+function stripItemSuffix(id: string): string {
+  return id.replace(/-q\d+$/, '');
+}
+
 /**
  * @param db
  * @param examPart
- * @returns variant ids already stored for the part
+ * @returns variants stored for the part, which of them are published and their normalized titles
  */
-export async function existingVariants(db: Db, examPart: string): Promise<Set<string>> {
-  const table = examPart === 'fce_listening_part1' ? 'closed_items' : 'item_groups';
-  const column = table === 'closed_items' ? 'framework' : 'exam';
-  const value = table === 'closed_items' ? FRAMEWORK : EXAM;
-  const { data, error } = await db.from(table).select('variant_id').eq(column, value).eq('exam_part', examPart).eq('cefr_level', CEFR);
+export async function slotState(db: Db, examPart: string): Promise<SlotState> {
+  const state: SlotState = { all: new Set(), published: new Set(), titles: new Set() };
+  if (examPart === 'fce_listening_part1') {
+    const { data, error } = await db
+      .from('closed_items')
+      .select('variant_id, status')
+      .eq('framework', FRAMEWORK)
+      .eq('exam_part', examPart)
+      .eq('cefr_level', CEFR)
+      .eq('source', 'generated');
+    if (error) throw new Error(`Listing ${examPart} failed: ${error.message}`);
+    for (const row of data ?? []) {
+      const variant = stripItemSuffix(String(row.variant_id));
+      state.all.add(variant);
+      if (row.status === 'published') state.published.add(variant);
+    }
+    return state;
+  }
+  const { data, error } = await db
+    .from('item_groups')
+    .select('variant_id, status, metadata')
+    .eq('exam', EXAM)
+    .eq('exam_part', examPart)
+    .eq('cefr_level', CEFR);
   if (error) throw new Error(`Listing ${examPart} failed: ${error.message}`);
-  const ids = (data ?? []).map((row) => String(row.variant_id));
-  if (table === 'item_groups') return new Set(ids);
-  return new Set(ids.map((id) => id.replace(/-q\d+$/, '')));
+  for (const row of data ?? []) {
+    const variant = String(row.variant_id);
+    state.all.add(variant);
+    if (row.status !== 'published') continue;
+    state.published.add(variant);
+    const title = (row.metadata as Record<string, unknown> | null)?.title;
+    if (typeof title === 'string') state.titles.add(normalizeTitle(title));
+  }
+  return state;
 }
 
 /**
  * @param examPart
  * @returns skill of the part
  */
-export function skillOf(examPart: string): 'reading' | 'listening' {
-  return examPart.includes('listening') ? 'listening' : 'reading';
+export function skillOf(examPart: string): 'reading' | 'listening' | 'writing' | 'speaking' {
+  if (examPart.includes('listening')) return 'listening';
+  if (examPart.includes('writing')) return 'writing';
+  if (examPart.includes('speaking')) return 'speaking';
+  return 'reading';
+}
+
+/**
+ * @param db
+ * @param examPart
+ * @param variant group variant id
+ * @returns resolves once the group and its items are retired
+ */
+export async function retireVariant(db: Db, examPart: string, variant: string): Promise<void> {
+  if (examPart !== 'fce_listening_part1') {
+    const { error } = await db
+      .from('item_groups')
+      .update({ status: 'retired' })
+      .eq('exam', EXAM)
+      .eq('exam_part', examPart)
+      .eq('cefr_level', CEFR)
+      .eq('variant_id', variant);
+    if (error) throw new Error(`Retiring group ${variant} failed: ${error.message}`);
+  }
+  const { error } = await db
+    .from('closed_items')
+    .update({ status: 'retired' })
+    .eq('framework', FRAMEWORK)
+    .eq('exam_part', examPart)
+    .eq('cefr_level', CEFR)
+    .like('variant_id', `${variant}-q%`);
+  if (error) throw new Error(`Retiring items ${variant} failed: ${error.message}`);
 }
 
 async function upsertGroup(
@@ -79,6 +145,7 @@ export async function persist(
   audio: AudioPlan,
 ): Promise<number> {
   const groupId = await upsertGroup(db, examPart, variant, payload, audio);
+  if (payload.items.length === 0) return 0;
   const rows = payload.items.map((item, index) => ({
     framework: FRAMEWORK,
     exam_part: examPart,
@@ -95,7 +162,7 @@ export async function persist(
     stimulus_audio_url: audio.itemAudio[index],
     metadata: item.metadata,
     source: 'generated',
-    status: 'enabled',
+    status: 'published',
   }));
   const { error } = await db.from('closed_items').upsert(rows, { onConflict: 'framework,exam_part,cefr_level,variant_id' });
   if (error) throw new Error(`Items upsert failed: ${error.message}`);
