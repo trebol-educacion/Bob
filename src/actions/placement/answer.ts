@@ -139,10 +139,15 @@ async function finishAttempt(
     return { status: 'error', code: 'db_error' };
   }
 
-  await supabase
+  const { error: completeError } = await supabase
     .from('placement_attempts')
     .update({ status: 'completed', completed_at: new Date().toISOString(), result_level: resultLevel })
     .eq('id', attemptId);
+
+  if (completeError) {
+    console.error('[answerPlacementStepAction] attempt completion failed:', completeError.message);
+    return { status: 'error', code: 'db_error' };
+  }
 
   return { status: 'ok', done: true, attempt_id: attemptId, result_level: resultLevel };
 }
