@@ -60,7 +60,7 @@ function toClientQuestion(raw: Record<string, unknown>): PETReadingClientQuestio
   return { number, section, type: 'mcq', question: String(raw.question ?? ''), options };
 }
 
-function tryRestore(messages: StoredMessage[]): RestoredState | null {
+export function tryRestore(messages: StoredMessage[]): RestoredState | null {
   let title = '';
   let topics: string[] = [];
   let text = '';
@@ -252,7 +252,7 @@ export function PETReadingComprehensionPractice({
 }: PETReadingComprehensionPracticeProps) {
   const [phase, setPhase] = useState<Phase>('loading');
   const [sessionId, setSessionId] = useState<string | undefined>(initialSessionId);
-  const [userId, setUserId] = useState<string | undefined>();
+  const [planToken, setPlanToken] = useState<string | null>(null);
   const [title, setTitle] = useState('');
   const [topics, setTopics] = useState<string[]>([]);
   const [text, setText] = useState('');
@@ -283,11 +283,7 @@ export function PETReadingComprehensionPractice({
           setCorrectCount(restored.correctCount);
           setPhase('finished');
         } else {
-          const { createSupabaseBrowser } = await import('@/lib/supabase/browser-client');
-          const supabase = createSupabaseBrowser();
-          const { data: { user } } = await supabase.auth.getUser();
-          if (user) setUserId(user.id);
-          setPhase('ready');
+          setErrorMsg('Could not restore session. Please start a new one.');
         }
         return;
       }
@@ -295,16 +291,14 @@ export function PETReadingComprehensionPractice({
       if (boot.kind === 'restore-failed') { setErrorMsg('Could not restore session. Please start a new one.'); return; }
 
       setIsNewSession(true);
-      const result = await generatePETReadingComprehensionAction({ sessionId: initialSessionId });
+      const result = await generatePETReadingComprehensionAction();
 
       if ('error' in result) {
         setErrorMsg(result.error);
         return;
       }
 
-      onSessionCreated?.(result.sessionId);
-      setSessionId(result.sessionId);
-      setUserId(result.userId);
+      setPlanToken(result.planToken);
       setTitle(result.title);
       setTopics(result.topics);
       setText(result.text);
@@ -325,10 +319,10 @@ export function PETReadingComprehensionPractice({
   }
 
   async function handleSubmit() {
-    if (!sessionId || !userId) return;
+    if (!planToken) return;
     setPhase('submitting');
 
-    const result = await submitPETReadingComprehensionAction({ sessionId, userId, answers });
+    const result = await submitPETReadingComprehensionAction({ sessionId, planToken, answers });
 
     if ('error' in result) {
       setErrorMsg(result.error);
@@ -336,6 +330,8 @@ export function PETReadingComprehensionPractice({
       return;
     }
 
+    if (!sessionId) onSessionCreated?.(result.sessionId);
+    setSessionId(result.sessionId);
     setResults(result.question_results);
     setCorrectCount(result.correct_count);
     setPhase('finished');

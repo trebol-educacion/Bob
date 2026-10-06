@@ -3,9 +3,9 @@
 import { z } from 'zod';
 import { getPrompt } from '@/lib/prompts/db-prompts';
 import { callGemini, isOk } from '@/lib/gemini-client';
-import { persistMessage, persistMessages } from '@/lib/persist-activity';
-import { createSessionAction } from '@/actions/sessions';
-import { createSupabaseServer } from '@/lib/supabase/server';
+import { completeActivity } from '@/lib/session/complete';
+import { currentUserId } from '@/lib/session/lifecycle';
+import { sealPlan, unsealPlan } from '@/lib/session/sealed-plan';
 import { MODELS } from '@/lib/models';
 
 const SECTIONS = ['comprehension', 'vocabulary', 'grammar'] as const;
@@ -73,8 +73,7 @@ export type PETReadingClientQuestion =
 
 /** Full result of a successful generation call. */
 export interface PETReadingComprehensionResult {
-  sessionId: string;
-  userId: string;
+  planToken: string;
   framingText: string;
   title: string;
   topics: string[];
@@ -105,6 +104,7 @@ export type PETReadingQuestionResult =
 
 /** Full submit result. */
 export interface PETReadingComprehensionSubmitResult {
+  sessionId: string;
   correct_count: number;
   total: number;
   question_results: PETReadingQuestionResult[];
@@ -112,6 +112,15 @@ export interface PETReadingComprehensionSubmitResult {
 
 /** Answer payload from the client: option letter for mcq, free text for open. */
 export type PETReadingAnswer = { type: 'mcq'; value: 'A' | 'B' | 'C' } | { type: 'open'; value: string };
+
+interface PETReadingPlan {
+  kind: 'pet_reading_comprehension_plan';
+  framing_text: string;
+  title: string;
+  topics: string[];
+  text: string;
+  questions: GeneratedQuestion[];
+}
 
 function safeParse<T>(schema: z.ZodType<T>, raw: string): T | null {
   try {
@@ -152,28 +161,11 @@ function normalizeOpen(value: string): string {
  * Generates one PET B1 reading passage and its 10-question bank.
  * Returns questions WITHOUT the answer key or per-option feedback; both stay
  * server-side in the persisted plan and are only revealed at submit.
- * Creates a session when none is provided.
+ * Persists nothing: the plan travels sealed and the session is created on the first submit.
  */
-export async function generatePETReadingComprehensionAction(input: {
-  sessionId?: string;
-}): Promise<PETReadingComprehensionResult | { error: string }> {
-  let sessionId = input.sessionId;
-  let userId: string | undefined;
-
-  if (!sessionId) {
-    const result = await createSessionAction({
-      mode: 'cambridge_pet_reading_comprehension',
-      title: 'Reading, Comprehensive Text',
-    });
-    if (!result.data) return { error: result.error ?? 'Could not create session' };
-    sessionId = result.data.id;
-    userId = result.data.user_id;
-  } else {
-    const supabase = await createSupabaseServer();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return { error: 'Not authenticated' };
-    userId = user.id;
-  }
+export async function generatePETReadingComprehensionAction(): Promise<PETReadingComprehensionResult | { error: string }> {
+  const userId = await currentUserId();
+  if (!userId) return { error: 'unauthenticated' };
 
   const [generationPrompt, framingText] = await Promise.all([
     getPrompt('cambridge_pet_reading_comprehension_b1_generation').catch(() => null),
@@ -203,25 +195,17 @@ export async function generatePETReadingComprehensionAction(input: {
 
   const clientQuestions = parsed.questions.map(toClientQuestion);
 
-  persistMessage({
-    sessionId,
-    userId,
-    role: 'bob',
-    msgType: 'text',
-    contentText: null,
-    contentJson: {
-      kind: 'pet_reading_comprehension_plan',
-      framing_text: framingText,
-      title: parsed.title,
-      topics: parsed.topics,
-      text: parsed.text,
-      questions: parsed.questions,
-    },
-  }).catch(() => undefined);
+  const plan: PETReadingPlan = {
+    kind: 'pet_reading_comprehension_plan',
+    framing_text: framingText,
+    title: parsed.title,
+    topics: parsed.topics,
+    text: parsed.text,
+    questions: parsed.questions,
+  };
 
   return {
-    sessionId,
-    userId,
+    planToken: sealPlan(plan, userId),
     framingText,
     title: parsed.title,
     topics: parsed.topics,
@@ -231,32 +215,19 @@ export async function generatePETReadingComprehensionAction(input: {
 }
 
 /**
- * Evaluates answers deterministically against the server-side answer key and
- * persists results. No LLM involved.
+ * Evaluates answers deterministically against the sealed answer key; creates the session on this first turn.
+ * No LLM involved.
  */
 export async function submitPETReadingComprehensionAction(input: {
-  sessionId: string;
-  userId: string;
+  sessionId?: string;
+  planToken: string;
   answers: Record<number, PETReadingAnswer>;
 }): Promise<PETReadingComprehensionSubmitResult | { error: string }> {
-  const supabase = await createSupabaseServer();
-
-  const { data: planRow, error } = await supabase
-    .from('messages')
-    .select('content_json')
-    .eq('session_id', input.sessionId)
-    .eq('user_id', input.userId)
-    .eq('role', 'bob')
-    .eq('msg_type', 'text')
-    .order('created_at', { ascending: true })
-    .limit(1)
-    .single();
-
-  if (error || !planRow) return { error: 'Could not load exercise' };
-
-  const cj = planRow.content_json as { questions?: GeneratedQuestion[] } | null;
-  const planQuestions = cj?.questions;
-  if (!planQuestions || planQuestions.length === 0) return { error: 'Could not load exercise' };
+  const userId = await currentUserId();
+  if (!userId) return { error: 'unauthenticated' };
+  const plan = unsealPlan<PETReadingPlan>(input.planToken, userId);
+  const planQuestions = plan?.questions;
+  if (!plan || !planQuestions || planQuestions.length === 0) return { error: 'Could not load exercise' };
 
   const question_results: PETReadingQuestionResult[] = planQuestions.map((q) => {
     const given = input.answers[q.number];
@@ -293,36 +264,24 @@ export async function submitPETReadingComprehensionAction(input: {
   const correct_count = question_results.filter((r) => r.is_correct).length;
   const total = planQuestions.length;
 
-  persistMessages(
-    question_results.map((r) => ({
-      sessionId: input.sessionId,
-      userId: input.userId,
-      role: 'user' as const,
-      msgType: 'text' as const,
-      contentText: null,
-      contentJson: {
-        kind: 'pet_reading_comprehension_answer',
-        question_number: r.number,
-        chosen: r.chosen,
-        is_correct: r.is_correct,
-      },
-    }))
-  ).catch(() => undefined);
-
-  persistMessage({
+  const completed = await completeActivity({
+    mode: 'cambridge_pet_reading_comprehension',
     sessionId: input.sessionId,
-    userId: input.userId,
-    role: 'bob',
-    msgType: 'evaluation',
-    contentText: null,
-    contentJson: {
+    plan,
+    answers: question_results.map((r) => ({
+      kind: 'pet_reading_comprehension_answer',
+      question_number: r.number,
+      chosen: r.chosen,
+      is_correct: r.is_correct,
+    })),
+    evaluation: {
       kind: 'pet_reading_comprehension_evaluation',
       score: correct_count,
       score_max: total,
       question_results,
-      is_final: true,
     },
-  }).catch(() => undefined);
+  });
+  if (!completed.ok) return { error: completed.code };
 
-  return { correct_count, total, question_results };
+  return { sessionId: completed.data.sessionId, correct_count, total, question_results };
 }

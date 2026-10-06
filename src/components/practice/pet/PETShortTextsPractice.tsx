@@ -34,7 +34,7 @@ interface RestoredState {
   correctCount: number;
 }
 
-function tryRestore(messages: StoredMessage[]): RestoredState | null {
+export function tryRestore(messages: StoredMessage[]): RestoredState | null {
   let items: ShortTextItem[] | null = null;
   let framingText = '';
   let results: ShortTextAnswerResult[] | null = null;
@@ -249,7 +249,6 @@ export function PETShortTextsPractice({
 
   const [phase, setPhase] = useState<Phase>('loading');
   const [sessionId, setSessionId] = useState<string | undefined>(initialSessionId);
-  const [userId, setUserId] = useState<string | undefined>();
   const [items, setItems] = useState<ShortTextItem[]>([]);
   const [framingText, setFramingText] = useState('');
   const [answers, setAnswers] = useState<Record<number, 'A' | 'B' | 'C'>>({});
@@ -274,10 +273,6 @@ export function PETShortTextsPractice({
             setCorrectCount(restored.correctCount);
             setPhase('finished');
           } else {
-            const { createSupabaseBrowser } = await import('@/lib/supabase/browser-client');
-            const supabase = createSupabaseBrowser();
-            const { data: { user } } = await supabase.auth.getUser();
-            if (user) setUserId(user.id);
             setPhase('ready');
           }
           return;
@@ -289,19 +284,13 @@ export function PETShortTextsPractice({
       }
 
       setIsNewSession(true);
-      const result = await generatePETShortTextsAction({ sessionId: initialSessionId });
+      const result = await generatePETShortTextsAction();
 
       if ('error' in result) {
         setErrorMsg(result.error);
         return;
       }
 
-      if (!initialSessionId) {
-        onSessionCreated?.(result.sessionId);
-      }
-
-      setSessionId(result.sessionId);
-      setUserId(result.userId);
       setItems(result.items);
       setFramingText(result.framingText);
       setPhase('ready');
@@ -315,12 +304,11 @@ export function PETShortTextsPractice({
   }
 
   async function handleSubmit() {
-    if (!sessionId || !userId) return;
     setPhase('submitting');
 
     const result = await submitPETShortTextsAnswersAction({
       sessionId,
-      userId,
+      framingText,
       answers,
       items,
     });
@@ -331,6 +319,8 @@ export function PETShortTextsPractice({
       return;
     }
 
+    if (!sessionId) onSessionCreated?.(result.sessionId);
+    setSessionId(result.sessionId);
     setResults(result.results);
     setCorrectCount(result.correctCount);
     setPhase('finished');

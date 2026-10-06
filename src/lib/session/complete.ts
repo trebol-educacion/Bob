@@ -18,7 +18,7 @@ export async function completeActivity(input: {
   mode: string;
   sessionId?: string | null;
   topic?: string | null;
-  plan: Record<string, unknown> | null;
+  plan: object | null;
   answers: Array<Record<string, unknown>>;
   evaluation: Record<string, unknown>;
 }): Promise<ActionResult<CompletedActivity>> {
@@ -28,7 +28,7 @@ export async function completeActivity(input: {
 
   const messages: TurnMessage[] = [];
   if (session.data.created && input.plan) {
-    messages.push({ role: 'bob', msgType: 'text', contentText: null, contentJson: input.plan });
+    messages.push({ role: 'bob', msgType: 'text', contentText: null, contentJson: input.plan as Record<string, unknown> });
   }
   for (const answer of input.answers) {
     messages.push({ role: 'user', msgType: 'text', contentText: null, contentJson: answer });

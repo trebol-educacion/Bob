@@ -3,9 +3,8 @@
 import { z } from 'zod';
 import { getPrompt } from '@/lib/prompts/db-prompts';
 import { callGemini, isOk } from '@/lib/gemini-client';
-import { persistMessage, persistMessages } from '@/lib/persist-activity';
-import { createSessionAction } from '@/actions/sessions';
-import { createSupabaseServer } from '@/lib/supabase/server';
+import { completeActivity } from '@/lib/session/complete';
+import { currentUserId } from '@/lib/session/lifecycle';
 import { MODELS } from '@/lib/models';
 
 const OptionSchema = z.object({
@@ -42,8 +41,6 @@ export interface ShortTextItem {
 
 /** Full result of a successful generation call. */
 export interface PETShortTextsResult {
-  sessionId: string;
-  userId: string;
   items: ShortTextItem[];
   framingText: string;
 }
@@ -59,6 +56,7 @@ export interface ShortTextAnswerResult {
 
 /** Full submit result. */
 export interface PETShortTextsSubmitResult {
+  sessionId: string;
   correctCount: number;
   total: number;
   results: ShortTextAnswerResult[];
@@ -72,29 +70,9 @@ function safeParse<T>(schema: z.ZodType<T>, raw: string): T | null {
   }
 }
 
-/** Generates 5 PET B1 short-text items and a framing text; creates a session when none is provided. */
-export async function generatePETShortTextsAction(input: {
-  sessionId?: string;
-}): Promise<PETShortTextsResult | { error: string }> {
-  let sessionId = input.sessionId;
-  let userId: string | undefined;
-
-  if (!sessionId) {
-    const result = await createSessionAction({
-      mode: 'cambridge_pet_reading_part1',
-      title: 'Reading Part 1, Short Texts',
-    });
-    if (!result.data) {
-      return { error: result.error ?? 'Could not create session' };
-    }
-    sessionId = result.data.id;
-    userId = result.data.user_id;
-  } else {
-    const supabase = await createSupabaseServer();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return { error: 'Not authenticated' };
-    userId = user.id;
-  }
+/** Generates 5 PET B1 short-text items and a framing text; persists nothing until the first submit. */
+export async function generatePETShortTextsAction(): Promise<PETShortTextsResult | { error: string }> {
+  const userId = (await currentUserId()) ?? undefined;
 
   const [generationPrompt, framingText] = await Promise.all([
     getPrompt('cambridge_pet_reading_part1_b1_generation').catch(() => null),
@@ -128,31 +106,16 @@ export async function generatePETShortTextsAction(input: {
     return { error: 'Unexpected model response' };
   }
 
-  persistMessage({
-    sessionId,
-    userId,
-    role: 'bob',
-    msgType: 'text',
-    contentText: null,
-    contentJson: {
-      kind: 'reading_prompt',
-      items: parsed.items,
-      framing_text: framingText,
-    },
-  }).catch(() => undefined);
-
   return {
-    sessionId,
-    userId,
     items: parsed.items,
     framingText,
   };
 }
 
-/** Evaluates student answers deterministically (no LLM) and persists results. */
+/** Evaluates student answers deterministically (no LLM); creates the session on this first turn and closes it. */
 export async function submitPETShortTextsAnswersAction(input: {
-  sessionId: string;
-  userId: string;
+  sessionId?: string;
+  framingText: string;
   answers: Record<number, 'A' | 'B' | 'C'>;
   items: ShortTextItem[];
 }): Promise<PETShortTextsSubmitResult | { error: string }> {
@@ -170,36 +133,19 @@ export async function submitPETShortTextsAnswersAction(input: {
   const correctCount = results.filter((r) => r.isCorrect).length;
   const total = input.items.length;
 
-  const answerMessages = results.map((r) => ({
+  const completed = await completeActivity({
+    mode: 'cambridge_pet_reading_part1',
     sessionId: input.sessionId,
-    userId: input.userId,
-    role: 'user' as const,
-    msgType: 'text' as const,
-    contentText: null,
-    contentJson: {
+    plan: { kind: 'reading_prompt', items: input.items, framing_text: input.framingText },
+    answers: results.map((r) => ({
       kind: 'reading_answer',
       item_number: r.number,
       chosen: r.chosen,
       isCorrect: r.isCorrect,
-    },
-  }));
+    })),
+    evaluation: { kind: 'reading_evaluation', score: correctCount, score_max: total, results },
+  });
+  if (!completed.ok) return { error: completed.code };
 
-  persistMessages(answerMessages).catch(() => undefined);
-
-  persistMessage({
-    sessionId: input.sessionId,
-    userId: input.userId,
-    role: 'bob',
-    msgType: 'evaluation',
-    contentText: null,
-    contentJson: {
-      kind: 'reading_evaluation',
-      score: correctCount,
-      score_max: total,
-      results,
-      is_final: true,
-    },
-  }).catch(() => undefined);
-
-  return { correctCount, total, results };
+  return { sessionId: completed.data.sessionId, correctCount, total, results };
 }
