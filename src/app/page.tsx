@@ -104,7 +104,6 @@ export default function App() {
     activeSessionId,
     sessionsLoading,
     selectedMessages,
-    setSessions,
     setActiveSessionId,
     clearActiveSession,
     handleNewSession,
@@ -154,7 +153,7 @@ export default function App() {
 
   const onConversationSessionStart = useCallback((topicStr: string) => {
     setTopic(topicStr);
-    handleConversationSessionStart(topicStr);
+    return handleConversationSessionStart(topicStr);
   }, [handleConversationSessionStart]);
 
   const onFinish = useCallback(() => {
@@ -218,7 +217,6 @@ export default function App() {
       refreshSkillLevels={refreshSkillLevels}
       refreshPendingAssessments={refreshPendingAssessments}
       setActiveSessionId={setActiveSessionId}
-      setSessions={setSessions}
       cefrSelectorRef={cefrSelectorRef}
       assessmentId={assessment.assessmentId}
       assessmentPrompts={assessment.assessmentPrompts}

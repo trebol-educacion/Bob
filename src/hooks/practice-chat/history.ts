@@ -1,6 +1,7 @@
 import type { ImageScene } from '@/actions/gemini';
 import type { StoredMessage } from '@/actions/messages';
 import type { SceneConfig, Difficulty } from '@/components/ImageConfigSelection';
+import { isPracticeSummary } from '@/lib/session/practice-summary';
 import { restoreMessages } from './render';
 import type { ChatMsg, ChatPhase } from './types';
 
@@ -14,6 +15,15 @@ export interface DerivedChatHistory {
   currentScene: (ImageScene & { image_data?: string }) | null;
   currentSceneConfig: SceneConfig | null;
   phraseScores: number[];
+  closed: boolean;
+}
+
+function isGradedTurn(m: StoredMessage): boolean {
+  return m.role === 'bob' && m.msg_type === 'evaluation' && !isPracticeSummary(m.content_json);
+}
+
+function isClosed(msgs: StoredMessage[]): boolean {
+  return msgs.some((m) => m.msg_type === 'evaluation' && isPracticeSummary(m.content_json));
 }
 
 function inferPhaseFromHistory(mode: 'situation' | 'image', msgs: StoredMessage[]): ChatPhase {
@@ -21,14 +31,15 @@ function inferPhaseFromHistory(mode: 'situation' | 'image', msgs: StoredMessage[
   if (mode === 'situation') {
     const plan = msgs.find(m => m.msg_type === 'phrase_plan');
     const planLen = (plan?.content_json as { phrases?: string[] } | null)?.phrases?.length ?? 0;
-    const evals = msgs.filter(m => m.role === 'bob' && m.msg_type === 'evaluation').length;
+    const evals = msgs.filter(isGradedTurn).length;
     const total = planLen > 0 ? planLen : 10;
-    if (evals >= total) return 'finished';
+    if (evals >= total || isClosed(msgs)) return 'finished';
     const last = msgs[msgs.length - 1];
-    if (last.role === 'bob' && last.msg_type === 'evaluation') return 'result';
+    if (isGradedTurn(last)) return 'result';
     return 'phrase-ready';
   }
-  const last = msgs[msgs.length - 1];
+  const turns = msgs.filter((m) => !(m.msg_type === 'evaluation' && isPracticeSummary(m.content_json)));
+  const last = turns[turns.length - 1] ?? msgs[msgs.length - 1];
   if (last.role === 'bob') {
     if (last.msg_type === 'image_scene') return 'phrase-ready';
     if (last.msg_type === 'phrase') return 'phrase-ready';
@@ -74,7 +85,7 @@ export function deriveChatHistory(
 
   const currentIndex = (() => {
     if (!hasHistory) return 0;
-    const evals = initialMessages!.filter(m => m.role === 'bob' && m.msg_type === 'evaluation').length;
+    const evals = initialMessages!.filter(isGradedTurn).length;
     return Math.max(0, evals - 1);
   })();
 
@@ -99,7 +110,7 @@ export function deriveChatHistory(
   const phraseScores = (() => {
     if (!hasHistory) return [];
     return initialMessages!
-      .filter((m) => m.role === 'bob' && m.msg_type === 'evaluation')
+      .filter(isGradedTurn)
       .map((m) => {
         const j = m.content_json as { score?: number } | null;
         return typeof j?.score === 'number' ? j.score : 0;
@@ -116,5 +127,6 @@ export function deriveChatHistory(
     currentScene,
     currentSceneConfig,
     phraseScores,
+    closed: hasHistory && isClosed(initialMessages ?? []),
   };
 }

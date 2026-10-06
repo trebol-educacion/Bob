@@ -14,7 +14,6 @@ import { ModeSelectorView } from './views/ModeSelectorView';
 import { PracticeView } from './views/PracticeView';
 import { DashboardView } from './views/DashboardView';
 import { AssessmentView } from './views/AssessmentView';
-import type { BobSession } from '@/actions/sessions';
 import type { StoredMessage } from '@/actions/messages';
 import type { AssessmentPrompt, AssessmentListeningItem, AssessmentReadingItem, AssessmentWritingTask } from '@/actions/assessment';
 import type { AppState, ActivityRenderProps } from '@/lib/routing';
@@ -53,13 +52,12 @@ export interface AppShellRoutesProps {
   handleModeSelect: (m: PracticeMode) => void;
   handleAssessmentStart: () => void;
   handlePickLevel: (level: CefrLevel) => void;
-  onConversationSessionStart: (topic: string) => void;
+  onConversationSessionStart: (topic: string) => Promise<string | undefined>;
   refreshSessions: () => void;
   refreshSkillLevels: () => Promise<void>;
   refreshPendingAssessments: () => Promise<void>;
   requestLeaveConfirmation: (action: () => void) => void;
   setActiveSessionId: (id: string | null) => void;
-  setSessions: React.Dispatch<React.SetStateAction<BobSession[]>>;
   cefrSelectorRef: React.RefObject<HTMLDivElement | null>;
   assessmentId: string | null;
   assessmentPrompts: AssessmentPrompt[];
@@ -106,7 +104,6 @@ export function AppShellRoutes({
   refreshPendingAssessments,
   requestLeaveConfirmation,
   setActiveSessionId,
-  setSessions,
   cefrSelectorRef,
   assessmentId,
   assessmentPrompts,
@@ -295,7 +292,6 @@ export function AppShellRoutes({
             activeSessionId={activeSessionId}
             selectedMessages={selectedMessages}
             setActiveSessionId={setActiveSessionId}
-            setSessions={setSessions}
             refreshSessions={refreshSessions}
           />
         </motion.div>
@@ -315,6 +311,7 @@ export function AppShellRoutes({
             skillLevels={skillLevels} cefrActiveLevel={cefrActiveLevel}
             onFinish={onFinish}
             onConversationSessionStart={onConversationSessionStart}
+            refreshSessions={refreshSessions}
           />
         </motion.div>
       )}

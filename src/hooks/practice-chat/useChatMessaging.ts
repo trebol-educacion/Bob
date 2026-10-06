@@ -25,16 +25,20 @@ export function useChatMessaging({ sessionIdRef, setMessages }: Params) {
     setMessages(prev => [...prev, { id: crypto.randomUUID(), role: 'user', content }]);
   }, [setMessages]);
 
+  const reportSaveError = useCallback((message: string) => {
+    setSaveError(message);
+    setTimeout(() => setSaveError(null), 4000);
+  }, []);
+
   const saveMsg = useCallback<SaveMsg>(async (input) => {
     const sid = sessionIdRef.current;
     if (!sid) return;
     const { error } = await saveMessageAction({ ...input, session_id: sid });
     if (error) {
       console.error('[saveMsg] failed:', error, 'msg_type:', input.msg_type);
-      setSaveError(`Error saving message (${input.msg_type})`);
-      setTimeout(() => setSaveError(null), 4000);
+      reportSaveError(`Error saving message (${input.msg_type})`);
     }
-  }, [sessionIdRef]);
+  }, [sessionIdRef, reportSaveError]);
 
-  return { saveError, addBobMessage, addUserMessage, saveMsg };
+  return { saveError, addBobMessage, addUserMessage, saveMsg, reportSaveError };
 }

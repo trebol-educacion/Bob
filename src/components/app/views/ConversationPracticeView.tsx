@@ -15,7 +15,8 @@ export interface ConversationPracticeViewProps {
   skillLevels: SkillLevelMap | null;
   cefrActiveLevel: CefrLevel | null;
   onFinish: () => void;
-  onConversationSessionStart: (topic: string) => void;
+  onConversationSessionStart: (topic: string) => Promise<string | undefined>;
+  refreshSessions: () => void;
 }
 
 export function ConversationPracticeView({
@@ -26,6 +27,7 @@ export function ConversationPracticeView({
   cefrActiveLevel,
   onFinish,
   onConversationSessionStart,
+  refreshSessions,
 }: ConversationPracticeViewProps) {
   return (
     <ConversationPractice
@@ -33,6 +35,7 @@ export function ConversationPracticeView({
       onFinish={onFinish}
       noFrame={true}
       onSessionStart={onConversationSessionStart}
+      onSessionFinished={refreshSessions}
       level={resolveEffectiveLevel(skillLevels, cefrActiveLevel, 'speaking').level ?? undefined}
       sessionId={activeSessionId ?? undefined}
       initialMessages={selectedMessages.length > 0 ? mapStoredMessagesToConversation(selectedMessages) : undefined}

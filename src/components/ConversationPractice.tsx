@@ -22,7 +22,8 @@ interface ConversationPracticeProps {
   onFinish: () => void;
   noFrame?: boolean;
   onPhaseChange?: (label: string, iter?: string) => void;
-  onSessionStart?: (topic: string) => void;
+  onSessionStart?: (topic: string) => Promise<string | undefined>;
+  onSessionFinished?: () => void;
   level?: CefrLevel;
   sessionId?: string;
   initialMessages?: ChatMessage[];
@@ -36,6 +37,7 @@ export function ConversationPractice({
   noFrame,
   onPhaseChange,
   onSessionStart,
+  onSessionFinished,
   level = 'b1',
   sessionId,
   initialMessages = [],
@@ -53,13 +55,13 @@ export function ConversationPractice({
 
   const {
     onRecordedRef,
-    persistTurn,
+    persistTurns,
     handleListen,
     handleSendTextMessage,
     handleSimulateResponse,
     handleGoToQuestions,
     handleTopicConfirm,
-  } = useConversationHandlers({ conv, qf, maxTurns: MAX_TURNS, level, sessionId, onSessionStart, onError: handleError });
+  } = useConversationHandlers({ conv, qf, maxTurns: MAX_TURNS, level, sessionId, onSessionStart, onSessionFinished, onError: handleError });
 
   const { isRecording, startRecording, stopRecording } = useAudioRecorder({
     onRecorded: useCallback((blob: Blob) => onRecordedRef.current(blob), [onRecordedRef]),
@@ -87,7 +89,7 @@ export function ConversationPractice({
         const result = await generateInitialChatAction(conv.internalTopic, level);
         conv.setFraming(result.framing);
         conv.setMessages([{ role: 'model', text: result.message }]);
-        persistTurn('model', result.message);
+        await persistTurns([{ role: 'model', text: result.message }]);
         setTimeout(() => handleListen(result.message, 0), 500);
       } catch (error) {
         console.error('Failed to init chat:', error);

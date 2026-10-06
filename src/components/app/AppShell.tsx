@@ -50,12 +50,11 @@ export interface AppShellProps {
   handleModeSelect: (m: PracticeMode) => void;
   handleAssessmentStart: () => void;
   handlePickLevel: (level: CefrLevel) => void;
-  onConversationSessionStart: (topic: string) => void;
+  onConversationSessionStart: (topic: string) => Promise<string | undefined>;
   refreshSessions: () => void;
   refreshSkillLevels: () => Promise<void>;
   refreshPendingAssessments: () => Promise<void>;
   setActiveSessionId: (id: string | null) => void;
-  setSessions: React.Dispatch<React.SetStateAction<BobSession[]>>;
   cefrSelectorRef: React.RefObject<HTMLDivElement | null>;
   assessmentId: string | null;
   assessmentPrompts: AssessmentPrompt[];
@@ -106,7 +105,6 @@ export function AppShell({
   refreshSkillLevels,
   refreshPendingAssessments,
   setActiveSessionId,
-  setSessions,
   cefrSelectorRef,
   assessmentId,
   assessmentPrompts,
@@ -203,7 +201,6 @@ export function AppShell({
             refreshPendingAssessments={refreshPendingAssessments}
             requestLeaveConfirmation={requestLeaveConfirmation}
             setActiveSessionId={setActiveSessionId}
-            setSessions={setSessions}
             cefrSelectorRef={cefrSelectorRef}
             assessmentId={assessmentId}
             assessmentPrompts={assessmentPrompts}
