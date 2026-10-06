@@ -79,7 +79,7 @@ describe('FCEListeningGapFillPractice (Listening P2)', () => {
     fireEvent.change(screen.getByLabelText('Gap 9'), { target: { value: 'Vesuvius' } });
     fireEvent.change(screen.getByLabelText('Gap 10'), { target: { value: 'AD 79' } });
     fireEvent.change(screen.getByLabelText('Gap 11'), { target: { value: 'three' } });
-    fireEvent.click(screen.getByRole('button', { name: /Check answers \(3\/3\)/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Submit answers \(3\/3\)/ }));
 
     await waitFor(() => expect(screen.getByTestId('score-10')).toHaveTextContent('Score: 6.7 / 10'));
     expect(screen.getByText('two')).toBeInTheDocument();
@@ -103,7 +103,7 @@ describe('FCEListeningInterviewPractice (Listening P4)', () => {
 
     const firstGroup = screen.getAllByRole('group')[0];
     fireEvent.click(firstGroup.querySelectorAll('button')[0]);
-    fireEvent.click(screen.getByRole('button', { name: /Check answers \(1\/3\)/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Submit answers \(1\/3\)/ }));
 
     await waitFor(() => expect(screen.getByTestId('score-10')).toHaveTextContent('Score: 0 / 10'));
     expect(screen.getAllByRole('group')[0].querySelectorAll('button')[1]).toHaveClass('bg-green-50');

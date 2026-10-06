@@ -31,6 +31,7 @@ export function FCEListeningGapFillPractice({ onBack, onOpenDashboard, ...sessio
   return (
     <GroupExerciseFrame
       controller={controller}
+      examPart="fce_listening_part2"
       title="Listening Part 2, Sentence Completion"
       subtitle="Listen and complete the sentences"
       onBack={onBack}

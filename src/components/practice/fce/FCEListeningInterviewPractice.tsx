@@ -19,6 +19,7 @@ export function FCEListeningInterviewPractice({ onBack, onOpenDashboard, ...sess
   return (
     <GroupExerciseFrame
       controller={controller}
+      examPart="fce_listening_part4"
       title="Listening Part 4, Interview"
       subtitle="Listen to the interview and choose the best answer"
       onBack={onBack}

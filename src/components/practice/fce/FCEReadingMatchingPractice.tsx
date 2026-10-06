@@ -22,6 +22,7 @@ export function FCEReadingMatchingPractice({ onBack, onOpenDashboard, ...session
   return (
     <GroupExerciseFrame
       controller={controller}
+      examPart="fce_reading_part7"
       title="Reading Part 7, Multiple Matching"
       subtitle="Read the four sections and match each statement"
       onBack={onBack}

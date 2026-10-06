@@ -86,7 +86,7 @@ describe('FCEReadingMatchingPractice (Reading P7)', () => {
     expect(screen.getByLabelText('Question 43: A')).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByLabelText('Question 50: A')).toHaveAttribute('aria-pressed', 'true');
 
-    fireEvent.click(screen.getByRole('button', { name: /Check answers \(3\/10\)/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Submit answers \(3\/10\)/ }));
     await waitFor(() => expect(screen.getByTestId('score-10')).toHaveTextContent('Score: 3 / 10'));
     expect(submitMocks.r7).toHaveBeenCalledWith({ sessionId: undefined, groupId: r7.groupId, answers: { 'r7-item-1': 'A', 'r7-item-8': 'A', 'r7-item-10': 'A' } });
     expect(screen.getByLabelText('Question 44: D')).toBeDisabled();
@@ -145,7 +145,7 @@ describe('FCEListeningMatchingPractice (Listening P3)', () => {
     for (const [n, key] of [[19, 'E'], [20, 'B'], [21, 'A'], [22, 'G'], [23, 'D']] as const) {
       fireEvent.click(screen.getByLabelText(`Question ${n}: ${key}`));
     }
-    fireEvent.click(screen.getByRole('button', { name: /Check answers \(5\/5\)/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Submit answers \(5\/5\)/ }));
     await waitFor(() => expect(screen.getByTestId('score-10')).toHaveTextContent('Score: 10 / 10'));
   });
 

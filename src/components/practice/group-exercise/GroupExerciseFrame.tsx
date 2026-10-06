@@ -3,12 +3,16 @@
 import React from 'react';
 import { ChevronRight } from 'lucide-react';
 import { ActivityErrorState } from '@/components/activity/ActivityErrorState';
+import { ActivityHeader } from '@/components/activity/ActivityHeader';
 import { BobMascotLoader } from '@/components/chat/BobMascotLoader';
 import { CelebrationCard } from '@/components/practice/yl/CelebrationCard';
+import { useActivityPresentation } from '@/hooks/useActivityPresentation';
+import { partLabel } from '@/lib/activity/part-label';
 import type { ChoiceGroupController } from './types';
 
 export interface GroupExerciseFrameProps {
   controller: ChoiceGroupController;
+  examPart: string;
   title: string;
   subtitle: string;
   onBack: () => void;
@@ -16,39 +20,23 @@ export interface GroupExerciseFrameProps {
   children: React.ReactNode;
 }
 
-function Header({ title, subtitle, onBack }: Pick<GroupExerciseFrameProps, 'title' | 'subtitle' | 'onBack'>) {
-  return (
-    <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-100 bg-white shrink-0">
-      <button
-        type="button"
-        onClick={onBack}
-        className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-600 cursor-pointer"
-        aria-label="Go back"
-      >
-        ←
-      </button>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-bold text-gray-800 truncate">{title}</p>
-        <p className="text-xs text-gray-400">{subtitle}</p>
-      </div>
-      <span
-        className="shrink-0 px-2 py-0.5 rounded-full text-indigo-600 text-[10px] font-bold uppercase tracking-widest"
-        style={{ background: 'color-mix(in oklab, #6366f1 12%, white)' }}
-      >
-        B2 · FCE
-      </span>
-    </div>
+export function GroupExerciseFrame({ controller, examPart, title, subtitle, onBack, onOpenDashboard, children }: GroupExerciseFrameProps) {
+  const presentation = useActivityPresentation(examPart);
+  const header = (
+    <ActivityHeader
+      title={presentation?.title ?? title}
+      subtitle={presentation?.description ?? subtitle}
+      badge={partLabel(examPart)}
+      onBack={onBack}
+    />
   );
-}
-
-export function GroupExerciseFrame({ controller, title, subtitle, onBack, onOpenDashboard, children }: GroupExerciseFrameProps) {
   const { phase, exercise, answers, result, errorMessage, isNewSession, submit, retry } = controller;
   const answeredCount = Object.values(answers).filter((value) => value.trim() !== '').length;
 
   if (phase === 'loading' || phase === 'submitting') {
     return (
       <div className="flex flex-col h-full">
-        <Header title={title} subtitle={subtitle} onBack={onBack} />
+        {header}
         <div className="flex-1 flex flex-col min-h-0">
           <BobMascotLoader message={phase === 'loading' ? 'Loading your exercise…' : 'Checking your answers…'} />
         </div>
@@ -59,7 +47,7 @@ export function GroupExerciseFrame({ controller, title, subtitle, onBack, onOpen
   if (phase === 'error' || !exercise) {
     return (
       <div className="flex flex-col h-full">
-        <Header title={title} subtitle={subtitle} onBack={onBack} />
+        {header}
         <ActivityErrorState message={errorMessage} onRetry={retry} onBack={onBack} />
       </div>
     );
@@ -67,7 +55,7 @@ export function GroupExerciseFrame({ controller, title, subtitle, onBack, onOpen
 
   return (
     <div className="flex flex-col h-full">
-      <Header title={title} subtitle={subtitle} onBack={onBack} />
+      {header}
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-3xl mx-auto px-4 py-4 space-y-4">
           {children}
@@ -99,7 +87,7 @@ export function GroupExerciseFrame({ controller, title, subtitle, onBack, onOpen
               answeredCount > 0 ? 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm cursor-pointer' : 'bg-gray-100 text-gray-400 cursor-not-allowed',
             ].join(' ')}
           >
-            Check answers ({answeredCount}/{exercise.questions.length})
+            Submit answers ({answeredCount}/{exercise.questions.length})
             <ChevronRight size={16} />
           </button>
         </div>

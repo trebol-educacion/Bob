@@ -25,6 +25,7 @@ export function FCEListeningMatchingPractice({ onBack, onOpenDashboard, ...sessi
   return (
     <GroupExerciseFrame
       controller={controller}
+      examPart="fce_listening_part3"
       title="Listening Part 3, Multiple Matching"
       subtitle="Match each speaker to what they say"
       onBack={onBack}
