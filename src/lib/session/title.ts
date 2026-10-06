@@ -74,6 +74,9 @@ const FULL_TITLES: Record<string, string> = {
   generic_conversation: 'Free Conversation',
   generic_situation: 'Situation Practice',
   generic_image: 'Image Practice',
+  practice_conversation: 'Practice · Conversation',
+  practice_situation: 'Practice · Situation',
+  practice_picture: 'Practice · Picture',
 };
 
 const PART_PATTERN = /(?:_part|_p)(\d+)(?:_|$)/;

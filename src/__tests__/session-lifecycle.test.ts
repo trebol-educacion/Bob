@@ -93,6 +93,21 @@ describe('finishSession', () => {
   });
 });
 
+describe('finishSession con countsTowardProgress:false', () => {
+  it('guarda sessions.score_10 pero no consulta ni escribe activity_results', async () => {
+    const result = await finishSession({
+      sessionId: 's1',
+      userId: 'u1',
+      evaluation: { kind: 'practice_result', score_10: 6.5 },
+      countsTowardProgress: false,
+    });
+    expect(updateMock).toHaveBeenCalledWith({ score_10: 6.5 });
+    expect(existingResultMock).not.toHaveBeenCalled();
+    expect(persistResultMock).not.toHaveBeenCalled();
+    expect(result).toEqual({ ok: true, data: { score10: 6.5, messageId: 'm1' } });
+  });
+});
+
 describe('openSession', () => {
   it('persiste el opening solo si crea la sesión', async () => {
     const opening = [{ role: 'bob' as const, msgType: 'phrase' as const, contentJson: { a: 1 } }];

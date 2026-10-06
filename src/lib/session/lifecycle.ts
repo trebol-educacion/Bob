@@ -113,10 +113,11 @@ async function hasActivityResult(sessionId: string): Promise<boolean> {
  * @param input.sessionId - session being closed
  * @param input.userId - owner of the session
  * @param input.evaluation - final evaluation payload; is_final is forced to true
+ * @param input.countsTowardProgress - false keeps the grade on the session only and writes no activity_results row
  * @returns canonical 0-10 grade and the final message id; activity_results is written before returning
  */
 export async function finishSession(
-  input: SessionRef & { evaluation: Record<string, unknown> },
+  input: SessionRef & { evaluation: Record<string, unknown>; countsTowardProgress?: boolean },
 ): Promise<ActionResult<FinishedSession>> {
   const evaluation = { ...input.evaluation, is_final: true };
   const score10 = toScore10(evaluation);
@@ -142,7 +143,8 @@ export async function finishSession(
   });
   if (!('id' in message)) return fail('persist_failed', true);
 
-  if (!(await hasActivityResult(input.sessionId))) {
+  const countsTowardProgress = input.countsTowardProgress !== false;
+  if (countsTowardProgress && !(await hasActivityResult(input.sessionId))) {
     await persistActivityResult({
       sessionId: input.sessionId,
       userId: input.userId,
