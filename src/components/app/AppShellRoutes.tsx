@@ -202,7 +202,7 @@ export function AppShellRoutes({
 
       {(appState === 'assessment-invite' || appState === 'assessment-running') && (
         <motion.div
-          key={`assessment-${appState}`}
+          key="assessment"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -20 }}
