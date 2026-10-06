@@ -11,6 +11,7 @@ export interface CompletedActivity {
  * @param input.sessionId - existing session; none creates the row on this first turn
  * @param input.plan - exercise payload persisted only when the session is created here
  * @param input.answers - student answers persisted as user turns
+ * @param input.answerTexts - free-text student turns persisted with their text
  * @param input.evaluation - final evaluation payload
  * @returns session id and canonical grade; session, turns, result and activity_results are awaited
  */
@@ -20,6 +21,7 @@ export async function completeActivity(input: {
   topic?: string | null;
   plan: object | null;
   answers: Array<Record<string, unknown>>;
+  answerTexts?: Array<{ contentText: string; contentJson: Record<string, unknown> | null }>;
   evaluation: Record<string, unknown>;
 }): Promise<ActionResult<CompletedActivity>> {
   const session = await ensureSession({ mode: input.mode, sessionId: input.sessionId, topic: input.topic });
@@ -32,6 +34,9 @@ export async function completeActivity(input: {
   }
   for (const answer of input.answers) {
     messages.push({ role: 'user', msgType: 'text', contentText: null, contentJson: answer });
+  }
+  for (const answer of input.answerTexts ?? []) {
+    messages.push({ role: 'user', msgType: 'text', contentText: answer.contentText, contentJson: answer.contentJson });
   }
   const turn = await recordTurn({ ...ref, messages });
   if (!turn.ok) return turn;

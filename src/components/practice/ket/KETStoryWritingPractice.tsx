@@ -17,6 +17,7 @@ import {
   type PictureStoryFeedback,
 } from '@/actions/modes/ket-writing-part7';
 import type { StoredMessage } from '@/actions/messages';
+import { restorePictureStory } from '@/lib/ket/writing-restore';
 import { resolveActivityBoot } from '@/lib/activity/boot';
 
 export interface KETStoryWritingPracticeProps {
@@ -36,47 +37,8 @@ function countWords(text: string): number {
   return text.trim() === '' ? 0 : text.trim().split(/\s+/).length;
 }
 
-interface RestoredState {
-  story_premise: string;
-  scenes: StorySceneWithImage[];
-  framingText: string;
-  userText: string;
-  feedback: PictureStoryFeedback | null;
-}
-
-function tryRestore(messages: StoredMessage[]): RestoredState | null {
-  let story_premise = '';
-  let scenes: StorySceneWithImage[] | null = null;
-  let framingText = '';
-  let userText = '';
-  let feedback: PictureStoryFeedback | null = null;
-
-  for (const msg of messages) {
-    const cj = msg.content_json as Record<string, unknown> | null;
-    if (!cj) continue;
-
-    if (msg.role === 'bob' && cj.kind === 'picture_story_prompt') {
-      story_premise = String(cj.story_premise ?? '');
-      framingText = String(cj.framing_text ?? '');
-      const rawScenes = cj.scenes as StoryScene[];
-      const imageUrls = cj.image_urls as string[];
-      scenes = rawScenes.map((s, i) => ({ ...s, image_url: imageUrls?.[i] ?? '' }));
-    }
-    if (msg.role === 'user' && msg.content_text) {
-      userText = msg.content_text;
-    }
-    if (msg.role === 'bob' && msg.msg_type === 'evaluation' && cj.is_final === true) {
-      feedback = {
-        understood: Boolean(cj.understood),
-        highlights: (cj.highlights as string[]) ?? [],
-        suggestions: (cj.suggestions as string[]) ?? [],
-        model_answer: (cj.model_answer as string) ?? null,
-      };
-    }
-  }
-
-  if (scenes) return { story_premise, scenes, framingText, userText, feedback };
-  return null;
+function tryRestore(messages: StoredMessage[]) {
+  return restorePictureStory(messages);
 }
 
 function SceneStrip({ scenes, loadingNumbers }: { scenes: StorySceneWithImage[]; loadingNumbers?: Set<number> }) {
@@ -218,7 +180,7 @@ export function KETStoryWritingPractice({
 }: KETStoryWritingPracticeProps) {
   const [phase, setPhase] = useState<Phase>('loading');
   const [sessionId, setSessionId] = useState<string | undefined>(initialSessionId);
-  const [userId, setUserId] = useState<string | undefined>();
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [story_premise, setStoryPremise] = useState('');
   const [scenes, setScenes] = useState<StorySceneWithImage[]>([]);
   const [framingText, setFramingText] = useState('');
@@ -235,11 +197,11 @@ export function KETStoryWritingPractice({
    * patches it in as it resolves, so the strip fills progressively instead of
    * blocking the screen on a ~9s "Creating your story pictures…".
    */
-  async function loadSceneImagesInBackground(sid: string, planScenes: StoryScene[]) {
+  async function loadSceneImagesInBackground(planScenes: StoryScene[]) {
     setImageLoading(new Set(planScenes.map((s) => s.number)));
     await Promise.all(
       planScenes.map(async (scene) => {
-        const { image_url } = await generateKETSceneImageAction({ imagePrompt: scene.image_prompt, sessionId: sid }).catch(
+        const { image_url } = await generateKETSceneImageAction({ imagePrompt: scene.image_prompt }).catch(
           () => ({ image_url: '' })
         );
         setScenes((prev) =>
@@ -268,42 +230,42 @@ export function KETStoryWritingPractice({
         setText(r.userText);
         if (r.feedback) { setFeedback(r.feedback); setPhase('finished'); }
         else {
-          const { createSupabaseBrowser } = await import('@/lib/supabase/browser-client');
-          const { data: { user } } = await createSupabaseBrowser().auth.getUser();
-          if (user) setUserId(user.id);
           setPhase('ready');
           const missing = r.scenes.filter((s) => !s.image_url);
           if (missing.length > 0 && initialSessionId) {
-            void loadSceneImagesInBackground(initialSessionId, missing.map(({ image_url: _i, ...s }) => s));
+            void loadSceneImagesInBackground(missing.map(({ image_url: _i, ...s }) => s));
           }
         }
         return;
       }
       if (boot.kind === 'restore-failed') { setErrorMsg('Could not restore session. Please start a new one.'); return; }
       setIsNewSession(true); setPhase('generating');
-      const plan = await generateKETPictureStoryPlanAction({ sessionId: initialSessionId });
+      const plan = await generateKETPictureStoryPlanAction();
       if ('error' in plan) { setErrorMsg(plan.error); return; }
-      onSessionCreated?.(plan.sessionId);
-      setSessionId(plan.sessionId); setUserId(plan.userId);
       setStoryPremise(plan.story_premise);
       setScenes(plan.scenes.map((s) => ({ ...s, image_url: '' })));
       setFramingText(plan.framing_text);
       setPhase('ready');
-      void loadSceneImagesInBackground(plan.sessionId, plan.scenes);
+      void loadSceneImagesInBackground(plan.scenes);
     }
     void init();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleSubmit() {
-    if (!sessionId || !userId) return;
     setPhase('evaluating');
+    setSubmitError(null);
     const result = await evaluateKETPictureStoryAction({
-      sessionId, userId, userText: text,
+      sessionId, userText: text,
       story_premise,
+      framing_text: framingText,
       scenes: scenes.map(({ image_url: _, ...s }) => s),
+      image_urls: scenes.map((s) => s.image_url),
     });
-    if ('error' in result) { setErrorMsg(result.error); setPhase('ready'); return; }
-    setFeedback(result); setPhase('finished'); onSessionFinished?.();
+    if ('error' in result) { setSubmitError('We could not check your story. Please try again.'); setPhase('ready'); return; }
+    setFeedback(result.feedback); setPhase('finished');
+    if (!sessionId) onSessionCreated?.(result.sessionId);
+    setSessionId(result.sessionId);
+    onSessionFinished?.();
   }
 
   const wordCount = countWords(text);
@@ -377,7 +339,7 @@ export function KETStoryWritingPractice({
           </div>
 
           <div className="shrink-0 border-t border-gray-100 bg-white px-4 py-3 flex items-center gap-3">
-            <p className="text-xs text-gray-400 flex-1">Write at least {MIN_WORDS} words</p>
+            <p className={`text-xs flex-1 ${submitError ? 'text-red-500' : 'text-gray-400'}`}>{submitError ?? `Write at least ${MIN_WORDS} words`}</p>
             <button
               type="button"
               onClick={handleSubmit}

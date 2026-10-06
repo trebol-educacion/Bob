@@ -14,6 +14,7 @@ import {
   type KETShortMessageFeedback,
 } from '@/actions/modes/ket-writing-part6';
 import type { StoredMessage } from '@/actions/messages';
+import { restoreShortMessage } from '@/lib/ket/writing-restore';
 import { useTranslations } from 'next-intl';
 
 const ACCENT = '#469E7B';
@@ -165,46 +166,6 @@ function FeedbackPanel({ feedback, userText, onOpenDashboard, animate }: {
   );
 }
 
-function tryRestoreFromMessages(messages: StoredMessage[]): {
-  prompt: KETShortMessagePrompt | null;
-  userText: string | null;
-  feedback: KETShortMessageFeedback | null;
-} {
-  let prompt: KETShortMessagePrompt | null = null;
-  let userText: string | null = null;
-  let feedback: KETShortMessageFeedback | null = null;
-
-  for (const msg of messages) {
-    const cj = msg.content_json as Record<string, unknown> | null;
-    if (!cj) continue;
-
-    if (msg.role === 'bob' && cj.kind === 'writing_prompt') {
-      prompt = {
-        sessionId: msg.session_id ?? '',
-        userId: msg.user_id ?? '',
-        scenario: String(cj.scenario ?? ''),
-        recipient: String(cj.recipient ?? 'your friend'),
-        contentPoints: (cj.content_points as string[]) ?? [],
-        wordTarget: Number(cj.word_target ?? 25),
-        framingText: String(cj.framing_text ?? ''),
-      };
-    }
-    if (msg.role === 'user' && cj.kind === 'writing_submission') {
-      userText = String(cj.text ?? '');
-    }
-    if (msg.role === 'bob' && msg.msg_type === 'evaluation' && cj.is_final === true) {
-      feedback = {
-        understood: Boolean(cj.understood),
-        highlights: (cj.highlights as string[]) ?? [],
-        suggestions: (cj.suggestions as string[]) ?? [],
-        modelAnswer: (cj.modelAnswer as string | null) ?? null,
-      };
-    }
-  }
-
-  return { prompt, userText, feedback };
-}
-
 /** KET Writing Part 6, Short Message focus-mode practice component. */
 export function KETShortMessagePractice({
   onBack,
@@ -222,6 +183,8 @@ export function KETShortMessagePractice({
   const [feedback, setFeedback] = useState<KETShortMessageFeedback | null>(null);
   const [restoredUserText, setRestoredUserText] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [sessionId, setSessionId] = useState<string | undefined>(initialSessionId);
   const [isNewSession, setIsNewSession] = useState(false);
   const initStartedRef = useRef(false);
 
@@ -230,7 +193,7 @@ export function KETShortMessagePractice({
     initStartedRef.current = true;
     async function init() {
       if (initialMessages && initialMessages.length > 0) {
-        const restored = tryRestoreFromMessages(initialMessages);
+        const restored = restoreShortMessage(initialMessages);
         if (restored.prompt && restored.feedback) {
           setPrompt(restored.prompt);
           setRestoredUserText(restored.userText);
@@ -250,18 +213,11 @@ export function KETShortMessagePractice({
       }
 
       setIsNewSession(true);
-      const result = await generateKETShortMessageAction({
-        sessionId: initialSessionId,
-        userId: undefined,
-      });
+      const result = await generateKETShortMessageAction();
 
       if ('error' in result) {
         setErrorMsg(result.error);
         return;
-      }
-
-      if (!initialSessionId) {
-        onSessionCreated?.(result.sessionId);
       }
 
       setPrompt(result);
@@ -275,22 +231,19 @@ export function KETShortMessagePractice({
     if (!prompt || !text.trim() || wordCount < MIN_WORDS) return;
     setPhase('evaluating');
 
-    const result = await evaluateKETShortMessageAction({
-      sessionId: prompt.sessionId,
-      userId: prompt.userId,
-      scenario: prompt.scenario,
-      contentPoints: prompt.contentPoints,
-      userText: text,
-    });
+    setSubmitError(null);
+    const result = await evaluateKETShortMessageAction({ sessionId, prompt, userText: text });
 
     if ('error' in result) {
-      setErrorMsg(result.error);
+      setSubmitError(t('ket.shortMessage.evaluationFailed'));
       setPhase('ready');
       return;
     }
 
-    setFeedback(result);
+    setFeedback(result.feedback);
     setPhase('finished');
+    if (!sessionId) onSessionCreated?.(result.sessionId);
+    setSessionId(result.sessionId);
     onSessionFinished?.();
   }
 
@@ -406,10 +359,14 @@ export function KETShortMessagePractice({
                 </strong>{' '}
                 / target ~25
               </span>
-              {wordCount < MIN_WORDS && (
-                <span className="text-amber-500">
-                  {MIN_WORDS - wordCount} more to send
-                </span>
+              {submitError ? (
+                <span className="text-red-500">{submitError}</span>
+              ) : (
+                wordCount < MIN_WORDS && (
+                  <span className="text-amber-500">
+                    {MIN_WORDS - wordCount} more to send
+                  </span>
+                )
               )}
             </div>
           </div>
