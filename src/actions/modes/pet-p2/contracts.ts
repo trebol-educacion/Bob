@@ -41,8 +41,6 @@ export type PictureDescriptionLanguageBank = {
 
 /** Full result returned after a successful generate call. */
 export interface PETPictureDescriptionResult {
-  sessionId: string;
-  userId: string;
   topic: string;
   framingText: string;
   scenePrompt: string;
@@ -99,5 +97,6 @@ export interface PETPictureDescriptionFeedback {
   transcript_used: string;
   transcript: string;
   rubric?: z.infer<typeof RubricSchema>;
+  sessionId?: string;
 }
 

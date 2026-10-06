@@ -1,4 +1,5 @@
 import { EvalResponseSchema, type FormativeFeedback } from '@/lib/types/practice';
+import { toScore10 } from '@/lib/session/score';
 
 const SCORE_MAX = 20;
 const CRITERION_MAX = 5;
@@ -73,4 +74,13 @@ export function toExaminerFeedback(raw: unknown): FormativeFeedback | null {
     cefr_band,
     band_per_criterion: bands ?? undefined,
   };
+}
+
+/**
+ * @param feedback formative feedback that may carry the structured 4x4 rubric
+ * @returns the same feedback with a code-derived 0-10 grade when the rubric is complete
+ */
+export function withRubricScore(feedback: FormativeFeedback): FormativeFeedback {
+  const score10 = toScore10({ rubric: feedback.rubric });
+  return score10 === null ? feedback : { ...feedback, score10 };
 }

@@ -6,7 +6,7 @@ import { fail, ok, type ActionResult } from '@/lib/result';
 import { getOrCreateCachedContent } from '@/lib/cache';
 import { parseJsonResult } from '@/lib/llm/parse-json-result';
 import { callGemini, safeParseFallback } from '@/lib/gemini-client';
-import { toExaminerFeedback } from './examiner-score';
+import { toExaminerFeedback, withRubricScore } from './examiner-score';
 import { SPEAKING_ANSWER_KIND } from './question-round-restore';
 import type { QuestionRoundSchema } from './question-round-schema';
 import type { QuestionRoundAnswer, QuestionRoundContext, QuestionRoundEvaluation, SpeakingQA } from './types';
@@ -23,6 +23,7 @@ export interface QuestionRoundConfig<TPlan extends object> {
   logTag: string;
   eventName: string;
   examinerReaction?: boolean;
+  reactionPromptKey?: string;
   scoredEvaluation?: boolean;
 }
 
@@ -144,10 +145,11 @@ export async function processQuestionRoundAnswer<TPlan extends object>(
   const sessionId = session.data.sessionId;
   if (config.examinerReaction === false) return ok({ transcribed, reaction: '', sessionId });
 
-  const reactionKey = `${config.promptPrefix}_examiner_reaction`;
+  const reactionKey = config.reactionPromptKey ?? `${config.promptPrefix}_examiner_reaction`;
   const reactionPromptText = await getPrompt(reactionKey, {
     USER_TRANSCRIPT: transcribed,
     LAST_QUESTION: question,
+    QUESTION: question,
   });
   const reactionResult = await callGemini(
     { promptKey: reactionKey, model: MODELS.FLASH_LITE_PREVIEW, userId },
@@ -202,7 +204,7 @@ export async function evaluateQuestionRound<TPlan extends object>(
 
   const scored = config.scoredEvaluation ? toExaminerFeedback(parsed) : null;
   if (config.scoredEvaluation && !scored) return unscored();
-  const feedback = scored ?? safeParseFallback(FormativeFeedbackSchema, parsed, FormativeFeedbackFallback);
+  const feedback = scored ?? withRubricScore(safeParseFallback(FormativeFeedbackSchema, parsed, FormativeFeedbackFallback));
 
   const session = await openSession({
     mode: config.mode,

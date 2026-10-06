@@ -368,7 +368,6 @@ export function PETPictureDescriptionPractice({
 
   const [phase, setPhase] = useState<Phase>('loading');
   const [sessionId, setSessionId] = useState<string | undefined>(initialSessionId);
-  const [userId, setUserId] = useState<string | undefined>();
   const [topic, setTopic] = useState('');
   const [framingText, setFramingText] = useState('');
   const [scenePrompt, setScenePrompt] = useState('');
@@ -380,7 +379,7 @@ export function PETPictureDescriptionPractice({
     emotions: [],
     weather_setting: [],
   });
-  const [, setLanguageBank] = useState<PETPictureDescriptionResult['languageBank']>({
+  const [languageBank, setLanguageBank] = useState<PETPictureDescriptionResult['languageBank']>({
     openers: [],
     speculation: [],
     describing_people: [],
@@ -462,19 +461,13 @@ export function PETPictureDescriptionPractice({
       if (boot.kind === 'restore-failed') { setErrorMsg('Could not restore session. Please start a new one.'); return; }
 
       setIsNewSession(true);
-      const result = await generatePETPictureDescriptionAction({ sessionId: initialSessionId });
+      const result = await generatePETPictureDescriptionAction();
 
       if ('error' in result) {
         setErrorMsg(result.error);
         return;
       }
 
-      if (!initialSessionId) {
-        onSessionCreated?.(result.sessionId);
-      }
-
-      setSessionId(result.sessionId);
-      setUserId(result.userId);
       setTopic(result.topic);
       setFramingText(result.framingText);
       setScenePrompt(result.scenePrompt);
@@ -501,14 +494,9 @@ export function PETPictureDescriptionPractice({
   }
 
   async function handleEvaluate(blob: Blob, mime: string, duration: number) {
-    if (!sessionId || !userId) return;
-
     const result = await evaluatePETPictureDescriptionAction({
       sessionId,
-      userId,
-      topic,
-      scenePrompt,
-      referenceVocabulary,
+      plan: { topic, framingText, scenePrompt, referenceVocabulary, languageBank, imageUrl },
       audioBlob: blob,
       mimeType: mime,
       audioDuration: duration,
@@ -524,6 +512,10 @@ export function PETPictureDescriptionPractice({
       return;
     }
 
+    if (!sessionId && result.sessionId) {
+      setSessionId(result.sessionId);
+      onSessionCreated?.(result.sessionId);
+    }
     setFeedback(result);
     setTranscript(result.transcript || result.transcript_used);
     setPhase('finished');
