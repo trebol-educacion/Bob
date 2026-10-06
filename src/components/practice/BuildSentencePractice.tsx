@@ -10,6 +10,7 @@ import { useClosedSetSubmit } from '@/hooks/useClosedSetSubmit';
 import { resolveActivityBoot } from '@/lib/activity/boot';
 import { restoreClosedSet, scoreClosedEntries, type ClosedEntryResult } from '@/lib/toefl/closed-set';
 import type { ActivityRenderProps } from '@/lib/routing';
+import { ActivityLoadError } from '@/components/practice/ActivityLoadError';
 import { BobMascotLoader } from '@/components/chat/BobMascotLoader';
 
 export interface BuildSentenceItem {
@@ -44,7 +45,6 @@ export function BuildSentencePractice({
   onSessionFinished,
 }: BuildSentencePracticeProps) {
   const t = useTranslations('resultcard');
-  const tErrors = useTranslations('errors');
   const tLoading = useTranslations('loading');
   const [boot] = useState(() =>
     resolveActivityBoot({ initialMessages, sessionId, tryRestore: (messages) => restoreClosedSet(messages) }),
@@ -54,6 +54,7 @@ export function BuildSentencePractice({
   const [loadError, setLoadError] = useState<string | null>(boot.kind === 'restore-failed' ? 'restore_failed' : null);
   const callbacks = useMemo(() => ({ sessionId, onSessionCreated, onSessionFinished }), [sessionId, onSessionCreated, onSessionFinished]);
   const { submit, error: submitError } = useClosedSetSubmit(callbacks);
+  const [bankGroupId, setBankGroupId] = useState<string | undefined>(undefined);
   const [index, setIndex] = useState(0);
   const [bank, setBank] = useState<string[]>([]);
   const [ordered, setOrdered] = useState<string[]>([]);
@@ -67,12 +68,13 @@ export function BuildSentencePractice({
     if (boot.kind !== 'generate') return;
     async function init() {
       const res = await getBuildSentenceItemsAction();
-      if ('error' in res) {
-        setLoadError(res.error);
+      if (!res.ok) {
+        setLoadError(res.code);
       } else {
-        setItems(res.items);
-        if (res.items[0]) {
-          setBank([...res.items[0].tokens].sort(() => Math.random() - 0.5));
+        setItems(res.data.items);
+        setBankGroupId(res.data.bankGroupId);
+        if (res.data.items[0]) {
+          setBank([...res.data.items[0].tokens].sort(() => Math.random() - 0.5));
         }
       }
       setLoading(false);
@@ -107,6 +109,7 @@ export function BuildSentencePractice({
   function submitAll(results: ItemResult[]) {
     void submit({
       mode: 'toefl_writing_build_sentence',
+      bankGroupId,
       items,
       entries: items.map((item, index) => ({
         id: item.id,
@@ -139,12 +142,7 @@ export function BuildSentencePractice({
   }
 
   if (loadError) {
-    return (
-      <div className="flex flex-col items-center gap-4 py-10">
-        <p className="text-sm text-red-500">{tErrors('couldNotLoadItems')}</p>
-        <button onClick={onBack} className="text-sm text-blue-600 underline">Go back</button>
-      </div>
-    );
+    return <ActivityLoadError code={loadError} onBack={onBack} />;
   }
 
   if (done || items.length === 0) {

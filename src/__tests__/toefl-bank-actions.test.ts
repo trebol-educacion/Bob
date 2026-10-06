@@ -26,6 +26,9 @@ vi.mock('@/lib/session/complete', () => ({ completeActivity: vi.fn() }));
 
 import { generateToeflRepeatSessionAction } from '@/actions/modes/toefl_repeat';
 import { generateToeflInterviewAction } from '@/actions/modes/toefl_interview';
+import { getBuildSentenceItemsAction } from '@/actions/modes/writing-build-sentence';
+import { getEmailTaskAction } from '@/actions/modes/writing-email';
+import { getAcademicTaskAction } from '@/actions/modes/writing-academic';
 
 function groupOf(plan: unknown) {
   return { ok: true, data: { kind: 'group', group: { id: 'g1', metadata: { plan } }, items: [] } };
@@ -98,5 +101,65 @@ describe('restoration keeps the banked audio', () => {
     const restored = restoreInterview([{ role: 'bob', msg_type: 'phrase', content_json: { ...plan, exam_part: 'toefl_interview' } }]);
     expect(restored?.plan.questions[0].audio_url).toBe('https://x/q1.mp3');
     expect(restored?.plan.bank_group_id).toBe('g1');
+  });
+});
+
+const BUILD_PLAN = {
+  items: Array.from({ length: 10 }, (_, i) => ({
+    id: i + 1,
+    structure: 'passive',
+    tokens: ['was', 'The', 'built', 'house', 'in', '1990', '.'],
+    correct_sentence: 'The house was built in 1990.',
+    explanation: 'Passive voice.',
+  })),
+};
+
+const EMAIL_PLAN = { scenario: 'You missed a class.', recipient: 'Professor Miller', purpose: 'ask for notes' };
+
+const ACADEMIC_PLAN = {
+  professor_post: { name: 'Dr. Lee', text: 'Should universities offer more online classes?' },
+  peer_posts: [
+    { name: 'Ana', text: 'Yes, flexibility matters.' },
+    { name: 'Tom', text: 'No, campus life matters.' },
+  ],
+  writing_prompt: 'Add your contribution (minimum 100 words).',
+};
+
+describe('TOEFL writing activities open from the bank', () => {
+  it('Build a Sentence returns stable item ids per group and never calls Gemini', async () => {
+    pickContent.mockResolvedValue(groupOf(BUILD_PLAN));
+    const result = await getBuildSentenceItemsAction();
+    expect(result).toMatchObject({ ok: true, data: { bankGroupId: 'g1' } });
+    if (result.ok) {
+      expect(result.data.items).toHaveLength(10);
+      expect(result.data.items[0]).toMatchObject({ id: 'g1-1', target_sentence: 'The house was built in 1990.' });
+    }
+    expect(callGemini).not.toHaveBeenCalled();
+  });
+
+  it('Email and Academic Discussion return the banked task', async () => {
+    pickContent.mockResolvedValue(groupOf(EMAIL_PLAN));
+    expect(await getEmailTaskAction()).toMatchObject({ ok: true, data: { bankGroupId: 'g1', task: { recipient: 'Professor Miller' } } });
+    pickContent.mockResolvedValue(groupOf(ACADEMIC_PLAN));
+    const academic = await getAcademicTaskAction();
+    expect(academic).toMatchObject({ ok: true, data: { instructions: ACADEMIC_PLAN.writing_prompt } });
+    expect(callGemini).not.toHaveBeenCalled();
+  });
+
+  it('all three return no_content with an empty bank', async () => {
+    pickContent.mockResolvedValue({ ok: false, code: 'no_content', retryable: false });
+    expect(await getBuildSentenceItemsAction()).toMatchObject({ ok: false, code: 'no_content' });
+    expect(await getEmailTaskAction()).toMatchObject({ ok: false, code: 'no_content' });
+    expect(await getAcademicTaskAction()).toMatchObject({ ok: false, code: 'no_content' });
+  });
+
+  it('reopens an open-writing session with the stored task', async () => {
+    const { restoreOpenWriting } = await import('@/lib/writing/open-writing-restore');
+    const restored = restoreOpenWriting([
+      { role: 'bob', msg_type: 'text', content_json: { kind: 'writing_prompt', instructions: 'write', task: EMAIL_PLAN } },
+      { role: 'user', msg_type: 'text', content_json: { kind: 'writing_submission', text: 'hello' } },
+      { role: 'bob', msg_type: 'evaluation', content_json: { is_final: true, understood: true, highlights: [], suggestions: [], indicators: { word_count: 1 } } },
+    ]);
+    expect(restored).toMatchObject({ instructions: 'write', task: EMAIL_PLAN, text: 'hello' });
   });
 });

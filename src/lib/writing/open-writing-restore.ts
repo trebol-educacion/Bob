@@ -12,6 +12,8 @@ export interface RestorableWritingMessage {
 export interface RestoredOpenWriting {
   text: string;
   feedback: WritingFormativeFeedback;
+  instructions: string | null;
+  task: Record<string, unknown> | null;
 }
 
 function stringList(value: unknown): string[] {
@@ -39,13 +41,19 @@ function readFeedback(json: Record<string, unknown>): WritingFormativeFeedback |
 export function restoreOpenWriting(messages: RestorableWritingMessage[]): RestoredOpenWriting | null {
   let text: string | null = null;
   let feedback: WritingFormativeFeedback | null = null;
+  let instructions: string | null = null;
+  let task: Record<string, unknown> | null = null;
   for (const message of messages) {
     const json = message.content_json as Record<string, unknown> | null;
     if (!json) continue;
+    if (message.role === 'bob' && json.kind === OPEN_WRITING_PLAN_KIND) {
+      instructions = typeof json.instructions === 'string' ? json.instructions : null;
+      task = json.task && typeof json.task === 'object' ? (json.task as Record<string, unknown>) : null;
+    }
     if (message.role === 'user' && json.kind === OPEN_WRITING_SUBMISSION_KIND) text = String(json.text ?? '');
     if (message.role === 'bob' && message.msg_type === 'evaluation' && json.is_final === true) {
       feedback = readFeedback(json) ?? feedback;
     }
   }
-  return text !== null && feedback ? { text, feedback } : null;
+  return text !== null && feedback ? { text, feedback, instructions, task } : null;
 }

@@ -1,6 +1,7 @@
 'use server';
 
 import { completeActivity } from '@/lib/session/complete';
+import { bankStamp } from '@/lib/item-bank/plan-bank';
 import {
   CLOSED_ANSWER_KIND,
   CLOSED_PLAN_KIND,
@@ -14,10 +15,16 @@ const CLOSED_SET_MODES = ['toefl_listen_choose_response', 'toefl_writing_build_s
 
 type ClosedSetMode = (typeof CLOSED_SET_MODES)[number];
 
+const BANK_PART: Record<ClosedSetMode, string> = {
+  toefl_listen_choose_response: 'listen_choose_response',
+  toefl_writing_build_sentence: 'toefl_writing_build_sentence',
+};
+
 export interface ClosedSetSubmission {
   mode: ClosedSetMode;
   sessionId?: string;
   items: unknown[];
+  bankGroupId?: string;
   entries: ClosedEntry[];
 }
 
@@ -36,6 +43,7 @@ export async function submitClosedSetAction(input: ClosedSetSubmission): Promise
   const completed = await completeActivity({
     mode: input.mode,
     sessionId: input.sessionId,
+    bank: bankStamp(BANK_PART[input.mode], input.bankGroupId),
     plan: { kind: CLOSED_PLAN_KIND, items: input.items },
     answers: input.entries.map((entry) => ({ kind: CLOSED_ANSWER_KIND, id: entry.id, selected: entry.selected })),
     evaluation: buildClosedEvaluation(results),

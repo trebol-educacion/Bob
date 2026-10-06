@@ -4,6 +4,7 @@ import { callGemini, isOk } from '@/lib/gemini-client';
 import { MODELS } from '@/lib/models';
 import { fail, ok, type ActionResult } from '@/lib/result';
 import { completeActivity } from '@/lib/session/complete';
+import { bankStamp } from '@/lib/item-bank/plan-bank';
 import { currentUserId } from '@/lib/session/lifecycle';
 import { countWords } from '@/lib/writing/word-count';
 import { OPEN_WRITING_PLAN_KIND, OPEN_WRITING_SUBMISSION_KIND } from '@/lib/writing/open-writing-restore';
@@ -32,6 +33,8 @@ export interface OpenWritingInput {
   targetWordCount: [number, number];
   instructions: string;
   examinerRole: string;
+  task?: Record<string, unknown>;
+  bankGroupId?: string;
 }
 
 export interface OpenWritingOutcome {
@@ -71,7 +74,7 @@ async function evaluate(input: OpenWritingInput): Promise<ActionResult<WritingFo
         contents: [
           {
             role: 'user',
-            parts: [{ text: `Exam part prompt:\n${prompt}\n\nStudent answer (${wordCount} words):\n${input.text}` }],
+            parts: [{ text: `Exam part prompt:\n${prompt}\n\nTask given to the student:\n${input.instructions}${input.task ? `\n${JSON.stringify(input.task)}` : ''}\n\nStudent answer (${wordCount} words):\n${input.text}` }],
           },
         ],
         config: { systemInstruction: buildSystemInstruction(input.examinerRole), responseMimeType: 'application/json' },
@@ -111,7 +114,8 @@ export async function evaluateAndSaveOpenWriting(input: OpenWritingInput): Promi
   const completed = await completeActivity({
     mode: input.mode,
     sessionId: input.sessionId,
-    plan: { kind: OPEN_WRITING_PLAN_KIND, instructions: input.instructions },
+    bank: bankStamp(input.examPart, input.bankGroupId),
+    plan: { kind: OPEN_WRITING_PLAN_KIND, instructions: input.instructions, ...(input.task ? { task: input.task } : {}) },
     answers: [{ kind: OPEN_WRITING_SUBMISSION_KIND, text: input.text }],
     evaluation: { ...evaluated.data },
   });
