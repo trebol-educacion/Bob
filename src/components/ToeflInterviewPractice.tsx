@@ -8,16 +8,17 @@ import { useCountdown } from '@/hooks/useCountdown';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
 import { blobToBase64 } from '@/lib/audio';
 import { useTTS } from '@/hooks/useTTS';
-import { createSessionAction } from '@/actions/sessions';
 import {
   generateToeflInterviewAction,
-  evaluateToeflResponseAction,
-  persistToeflPlanAction,
-  persistToeflResponseAction,
-  persistToeflQuestionEvaluationAction,
-  persistToeflSessionSummaryAction,
-  type ToeflInterviewPlan,
+  submitToeflAnswerAction,
+  finishToeflInterviewAction,
 } from '@/actions/modes/toefl_interview';
+import { restoreInterview, type ToeflInterviewPlan } from '@/lib/toefl/interview';
+import { resolveActivityBoot } from '@/lib/activity/boot';
+import { FormativeFeedbackCard } from '@/components/toefl/FormativeFeedbackCard';
+import { InterviewSummary } from '@/components/toefl/InterviewSummary';
+import { difficultyKey } from '@/components/toefl/difficulty-key';
+import type { ActivityRenderProps } from '@/lib/routing';
 import type { FormativeFeedback } from '@/lib/types/practice';
 import { BobMascotLoader } from '@/components/chat/BobMascotLoader';
 import { ChatShell } from '@/components/ChatShell';
@@ -41,72 +42,31 @@ type QuestionSubPhase =
 const PREP_SECONDS = 5;
 const RECORD_SECONDS = 45;
 
-function difficultyKey(difficulty: number): string {
-  switch (difficulty) {
-    case 1: return 'easy';
-    case 2: return 'medium';
-    case 3: return 'hard';
-    case 4: return 'veryHard';
-    default: return '';
-  }
-}
-
-function FormativeFeedbackCard({ feedback }: { feedback: FormativeFeedback }) {
-  const t = useTranslations('toefl.interview.feedback');
-  return (
-    <div className="w-full space-y-3">
-      <div className={`text-center py-2 px-4 rounded-xl font-bold text-sm ${feedback.understood ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'}`}>
-        {feedback.understood ? t('understood') : t('notUnderstood')}
-      </div>
-      {feedback.highlights.length > 0 && (
-        <div className="bg-green-50 rounded-xl p-3 space-y-1">
-          <p className="text-xs font-bold text-green-700 uppercase tracking-widest">{t('strengths')}</p>
-          {feedback.highlights.map((h, i) => (
-            <p key={i} className="text-sm text-green-800">✓ {h}</p>
-          ))}
-        </div>
-      )}
-      {feedback.suggestions.length > 0 && (
-        <div className="bg-amber-50 rounded-xl p-3 space-y-1">
-          <p className="text-xs font-bold text-amber-700 uppercase tracking-widest">{t('tips')}</p>
-          {feedback.suggestions.map((s, i) => (
-            <p key={i} className="text-sm text-amber-800">→ {s}</p>
-          ))}
-        </div>
-      )}
-      {feedback.model_answer && (
-        <div
-          className="rounded-xl p-3 space-y-1"
-          style={{ background: 'color-mix(in oklab, var(--color-bob-brand) 8%, white)' }}
-        >
-          <p className="text-xs font-bold text-bob-brand uppercase tracking-widest">{t('example')}</p>
-          <p className="text-sm text-gray-800 italic">&quot;{feedback.model_answer}&quot;</p>
-        </div>
-      )}
-    </div>
-  );
-}
-
-interface ToeflInterviewPracticeProps {
-  onBack: () => void;
-}
-
-export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) {
+export function ToeflInterviewPractice({
+  onBack,
+  sessionId: initialSessionId,
+  initialMessages,
+  onSessionCreated,
+  onSessionFinished,
+}: ActivityRenderProps) {
   const t = useTranslations('toefl');
-  const [phase, setPhase] = useState<InterviewPhase>('loading');
+  const [boot] = useState(() =>
+    resolveActivityBoot({ initialMessages, sessionId: initialSessionId, tryRestore: restoreInterview }),
+  );
+  const restored = boot.kind === 'restore' ? boot.data : null;
+  const [phase, setPhase] = useState<InterviewPhase>(restored ? (restored.finished ? 'finished' : 'intro') : 'loading');
   const [subPhase, setSubPhase] = useState<QuestionSubPhase>('reading');
-  const [plan, setPlan] = useState<ToeflInterviewPlan | null>(null);
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [evaluations, setEvaluations] = useState<FormativeFeedback[]>([]);
+  const [plan, setPlan] = useState<ToeflInterviewPlan | null>(restored?.plan ?? null);
+  const [currentIndex, setCurrentIndex] = useState(restored && !restored.finished ? restored.evaluations.length : 0);
+  const [evaluations, setEvaluations] = useState<FormativeFeedback[]>(restored?.evaluations ?? []);
   const [currentEval, setCurrentEval] = useState<FormativeFeedback | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(boot.kind === 'restore-failed' ? t('interview.loadError') : null);
+  const [loadKey, setLoadKey] = useState(0);
 
   const recordedBlobRef = useRef<Blob | null>(null);
   const { play: playTTS, stop: stopTTS } = useTTS();
   const autoStartedRef = useRef(false);
-  const sessionCreatedRef = useRef(false);
-  const sessionIdRef = useRef<string | null>(null);
-  const userIdRef = useRef<string | null>(null);
+  const sessionIdRef = useRef<string | null>(initialSessionId ?? null);
 
   const { startRecording, stopRecording } = useAudioRecorder({
     onRecorded: (blob) => {
@@ -135,6 +95,7 @@ export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) 
   });
 
   useEffect(() => {
+    if (boot.kind !== 'generate') return;
     let cancelled = false;
     async function load() {
       try {
@@ -151,28 +112,12 @@ export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) 
     }
     load();
     return () => { cancelled = true; };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [boot.kind, loadKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleStart = useCallback(async () => {
+  const handleStart = useCallback(() => {
     if (!plan) return;
-    if (!sessionCreatedRef.current) {
-      sessionCreatedRef.current = true;
-      const sessionResult = await createSessionAction({
-        mode: 'toefl_interview',
-        topic: plan.topic_id,
-        title: `TOEFL Interview, ${plan.topic_name}`,
-      });
-      if (sessionResult.data) {
-        sessionIdRef.current = sessionResult.data.id;
-        userIdRef.current = sessionResult.data.user_id;
-        persistToeflPlanAction(sessionResult.data.id, sessionResult.data.user_id, plan).catch(
-          (err) => console.error('[ToeflInterview persist] plan fire-and-forget:', err)
-        );
-      }
-    }
     setPhase('question');
     setSubPhase('reading');
-    setCurrentIndex(0);
     autoStartedRef.current = false;
   }, [plan]);
 
@@ -227,29 +172,25 @@ export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) 
 
     const blob = recordedBlobRef.current;
     recordedBlobRef.current = null;
-    const question = plan.questions[currentIndex];
+    const activePlan = plan;
 
     async function evaluate() {
-      const durationMs = RECORD_SECONDS * 1000;
       try {
         const base64 = await blobToBase64(blob);
         const mimeType = blob.type || 'audio/webm;codecs=opus';
-        const feedback = await evaluateToeflResponseAction(question.text, base64, mimeType);
-        setCurrentEval(feedback);
-        setEvaluations((prev) => {
-          const next = [...prev, feedback];
-          if (sessionIdRef.current && userIdRef.current) {
-            const sid = sessionIdRef.current;
-            const uid = userIdRef.current;
-            persistToeflResponseAction(sid, uid, currentIndex, feedback.model_answer ?? '', durationMs).catch(
-              (err) => console.error('[ToeflInterview persist] response:', err)
-            );
-            persistToeflQuestionEvaluationAction(sid, uid, currentIndex, feedback).catch(
-              (err) => console.error('[ToeflInterview persist] q-eval:', err)
-            );
-          }
-          return next;
+        const outcome = await submitToeflAnswerAction({
+          plan: activePlan,
+          questionIndex: currentIndex,
+          audioBase64: base64,
+          mimeType,
+          durationMs: RECORD_SECONDS * 1000,
+          sessionId: sessionIdRef.current ?? undefined,
         });
+        if ('error' in outcome) throw new Error(outcome.error);
+        if (!sessionIdRef.current) onSessionCreated?.(outcome.sessionId);
+        sessionIdRef.current = outcome.sessionId;
+        setCurrentEval(outcome.feedback);
+        setEvaluations((prev) => [...prev, outcome.feedback]);
         setSubPhase('result-preview');
       } catch (err) {
         console.error('Evaluation error:', err);
@@ -260,7 +201,6 @@ export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) 
           suggestions: [t('interview.evalError')],
         };
         setCurrentEval(fallback);
-        setEvaluations((prev) => [...prev, fallback]);
         setSubPhase('result-preview');
       }
     }
@@ -280,21 +220,20 @@ export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) 
     setError(null);
     const next = currentIndex + 1;
     if (next >= plan.questions.length) {
-      setEvaluations((prev) => {
-        if (sessionIdRef.current && userIdRef.current) {
-          persistToeflSessionSummaryAction(sessionIdRef.current, userIdRef.current, prev).catch(
-            (err) => console.error('[ToeflInterview persist] summary:', err)
-          );
-        }
-        return prev;
-      });
+      const sessionId = sessionIdRef.current;
+      if (sessionId) {
+        void finishToeflInterviewAction(sessionId).then((outcome) => {
+          if ('error' in outcome) setError(t('interview.evalError'));
+          else onSessionFinished?.();
+        });
+      }
       setPhase('finished');
     } else {
       setCurrentIndex(next);
       setSubPhase('reading');
       autoStartedRef.current = false;
     }
-  }, [currentIndex, plan]);
+  }, [currentIndex, plan, onSessionFinished, t]);
 
   const handleRestart = useCallback(() => {
     setPlan(null);
@@ -305,13 +244,9 @@ export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) 
     setCurrentEval(null);
     setError(null);
     autoStartedRef.current = false;
-    sessionCreatedRef.current = false;
     sessionIdRef.current = null;
-    userIdRef.current = null;
+    setLoadKey((key) => key + 1);
   }, []);
-
-  const allHighlights = evaluations.flatMap((e) => e.highlights);
-  const allSuggestions = evaluations.flatMap((e) => e.suggestions);
 
   const progressDots = plan ? (
     <div className="flex gap-1.5">
@@ -509,48 +444,7 @@ export function ToeflInterviewPractice({ onBack }: ToeflInterviewPracticeProps) 
       )}
 
       {phase === 'finished' && plan && (
-        <div className="space-y-4 py-2">
-          <InfoCard title={t('interview.finished.sessionFeedback')} icon={ClipboardList}>
-            <div className="space-y-3">
-              {allHighlights.length > 0 && (
-                <div className="space-y-1">
-                  <p className="text-xs font-bold text-green-700 uppercase tracking-widest">{t('interview.finished.strengthsTitle')}</p>
-                  {allHighlights.map((h, i) => (
-                    <p key={i} className="text-sm text-green-800">✓ {h}</p>
-                  ))}
-                </div>
-              )}
-              {allSuggestions.length > 0 && (
-                <div className="space-y-1">
-                  <p className="text-xs font-bold text-amber-700 uppercase tracking-widest">{t('interview.finished.focusAreas')}</p>
-                  {allSuggestions.map((s, i) => (
-                    <p key={i} className="text-sm text-amber-800">→ {s}</p>
-                  ))}
-                </div>
-              )}
-            </div>
-          </InfoCard>
-
-          <div className="space-y-2">
-            {plan.questions.map((q, i) => {
-              const ev = evaluations[i];
-              if (!ev) return null;
-              return (
-                <MessageBubble key={i} variant="assistant" icon={ClipboardList} accentColor="blue" noAnimate>
-                  <div className="space-y-1">
-                    <p className="text-[10px] font-bold text-bob-brand uppercase tracking-widest">
-                      {t('interview.questionLabel', { n: i + 1, difficulty: t(`interview.difficulty.${difficultyKey(q.difficulty)}`) })}
-                    </p>
-                    <p className="text-sm font-bold leading-snug line-clamp-2">{q.text}</p>
-                    <p className={`text-xs font-bold ${ev.understood ? 'text-green-600' : 'text-amber-600'}`}>
-                      {ev.understood ? t('interview.finished.messageUnderstood') : t('interview.finished.needsPractice')}
-                    </p>
-                  </div>
-                </MessageBubble>
-              );
-            })}
-          </div>
-        </div>
+        <InterviewSummary plan={plan} evaluations={evaluations} />
       )}
     </>
   );

@@ -1,30 +1,15 @@
 'use server';
 
-import { z } from 'zod';
 import { Type } from '@google/genai';
 import { MODELS } from '@/lib/models';
 import { FormativeFeedbackSchema, type FormativeFeedback } from '@/lib/types/practice';
 import { getPrompt } from '@/lib/prompts/db-prompts';
-import { persistMessage, readSessionMessagesForCurrentOrUser } from '@/lib/persist-activity';
+import { readSessionMessages } from '@/lib/persist-activity';
+import { currentUserId, finishSession, openSession, recordTurn } from '@/lib/session/lifecycle';
+import { ToeflInterviewPlanSchema, buildInterviewEvaluation, restoreInterview, INTERVIEW_ANSWER_KIND, type ToeflInterviewPlan } from '@/lib/toefl/interview';
 import { getOrCreateCachedContent } from '@/lib/cache';
 import { parseJsonResult } from '@/lib/llm/parse-json-result';
-import { callGemini, safeParseFallback } from '@/lib/gemini-client';
-
-const ToeflQuestionSchema = z.object({
-  text: z.string(),
-  difficulty: z.number().min(1).max(4),
-  suggested_time: z.number(),
-});
-
-const ToeflInterviewPlanSchema = z.object({
-  topic_id: z.string(),
-  topic_name: z.string(),
-  topic_context: z.string(),
-  questions: z.array(ToeflQuestionSchema).length(4),
-});
-
-export type ToeflInterviewPlan = z.infer<typeof ToeflInterviewPlanSchema>;
-export type ToeflQuestion = z.infer<typeof ToeflQuestionSchema>;
+import { callGemini } from '@/lib/gemini-client';
 
 const PlanFallback: ToeflInterviewPlan = {
   topic_id: 'daily_life',
@@ -36,13 +21,6 @@ const PlanFallback: ToeflInterviewPlan = {
     { text: 'How has technology changed the way you spend your time?', difficulty: 3, suggested_time: 60 },
     { text: 'What would your ideal daily routine look like and why?', difficulty: 4, suggested_time: 60 },
   ],
-};
-
-const FormativeFeedbackFallback: FormativeFeedback = {
-  kind: 'formative',
-  understood: false,
-  highlights: [],
-  suggestions: ['Try again, we could not process your response.'],
 };
 
 /** Generates a TOEFL Interview session plan with 4 progressive questions. */
@@ -96,12 +74,23 @@ export async function generateToeflInterviewAction(): Promise<ToeflInterviewPlan
   return cached;
 }
 
-/** Evaluates a user's spoken TOEFL response and returns formative feedback (no numeric score). */
-export async function evaluateToeflResponseAction(
-  question: string,
-  audioBase64: string,
-  mimeType: string
-): Promise<FormativeFeedback> {
+const MODE = 'toefl_interview';
+
+export interface ToeflAnswerInput {
+  plan: ToeflInterviewPlan;
+  questionIndex: number;
+  audioBase64: string;
+  mimeType: string;
+  durationMs: number;
+  sessionId?: string;
+}
+
+export interface ToeflAnswerOutcome {
+  sessionId: string;
+  feedback: FormativeFeedback;
+}
+
+async function evaluateSpokenAnswer(question: string, audioBase64: string, mimeType: string): Promise<FormativeFeedback | null> {
   const prompt = `You are a supportive TOEFL iBT speaking coach giving formative feedback to an English learner.
 
 The student answered this question:
@@ -117,126 +106,70 @@ Listen to the audio and return ONLY a JSON object with these fields:
 
 Return ONLY valid JSON. No score, no band, no percentage outside the rubric object.`;
 
+  const userId = (await currentUserId()) ?? undefined;
   const result = await callGemini(
-    { promptKey: 'toefl_interview_b2_formative', model: MODELS.FLASH_LITE_PREVIEW },
+    { promptKey: 'toefl_interview_b2_formative', model: MODELS.FLASH_LITE_PREVIEW, userId },
     (ai) => ai.models.generateContent({
       model: MODELS.FLASH_LITE_PREVIEW,
-      contents: [
-        {
-          role: 'user',
-          parts: [
-            { inlineData: { mimeType, data: audioBase64 } },
-            { text: prompt },
-          ],
-        },
-      ],
+      contents: [{ role: 'user', parts: [{ inlineData: { mimeType, data: audioBase64 } }, { text: prompt }] }],
       config: { responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
     })
   );
-
   if (!result.ok || !result.data.text) {
-    console.error(JSON.stringify({ event: 'evaluateToeflResponseAction', error: result.ok ? 'empty response' : result.error }));
-    return FormativeFeedbackFallback;
+    console.error(JSON.stringify({ event: 'evaluateSpokenAnswer', error: result.ok ? 'empty response' : result.error }));
+    return null;
   }
-
-  let parsed: unknown;
   try {
-    parsed = JSON.parse(result.data.text);
+    const parsed = FormativeFeedbackSchema.safeParse(JSON.parse(result.data.text));
+    return parsed.success && parsed.data.rubric ? parsed.data : null;
   } catch {
-    return FormativeFeedbackFallback;
+    return null;
   }
-  return safeParseFallback(FormativeFeedbackSchema, parsed, FormativeFeedbackFallback);
 }
 
-/** Persists the generated question plan as a single phrase row in bob_messages. */
-export async function persistToeflPlanAction(
-  sessionId: string,
-  userId: string,
-  plan: ToeflInterviewPlan
-): Promise<void> {
-  const result = await persistMessage({
-    sessionId,
-    userId,
-    role: 'bob',
-    msgType: 'phrase',
-    contentJson: { questions: plan.questions, topic_id: plan.topic_id, topic_name: plan.topic_name, topic_context: plan.topic_context },
+/** Evaluates a spoken answer by rubric; opens the session on the first graded answer and persists the turn. */
+export async function submitToeflAnswerAction(input: ToeflAnswerInput): Promise<ToeflAnswerOutcome | { error: string }> {
+  const question = input.plan.questions[input.questionIndex];
+  if (!question) return { error: 'invalid_question' };
+  const feedback = await evaluateSpokenAnswer(question.text, input.audioBase64, input.mimeType);
+  if (!feedback) return { error: 'evaluation_failed' };
+
+  const opened = await openSession({
+    mode: MODE,
+    sessionId: input.sessionId,
+    topic: input.plan.topic_id,
+    opening: [{ role: 'bob', msgType: 'phrase', contentJson: { ...input.plan } }],
   });
-  if ('error' in result) {
-    console.error('[ToeflInterview persist] plan:', result.error);
-  }
-}
+  if (!opened.ok) return { error: opened.code };
 
-/** Persists a single user spoken response with its transcription. */
-export async function persistToeflResponseAction(
-  sessionId: string,
-  userId: string,
-  questionIndex: number,
-  transcribedText: string,
-  durationMs: number
-): Promise<void> {
-  const result = await persistMessage({
-    sessionId,
-    userId,
-    role: 'user',
-    msgType: 'user_audio',
-    contentText: transcribedText,
-    contentJson: { questionIndex, durationMs },
+  const turn = await recordTurn({
+    ...opened.data,
+    messages: [
+      {
+        role: 'user',
+        msgType: 'text',
+        contentText: null,
+        contentJson: { kind: INTERVIEW_ANSWER_KIND, questionIndex: input.questionIndex, question: question.text, durationMs: input.durationMs },
+      },
+      {
+        role: 'bob',
+        msgType: 'evaluation',
+        contentText: feedback.suggestions[0] ?? '',
+        contentJson: { questionIndex: input.questionIndex, ...feedback },
+      },
+    ],
   });
-  if ('error' in result) {
-    console.error('[ToeflInterview persist] user response:', result.error);
-  }
+  if (!turn.ok) return { error: turn.code };
+  return { sessionId: opened.data.sessionId, feedback };
 }
 
-/** Persists the formative feedback for a single question as an evaluation row. */
-export async function persistToeflQuestionEvaluationAction(
-  sessionId: string,
-  userId: string,
-  questionIndex: number,
-  feedback: FormativeFeedback
-): Promise<void> {
-  const result = await persistMessage({
-    sessionId,
-    userId,
-    role: 'bob',
-    msgType: 'evaluation',
-    contentText: feedback.suggestions[0] ?? '',
-    contentJson: { questionIndex, ...feedback },
-  });
-  if ('error' in result) {
-    console.error('[ToeflInterview persist] evaluation:', result.error);
-  }
-}
-
-/** Persists the aggregated session-end summary. */
-export async function persistToeflSessionSummaryAction(
-  sessionId: string,
-  userId: string,
-  feedbacks: FormativeFeedback[]
-): Promise<void> {
-  const count = feedbacks.length;
-  if (count === 0) return;
-  const result = await persistMessage({
-    sessionId,
-    userId,
-    role: 'bob',
-    msgType: 'evaluation',
-    contentJson: {
-      summary: true,
-      questionsAnswered: count,
-      highlights: feedbacks.flatMap((f) => f.highlights),
-      suggestions: feedbacks.flatMap((f) => f.suggestions),
-      is_final: true,
-    },
-  });
-  if ('error' in result) {
-    console.error('[ToeflInterview persist] session summary:', result.error);
-  }
-}
-
-/** Returns all persisted messages for a TOEFL interview session for hydration. */
-export async function getToeflInterviewSessionMessagesAction(
-  sessionId: string,
-  userId: string
-) {
-  return readSessionMessagesForCurrentOrUser(sessionId, userId);
+/** Closes the interview with the 0-10 grade averaged from the rubrics of the persisted answers. */
+export async function finishToeflInterviewAction(sessionId: string): Promise<{ score10: number | null } | { error: string }> {
+  const userId = await currentUserId();
+  if (!userId) return { error: 'unauthenticated' };
+  const restored = restoreInterview(await readSessionMessages(sessionId, userId));
+  const evaluation = restored ? buildInterviewEvaluation(restored.evaluations) : null;
+  if (!evaluation) return { error: 'nothing_to_grade' };
+  const finished = await finishSession({ sessionId, userId, evaluation });
+  return finished.ok ? { score10: finished.data.score10 } : { error: finished.code };
 }
