@@ -21,10 +21,11 @@ describe('sessionTitle', () => {
   });
 
   it('sin parte conocida usa el modo legible', () => {
-    expect(sessionTitle('generic_conversation')).toBe('Generic Conversation');
+    expect(sessionTitle('generic_conversation')).toBe('Free Conversation');
+    expect(sessionTitle('some_other_mode')).toBe('Some Other Mode');
   });
 
-  it('sin etiqueta omite el tercer segmento', () => {
-    expect(sessionTitle('cambridge_pet_reading_part1')).toBe('Reading · Part 1');
+  it('incluye etiqueta de parte PET', () => {
+    expect(sessionTitle('cambridge_pet_reading_part1')).toBe('Reading · Part 1 · Short Texts');
   });
 });
