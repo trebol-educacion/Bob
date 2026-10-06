@@ -3,6 +3,9 @@
 import { z } from 'zod';
 import { getPrompt } from '@/lib/prompts/db-prompts';
 import { callGemini, isOk } from '@/lib/gemini-client';
+import { bankStamp, pickPlan } from '@/lib/item-bank/plan-bank';
+import { PetChallengePlanSchema } from '@/lib/bank-plans/pet-writing-challenge';
+import { fail, ok, type ActionResult } from '@/lib/result';
 import { completeActivity } from '@/lib/session/complete';
 import { currentUserId } from '@/lib/session/lifecycle';
 import { MODELS } from '@/lib/models';
@@ -21,6 +24,7 @@ export interface PETWritingChallengePrompt {
   minWords: number;
   maxWords: number;
   framingText: string;
+  bankGroupId?: string;
 }
 
 /** A single vocabulary improvement suggestion tied to a word the student used. */
@@ -44,17 +48,6 @@ export interface PETWritingChallengeFeedback {
   vocabulary: VocabularySuggestion[];
   grammar: GrammarNote[];
 }
-
-const GenerationSchema = z.object({
-  format: z.enum(['email', 'review', 'story']),
-  title: z.string().default(''),
-  theme: z.string().default(''),
-  stimulus: z.string(),
-  task: z.string(),
-  guide_points: z.array(z.string()).min(3).max(4),
-  min_words: z.number().default(60),
-  max_words: z.number().default(100),
-});
 
 const EvaluationSchema = z.object({
   kind: z.literal('formative').default('formative'),
@@ -93,57 +86,33 @@ function safeParse<T>(schema: z.ZodType<T>, raw: string): T | null {
   }
 }
 
-/** Generates a B1 PET Writing Challenge and framing text; persists nothing until the first submit. */
-export async function generatePETWritingChallengeAction(): Promise<PETWritingChallengePrompt | { error: string }> {
-  const userId = (await currentUserId()) ?? undefined;
-
-  const [generationPrompt, framingText] = await Promise.all([
-    getPrompt('cambridge_pet_writing_challenge_b1_generation').catch(() => null),
-    getPrompt('cambridge_pet_writing_challenge_b1_framing').catch(() => FALLBACK_FRAMING),
-  ]);
-
-  if (!generationPrompt) {
-    return { error: 'Could not load generation prompt' };
-  }
-
-  const result = await callGemini(
-    { promptKey: 'cambridge_pet_writing_challenge_b1_generation', model: MODELS.FLASH_LITE_PREVIEW, userId },
-    (ai) =>
-      ai.models.generateContent({
-        model: MODELS.FLASH_LITE_PREVIEW,
-        contents: [{ role: 'user', parts: [{ text: generationPrompt }] }],
-        config: { responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
-      })
-  );
-
-  if (!isOk(result)) {
-    return { error: 'Could not generate the exercise' };
-  }
-
-  const rawText = result.data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
-  const parsed = safeParse(GenerationSchema, rawText);
-
-  if (!parsed) {
-    console.error(
-      JSON.stringify({
-        event: 'pet_writing_challenge_generate_parse_failed',
-        rawPreview: rawText.slice(0, 500),
-      })
-    );
-    return { error: 'Unexpected response from the model' };
-  }
-
-  return {
-    format: parsed.format,
-    title: parsed.title,
-    theme: parsed.theme,
-    stimulus: parsed.stimulus,
-    task: parsed.task,
-    guidePoints: parsed.guide_points,
-    minWords: parsed.min_words,
-    maxWords: parsed.max_words,
+/** Reads one pregenerated B1 PET Writing Challenge from the bank; no model call and no session row. */
+export async function generatePETWritingChallengeAction(): Promise<ActionResult<PETWritingChallengePrompt>> {
+  const userId = await currentUserId();
+  if (!userId) return fail('unauthenticated');
+  const picked = await pickPlan({
+    exam: 'pet',
+    cefr: 'b1',
+    examPart: 'pet_writing_challenge',
+    skill: 'writing',
+    schema: PetChallengePlanSchema,
+    userId,
+  });
+  if (!picked.ok) return picked;
+  const plan = picked.data.plan;
+  const framingText = await getPrompt('cambridge_pet_writing_challenge_b1_framing').catch(() => FALLBACK_FRAMING);
+  return ok({
+    format: plan.format,
+    title: plan.title,
+    theme: plan.theme,
+    stimulus: plan.stimulus,
+    task: plan.task,
+    guidePoints: plan.guide_points,
+    minWords: plan.min_words,
+    maxWords: plan.max_words,
     framingText,
-  };
+    bankGroupId: picked.data.groupId,
+  });
 }
 
 /** Evaluates the student's Writing Challenge text; creates the session and closes it only when the evaluation succeeds. */
@@ -191,6 +160,7 @@ export async function submitPETWritingChallengeAction(input: {
   const completed = await completeActivity({
     mode: 'cambridge_pet_writing_challenge',
     sessionId: input.sessionId,
+    bank: bankStamp('pet_writing_challenge', input.prompt.bankGroupId),
     plan: {
       kind: 'pet_writing_challenge_prompt',
       format: input.prompt.format,

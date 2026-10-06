@@ -3,6 +3,9 @@
 import { z } from 'zod';
 import { getPrompt } from '@/lib/prompts/db-prompts';
 import { callGemini, isOk } from '@/lib/gemini-client';
+import { bankStamp, pickPlan } from '@/lib/item-bank/plan-bank';
+import { PetEmailPlanSchema } from '@/lib/bank-plans/pet-writing-part1';
+import { fail, ok, type ActionResult } from '@/lib/result';
 import { completeActivity } from '@/lib/session/complete';
 import { currentUserId } from '@/lib/session/lifecycle';
 import { MODELS } from '@/lib/models';
@@ -13,6 +16,7 @@ export interface PETEmailPrompt {
   wordTarget: number;
   context: string;
   framingText: string;
+  bankGroupId?: string;
 }
 
 export interface PETEmailFeedback {
@@ -24,17 +28,6 @@ export interface PETEmailFeedback {
   modelAnswer: string | null;
   rubric?: z.infer<typeof RubricSchema>;
 }
-
-const GenerationSchema = z.object({
-  email_received: z.object({
-    from: z.string(),
-    subject: z.string(),
-    body: z.string(),
-  }),
-  content_points: z.array(z.string()).length(4),
-  word_target: z.number().default(100),
-  context: z.string().default(''),
-});
 
 const RubricSchema = z
   .object({
@@ -57,66 +50,37 @@ const EvaluationSchema = z.object({
 function safeParse<T>(schema: z.ZodType<T>, raw: string): T | null {
   try {
     return schema.parse(JSON.parse(raw));
-  } catch (err) {
-    console.warn(JSON.stringify({
-      event: 'pet_writing_part1_safeparse_error',
-      error: err instanceof Error ? err.message : String(err),
-      rawPreview: raw.slice(0, 300),
-    }));
+  } catch {
     return null;
   }
 }
 
-/** Generates a PET Writing Part 1 email scenario and framing text; persists nothing until the first submit. */
-export async function generatePETEmailAction(): Promise<PETEmailPrompt | { error: string }> {
-  const userId = (await currentUserId()) ?? undefined;
+const FRAMING_FALLBACK =
+  'You will write an email reply in English. Bob will show you the email you received and 4 things you must include in your answer. Write about 100 words.';
 
-  const [generationPrompt, framingText] = await Promise.all([
-    getPrompt('cambridge_pet_writing_part1_b1_generation').catch(() => null),
-    getPrompt('cambridge_pet_writing_part1_b1_framing').catch(
-      () =>
-        'You will write an email reply in English. Bob will show you the email you received and 4 things you must include in your answer. Write about 100 words.'
-    ),
-  ]);
-
-  if (!generationPrompt) {
-    return { error: 'Could not load generation prompt' };
-  }
-
-  const result = await callGemini(
-    { promptKey: 'cambridge_pet_writing_part1_b1_generation', model: MODELS.FLASH_LITE_PREVIEW, userId },
-    (ai) =>
-      ai.models.generateContent({
-        model: MODELS.FLASH_LITE_PREVIEW,
-        contents: [{ role: 'user', parts: [{ text: generationPrompt }] }],
-        config: { responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
-      })
-  );
-
-  if (!isOk(result)) {
-    return { error: 'Could not generate the exercise' };
-  }
-
-  const rawText = result.data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
-  const parsed = safeParse(GenerationSchema, rawText);
-
-  if (!parsed) {
-    console.error(JSON.stringify({
-      event: 'pet_writing_part1_generate_parse_failed',
-      rawPreview: rawText.slice(0, 500),
-    }));
-    return { error: 'Unexpected response from the model' };
-  }
-
-  const contentPoints = parsed.content_points as [string, string, string, string];
-
-  return {
-    emailReceived: parsed.email_received,
-    contentPoints,
-    wordTarget: parsed.word_target,
-    context: parsed.context,
+/** Reads one pregenerated PET Writing Part 1 email scenario from the bank; no model call and no session row. */
+export async function generatePETEmailAction(): Promise<ActionResult<PETEmailPrompt>> {
+  const userId = await currentUserId();
+  if (!userId) return fail('unauthenticated');
+  const picked = await pickPlan({
+    exam: 'pet',
+    cefr: 'b1',
+    examPart: 'pet_writing_part1',
+    skill: 'writing',
+    schema: PetEmailPlanSchema,
+    userId,
+  });
+  if (!picked.ok) return picked;
+  const plan = picked.data.plan;
+  const framingText = await getPrompt('cambridge_pet_writing_part1_b1_framing').catch(() => FRAMING_FALLBACK);
+  return ok({
+    emailReceived: plan.email_received,
+    contentPoints: plan.content_points as [string, string, string, string],
+    wordTarget: plan.word_target,
+    context: plan.context,
     framingText,
-  };
+    bankGroupId: picked.data.groupId,
+  });
 }
 
 /** Evaluates the student's email reply; creates the session and closes it only when the evaluation succeeds. */
@@ -127,6 +91,7 @@ export async function evaluatePETEmailAction(input: {
   wordTarget: number;
   context: string;
   framingText: string;
+  bankGroupId?: string;
   userText: string;
 }): Promise<PETEmailFeedback | { error: string }> {
   const userId = await currentUserId();
@@ -174,6 +139,7 @@ export async function evaluatePETEmailAction(input: {
   const completed = await completeActivity({
     mode: 'cambridge_pet_writing_part1',
     sessionId: input.sessionId,
+    bank: bankStamp('pet_writing_part1', input.bankGroupId),
     plan: {
       kind: 'pet_writing_prompt',
       email_received: input.emailReceived,

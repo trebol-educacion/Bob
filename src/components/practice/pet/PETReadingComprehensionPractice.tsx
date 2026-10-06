@@ -14,6 +14,7 @@ import {
   type PETReadingQuestionResult,
   type PETReadingAnswer,
 } from '@/actions/modes/pet-reading-comprehension';
+import { ActivityLoadError } from '@/components/practice/ActivityLoadError';
 import type { StoredMessage } from '@/actions/messages';
 import { resolveActivityBoot } from '@/lib/activity/boot';
 
@@ -262,6 +263,7 @@ export function PETReadingComprehensionPractice({
   const [results, setResults] = useState<PETReadingQuestionResult[]>([]);
   const [correctCount, setCorrectCount] = useState(0);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [loadErrorCode, setLoadErrorCode] = useState<string | null>(null);
   const [isNewSession, setIsNewSession] = useState(false);
   const initStartedRef = useRef(false);
 
@@ -293,17 +295,17 @@ export function PETReadingComprehensionPractice({
       setIsNewSession(true);
       const result = await generatePETReadingComprehensionAction();
 
-      if ('error' in result) {
-        setErrorMsg(result.error);
+      if (!result.ok) {
+        setLoadErrorCode(result.code);
         return;
       }
 
-      setPlanToken(result.planToken);
-      setTitle(result.title);
-      setTopics(result.topics);
-      setText(result.text);
-      setQuestions(result.questions);
-      setFramingText(result.framingText);
+      setPlanToken(result.data.planToken);
+      setTitle(result.data.title);
+      setTopics(result.data.topics);
+      setText(result.data.text);
+      setQuestions(result.data.questions);
+      setFramingText(result.data.framingText);
       setPhase('ready');
     }
 
@@ -347,6 +349,8 @@ export function PETReadingComprehensionPractice({
 
   const answeredCount = questions.filter(isAnswered).length;
   const allAnswered = answeredCount === questions.length && questions.length > 0;
+
+  if (loadErrorCode) return <ActivityLoadError code={loadErrorCode} onBack={onBack} />;
 
   if (errorMsg) {
     return (

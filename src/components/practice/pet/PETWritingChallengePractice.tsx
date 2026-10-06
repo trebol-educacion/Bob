@@ -13,6 +13,7 @@ import {
   type PETWritingChallengePrompt,
   type PETWritingChallengeFeedback,
 } from '@/actions/modes/pet-writing-challenge';
+import { ActivityLoadError } from '@/components/practice/ActivityLoadError';
 import type { StoredMessage } from '@/actions/messages';
 import type { ActivityRenderProps } from '@/lib/routing';
 
@@ -218,6 +219,7 @@ export function PETWritingChallengePractice({
   const [feedback, setFeedback] = useState<PETWritingChallengeFeedback | null>(null);
   const [restoredUserText, setRestoredUserText] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [loadErrorCode, setLoadErrorCode] = useState<string | null>(null);
   const [isNewSession, setIsNewSession] = useState(false);
   const initStartedRef = useRef(false);
 
@@ -249,12 +251,12 @@ export function PETWritingChallengePractice({
       setIsNewSession(true);
       const result = await generatePETWritingChallengeAction();
 
-      if ('error' in result) {
-        setErrorMsg(result.error);
+      if (!result.ok) {
+        setLoadErrorCode(result.code);
         return;
       }
 
-      setPrompt(result);
+      setPrompt(result.data);
       setPhase('ready');
     }
 
@@ -287,6 +289,8 @@ export function PETWritingChallengePractice({
   const wordCount = countWords(text);
   const minWords = prompt?.minWords ?? 60;
   const maxWords = prompt?.maxWords ?? 100;
+
+  if (loadErrorCode) return <ActivityLoadError code={loadErrorCode} onBack={onBack} />;
 
   if (errorMsg) {
     return (

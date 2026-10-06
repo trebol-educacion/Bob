@@ -14,6 +14,7 @@ import {
   type PETEmailPrompt,
   type PETEmailFeedback,
 } from '@/actions/modes/pet-writing-part1';
+import { ActivityLoadError } from '@/components/practice/ActivityLoadError';
 import type { StoredMessage } from '@/actions/messages';
 import { useTranslations } from 'next-intl';
 
@@ -269,6 +270,7 @@ export function PETEmailWritingPractice({
   const [feedback, setFeedback] = useState<PETEmailFeedback | null>(null);
   const [restoredUserText, setRestoredUserText] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [loadErrorCode, setLoadErrorCode] = useState<string | null>(null);
   const [isNewSession, setIsNewSession] = useState(false);
   const initStartedRef = useRef(false);
 
@@ -300,12 +302,12 @@ export function PETEmailWritingPractice({
       setIsNewSession(true);
       const result = await generatePETEmailAction();
 
-      if ('error' in result) {
-        setErrorMsg(result.error);
+      if (!result.ok) {
+        setLoadErrorCode(result.code);
         return;
       }
 
-      setPrompt(result);
+      setPrompt(result.data);
       setPhase('ready');
     }
 
@@ -323,6 +325,7 @@ export function PETEmailWritingPractice({
       wordTarget: prompt.wordTarget,
       context: prompt.context,
       framingText: prompt.framingText,
+      bankGroupId: prompt.bankGroupId,
       userText: text,
     });
 
@@ -342,6 +345,8 @@ export function PETEmailWritingPractice({
   const wordCount = countWords(text);
   const MIN_WORDS = 60;
   const WARN_WORDS = 130;
+
+  if (loadErrorCode) return <ActivityLoadError code={loadErrorCode} onBack={onBack} />;
 
   if (errorMsg) {
     return (

@@ -6,11 +6,13 @@ const completeMock = vi.fn();
 const createSessionMock = vi.fn();
 const geminiMock = vi.fn();
 const promptMock = vi.fn();
+const pickContent = vi.fn();
 
 vi.mock('@/lib/session/complete', () => ({ completeActivity: (...a: unknown[]) => completeMock(...a) }));
 vi.mock('@/lib/session/lifecycle', () => ({ currentUserId: async () => 'u1' }));
 vi.mock('@/actions/sessions', () => ({ createSessionAction: (...a: unknown[]) => createSessionMock(...a) }));
 vi.mock('@/lib/prompts/db-prompts', () => ({ getPrompt: (...a: unknown[]) => promptMock(...a) }));
+vi.mock('@/lib/item-bank/content-source', () => ({ pickContent: (...a: unknown[]) => pickContent(...a) }));
 vi.mock('@/lib/gemini-client', () => ({
   callGemini: (...a: unknown[]) => geminiMock(...a),
   isOk: (r: { ok?: boolean }) => r.ok === true,
@@ -31,6 +33,10 @@ import { tryRestore as restoreComprehension } from '@/components/practice/pet/PE
 import { tryRestoreFromMessages as restoreEmail } from '@/components/practice/pet/PETEmailWritingPractice';
 import { tryRestoreFromMessages as restoreChallenge } from '@/components/practice/pet/PETWritingChallengePractice';
 import type { StoredMessage } from '@/actions/messages';
+
+function banked(plan: unknown) {
+  return { ok: true, data: { kind: 'group', group: { id: 'g1', metadata: { plan } }, items: [] } };
+}
 
 function geminiJson(payload: unknown) {
   return { ok: true, data: { candidates: [{ content: { parts: [{ text: JSON.stringify(payload) }] } }] } };
@@ -53,6 +59,7 @@ beforeEach(() => {
   completeMock.mockReset().mockResolvedValue({ ok: true, data: { sessionId: 's1', score10: 8 } });
   createSessionMock.mockReset();
   geminiMock.mockReset();
+  pickContent.mockReset();
   promptMock.mockReset().mockResolvedValue('prompt');
 });
 
@@ -72,9 +79,10 @@ const SHORT_ITEMS = Array.from({ length: 5 }, (_, i) => ({
 
 describe('PET Reading Part 1', () => {
   it('generates without creating a session or persisting', async () => {
-    geminiMock.mockResolvedValue(geminiJson({ items: SHORT_ITEMS }));
+    pickContent.mockResolvedValue(banked({ items: SHORT_ITEMS }));
     const result = await generatePETShortTextsAction();
-    expect('error' in result).toBe(false);
+    expect(result).toMatchObject({ ok: true, data: { items: [{ bank_group_id: 'g1' }, {}, {}, {}, {}] } });
+    expect(geminiMock).not.toHaveBeenCalled();
     expect(createSessionMock).not.toHaveBeenCalled();
     expect(completeMock).not.toHaveBeenCalled();
   });
@@ -94,6 +102,12 @@ describe('PET Reading Part 1', () => {
     expect(restored?.items).toHaveLength(5);
     expect(restored?.correctCount).toBe(4);
     expect(restored?.results).toHaveLength(5);
+  });
+
+  it('returns no_content with an empty bank without calling Gemini', async () => {
+    pickContent.mockResolvedValue({ ok: false, code: 'no_content', retryable: false });
+    expect(await generatePETShortTextsAction()).toMatchObject({ ok: false, code: 'no_content' });
+    expect(geminiMock).not.toHaveBeenCalled();
   });
 
   it('reports a failed completion instead of pretending success', async () => {
@@ -127,9 +141,11 @@ const COMPREHENSION_ANSWERS = {
 
 describe('PET Reading comprehension', () => {
   it('seals the answer key, scores server-side and restores', async () => {
-    geminiMock.mockResolvedValue(geminiJson(COMPREHENSION));
-    const generated = await generatePETReadingComprehensionAction();
-    if ('error' in generated) throw new Error(generated.error);
+    pickContent.mockResolvedValue(banked(COMPREHENSION));
+    const generatedResult = await generatePETReadingComprehensionAction();
+    if (!generatedResult.ok) throw new Error(generatedResult.code);
+    const generated = generatedResult.data;
+    expect(geminiMock).not.toHaveBeenCalled();
     expect(JSON.stringify(generated)).not.toContain('"answer"');
     expect(createSessionMock).not.toHaveBeenCalled();
 
@@ -140,6 +156,7 @@ describe('PET Reading comprehension', () => {
     if ('error' in result) throw new Error(result.error);
     expect(result.correct_count).toBe(10);
     expect(completeMock.mock.calls[0][0].mode).toBe('cambridge_pet_reading_comprehension');
+    expect(completeMock.mock.calls[0][0].bank).toEqual({ exam_part: 'pet_reading_comprehension', bank_group_id: 'g1' });
     const restored = restoreComprehension(completionMessages());
     expect(restored?.questions).toHaveLength(10);
     expect(restored?.correctCount).toBe(10);
@@ -162,11 +179,12 @@ describe('PET Writing Part 1', () => {
   };
 
   it('generate does not persist', async () => {
-    geminiMock.mockResolvedValue(
-      geminiJson({ email_received: prompt.emailReceived, content_points: prompt.contentPoints, word_target: 100, context: 'c' }),
+    pickContent.mockResolvedValue(
+      banked({ email_received: prompt.emailReceived, content_points: prompt.contentPoints, word_target: 100, context: 'c' }),
     );
     const result = await generatePETEmailAction();
-    expect('error' in result).toBe(false);
+    expect(result).toMatchObject({ ok: true, data: { bankGroupId: 'g1', wordTarget: 100 } });
+    expect(geminiMock).not.toHaveBeenCalled();
     expect(createSessionMock).not.toHaveBeenCalled();
     expect(completeMock).not.toHaveBeenCalled();
   });
@@ -216,11 +234,12 @@ describe('PET Writing Challenge', () => {
   };
 
   it('generate does not persist', async () => {
-    geminiMock.mockResolvedValue(
-      geminiJson({ format: 'email', title: 't', theme: 'th', stimulus: 'st', task: 'task', guide_points: ['a', 'b', 'c'], min_words: 60, max_words: 100 }),
+    pickContent.mockResolvedValue(
+      banked({ format: 'email', title: 't', theme: 'th', stimulus: 'st', task: 'task', guide_points: ['a', 'b', 'c'], min_words: 60, max_words: 100 }),
     );
     const result = await generatePETWritingChallengeAction();
-    expect('error' in result).toBe(false);
+    expect(result).toMatchObject({ ok: true, data: { bankGroupId: 'g1', title: 't' } });
+    expect(geminiMock).not.toHaveBeenCalled();
     expect(createSessionMock).not.toHaveBeenCalled();
     expect(completeMock).not.toHaveBeenCalled();
   });

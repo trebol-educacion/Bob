@@ -1,32 +1,13 @@
 'use server';
 
-import { z } from 'zod';
 import { getPrompt } from '@/lib/prompts/db-prompts';
-import { callGemini, isOk } from '@/lib/gemini-client';
+import { bankStamp, pickPlan } from '@/lib/item-bank/plan-bank';
+import { PetShortTextsPlanSchema, type PetShortTextsPlan } from '@/lib/bank-plans/pet-reading-part1';
+import { fail, ok, type ActionResult } from '@/lib/result';
 import { completeActivity } from '@/lib/session/complete';
 import { currentUserId } from '@/lib/session/lifecycle';
-import { MODELS } from '@/lib/models';
 
-const OptionSchema = z.object({
-  id: z.enum(['A', 'B', 'C']),
-  text: z.string(),
-});
-
-const ShortTextItemSchema = z.object({
-  number: z.number().int().min(1).max(5),
-  text_body: z.string(),
-  text_context: z.string(),
-  question: z.string(),
-  options: z.array(OptionSchema).length(3),
-  correct_option: z.enum(['A', 'B', 'C']),
-  explanation: z.string(),
-});
-
-const GenerationSchema = z.object({
-  items: z.array(ShortTextItemSchema).min(5).max(5),
-});
-
-export type ShortTextOption = z.infer<typeof OptionSchema>;
+export type ShortTextOption = PetShortTextsPlan['items'][number]['options'][number];
 
 /** A single short-text item as returned to the client. */
 export interface ShortTextItem {
@@ -37,6 +18,7 @@ export interface ShortTextItem {
   options: ShortTextOption[];
   correct_option: 'A' | 'B' | 'C';
   explanation: string;
+  bank_group_id?: string;
 }
 
 /** Full result of a successful generation call. */
@@ -62,54 +44,25 @@ export interface PETShortTextsSubmitResult {
   results: ShortTextAnswerResult[];
 }
 
-function safeParse<T>(schema: z.ZodType<T>, raw: string): T | null {
-  try {
-    return schema.parse(JSON.parse(raw));
-  } catch {
-    return null;
-  }
-}
+const FRAMING_FALLBACK =
+  'You will read 5 short texts (notices, emails, messages, postcards). For each one, choose the meaning that fits best, A, B or C.';
 
-/** Generates 5 PET B1 short-text items and a framing text; persists nothing until the first submit. */
-export async function generatePETShortTextsAction(): Promise<PETShortTextsResult | { error: string }> {
-  const userId = (await currentUserId()) ?? undefined;
-
-  const [generationPrompt, framingText] = await Promise.all([
-    getPrompt('cambridge_pet_reading_part1_b1_generation').catch(() => null),
-    getPrompt('cambridge_pet_reading_part1_b1_framing').catch(
-      () => 'You will read 5 short texts (notices, emails, messages, postcards). For each one, choose the meaning that fits best, A, B or C.'
-    ),
-  ]);
-
-  if (!generationPrompt) {
-    return { error: 'Could not load generation prompt' };
-  }
-
-  const geminiResult = await callGemini(
-    { promptKey: 'cambridge_pet_reading_part1_b1_generation', model: MODELS.FLASH_LITE_PREVIEW, userId },
-    (ai) =>
-      ai.models.generateContent({
-        model: MODELS.FLASH_LITE_PREVIEW,
-        contents: [{ role: 'user', parts: [{ text: generationPrompt }] }],
-        config: { responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
-      })
-  );
-
-  if (!isOk(geminiResult)) {
-    return { error: 'Could not generate items' };
-  }
-
-  const rawText = geminiResult.data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
-  const parsed = safeParse(GenerationSchema, rawText);
-
-  if (!parsed) {
-    return { error: 'Unexpected model response' };
-  }
-
-  return {
-    items: parsed.items,
-    framingText,
-  };
+/** Reads one pregenerated set of 5 short-text items from the bank; no model call and no session row. */
+export async function generatePETShortTextsAction(): Promise<ActionResult<PETShortTextsResult>> {
+  const userId = await currentUserId();
+  if (!userId) return fail('unauthenticated');
+  const picked = await pickPlan({
+    exam: 'pet',
+    cefr: 'b1',
+    examPart: 'pet_reading_part1',
+    skill: 'reading',
+    schema: PetShortTextsPlanSchema,
+    userId,
+  });
+  if (!picked.ok) return picked;
+  const framingText = await getPrompt('cambridge_pet_reading_part1_b1_framing').catch(() => FRAMING_FALLBACK);
+  const items = picked.data.plan.items.map((item) => ({ ...item, bank_group_id: picked.data.groupId }));
+  return ok({ items, framingText });
 }
 
 /** Evaluates student answers deterministically (no LLM); creates the session on this first turn and closes it. */
@@ -136,6 +89,7 @@ export async function submitPETShortTextsAnswersAction(input: {
   const completed = await completeActivity({
     mode: 'cambridge_pet_reading_part1',
     sessionId: input.sessionId,
+    bank: bankStamp('pet_reading_part1', input.items[0]?.bank_group_id),
     plan: { kind: 'reading_prompt', items: input.items, framing_text: input.framingText },
     answers: results.map((r) => ({
       kind: 'reading_answer',

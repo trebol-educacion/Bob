@@ -14,6 +14,7 @@ import {
   type ShortTextAnswerResult,
 } from '@/actions/modes/pet-reading-part1';
 import type { StoredMessage } from '@/actions/messages';
+import { ActivityLoadError } from '@/components/practice/ActivityLoadError';
 import { useTranslations } from 'next-intl';
 
 export interface PETShortTextsPracticeProps {
@@ -255,6 +256,7 @@ export function PETShortTextsPractice({
   const [results, setResults] = useState<ShortTextAnswerResult[]>([]);
   const [correctCount, setCorrectCount] = useState(0);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [loadErrorCode, setLoadErrorCode] = useState<string | null>(null);
   const [isNewSession, setIsNewSession] = useState(false);
   const initStartedRef = useRef(false);
 
@@ -286,13 +288,13 @@ export function PETShortTextsPractice({
       setIsNewSession(true);
       const result = await generatePETShortTextsAction();
 
-      if ('error' in result) {
-        setErrorMsg(result.error);
+      if (!result.ok) {
+        setLoadErrorCode(result.code);
         return;
       }
 
-      setItems(result.items);
-      setFramingText(result.framingText);
+      setItems(result.data.items);
+      setFramingText(result.data.framingText);
       setPhase('ready');
     }
 
@@ -329,6 +331,8 @@ export function PETShortTextsPractice({
 
   const answeredCount = Object.keys(answers).length;
   const allAnswered = answeredCount === items.length && items.length > 0;
+
+  if (loadErrorCode) return <ActivityLoadError code={loadErrorCode} onBack={onBack} />;
 
   if (errorMsg) {
     return (
