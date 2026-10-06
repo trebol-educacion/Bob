@@ -350,6 +350,7 @@ export function AppShellRoutes({
           className="flex-1 flex flex-col min-h-0"
         >
           <ChallengeHome
+            studentLevel={cefrActiveLevel}
             onSelectFramework={() => setAppState('challenge-running')}
             onBack={() => setAppState('dashboard')}
           />
