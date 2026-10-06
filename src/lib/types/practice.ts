@@ -84,6 +84,18 @@ export type ModeKey = string;
  */
 export type ActivityStatus = 'enabled' | 'coming_soon' | 'hidden';
 
+export interface CardPresentationRules {
+  allowRepeatOptions?: boolean;
+}
+
+export interface CardPresentation {
+  title: string;
+  description: string;
+  minutes: number;
+  iconKey: string;
+  rules: CardPresentationRules;
+}
+
 export interface DynamicCard {
   framework: string;
   exam_part: string;
@@ -94,6 +106,7 @@ export interface DynamicCard {
   status: ActivityStatus;
   /** Skill bucket from bob_prompts.skill. Used to filter catalog by selected skill. */
   skill: string;
+  presentation?: CardPresentation;
 }
 
 export type ExamLevel = 'a2' | 'b1' | 'b2' | 'toefl';

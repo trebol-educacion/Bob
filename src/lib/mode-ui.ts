@@ -2,6 +2,7 @@ import type { DynamicCard } from '@/lib/types/practice';
 
 /** Returns the lucide-react icon name for a given DynamicCard. */
 export function getModeIcon(card: DynamicCard): string {
+  if (card.presentation) return card.presentation.iconKey;
   const PART_ICON: Record<string, string> = {
     starters_part1: 'ListenAndPoint',
     starters_part2: 'LookAndAnswer',
@@ -105,7 +106,7 @@ function estimatedMinutes(card: DynamicCard): number {
 /** Returns the badge string for a card (e.g. "Pre-A1 · 3 min"). */
 export function getModeBadge(card: DynamicCard): string {
   const label = cefrLabel(card);
-  const mins = estimatedMinutes(card);
+  const mins = card.presentation?.minutes ?? estimatedMinutes(card);
   return label ? `${label} · ${mins} min` : `${mins} min`;
 }
 
@@ -189,12 +190,12 @@ export function getModeSortWeight(card: DynamicCard): number {
 
 /** Returns the display title for a card. */
 export function getModeTitle(card: DynamicCard): string {
-  return card.label;
+  return card.presentation?.title ?? card.label;
 }
 
 /** Returns the display description for a card. */
 export function getModeDescription(card: DynamicCard): string {
-  return card.description ?? '';
+  return card.presentation?.description ?? card.description ?? '';
 }
 
 export type CambridgeFamily = 'starters' | 'movers' | 'flyers' | 'ket' | 'pet' | 'fce' | 'cae' | 'cpe';
