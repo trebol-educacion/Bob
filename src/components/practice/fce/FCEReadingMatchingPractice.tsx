@@ -5,6 +5,7 @@ import { startFCEReadingPart7Action, submitFCEReadingPart7Action } from '@/actio
 import { GroupExerciseFrame } from '@/components/practice/group-exercise/GroupExerciseFrame';
 import { toMatchingReview, type GroupPracticeProps, choiceGroupApi } from '@/components/practice/group-exercise/types';
 import { useGroupExercise } from '@/components/practice/group-exercise/useGroupExercise';
+import { useActivityRules } from '@/hooks/useActivityRules';
 import { MatchingBoard } from '@/components/practice/matching';
 
 const API = choiceGroupApi(startFCEReadingPart7Action, submitFCEReadingPart7Action);
@@ -12,6 +13,7 @@ const API = choiceGroupApi(startFCEReadingPart7Action, submitFCEReadingPart7Acti
 export type FCEReadingMatchingPracticeProps = GroupPracticeProps;
 
 export function FCEReadingMatchingPractice({ onBack, onOpenDashboard, ...session }: FCEReadingMatchingPracticeProps) {
+  const rules = useActivityRules('fce_reading_part7');
   const controller = useGroupExercise({ api: API, ...session });
   const { exercise, answers, result, phase, setAnswer } = controller;
 
@@ -34,6 +36,7 @@ export function FCEReadingMatchingPractice({ onBack, onOpenDashboard, ...session
             answers={answers}
             onAnswer={phase === 'ready' ? setAnswer : undefined}
             review={review}
+            allowRepeatOptions={rules.allowRepeatOptions ?? true}
           />
         </>
       )}

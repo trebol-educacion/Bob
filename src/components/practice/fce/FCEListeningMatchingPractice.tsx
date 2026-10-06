@@ -6,6 +6,7 @@ import { GroupAudioPlayer } from '@/components/practice/group-exercise/GroupAudi
 import { GroupExerciseFrame } from '@/components/practice/group-exercise/GroupExerciseFrame';
 import { toMatchingReview, type GroupPracticeProps, choiceGroupApi } from '@/components/practice/group-exercise/types';
 import { useGroupExercise } from '@/components/practice/group-exercise/useGroupExercise';
+import { useActivityRules } from '@/hooks/useActivityRules';
 import { MatchingBoard } from '@/components/practice/matching';
 
 const API = choiceGroupApi(startFCEListeningPart3Action, submitFCEListeningPart3Action);
@@ -13,6 +14,7 @@ const API = choiceGroupApi(startFCEListeningPart3Action, submitFCEListeningPart3
 export type FCEListeningMatchingPracticeProps = GroupPracticeProps;
 
 export function FCEListeningMatchingPractice({ onBack, onOpenDashboard, ...session }: FCEListeningMatchingPracticeProps) {
+  const rules = useActivityRules('fce_listening_part3');
   const controller = useGroupExercise({ api: API, ...session });
   const { exercise, answers, result, phase, setAnswer } = controller;
 
@@ -37,6 +39,7 @@ export function FCEListeningMatchingPractice({ onBack, onOpenDashboard, ...sessi
             answers={answers}
             onAnswer={phase === 'ready' ? setAnswer : undefined}
             review={review}
+            allowRepeatOptions={rules.allowRepeatOptions ?? true}
             renderQuestionExtra={(question) => (
               <GroupAudioPlayer audioPath={audioById.get(question.id) ?? null} label={`Play ${question.text}`} />
             )}

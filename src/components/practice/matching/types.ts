@@ -24,4 +24,5 @@ export interface MatchingBoardProps {
   onAnswer?: (questionId: string, key: string) => void;
   review?: Record<string, MatchingReview>;
   renderQuestionExtra?: (question: MatchingQuestion) => React.ReactNode;
+  allowRepeatOptions?: boolean;
 }
