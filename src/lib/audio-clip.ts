@@ -66,7 +66,12 @@ export function createAudioClip(
       if (disposed) return;
       handlers.onLoading?.();
       armTimer();
-      Promise.resolve(audio.play()).catch((error: unknown) => {
+      const started: Promise<void> | undefined = audio.play();
+      if (!started || typeof started.catch !== 'function') {
+        fail();
+        return;
+      }
+      started.catch((error: unknown) => {
         if (error instanceof Error && error.name === 'AbortError') return;
         fail();
       });
@@ -91,7 +96,7 @@ export interface ClipPlayback {
 
 /**
  * @param src - audio url or data uri
- * @param hooks - onStart when playback begins, onError on failure
+ * @param hooks - onStart just before playback is requested, onError on failure
  * @returns promise resolving when playback ends, fails or is stopped; never rejects
  */
 export function playClip(src: string, hooks: { onStart?: () => void; onError?: () => void } = {}): ClipPlayback {
@@ -100,13 +105,13 @@ export function playClip(src: string, hooks: { onStart?: () => void; onError?: (
     settle = resolve;
   });
   const clip = createAudioClip(src, {
-    onPlaying: () => hooks.onStart?.(),
     onEnded: () => settle('ended'),
     onError: () => {
       hooks.onError?.();
       settle('error');
     },
   });
+  hooks.onStart?.();
   clip.play();
   return {
     finished,

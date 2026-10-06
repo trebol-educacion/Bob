@@ -1,5 +1,6 @@
 import { generateSpeechAction } from '@/actions/gemini';
 import { pcmToWavBase64 } from '@/lib/audio';
+import { playClip } from '@/lib/audio-clip';
 
 function speakWithBrowserTts(text: string): void {
   const utterance = new SpeechSynthesisUtterance(text);
@@ -15,8 +16,8 @@ export async function playSpeech(text: string): Promise<void> {
       return;
     }
     const audioUrl = pcmToWavBase64(data, mimeType);
-    const audio = new Audio(audioUrl);
-    audio.play();
+    const playback = playClip(audioUrl, { onError: () => speakWithBrowserTts(text) });
+    void playback.finished;
   } catch {
     speakWithBrowserTts(text);
   }

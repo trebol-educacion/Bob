@@ -5,6 +5,7 @@ import { motion } from 'motion/react';
 import { useTranslations } from 'next-intl';
 import { generateSpeechAction } from '@/actions/gemini';
 import { pcmToWavBase64 } from '@/lib/audio';
+import { playClip } from '@/lib/audio-clip';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
 
 interface PhraseCardProps {
@@ -24,21 +25,23 @@ export function PhraseCard({ phrase, onAudioRecorded }: PhraseCardProps) {
     },
   });
 
+  const speakWithBrowser = () => {
+    const utterance = new SpeechSynthesisUtterance(phrase);
+    utterance.lang = 'en-US';
+    window.speechSynthesis.speak(utterance);
+  };
+
   const handleListen = async () => {
     if (isGeneratingAudio) return;
-    
+
     setIsGeneratingAudio(true);
     try {
       const { data, mimeType } = await generateSpeechAction(phrase);
       const audioUrl = pcmToWavBase64(data, mimeType);
-      const audio = new Audio(audioUrl);
-      await audio.play();
-    } catch (error) {
-      console.error('Error playing phrase audio:', error);
-      // Fallback to basic speech synthesis if Gemini fails
-      const utterance = new SpeechSynthesisUtterance(phrase);
-      utterance.lang = 'en-US';
-      window.speechSynthesis.speak(utterance);
+      const outcome = await playClip(audioUrl).finished;
+      if (outcome === 'error') speakWithBrowser();
+    } catch {
+      speakWithBrowser();
     } finally {
       setIsGeneratingAudio(false);
     }

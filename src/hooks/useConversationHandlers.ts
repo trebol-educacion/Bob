@@ -10,6 +10,7 @@ import {
   checkTopicIsAppropriateAction,
 } from '@/actions/gemini';
 import { pcmToWavBase64, blobToBase64 } from '@/lib/audio';
+import { playClip } from '@/lib/audio-clip';
 import { finishGenericSessionAction, recordGenericTurnAction } from '@/actions/generic-session';
 import type { CefrLevel } from '@/lib/types/practice';
 import type { UseConversationStateReturn } from './useConversationState';
@@ -78,11 +79,9 @@ export function useConversationHandlers({
     try {
       const { data, mimeType } = await generateSpeechAction(text);
       const audioUrl = pcmToWavBase64(data, mimeType);
-      const audio = new Audio(audioUrl);
-
       conv.incrementPlayCount(index);
 
-      await audio.play();
+      await playClip(audioUrl).finished;
     } catch (error) {
       console.error('Error playing audio:', error);
     } finally {

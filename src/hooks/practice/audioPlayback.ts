@@ -1,3 +1,5 @@
+import { createAudioClip } from '@/lib/audio-clip';
+
 export const AUDIO_GENERATION_TIMEOUT_MS = 15000;
 export const AUDIO_PLAYBACK_BLOCK_TIMEOUT_MS = 2500;
 
@@ -28,12 +30,19 @@ export function withTimeout<T>(promise: Promise<T>, ms: number, timeoutMessage: 
  * @param url string
  * @returns Promise<boolean>
  */
-export async function playAudioSafely(url: string): Promise<boolean> {
-  try {
-    await withTimeout(new Audio(url).play(), AUDIO_PLAYBACK_BLOCK_TIMEOUT_MS, 'audio-playback-blocked');
-    return true;
-  } catch (error) {
-    console.warn('[practice audio] playback safeguard:', error instanceof Error ? error.message : error);
-    return false;
-  }
+export function playAudioSafely(url: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    const clip = createAudioClip(
+      url,
+      {
+        onPlaying: () => resolve(true),
+        onError: () => {
+          console.warn('[practice audio] playback safeguard: audio-playback-blocked');
+          resolve(false);
+        },
+      },
+      AUDIO_PLAYBACK_BLOCK_TIMEOUT_MS,
+    );
+    clip.play();
+  });
 }
