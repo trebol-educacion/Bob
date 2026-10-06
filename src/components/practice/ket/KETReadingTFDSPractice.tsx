@@ -491,7 +491,7 @@ export function KETReadingTFDSPractice({
             ))}
 
             <div className="flex justify-center pt-2">
-              <CelebrationCard score={correctCount} scoreMax={exercise.statements.length} feedback="Great reading practice!" onAction={onOpenDashboard} actionLabel="See my progress" animate={isNewSession} />
+              <CelebrationCard score={correctCount} scoreMax={exercise.statements.length} onAction={onOpenDashboard} actionLabel="See my progress" animate={isNewSession} />
             </div>
           </div>
         </div>

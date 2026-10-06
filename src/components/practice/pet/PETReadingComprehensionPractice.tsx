@@ -491,7 +491,6 @@ export function PETReadingComprehensionPractice({
             <CelebrationCard
               score={correctCount}
               scoreMax={10}
-              feedback="Great reading practice!"
               onAction={onOpenDashboard}
               actionLabel="See my progress"
               animate={isNewSession}

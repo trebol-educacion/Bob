@@ -573,7 +573,6 @@ export function PETListeningSituationalPractice({
               <CelebrationCard
                 score={correctCount}
                 scoreMax={items.length}
-                feedback="Great listening practice!"
                 onAction={onOpenDashboard}
                 actionLabel="See my progress"
                 animate={isNewSession}

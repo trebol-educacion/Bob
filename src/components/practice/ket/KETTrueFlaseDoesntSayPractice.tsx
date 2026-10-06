@@ -546,7 +546,6 @@ export function KETTrueFalseDoesntSayPractice({
               <CelebrationCard
                 score={correctCount}
                 scoreMax={exercise.statements.length}
-                feedback="Great listening practice!"
                 onAction={onOpenDashboard}
                 actionLabel="See my progress"
                 animate={isNewSession}

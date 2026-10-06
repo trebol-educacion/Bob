@@ -123,7 +123,6 @@ export function FCEGroupedReadingPractice({
               <CelebrationCard
                 score={score.correct}
                 scoreMax={score.total}
-                feedback={t('fce.grouped.celebrationFeedback')}
                 onAction={onOpenDashboard}
                 actionLabel={t('fce.grouped.celebrationAction')}
                 animate={state.isNewSession}

@@ -79,7 +79,6 @@ export function GroupExerciseFrame({ controller, title, subtitle, onBack, onOpen
               <CelebrationCard
                 score={result.correct}
                 scoreMax={result.total}
-                feedback="Keep practising to sharpen your B2 skills."
                 onAction={onOpenDashboard}
                 actionLabel="Go to dashboard"
                 animate={isNewSession}

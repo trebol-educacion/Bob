@@ -501,7 +501,6 @@ export function PETListeningGapFillPractice({
               <CelebrationCard
                 score={correctCount}
                 scoreMax={totalGaps}
-                feedback="Great listening practice!"
                 onAction={onOpenDashboard}
                 actionLabel="See my progress"
                 animate={isNewSession}

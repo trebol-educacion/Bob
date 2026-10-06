@@ -198,7 +198,6 @@ function FeedbackPanel({
         score={coveredCount}
         scoreMax={3}
         hideGrade
-        feedback={t('fce.essay.celebrationFeedback')}
         onAction={onOpenDashboard}
         actionLabel={t('fce.essay.celebrationAction')}
         animate={animate}

@@ -7,24 +7,38 @@ vi.mock('next-intl', () => ({
   useTranslations: () => (key: string) => key,
 }));
 
-import { scoreHeadlineTier } from '@/lib/writing/score-headline';
+import { scoreTier, toTenScale } from '@/lib/score/headline';
+import ylMessages from '../../messages/en/yl.json';
 import { ScoreHeadline } from '@/components/practice/writing/FceScoreCard';
 import messages from '../../messages/en/cambridge.json';
 
 afterEach(cleanup);
 
-describe('scoreHeadlineTier', () => {
+describe('scoreTier', () => {
   it.each([
-    [10, 'excellent'],
-    [8, 'excellent'],
+    [10, 'perfect'],
+    [8, 'great'],
     [7.9, 'good'],
     [6, 'good'],
     [5.5, 'fair'],
     [4, 'fair'],
-    [3.9, 'keepGoing'],
-    [0, 'keepGoing'],
+    [3.9, 'keep'],
+    [0, 'keep'],
   ])('%s -> %s', (score, tier) => {
-    expect(scoreHeadlineTier(score)).toBe(tier);
+    expect(scoreTier(score)).toBe(tier);
+  });
+
+  it('converts raw points to the 0-10 scale', () => {
+    expect(toTenScale(5, 8)).toBe(6.3);
+    expect(toTenScale(0, 0)).toBe(0);
+  });
+
+  it('every celebration tier has heading and sub text', () => {
+    const celebration = ylMessages.celebration as Record<string, { heading?: string; sub?: string }>;
+    for (const tier of ['perfect', 'great', 'good', 'fair', 'keep']) {
+      expect(celebration[tier]?.heading).toBeTruthy();
+      expect(celebration[tier]?.sub).toBeTruthy();
+    }
   });
 
   it('every tier has an English text', () => {

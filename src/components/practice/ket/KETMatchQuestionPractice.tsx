@@ -594,7 +594,7 @@ export function KETMatchQuestionPractice({
             ))}
 
             <div className="flex justify-center pt-2">
-              <CelebrationCard score={correctCount} scoreMax={exercise.questions.length} feedback="Great reading practice!" onAction={onOpenDashboard} actionLabel="See my progress" animate={isNewSession} />
+              <CelebrationCard score={correctCount} scoreMax={exercise.questions.length} onAction={onOpenDashboard} actionLabel="See my progress" animate={isNewSession} />
             </div>
           </div>
         </div>

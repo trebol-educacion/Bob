@@ -741,7 +741,6 @@ export function KETShortTalksPractice({
               <CelebrationCard
                 score={correctCount}
                 scoreMax={exercise.people.length}
-                feedback="Great listening practice!"
                 onAction={onOpenDashboard}
                 actionLabel="See my progress"
                 animate={isNewSession}

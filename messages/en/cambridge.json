@@ -68,7 +68,6 @@
       "incorrectBadge": "Incorrect",
       "correctAnswerLabel": "Correct answer:",
       "explanationLabel": "Why:",
-      "celebrationFeedback": "Great work reading those signs! Keep practising to get even faster.",
       "celebrationAction": "See my activities"
     },
     "listenAndChoose": {
@@ -87,7 +86,6 @@
       "listenAgain": "Listen again",
       "showTranscript": "See conversation transcript",
       "hideTranscript": "Hide transcript",
-      "celebrationFeedback": "Great listening! Keep practising to catch every word.",
       "celebrationAction": "See my activities",
       "framingFallback": "You will hear 5 short conversations. After each one, choose the picture that matches what you heard, A, B or C."
     },
@@ -158,7 +156,6 @@
       "incorrectBadge": "Incorrect",
       "correctAnswerLabel": "Correct answer:",
       "explanationLabel": "Why:",
-      "celebrationFeedback": "Well done! Keep practising collocations and phrasal verbs to master B2 vocabulary.",
       "celebrationAction": "See my activities"
     },
     "grouped": {
@@ -177,7 +174,6 @@
       "keywordHint": "Use the keyword unchanged. Write between 2 and 5 words.",
       "sentenceBankTitle": "Missing sentences",
       "markLabel": "Mark: {score} / 10",
-      "celebrationFeedback": "Review the corrections above and try another exercise to keep improving.",
       "celebrationAction": "See my activities",
       "parts": {
         "fce_reading_part2": {
@@ -242,7 +238,6 @@
       "viewModelAnswer": "View model answer",
       "hideModelAnswer": "Hide model answer",
       "modelAnswerTitle": "Model answer (B2 level)",
-      "celebrationFeedback": "Well done writing your essay! Keep practising to cover all 3 notes with a strong, balanced argument.",
       "celebrationAction": "See my activities"
     },
     "pictureDescription": {
@@ -300,7 +295,6 @@
       "showModelAnswer": "See a model answer",
       "hideModelAnswer": "Hide model answer",
       "modelAnswerTitle": "Model answer (B2 level)",
-      "celebrationFeedback": "Nice work comparing the pictures! Keep practising to cover all 6 points fluently.",
       "celebrationAction": "See my progress",
       "finishedTitle": "Long Turn complete"
     },
@@ -356,7 +350,6 @@
       "incorrectBadge": "Incorrect",
       "correctAnswerLabel": "Correct answer:",
       "explanationLabel": "Why:",
-      "celebrationFeedback": "Well done reading those texts! Keep practising your comprehension skills.",
       "celebrationAction": "See my activities"
     },
     "pictureDescription": {
@@ -409,7 +402,6 @@
       "showModelAnswer": "See a model answer",
       "hideModelAnswer": "Hide model answer",
       "modelAnswerTitle": "Model answer (B1 level)",
-      "celebrationFeedback": "Nice work describing the picture! Keep practising to cover all 8 points fluently.",
       "celebrationAction": "See my progress",
       "finishedTitle": "Description complete"
     },
@@ -433,7 +425,6 @@
       "toImprove": "To improve",
       "viewModelAnswer": "View model answer",
       "hideModelAnswer": "Hide model answer",
-      "celebrationFeedback": "Well done writing your email! Keep practising to cover all 4 points perfectly.",
       "celebrationAction": "See my activities"
     }
   }

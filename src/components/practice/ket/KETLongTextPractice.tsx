@@ -497,7 +497,7 @@ export function KETLongTextPractice({
             })}
 
             <div className="flex justify-center pt-2">
-              <CelebrationCard score={correctCount} scoreMax={exercise.items.length} feedback="Great reading practice!" onAction={onOpenDashboard} actionLabel="See my progress" animate={isNewSession} />
+              <CelebrationCard score={correctCount} scoreMax={exercise.items.length} onAction={onOpenDashboard} actionLabel="See my progress" animate={isNewSession} />
             </div>
           </div>
         </div>

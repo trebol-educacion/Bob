@@ -402,7 +402,6 @@ export function FCEShortExtractsPractice({
             <CelebrationCard
               score={score}
               scoreMax={ITEMS_PER_SESSION}
-              feedback="Great work! Keep practising to sharpen your listening skills."
               onAction={onOpenDashboard}
               actionLabel="Go to dashboard"
               animate={isNewSession}

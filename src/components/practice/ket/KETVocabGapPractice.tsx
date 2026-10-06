@@ -448,7 +448,6 @@ export function KETVocabGapPractice({
               <CelebrationCard
                 score={correctCount}
                 scoreMax={exercise.items.length}
-                feedback="Great reading practice!"
                 onAction={onOpenDashboard}
                 actionLabel="See my progress"
                 animate={isNewSession}

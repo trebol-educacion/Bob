@@ -583,7 +583,6 @@ export function KETSignsAndNoticesPractice({
               <CelebrationCard
                 score={correctCount}
                 scoreMax={items.length || 6}
-                feedback={t('ket.signsAndNotices.celebrationFeedback')}
                 onAction={onOpenDashboard}
                 actionLabel={t('ket.signsAndNotices.celebrationAction')}
                 animate={isNewSession}

@@ -815,7 +815,6 @@ export function PETPictureDescriptionPractice({
               score={coverageHits}
               scoreMax={8}
               hideGrade
-              feedback={t('pet.pictureDescription.celebrationFeedback')}
               onAction={onOpenDashboard}
               actionLabel={t('pet.pictureDescription.celebrationAction')}
               animate={isNewSession}

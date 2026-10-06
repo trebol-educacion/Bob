@@ -310,7 +310,6 @@ export function FCEMultipleChoiceClozePractice({
             <CelebrationCard
               score={correctCount}
               scoreMax={8}
-              feedback={t('fce.cloze.celebrationFeedback')}
               onAction={onOpenDashboard}
               actionLabel={t('fce.cloze.celebrationAction')}
               animate={isNewSession}

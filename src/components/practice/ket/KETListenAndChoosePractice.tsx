@@ -662,7 +662,6 @@ export function KETListenAndChoosePractice({
             <CelebrationCard
               score={correctCount}
               scoreMax={5}
-              feedback={t('ket.listenAndChoose.celebrationFeedback')}
               onAction={onOpenDashboard}
               actionLabel={t('ket.listenAndChoose.celebrationAction')}
               animate={isNewSession}

@@ -202,7 +202,6 @@ function FeedbackPanel({
         score={coveredCount}
         scoreMax={4}
         hideGrade
-        feedback={t('pet.emailWriting.celebrationFeedback')}
         onAction={onOpenDashboard}
         actionLabel={t('pet.emailWriting.celebrationAction')}
         animate={animate}

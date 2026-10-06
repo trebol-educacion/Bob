@@ -597,7 +597,6 @@ export function PETListeningTrueFalseJustifyPractice({
               <CelebrationCard
                 score={score}
                 scoreMax={scoreMax}
-                feedback="Great listening practice!"
                 onAction={onOpenDashboard}
                 actionLabel="See my progress"
                 animate={isNewSession}

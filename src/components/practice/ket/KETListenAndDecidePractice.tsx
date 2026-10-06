@@ -614,7 +614,6 @@ export function KETListenAndDecidePractice({
               <CelebrationCard
                 score={correctCount}
                 scoreMax={exercise.items.length}
-                feedback="Great listening practice!"
                 onAction={onOpenDashboard}
                 actionLabel="See my progress"
                 animate={isNewSession}

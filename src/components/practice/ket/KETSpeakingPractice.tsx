@@ -472,7 +472,6 @@ export function KETSpeakingPractice({
                 <CelebrationCard
                   score={rubricTotal(feedback.rubric)}
                   scoreMax={16}
-                  feedback="Great speaking practice!"
                   onAction={onOpenDashboard}
                   actionLabel="See my progress"
                   animate={true}
@@ -481,7 +480,6 @@ export function KETSpeakingPractice({
                 <CelebrationCard
                   score={feedback.understood ? 1 : 0}
                   scoreMax={1}
-                  feedback="Great speaking practice!"
                   onAction={onOpenDashboard}
                   actionLabel="See my progress"
                   animate={true}

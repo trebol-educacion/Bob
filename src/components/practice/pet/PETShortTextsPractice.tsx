@@ -444,7 +444,6 @@ export function PETShortTextsPractice({
             <CelebrationCard
               score={correctCount}
               scoreMax={5}
-              feedback={t('pet.shortTexts.celebrationFeedback')}
               onAction={onOpenDashboard}
               actionLabel={t('pet.shortTexts.celebrationAction')}
               animate={isNewSession}

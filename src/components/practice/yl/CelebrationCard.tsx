@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'motion/react';
 import confetti from 'canvas-confetti';
 import { Trophy, Star, ChevronRight } from 'lucide-react';
+import { scoreTier, toTenScale } from '@/lib/score/headline';
 import { useTranslations } from 'next-intl';
 
 export interface CelebrationCardProps {
@@ -86,13 +87,13 @@ export function CelebrationCard({
   const resolvedActionLabel = actionLabel ?? t('celebration.defaultActionLabel');
   const pct = scoreMax > 0 ? Math.round((score / scoreMax) * 100) : 0;
   const stars = pct === 100 ? 3 : pct >= 75 ? 2 : pct >= 50 ? 1 : 0;
-  const tier: 'perfect' | 'great' | 'good' | 'keep' =
-    pct === 100 ? 'perfect' : pct >= 75 ? 'great' : pct >= 50 ? 'good' : 'keep';
+  const tier = scoreTier(toTenScale(score, scoreMax));
 
   const tierConfig = {
     perfect: { heading: t('celebration.perfect.heading'), sub: t('celebration.perfect.sub'), accent: 'text-amber-500', ring: 'ring-amber-200', glow: 'from-amber-100 via-violet-50 to-white' },
     great:   { heading: t('celebration.great.heading'), sub: t('celebration.great.sub'), accent: 'text-violet-600', ring: 'ring-violet-200', glow: 'from-violet-100 via-violet-50 to-white' },
     good:    { heading: t('celebration.good.heading'), sub: t('celebration.good.sub'), accent: 'text-violet-600', ring: 'ring-violet-100', glow: 'from-violet-50 via-white to-white' },
+    fair:    { heading: t('celebration.fair.heading'), sub: t('celebration.fair.sub'), accent: 'text-slate-600', ring: 'ring-slate-200', glow: 'from-slate-50 via-white to-white' },
     keep:    { heading: t('celebration.keep.heading'), sub: t('celebration.keep.sub'), accent: 'text-slate-600', ring: 'ring-slate-200', glow: 'from-slate-50 via-white to-white' },
   }[tier];
 
