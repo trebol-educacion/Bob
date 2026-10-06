@@ -1,6 +1,9 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
+import { ActivityLoadError } from '@/components/practice/ActivityLoadError';
+import { withBankAudio } from '@/lib/yl/bank-audio';
+import { pointingCorrectReaction, pointingWrongReaction } from '@/lib/yl/spoken-texts';
 import { ArrowLeft } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { ListenAndPointIcon } from '@/components/icons/ModeIcons';
@@ -8,10 +11,8 @@ import { CelebrationCard } from './CelebrationCard';
 import { ACTIVE_MODEL_LABEL } from '@/lib/models';
 import {
   startYLSessionAction,
-  generateYLImagesParallelAction,
   saveYLTurnAction,
   getYLSessionPlanAction,
-  pregenerateYLCueAudiosAction,
 } from '@/actions/modes/yl';
 import type { YLExam, YLPlan } from '@/lib/types/yl';
 import type { EvalResponse, ModeKey } from '@/lib/types/practice';
@@ -73,6 +74,7 @@ export function YLPointingPractice({
   const [score, setScore] = useState(0);
   const [finalEval, setFinalEval] = useState<EvalResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loadErrorCode, setLoadErrorCode] = useState<string | null>(null);
   const [messages] = useState<BobMessageShape[]>(initialMessages ?? []);
   type TurnEntry = {
     id: string;
@@ -93,7 +95,7 @@ export function YLPointingPractice({
       (async () => {
         try {
           const restoredPlan = await getYLSessionPlanAction(initialSessionId);
-          if (restoredPlan) setPlan(restoredPlan);
+          if (restoredPlan) setPlan(withBankAudio(restoredPlan));
 
           const imgs = (initialMessages ?? [])
             .filter((m) => m.role === 'bob' && m.msg_type === 'image_scene')
@@ -183,43 +185,15 @@ export function YLPointingPractice({
     }
     (async () => {
       try {
-        const { draftId: sid, plan: p } = await startYLSessionAction({ mode });
+        const started = await startYLSessionAction({ mode });
+        if (!started.ok) {
+          setLoadErrorCode(started.code);
+          return;
+        }
+        const p = withBankAudio(started.data.plan);
+        const urls = p.image_urls ?? [];
         setPlan(p);
-        let urls: string[] = [];
-        if (p.option_image_prompts && p.option_image_prompts.length > 0) {
-          const words = p.options ?? [];
-          const items = p.option_image_prompts.map((scenePrompt, i) => ({
-            word: words[i] ?? '',
-            scenePrompt,
-          }));
-          urls = await generateYLImagesParallelAction(
-            exam,
-            part,
-            items,
-            sid,
-            p.character_description
-          );
-          setImages(urls);
-        }
-
-        const cuesTexts = (p.pointing_cues ?? []).map((c) => c.text);
-        const opts = p.options ?? [];
-        const reactionTexts: string[] = [];
-        for (const cue of p.pointing_cues ?? []) {
-          const target = opts[cue.target_index] ?? '';
-          if (target) reactionTexts.push(`Excellent! That's the ${target}. Well done!`);
-          for (const chosen of opts) {
-            if (!chosen || chosen === target) continue;
-            reactionTexts.push(
-              `Not quite. That's the ${chosen}. The ${target} is over there. Try the next one!`
-            );
-          }
-        }
-        const allTexts = [...cuesTexts, ...reactionTexts];
-        if (allTexts.length > 0) {
-          void pregenerateYLCueAudiosAction(allTexts);
-        }
-
+        setImages(urls);
         stash(p, urls);
         setPhase('ready');
       } catch (err) {
@@ -246,9 +220,7 @@ export function YLPointingPractice({
 
     const targetWord = plan?.options?.[currentCue.target_index] ?? 'item';
     const chosenWord = plan?.options?.[optionIdx] ?? 'item';
-    const reactionText = correct
-      ? `Excellent! That's the ${targetWord}. Well done!`
-      : `Not quite. That's the ${chosenWord}. The ${targetWord} is over there. Try the next one!`;
+    const reactionText = correct ? pointingCorrectReaction(targetWord) : pointingWrongReaction(chosenWord, targetWord);
 
     setTurns((prev) => [
       ...prev,
@@ -314,6 +286,7 @@ export function YLPointingPractice({
     }
   }, [phase, plan, score, finish]);
 
+  if (loadErrorCode) return <ActivityLoadError code={loadErrorCode} onBack={onBack} />;
   if (error) return <YLErrorScreen error={error} onBack={onBack} />;
   if (phase === 'loading')
     return <YLLoadingScreen message={t('common.gettingPracticeReady')} />;

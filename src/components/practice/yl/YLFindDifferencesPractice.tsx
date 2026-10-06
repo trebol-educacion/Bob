@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
+import { ActivityLoadError } from '@/components/practice/ActivityLoadError';
+import { withBankAudio } from '@/lib/yl/bank-audio';
 import { motion } from 'motion/react';
 import { ArrowLeft } from 'lucide-react';
 import { useTranslations } from 'next-intl';
@@ -9,9 +11,7 @@ import { CelebrationCard } from './CelebrationCard';
 import { ACTIVE_MODEL_LABEL } from '@/lib/models';
 import {
   startYLSessionAction,
-  generateYLImagesParallelAction,
   getYLSessionPlanAction,
-  pregenerateYLCueAudiosAction,
   evaluateFindDifferencesAnswerAction,
 } from '@/actions/modes/yl';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
@@ -103,6 +103,7 @@ export function YLFindDifferencesPractice({
   const [correctCount, setCorrectCount] = useState(0);
   const [finalEval, setFinalEval] = useState<EvalResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loadErrorCode, setLoadErrorCode] = useState<string | null>(null);
 
   const initStartedRef = useRef(false);
   const recordedBlobRef = useRef<Blob | null>(null);
@@ -132,7 +133,7 @@ export function YLFindDifferencesPractice({
         try {
           const restoredPlan = await getYLSessionPlanAction(initialSessionId);
           if (restoredPlan) {
-            setPlan(restoredPlan);
+            setPlan(withBankAudio(restoredPlan));
             if (restoredPlan.differences && restoredPlan.differences.length > 0) {
               setDifferences(restoredPlan.differences);
             }
@@ -233,35 +234,17 @@ export function YLFindDifferencesPractice({
 
     void (async () => {
       try {
-        const { draftId: sid, plan: p } = await startYLSessionAction({ mode });
-        setPlan(p);
-        stash(p);
-
-        const diffs = p.differences ?? [];
-        setDifferences(diffs);
-
-        const imagePrompts = p.image_prompts ?? [];
-        if (imagePrompts.length >= 2) {
-          setPhase('generating-images');
-          const urls = await generateYLImagesParallelAction(
-            exam,
-            part,
-            imagePrompts,
-            sid,
-            p.character_description,
-            'scene'
-          );
-          setImages(urls);
-          stash(p, urls);
-
-          const cueTexts = diffs.map((d) => d.examiner_cue);
-          const reactionTexts = diffs.flatMap((d) => [
-            `Yes! Well spotted!`,
-            `Almost, ${d.expected_answer} Good try!`,
-          ]);
-          void pregenerateYLCueAudiosAction([...cueTexts, ...reactionTexts]);
+        const started = await startYLSessionAction({ mode });
+        if (!started.ok) {
+          setLoadErrorCode(started.code);
+          return;
         }
-
+        const p = withBankAudio(started.data.plan);
+        const urls = p.image_urls ?? [];
+        setPlan(p);
+        setDifferences(p.differences ?? []);
+        setImages(urls);
+        stash(p, urls);
         setPhase('ready');
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Error preparing the session');
@@ -387,6 +370,7 @@ export function YLFindDifferencesPractice({
     setPhase('ready');
   };
 
+  if (loadErrorCode) return <ActivityLoadError code={loadErrorCode} onBack={onBack} />;
   if (error) return <YLErrorScreen error={error} onBack={onBack} />;
   if (phase === 'loading' || phase === 'generating-images')
     return (

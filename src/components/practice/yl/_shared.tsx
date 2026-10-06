@@ -10,8 +10,7 @@ import Image from 'next/image';
 import { motion } from 'motion/react';
 import { ArrowLeft, Mic, MicOff, CheckCircle } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { generateSpeechAction } from '@/actions/gemini';
-import { pcmToWavBase64 } from '@/lib/audio';
+import { resolveCueAudioUrl } from '@/lib/yl/bank-audio';
 import type { EvalResponse } from '@/lib/types/practice';
 import { BobMascotLoader } from '@/components/chat/BobMascotLoader';
 import { setBobSpeaking, useBobSpeaking } from '@/lib/bob-speaking';
@@ -97,8 +96,7 @@ export async function playTTS(text: string): Promise<void> {
 
   stopCurrentAudio();
   try {
-    const { data, mimeType } = await generateSpeechAction(text);
-    const url = pcmToWavBase64(data, mimeType);
+    const url = await resolveCueAudioUrl(text);
     _currentText = text;
     _cachedUrl = url;
     const audio = new Audio(url);
@@ -358,8 +356,7 @@ export function YLVoiceNote({
     }
     try {
       stopCurrentAudio();
-      const { data, mimeType } = await generateSpeechAction(text);
-      const url = pcmToWavBase64(data, mimeType);
+      const url = await resolveCueAudioUrl(text);
       const audio = new Audio(url);
       audioRef.current = audio;
       audio.onloadedmetadata = () => {
@@ -669,6 +666,8 @@ export function YLReadOnlyMessage({
       </div>
     );
   }
+
+  if (msgType === 'yl_tts') return null;
 
   if (msgType === 'image_scene') {
     const src =

@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
+import { ActivityLoadError } from '@/components/practice/ActivityLoadError';
+import { withBankAudio } from '@/lib/yl/bank-audio';
 import { motion } from 'motion/react';
 import { ArrowLeft } from 'lucide-react';
 import { useTranslations } from 'next-intl';
@@ -9,9 +11,7 @@ import { CelebrationCard } from './CelebrationCard';
 import { ACTIVE_MODEL_LABEL } from '@/lib/models';
 import {
   startYLSessionAction,
-  generateYLImagesParallelAction,
   getYLSessionPlanAction,
-  pregenerateYLCueAudiosAction,
   evaluateTellTheStoryAnswerAction,
 } from '@/actions/modes/yl';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
@@ -151,6 +151,7 @@ export function YLTellTheStoryPractice({
   const [correctCount, setCorrectCount] = useState(0);
   const [finalEval, setFinalEval] = useState<EvalResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loadErrorCode, setLoadErrorCode] = useState<string | null>(null);
 
   const initStartedRef = useRef(false);
   const recordedBlobRef = useRef<Blob | null>(null);
@@ -180,7 +181,7 @@ export function YLTellTheStoryPractice({
         try {
           const restoredPlan = await getYLSessionPlanAction(initialSessionId);
           if (restoredPlan) {
-            setPlan(restoredPlan);
+            setPlan(withBankAudio(restoredPlan));
             if (restoredPlan.scenes && restoredPlan.scenes.length === TOTAL_IMAGES) {
               setScenes(restoredPlan.scenes);
             }
@@ -282,41 +283,17 @@ export function YLTellTheStoryPractice({
 
     void (async () => {
       try {
-        const { draftId: sid, plan: p } = await startYLSessionAction({ mode });
-        setPlan(p);
-        stash(p);
-
-        const planScenes = p.scenes ?? [];
-        setScenes(planScenes);
-
-        const imagePrompts = p.image_prompts ?? [];
-        if (imagePrompts.length >= 4) {
-          setPhase('generating-images');
-          const urls = await generateYLImagesParallelAction(
-            exam,
-            part,
-            imagePrompts,
-            sid,
-            p.character_description,
-            'scene'
-          );
-          setImages(urls);
-          stash(p, urls);
-
-          const storySetupText = p.story_setup ?? '';
-          const scene1Model = planScenes[0]?.modeled_description ?? '';
-          const cueTexts = planScenes.slice(1).map((s) => s.examiner_cue ?? '');
-          const reactionCorrect = planScenes.slice(1).map(() => 'Great storytelling! Keep going!');
-          const reactionWrong = planScenes.slice(1).map((s) => `Almost, ${s.expected_answer ?? ''}`);
-          void pregenerateYLCueAudiosAction([
-            storySetupText,
-            scene1Model,
-            ...cueTexts,
-            ...reactionCorrect,
-            ...reactionWrong,
-          ].filter(Boolean));
+        const started = await startYLSessionAction({ mode });
+        if (!started.ok) {
+          setLoadErrorCode(started.code);
+          return;
         }
-
+        const p = withBankAudio(started.data.plan);
+        const urls = p.image_urls ?? [];
+        setPlan(p);
+        setScenes(p.scenes ?? []);
+        setImages(urls);
+        stash(p, urls);
         setPhase('setup');
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Error preparing the session');
@@ -445,6 +422,7 @@ export function YLTellTheStoryPractice({
     setPhase('ready');
   };
 
+  if (loadErrorCode) return <ActivityLoadError code={loadErrorCode} onBack={onBack} />;
   if (error) return <YLErrorScreen error={error} onBack={onBack} />;
   if (phase === 'loading' || phase === 'generating-images')
     return (

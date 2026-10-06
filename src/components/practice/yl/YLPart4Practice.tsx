@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { ActivityLoadError } from '@/components/practice/ActivityLoadError';
+import { withBankAudio } from '@/lib/yl/bank-audio';
 import { motion, AnimatePresence } from 'motion/react';
 import { User, ArrowLeft, Star } from 'lucide-react';
 import { useTranslations } from 'next-intl';
@@ -86,6 +88,7 @@ export function YLPart4Practice({
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [finalEval, setFinalEval] = useState<EvalResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loadErrorCode, setLoadErrorCode] = useState<string | null>(null);
   const [messages] = useState<BobMessageShape[]>(initialMessages ?? []);
 
   const recordedBlobRef = useRef<Blob | null>(null);
@@ -109,7 +112,12 @@ export function YLPart4Practice({
 
     async function init() {
       try {
-        const { plan: p } = await startYLSessionAction({ mode });
+        const started = await startYLSessionAction({ mode });
+        if (!started.ok) {
+          setLoadErrorCode(started.code);
+          return;
+        }
+        const p = withBankAudio(started.data.plan);
         setPlan(p);
         stash(p);
         setPhase('ready');
@@ -301,6 +309,7 @@ export function YLPart4Practice({
     </span>
   );
 
+  if (loadErrorCode) return <ActivityLoadError code={loadErrorCode} onBack={onBack} />;
   if (error) return <YLErrorScreen error={error} onBack={onBack} />;
   if (phase === 'loading') return <YLLoadingScreen message={t('common.gettingPracticeReady')} />;
   if (phase === 'evaluating') return <YLLoadingScreen message={t('common.calculatingFinalScore')} />;

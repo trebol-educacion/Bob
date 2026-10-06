@@ -26,7 +26,7 @@ vi.mock('@/lib/supabase/server', () => ({
 }));
 vi.mock('@/lib/gemini-client', () => ({ safeParseFallback: (_s: unknown, v: unknown) => v }));
 vi.mock('@/actions/messages', () => ({ getMessagesAction: vi.fn() }));
-vi.mock('@/actions/modes/yl/content', () => ({ generateYLContentAction: vi.fn() }));
+vi.mock('@/lib/item-bank/content-source', () => ({ pickContent: vi.fn() }));
 
 import { openYLSessionAction } from '@/actions/modes/yl/session';
 import { saveYLFinalEvalAction, saveYLTurnAction } from '@/actions/modes/yl/persist';
@@ -49,8 +49,9 @@ describe('openYLSessionAction', () => {
     expect(ensureMock).toHaveBeenCalledWith({ mode: 'cambridge_starters_part1', topic: 'starters_part1' });
     expect(updateMock).toHaveBeenCalledWith({ plan_json: plan });
     const messages = recordMock.mock.calls[0][0].messages;
-    expect(messages).toHaveLength(2);
-    expect(messages[1].contentJson).toEqual({ image_data_uri: 'u1', image_index: 1 });
+    expect(messages).toHaveLength(3);
+    expect(messages[0]).toMatchObject({ msgType: 'yl_tts', contentJson: { kind: 'yl_plan_stamp', exam_part: 'starters_part1', bank_group_id: null } });
+    expect(messages[2].contentJson).toEqual({ image_data_uri: 'u1', image_index: 1 });
     expect(result).toEqual({ ok: true, data: { sessionId: 's1' } });
   });
 

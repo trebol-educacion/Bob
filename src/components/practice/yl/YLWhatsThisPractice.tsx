@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
+import { ActivityLoadError } from '@/components/practice/ActivityLoadError';
+import { withBankAudio } from '@/lib/yl/bank-audio';
 import { motion } from 'motion/react';
 import { ArrowLeft } from 'lucide-react';
 import { useTranslations } from 'next-intl';
@@ -9,9 +11,7 @@ import { CelebrationCard } from './CelebrationCard';
 import { ACTIVE_MODEL_LABEL } from '@/lib/models';
 import {
   startYLSessionAction,
-  generateYLImagesParallelAction,
   getYLSessionPlanAction,
-  pregenerateYLCueAudiosAction,
   evaluateWhatsThisAnswerAction,
 } from '@/actions/modes/yl';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
@@ -100,6 +100,7 @@ export function YLWhatsThisPractice({
   const [correctCount, setCorrectCount] = useState(0);
   const [finalEval, setFinalEval] = useState<EvalResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loadErrorCode, setLoadErrorCode] = useState<string | null>(null);
 
   const initStartedRef = useRef(false);
   const recordedBlobRef = useRef<Blob | null>(null);
@@ -131,7 +132,7 @@ export function YLWhatsThisPractice({
       void (async () => {
         try {
           const restoredPlan = await getYLSessionPlanAction(initialSessionId);
-          if (restoredPlan) setPlan(restoredPlan);
+          if (restoredPlan) setPlan(withBankAudio(restoredPlan));
 
           const imgs = (initialMessages ?? [])
             .filter((m) => m.role === 'bob' && m.msg_type === 'image_scene')
@@ -232,41 +233,16 @@ export function YLWhatsThisPractice({
 
     void (async () => {
       try {
-        const { draftId: sid, plan: p } = await startYLSessionAction({ mode });
-        setPlan(p);
-        stash(p);
-
-        if (p.object_cards && p.object_cards.length > 0) {
-          setPhase('generating-images');
-          const items = p.object_cards.map((card) => ({
-            word: card.word,
-            scenePrompt: card.image_prompt,
-          }));
-          const urls = await generateYLImagesParallelAction(
-            exam,
-            part,
-            items,
-            sid,
-            p.character_description,
-            'object_card'
-          );
-          setImages(urls);
-          stash(p, urls);
-
-          const questionTexts = p.object_cards.flatMap((card) =>
-            card.questions.map((q) => q.text)
-          );
-          const reactionTexts: string[] = [];
-          for (const card of p.object_cards) {
-            reactionTexts.push(`That's right! It's a ${card.word}. Well done!`);
-            reactionTexts.push(`Good try! It's a ${card.word}.`);
-            reactionTexts.push(`Great job! Yes or no, you did it!`);
-            reactionTexts.push(`Good try! Keep going!`);
-          }
-          const allTexts = [...questionTexts, ...reactionTexts];
-          void pregenerateYLCueAudiosAction(allTexts);
+        const started = await startYLSessionAction({ mode });
+        if (!started.ok) {
+          setLoadErrorCode(started.code);
+          return;
         }
-
+        const p = withBankAudio(started.data.plan);
+        const urls = p.image_urls ?? [];
+        setPlan(p);
+        setImages(urls);
+        stash(p, urls);
         setPhase('ready');
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Error preparing the session');
@@ -402,6 +378,7 @@ export function YLWhatsThisPractice({
     setPhase('ready');
   };
 
+  if (loadErrorCode) return <ActivityLoadError code={loadErrorCode} onBack={onBack} />;
   if (error) return <YLErrorScreen error={error} onBack={onBack} />;
   if (phase === 'loading' || phase === 'generating-images')
     return <YLLoadingScreen message={phase === 'generating-images' ? t('findDifferences.gettingPicturesReady') : t('common.gettingPracticeReady')} />;

@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { ActivityLoadError } from '@/components/practice/ActivityLoadError';
+import { withBankAudio } from '@/lib/yl/bank-audio';
 import { motion, AnimatePresence } from 'motion/react';
 import { ArrowLeft, Headphones, Image as ImageIcon } from 'lucide-react';
 import { useTranslations } from 'next-intl';
@@ -9,7 +11,6 @@ import { blobToBase64 } from '@/lib/audio';
 import { ACTIVE_MODEL_LABEL } from '@/lib/models';
 import {
   startYLSessionAction,
-  generateYLImagesAction,
   evaluateYLTurnAction,
   saveYLTurnAction,
   evaluateYLFinalAction,
@@ -87,6 +88,7 @@ export function YLPart2Practice({
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [finalEval, setFinalEval] = useState<EvalResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loadErrorCode, setLoadErrorCode] = useState<string | null>(null);
   const [messages] = useState<BobMessageShape[]>(initialMessages ?? []);
 
   const recordedBlobRef = useRef<Blob | null>(null);
@@ -110,16 +112,16 @@ export function YLPart2Practice({
 
     async function init() {
       try {
-        const { plan: p } = await startYLSessionAction({ mode });
-        setPlan(p);
-        stash(p);
-
-        if (p.image_prompts && p.image_prompts.length > 0) {
-          const imgs = await generateYLImagesAction(exam, part, p.image_prompts);
-          setImages(imgs);
-          stash(p, imgs);
+        const started = await startYLSessionAction({ mode });
+        if (!started.ok) {
+          setLoadErrorCode(started.code);
+          return;
         }
-
+        const p = withBankAudio(started.data.plan);
+        const urls = p.image_urls ?? [];
+        setPlan(p);
+        setImages(urls);
+        stash(p, urls);
         setPhase('ready');
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Error preparing the session');
@@ -300,6 +302,7 @@ export function YLPart2Practice({
     </span>
   );
 
+  if (loadErrorCode) return <ActivityLoadError code={loadErrorCode} onBack={onBack} />;
   if (error) return <YLErrorScreen error={error} onBack={onBack} />;
   if (phase === 'loading') return <YLLoadingScreen message={t('common.gettingPracticeReady')} />;
   if (phase === 'evaluating') return <YLLoadingScreen message={t('common.calculatingFinalScore')} />;
@@ -382,7 +385,7 @@ export function YLPart2Practice({
         <div className="max-w-lg mx-auto w-full rounded-2xl overflow-hidden shadow-md bg-white">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={(images[0]?.startsWith('data:') ? images[0] : `data:image/png;base64,${images[0] ?? ''}`)}
+            src={images[0]}
             alt={t('part2.sceneImage')}
             className="w-full object-cover"
           />
