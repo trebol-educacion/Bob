@@ -3,9 +3,8 @@
 import { z } from 'zod';
 import { getPrompt } from '@/lib/prompts/db-prompts';
 import { callGemini, isOk } from '@/lib/gemini-client';
-import { persistMessage } from '@/lib/persist-activity';
-import { createSessionAction } from '@/actions/sessions';
-import { createSupabaseServer } from '@/lib/supabase/server';
+import { completeActivity } from '@/lib/session/complete';
+import { currentUserId } from '@/lib/session/lifecycle';
 import { MODELS } from '@/lib/models';
 
 const FALLBACK_FRAMING =
@@ -13,8 +12,6 @@ const FALLBACK_FRAMING =
 
 /** A generated B1 PET Writing Challenge: one of email reply, online review, or story continuation. */
 export interface PETWritingChallengePrompt {
-  sessionId: string;
-  userId: string;
   format: 'email' | 'review' | 'story';
   title: string;
   theme: string;
@@ -41,6 +38,7 @@ export interface GrammarNote {
 
 /** Formative, three-step feedback for a Writing Challenge submission. Never contains a numeric score. */
 export interface PETWritingChallengeFeedback {
+  sessionId?: string;
   kind: 'formative';
   motivation: string;
   vocabulary: VocabularySuggestion[];
@@ -95,41 +93,9 @@ function safeParse<T>(schema: z.ZodType<T>, raw: string): T | null {
   }
 }
 
-function buildFallbackFeedback(): PETWritingChallengeFeedback {
-  return {
-    kind: 'formative',
-    motivation: 'Great effort finishing your text! Have a look and try again to keep improving.',
-    vocabulary: [],
-    grammar: [],
-  };
-}
-
-/** Generates a B1 PET Writing Challenge and framing text; creates a session if none provided. */
-export async function generatePETWritingChallengeAction(input: {
-  sessionId?: string;
-  userId?: string;
-}): Promise<PETWritingChallengePrompt | { error: string }> {
-  let sessionId = input.sessionId;
-  let userId = input.userId;
-
-  if (!sessionId) {
-    const result = await createSessionAction({
-      mode: 'cambridge_pet_writing_challenge',
-      title: 'Writing Challenge',
-    });
-    if (!result.data) {
-      return { error: result.error ?? 'Could not create session' };
-    }
-    sessionId = result.data.id;
-    userId = result.data.user_id;
-  } else if (!userId) {
-    const supabase = await createSupabaseServer();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) return { error: 'Not authenticated' };
-    userId = user.id;
-  }
+/** Generates a B1 PET Writing Challenge and framing text; persists nothing until the first submit. */
+export async function generatePETWritingChallengeAction(): Promise<PETWritingChallengePrompt | { error: string }> {
+  const userId = (await currentUserId()) ?? undefined;
 
   const [generationPrompt, framingText] = await Promise.all([
     getPrompt('cambridge_pet_writing_challenge_b1_generation').catch(() => null),
@@ -161,36 +127,13 @@ export async function generatePETWritingChallengeAction(input: {
     console.error(
       JSON.stringify({
         event: 'pet_writing_challenge_generate_parse_failed',
-        sessionId,
         rawPreview: rawText.slice(0, 500),
       })
     );
     return { error: 'Unexpected response from the model' };
   }
 
-  persistMessage({
-    sessionId,
-    userId,
-    role: 'bob',
-    msgType: 'text',
-    contentText: null,
-    contentJson: {
-      kind: 'pet_writing_challenge_prompt',
-      format: parsed.format,
-      title: parsed.title,
-      theme: parsed.theme,
-      stimulus: parsed.stimulus,
-      task: parsed.task,
-      guide_points: parsed.guide_points,
-      min_words: parsed.min_words,
-      max_words: parsed.max_words,
-      framing_text: framingText,
-    },
-  }).catch(() => undefined);
-
   return {
-    sessionId,
-    userId,
     format: parsed.format,
     title: parsed.title,
     theme: parsed.theme,
@@ -203,43 +146,27 @@ export async function generatePETWritingChallengeAction(input: {
   };
 }
 
-/** Evaluates the student's Writing Challenge text and persists formative three-step feedback. */
+/** Evaluates the student's Writing Challenge text; creates the session and closes it only when the evaluation succeeds. */
 export async function submitPETWritingChallengeAction(input: {
-  sessionId: string;
-  userId: string;
-  task: string;
+  sessionId?: string;
+  prompt: PETWritingChallengePrompt;
   userText: string;
 }): Promise<PETWritingChallengeFeedback | { error: string }> {
-  const fallback = buildFallbackFeedback();
+  const userId = await currentUserId();
+  if (!userId) return { error: 'unauthenticated' };
 
   let evalPromptText: string;
   try {
     evalPromptText = await getPrompt('cambridge_pet_writing_challenge_b1_evaluation', {
-      TASK: input.task,
+      TASK: input.prompt.task,
       USER_TEXT: input.userText,
     });
   } catch {
-    persistMessage({
-      sessionId: input.sessionId,
-      userId: input.userId,
-      role: 'bob',
-      msgType: 'evaluation',
-      contentJson: { ...fallback, is_final: true },
-    }).catch(() => undefined);
-    return fallback;
+    return { error: 'evaluation_unavailable' };
   }
 
-  persistMessage({
-    sessionId: input.sessionId,
-    userId: input.userId,
-    role: 'user',
-    msgType: 'text',
-    contentText: input.userText,
-    contentJson: { kind: 'writing_submission', text: input.userText },
-  }).catch(() => undefined);
-
   const result = await callGemini(
-    { promptKey: 'cambridge_pet_writing_challenge_b1_evaluation', model: MODELS.FLASH_LITE_PREVIEW, userId: input.userId },
+    { promptKey: 'cambridge_pet_writing_challenge_b1_evaluation', model: MODELS.FLASH_LITE_PREVIEW, userId },
     (ai) =>
       ai.models.generateContent({
         model: MODELS.FLASH_LITE_PREVIEW,
@@ -248,30 +175,11 @@ export async function submitPETWritingChallengeAction(input: {
       })
   );
 
-  if (!isOk(result)) {
-    persistMessage({
-      sessionId: input.sessionId,
-      userId: input.userId,
-      role: 'bob',
-      msgType: 'evaluation',
-      contentJson: { ...fallback, is_final: true },
-    }).catch(() => undefined);
-    return fallback;
-  }
+  if (!isOk(result)) return { error: 'evaluation_failed' };
 
   const rawText = result.data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
   const parsed = safeParse(EvaluationSchema, rawText);
-
-  if (!parsed) {
-    persistMessage({
-      sessionId: input.sessionId,
-      userId: input.userId,
-      role: 'bob',
-      msgType: 'evaluation',
-      contentJson: { ...fallback, is_final: true },
-    }).catch(() => undefined);
-    return fallback;
-  }
+  if (!parsed) return { error: 'evaluation_failed' };
 
   const feedback: PETWritingChallengeFeedback = {
     kind: 'formative',
@@ -280,13 +188,25 @@ export async function submitPETWritingChallengeAction(input: {
     grammar: parsed.grammar,
   };
 
-  persistMessage({
+  const completed = await completeActivity({
+    mode: 'cambridge_pet_writing_challenge',
     sessionId: input.sessionId,
-    userId: input.userId,
-    role: 'bob',
-    msgType: 'evaluation',
-    contentJson: { ...feedback, is_final: true },
-  }).catch(() => undefined);
+    plan: {
+      kind: 'pet_writing_challenge_prompt',
+      format: input.prompt.format,
+      title: input.prompt.title,
+      theme: input.prompt.theme,
+      stimulus: input.prompt.stimulus,
+      task: input.prompt.task,
+      guide_points: input.prompt.guidePoints,
+      min_words: input.prompt.minWords,
+      max_words: input.prompt.maxWords,
+      framing_text: input.prompt.framingText,
+    },
+    answers: [{ kind: 'writing_submission', text: input.userText }],
+    evaluation: { ...feedback },
+  });
+  if (!completed.ok) return { error: completed.code };
 
-  return feedback;
+  return { ...feedback, sessionId: completed.data.sessionId };
 }

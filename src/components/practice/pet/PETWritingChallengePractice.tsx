@@ -159,7 +159,7 @@ function FeedbackPanel({
   );
 }
 
-function tryRestoreFromMessages(messages: StoredMessage[]): {
+export function tryRestoreFromMessages(messages: StoredMessage[]): {
   prompt: PETWritingChallengePrompt | null;
   userText: string | null;
   feedback: PETWritingChallengeFeedback | null;
@@ -175,8 +175,6 @@ function tryRestoreFromMessages(messages: StoredMessage[]): {
     if (msg.role === 'bob' && cj.kind === 'pet_writing_challenge_prompt') {
       const fmt = cj.format as PETWritingChallengePrompt['format'];
       prompt = {
-        sessionId: msg.session_id ?? '',
-        userId: msg.user_id ?? '',
         format: fmt === 'email' || fmt === 'review' || fmt === 'story' ? fmt : 'email',
         title: String(cj.title ?? ''),
         theme: String(cj.theme ?? ''),
@@ -214,6 +212,7 @@ export function PETWritingChallengePractice({
   onOpenDashboard,
 }: PETWritingChallengePracticeProps) {
   const [phase, setPhase] = useState<Phase>('loading');
+  const [sessionId, setSessionId] = useState<string | undefined>(initialSessionId);
   const [prompt, setPrompt] = useState<PETWritingChallengePrompt | null>(null);
   const [text, setText] = useState('');
   const [feedback, setFeedback] = useState<PETWritingChallengeFeedback | null>(null);
@@ -248,14 +247,13 @@ export function PETWritingChallengePractice({
       }
 
       setIsNewSession(true);
-      const result = await generatePETWritingChallengeAction({ sessionId: initialSessionId, userId: undefined });
+      const result = await generatePETWritingChallengeAction();
 
       if ('error' in result) {
         setErrorMsg(result.error);
         return;
       }
 
-      onSessionCreated?.(result.sessionId);
       setPrompt(result);
       setPhase('ready');
     }
@@ -268,9 +266,8 @@ export function PETWritingChallengePractice({
     setPhase('evaluating');
 
     const result = await submitPETWritingChallengeAction({
-      sessionId: prompt.sessionId,
-      userId: prompt.userId,
-      task: prompt.task,
+      sessionId,
+      prompt,
       userText: text,
     });
 
@@ -280,6 +277,8 @@ export function PETWritingChallengePractice({
       return;
     }
 
+    if (!sessionId && result.sessionId) onSessionCreated?.(result.sessionId);
+    setSessionId(result.sessionId ?? sessionId);
     setFeedback(result);
     setPhase('finished');
     onSessionFinished?.();

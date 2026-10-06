@@ -210,7 +210,7 @@ function FeedbackPanel({
   );
 }
 
-function tryRestoreFromMessages(messages: StoredMessage[]): {
+export function tryRestoreFromMessages(messages: StoredMessage[]): {
   prompt: PETEmailPrompt | null;
   userText: string | null;
   feedback: PETEmailFeedback | null;
@@ -227,8 +227,6 @@ function tryRestoreFromMessages(messages: StoredMessage[]): {
       const er = cj.email_received as { from: string; subject: string; body: string } | null;
       if (er) {
         prompt = {
-          sessionId: msg.session_id ?? '',
-          userId: msg.user_id ?? '',
           emailReceived: er,
           contentPoints: (cj.content_points as [string, string, string, string]) ?? ['', '', '', ''],
           wordTarget: Number(cj.word_target ?? 100),
@@ -265,6 +263,7 @@ export function PETEmailWritingPractice({
 }: PETEmailWritingPracticeProps) {
   const t = useTranslations('cambridge');
   const [phase, setPhase] = useState<Phase>('loading');
+  const [sessionId, setSessionId] = useState<string | undefined>(initialSessionId);
   const [prompt, setPrompt] = useState<PETEmailPrompt | null>(null);
   const [text, setText] = useState('');
   const [feedback, setFeedback] = useState<PETEmailFeedback | null>(null);
@@ -299,15 +298,11 @@ export function PETEmailWritingPractice({
       }
 
       setIsNewSession(true);
-      const result = await generatePETEmailAction({ sessionId: initialSessionId, userId: undefined });
+      const result = await generatePETEmailAction();
 
       if ('error' in result) {
         setErrorMsg(result.error);
         return;
-      }
-
-      if (!initialSessionId) {
-        onSessionCreated?.(result.sessionId);
       }
 
       setPrompt(result);
@@ -322,10 +317,12 @@ export function PETEmailWritingPractice({
     setPhase('evaluating');
 
     const result = await evaluatePETEmailAction({
-      sessionId: prompt.sessionId,
-      userId: prompt.userId,
+      sessionId,
       emailReceived: prompt.emailReceived,
       contentPoints: prompt.contentPoints,
+      wordTarget: prompt.wordTarget,
+      context: prompt.context,
+      framingText: prompt.framingText,
       userText: text,
     });
 
@@ -335,6 +332,8 @@ export function PETEmailWritingPractice({
       return;
     }
 
+    if (!sessionId && result.sessionId) onSessionCreated?.(result.sessionId);
+    setSessionId(result.sessionId ?? sessionId);
     setFeedback(result);
     setPhase('finished');
     onSessionFinished?.();
