@@ -37,7 +37,7 @@ export async function generatePlan<P>(
 ): Promise<P> {
   let feedback = '';
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-    const base = part.message ? part.message(prompt, ctx) : defaultMessage(prompt, ctx);
+    const base = part.message ? await part.message(prompt, ctx) : defaultMessage(prompt, ctx);
     try {
       const result = await ai.models.generateContent({
         model: MODELS.FLASH_LITE_PREVIEW,

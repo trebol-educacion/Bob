@@ -11,6 +11,7 @@ export interface SlotContext {
   slot: number;
   variant: string;
   existing: string[];
+  db: Db;
 }
 
 export interface JudgeRequest {
@@ -35,7 +36,7 @@ export interface PlanPart<P = unknown> {
   short: string;
   schema: z.ZodType<P>;
   topics?: string[];
-  message?: (prompt: string, ctx: SlotContext) => string;
+  message?: (prompt: string, ctx: SlotContext) => string | Promise<string>;
   normalize?: (plan: P) => P;
   rules?: (plan: P) => string[];
   judge?: (plan: P) => JudgeRequest | null;

@@ -28,7 +28,7 @@ async function fillPart(part: PlanPart, count: number): Promise<void> {
   while (slots.published.size < count) {
     const current = slot++;
     const variant = planVariant(part, current);
-    const ctx = { topic: topicOf(part, current), slot: current, variant, existing: slots.labels };
+    const ctx = { topic: topicOf(part, current), slot: current, variant, existing: slots.labels, db };
     const generated = await generatePlan(ai, part, prompt, ctx, review);
     const plan = part.produce ? await part.produce(generated, { ai, db, variant, slot: current, examPart: part.examPart }) : generated;
     const label = part.labelOf ? part.labelOf(plan) : ctx.topic;
