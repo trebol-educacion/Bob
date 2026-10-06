@@ -28,9 +28,27 @@ vi.mock('@/components/chat', () => ({
 }));
 
 const evaluateAcademicMock = vi.fn();
+const getAcademicTaskMock = vi.fn();
 vi.mock('@/actions/modes/writing-academic', () => ({
   evaluateAcademicAction: (...a: unknown[]) => evaluateAcademicMock(...a),
+  getAcademicTaskAction: (...a: unknown[]) => getAcademicTaskMock(...a),
 }));
+
+const ACADEMIC_TASK = {
+  ok: true,
+  data: {
+    instructions: 'Add your contribution to the discussion (minimum 100 words).',
+    bankGroupId: 'g1',
+    task: {
+      professor_post: { name: 'Dr. Smith', text: 'Should universities require students to study abroad?' },
+      peer_posts: [
+        { name: 'Maria', text: 'Yes, it builds empathy.' },
+        { name: 'James', text: 'No, it is too expensive.' },
+      ],
+      writing_prompt: 'Add your contribution to the discussion (minimum 100 words).',
+    },
+  },
+};
 
 import { AcademicWritingPractice } from '@/components/practice/AcademicWritingPractice';
 import { EXAM_PART_COMPONENT_MAP } from '@/lib/routing';
@@ -40,7 +58,10 @@ function words(n: number): string {
   return Array.from({ length: n }, (_, i) => `w${i}`).join(' ');
 }
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => {
+  vi.clearAllMocks();
+  getAcademicTaskMock.mockResolvedValue(ACADEMIC_TASK);
+});
 afterEach(cleanup);
 
 describe('Academic Discussion and Writing routing', () => {
@@ -72,8 +93,15 @@ describe('Academic Discussion and Writing routing', () => {
     fireEvent.click(screen.getByText('send'));
     await waitFor(() => expect(screen.getByText('Clear opinion')).toBeInTheDocument());
     expect(evaluateAcademicMock).toHaveBeenCalledWith(
-      expect.objectContaining({ exam_part: 'toefl_writing_academic_discussion', targetWordCount: [100, 200] }),
+      expect.objectContaining({ exam_part: 'toefl_writing_academic_discussion', targetWordCount: [100, 200], bankGroupId: 'g1' }),
     );
     expect(screen.queryByTestId('fce-score-card')).not.toBeInTheDocument();
+  });
+
+  it('shows the empty-bank state instead of an empty forum', async () => {
+    getAcademicTaskMock.mockResolvedValue({ ok: false, code: 'no_content', retryable: false });
+    render(<AcademicWritingPractice mode="toefl_writing_academic_discussion" onBack={vi.fn()} />);
+    expect(await screen.findByText('activityNoContent')).toBeInTheDocument();
+    expect(evaluateAcademicMock).not.toHaveBeenCalled();
   });
 });
