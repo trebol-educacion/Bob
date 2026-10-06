@@ -3,8 +3,6 @@ import { createSupabaseServer } from '@/lib/supabase/server';
 import { inferSkillFromMode, inferModeMetadata } from '@/lib/skill-from-mode';
 import { MAX_SECONDS_PER_TICK, clampSeconds } from '@/lib/usage/heartbeat';
 
-export const runtime = 'nodejs';
-
 interface UsagePayload {
   mode: string;
   seconds: number;
