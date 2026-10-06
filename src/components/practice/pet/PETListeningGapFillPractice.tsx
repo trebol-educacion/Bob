@@ -43,7 +43,7 @@ interface RestoredState {
   correctCount: number;
 }
 
-function tryRestore(messages: StoredMessage[]): RestoredState | null {
+export function tryRestore(messages: StoredMessage[]): RestoredState | null {
   let exercise: PETGapFillExercise | null = null;
   let framingText = '';
   let gapResults: PETGapFillGapResult[] | null = null;
@@ -393,7 +393,7 @@ export function PETListeningGapFillPractice({
 }: PETListeningGapFillPracticeProps) {
   const [phase, setPhase] = useState<Phase>('loading');
   const [sessionId, setSessionId] = useState<string | undefined>(initialSessionId);
-  const [userId, setUserId] = useState<string | undefined>();
+  const [planToken, setPlanToken] = useState<string | null>(null);
   const [exercise, setExercise] = useState<PETGapFillExercise | null>(null);
   const [framingText, setFramingText] = useState('');
   const [answers, setAnswers] = useState<Record<number, string>>({});
@@ -423,10 +423,7 @@ export function PETListeningGapFillPractice({
           setCorrectCount(restored.correctCount);
           setPhase('finished');
         } else {
-          const { createSupabaseBrowser } = await import('@/lib/supabase/browser-client');
-          const { data: { user } } = await createSupabaseBrowser().auth.getUser();
-          if (user) setUserId(user.id);
-          setPhase('ready');
+          setErrorMsg('Could not restore session. Please start a new one.');
         }
         return;
       }
@@ -436,16 +433,14 @@ export function PETListeningGapFillPractice({
       setIsNewSession(true);
       setPhase('generating');
 
-      const result = await generatePETListeningGapFillAction({ sessionId: initialSessionId });
+      const result = await generatePETListeningGapFillAction();
 
       if ('error' in result) {
         setErrorMsg(result.error);
         return;
       }
 
-      onSessionCreated?.(result.sessionId);
-      setSessionId(result.sessionId);
-      setUserId(result.userId);
+      setPlanToken(result.planToken);
       setExercise(result.exercise);
       setFramingText(result.framingText);
       setPhase('ready');
@@ -457,13 +452,13 @@ export function PETListeningGapFillPractice({
   useEffect(() => {
     if (audioStartedRef.current) return;
     if (phase === 'finished') return;
-    if (!exercise || !sessionId || !userId) return;
+    if (!exercise || !planToken) return;
     audioStartedRef.current = true;
 
     let cancelled = false;
     (async () => {
       try {
-        const audio = await generatePETListeningGapFillAudioAction({ sessionId, userId });
+        const audio = await generatePETListeningGapFillAudioAction({ planToken });
         if (cancelled) return;
         if (audio.data) {
           setAudioB64(audio.data);
@@ -480,7 +475,7 @@ export function PETListeningGapFillPractice({
     return () => {
       cancelled = true;
     };
-  }, [exercise, sessionId, userId, phase]);
+  }, [exercise, planToken, phase]);
 
   const summaryTokens = useMemo(
     () => (exercise ? tokenizeSummary(exercise.summary) : []),
@@ -509,11 +504,11 @@ export function PETListeningGapFillPractice({
   }
 
   async function handleSubmit() {
-    if (!sessionId || !userId) return;
+    if (!planToken) return;
     stopActiveAudio();
     setPhase('submitting');
 
-    const result = await submitPETListeningGapFillAction({ sessionId, userId, answers });
+    const result = await submitPETListeningGapFillAction({ sessionId, planToken, answers });
 
     if ('error' in result) {
       setErrorMsg(result.error);
@@ -521,6 +516,8 @@ export function PETListeningGapFillPractice({
       return;
     }
 
+    if (!sessionId) onSessionCreated?.(result.sessionId);
+    setSessionId(result.sessionId);
     setGapResults(result.gap_results);
     setCorrectCount(result.correct_count);
     setPhase('finished');

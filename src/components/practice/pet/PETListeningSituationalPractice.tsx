@@ -42,7 +42,7 @@ interface RestoredState {
   correctCount: number;
 }
 
-function tryRestore(messages: StoredMessage[]): RestoredState | null {
+export function tryRestore(messages: StoredMessage[]): RestoredState | null {
   let items: PETSituationalClientItem[] | null = null;
   let framingText = '';
   let itemResults: PETSituationalItemResult[] | null = null;
@@ -533,7 +533,7 @@ export function PETListeningSituationalPractice({
   const reduceMotion = useReducedMotion();
   const [phase, setPhase] = useState<Phase>('loading');
   const [sessionId, setSessionId] = useState<string | undefined>(initialSessionId);
-  const [userId, setUserId] = useState<string | undefined>();
+  const [planToken, setPlanToken] = useState<string | null>(null);
   const [items, setItems] = useState<PETSituationalClientItem[]>([]);
   const [framingText, setFramingText] = useState('');
   const [answers, setAnswers] = useState<Record<number, 'A' | 'B' | 'C'>>({});
@@ -560,10 +560,7 @@ export function PETListeningSituationalPractice({
           setCorrectCount(restored.correctCount);
           setPhase('finished');
         } else {
-          const { createSupabaseBrowser } = await import('@/lib/supabase/browser-client');
-          const { data: { user } } = await createSupabaseBrowser().auth.getUser();
-          if (user) setUserId(user.id);
-          setPhase('ready');
+          setErrorMsg('Could not restore session. Please start a new one.');
         }
         return;
       }
@@ -573,16 +570,14 @@ export function PETListeningSituationalPractice({
       setIsNewSession(true);
       setPhase('generating');
 
-      const result = await generatePETListeningSituationalAction({ sessionId: initialSessionId });
+      const result = await generatePETListeningSituationalAction();
 
       if ('error' in result) {
         setErrorMsg(result.error);
         return;
       }
 
-      onSessionCreated?.(result.sessionId);
-      setSessionId(result.sessionId);
-      setUserId(result.userId);
+      setPlanToken(result.planToken);
       setItems(result.items);
       setFramingText(result.framingText);
       setPhase('ready');
@@ -632,11 +627,11 @@ export function PETListeningSituationalPractice({
   }, [phase, items]);
 
   async function handleSubmit() {
-    if (!sessionId || !userId) return;
+    if (!planToken) return;
     stopActiveAudio();
     setPhase('submitting');
 
-    const result = await submitPETListeningSituationalAction({ sessionId, userId, answers });
+    const result = await submitPETListeningSituationalAction({ sessionId, planToken, answers });
 
     if ('error' in result) {
       setErrorMsg(result.error);
@@ -644,6 +639,8 @@ export function PETListeningSituationalPractice({
       return;
     }
 
+    if (!sessionId) onSessionCreated?.(result.sessionId);
+    setSessionId(result.sessionId);
     setItemResults(result.item_results);
     setCorrectCount(result.correct_count);
     setPhase('finished');

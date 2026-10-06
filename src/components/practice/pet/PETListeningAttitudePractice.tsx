@@ -42,7 +42,7 @@ interface RestoredState {
   correctCount: number;
 }
 
-function tryRestore(messages: StoredMessage[]): RestoredState | null {
+export function tryRestore(messages: StoredMessage[]): RestoredState | null {
   let items: PETAttitudeClientItem[] | null = null;
   let framingText = '';
   let itemResults: PETAttitudeItemResult[] | null = null;
@@ -526,7 +526,7 @@ export function PETListeningAttitudePractice({
   const reduceMotion = useReducedMotion();
   const [phase, setPhase] = useState<Phase>('loading');
   const [sessionId, setSessionId] = useState<string | undefined>(initialSessionId);
-  const [userId, setUserId] = useState<string | undefined>();
+  const [planToken, setPlanToken] = useState<string | null>(null);
   const [items, setItems] = useState<PETAttitudeClientItem[]>([]);
   const [framingText, setFramingText] = useState('');
   const [answers, setAnswers] = useState<Record<number, 'A' | 'B' | 'C'>>({});
@@ -553,10 +553,7 @@ export function PETListeningAttitudePractice({
           setCorrectCount(restored.correctCount);
           setPhase('finished');
         } else {
-          const { createSupabaseBrowser } = await import('@/lib/supabase/browser-client');
-          const { data: { user } } = await createSupabaseBrowser().auth.getUser();
-          if (user) setUserId(user.id);
-          setPhase('ready');
+          setErrorMsg('Could not restore session. Please start a new one.');
         }
         return;
       }
@@ -566,16 +563,14 @@ export function PETListeningAttitudePractice({
       setIsNewSession(true);
       setPhase('generating');
 
-      const result = await generatePETListeningAttitudeAction({ sessionId: initialSessionId });
+      const result = await generatePETListeningAttitudeAction();
 
       if ('error' in result) {
         setErrorMsg(result.error);
         return;
       }
 
-      onSessionCreated?.(result.sessionId);
-      setSessionId(result.sessionId);
-      setUserId(result.userId);
+      setPlanToken(result.planToken);
       setItems(result.items);
       setFramingText(result.framingText);
       setPhase('ready');
@@ -625,11 +620,11 @@ export function PETListeningAttitudePractice({
   }, [phase, items]);
 
   async function handleSubmit() {
-    if (!sessionId || !userId) return;
+    if (!planToken) return;
     stopActiveAudio();
     setPhase('submitting');
 
-    const result = await submitPETListeningAttitudeAction({ sessionId, userId, answers });
+    const result = await submitPETListeningAttitudeAction({ sessionId, planToken, answers });
 
     if ('error' in result) {
       setErrorMsg(result.error);
@@ -637,6 +632,8 @@ export function PETListeningAttitudePractice({
       return;
     }
 
+    if (!sessionId) onSessionCreated?.(result.sessionId);
+    setSessionId(result.sessionId);
     setItemResults(result.item_results);
     setCorrectCount(result.correct_count);
     setPhase('finished');

@@ -4,9 +4,9 @@ import { z } from 'zod';
 import { getPrompt } from '@/lib/prompts/db-prompts';
 import { stripDashes } from '@/lib/text';
 import { callGemini, isOk } from '@/lib/gemini-client';
-import { persistMessage, persistMessages } from '@/lib/persist-activity';
-import { createSessionAction } from '@/actions/sessions';
-import { createSupabaseServer } from '@/lib/supabase/server';
+import { completeActivity } from '@/lib/session/complete';
+import { currentUserId } from '@/lib/session/lifecycle';
+import { sealPlan, unsealPlan } from '@/lib/session/sealed-plan';
 import { generateSpeechAction } from '@/actions/gemini';
 import { MODELS } from '@/lib/models';
 import { isAcceptedAnswer } from '@/lib/answer-match';
@@ -46,8 +46,7 @@ export interface PETGapFillExercise {
 
 /** Full result returned from generatePETListeningGapFillAction. */
 export interface PETListeningGapFillResult {
-  sessionId: string;
-  userId: string;
+  planToken: string;
   framingText: string;
   exercise: PETGapFillExercise;
 }
@@ -62,6 +61,7 @@ export interface PETGapFillGapResult {
 
 /** Full submit result. */
 export interface PETListeningGapFillSubmitResult {
+  sessionId: string;
   correct_count: number;
   total: number;
   gap_results: PETGapFillGapResult[];
@@ -84,28 +84,10 @@ function safeParse<T>(schema: z.ZodType<T>, raw: string): T | null {
  * Generates one PET B1 Listening Part 3 interactive gap-fill exercise.
  * Returns the exercise WITHOUT the answer key and with empty audio; the key
  * stays server-side and the TTS audio is synthesized off the critical path.
- * Creates a session when none is provided.
  */
-export async function generatePETListeningGapFillAction(input: {
-  sessionId?: string;
-}): Promise<PETListeningGapFillResult | { error: string }> {
-  let sessionId = input.sessionId;
-  let userId: string | undefined;
-
-  if (!sessionId) {
-    const result = await createSessionAction({
-      mode: 'cambridge_pet_listening_part3',
-      title: 'Listening Part 3: Interactive Gap-Fill',
-    });
-    if (!result.data) return { error: result.error ?? 'Could not create session' };
-    sessionId = result.data.id;
-    userId = result.data.user_id;
-  } else {
-    const supabase = await createSupabaseServer();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return { error: 'Not authenticated' };
-    userId = user.id;
-  }
+export async function generatePETListeningGapFillAction(): Promise<PETListeningGapFillResult | { error: string }> {
+  const userId = await currentUserId();
+  if (!userId) return { error: 'unauthenticated' };
 
   const [generationPrompt, framingText] = await Promise.all([
     getPrompt('cambridge_pet_listening_part3_b1_generation').catch(() => null),
@@ -156,57 +138,36 @@ export async function generatePETListeningGapFillAction(input: {
     audio_mime: 'audio/L16;codec=pcm;rate=24000',
   };
 
-  persistMessage({
-    sessionId: sessionId!,
-    userId: userId!,
-    role: 'bob',
-    msgType: 'text',
-    contentText: null,
-    contentJson: {
-      kind: 'pet_listening_gapfill_plan',
-      framing_text: cleanFramingText,
-      exercise: {
-        context: cleanContext,
-        summary_title: cleanSummaryTitle,
-        transcript: parsed.transcript,
-        summary: cleanSummary,
-        gaps: cleanGaps,
-        word_bank: cleanWordBank,
-      },
+  const plan = {
+    kind: 'pet_listening_gapfill_plan',
+    framing_text: cleanFramingText,
+    exercise: {
+      context: cleanContext,
+      summary_title: cleanSummaryTitle,
+      transcript: parsed.transcript,
+      summary: cleanSummary,
+      gaps: cleanGaps,
+      word_bank: cleanWordBank,
     },
-  }).catch(() => undefined);
+  };
 
   return {
-    sessionId: sessionId!,
-    userId: userId!,
+    planToken: sealPlan(plan, userId),
     framingText: cleanFramingText,
     exercise,
   };
 }
 
-/** Generates the TTS audio for the monologue transcript, off the critical path. */
+/** Generates the TTS audio for the monologue transcript from the sealed plan, off the critical path. */
 export async function generatePETListeningGapFillAudioAction(input: {
-  sessionId: string;
-  userId: string;
+  planToken: string;
 }): Promise<{ data: string; mimeType: string }> {
-  const supabase = await createSupabaseServer();
-
-  const { data: planRow, error } = await supabase
-    .from('messages')
-    .select('content_json')
-    .eq('session_id', input.sessionId)
-    .eq('user_id', input.userId)
-    .eq('role', 'bob')
-    .eq('msg_type', 'text')
-    .order('created_at', { ascending: true })
-    .limit(1)
-    .single();
-
-  if (error || !planRow) return { data: '', mimeType: 'audio/L16;codec=pcm;rate=24000' };
-
-  const cj = planRow.content_json as { exercise?: { transcript?: string } } | null;
-  const transcript = cj?.exercise?.transcript;
-  if (!transcript) return { data: '', mimeType: 'audio/L16;codec=pcm;rate=24000' };
+  const empty = { data: '', mimeType: 'audio/L16;codec=pcm;rate=24000' };
+  const userId = await currentUserId();
+  if (!userId) return empty;
+  const plan = unsealPlan<{ exercise?: { transcript?: string } }>(input.planToken, userId);
+  const transcript = plan?.exercise?.transcript;
+  if (!transcript) return empty;
 
   return generateSpeechAction(transcript);
 }
@@ -216,27 +177,14 @@ export async function generatePETListeningGapFillAudioAction(input: {
  * persists results. No LLM involved; the key is re-read from the persisted plan.
  */
 export async function submitPETListeningGapFillAction(input: {
-  sessionId: string;
-  userId: string;
+  sessionId?: string;
+  planToken: string;
   answers: Record<number, string>;
 }): Promise<PETListeningGapFillSubmitResult | { error: string }> {
-  const supabase = await createSupabaseServer();
-
-  const { data: planRow, error } = await supabase
-    .from('messages')
-    .select('content_json')
-    .eq('session_id', input.sessionId)
-    .eq('user_id', input.userId)
-    .eq('role', 'bob')
-    .eq('msg_type', 'text')
-    .order('created_at', { ascending: true })
-    .limit(1)
-    .single();
-
-  if (error || !planRow) return { error: 'Could not load exercise' };
-
-  const cj = planRow.content_json as { exercise?: { gaps?: GenerationGap[] } } | null;
-  const planGaps = cj?.exercise?.gaps;
+  const userId = await currentUserId();
+  if (!userId) return { error: 'unauthenticated' };
+  const plan = unsealPlan<{ exercise?: { gaps?: GenerationGap[] } }>(input.planToken, userId);
+  const planGaps = plan?.exercise?.gaps;
   if (!planGaps || planGaps.length === 0) return { error: 'Could not load exercise' };
 
   const gap_results: PETGapFillGapResult[] = planGaps.map((gap) => {
@@ -252,36 +200,24 @@ export async function submitPETListeningGapFillAction(input: {
   const correct_count = gap_results.filter((r) => r.is_correct).length;
   const total = planGaps.length;
 
-  persistMessages(
-    gap_results.map((r) => ({
-      sessionId: input.sessionId,
-      userId: input.userId,
-      role: 'user' as const,
-      msgType: 'text' as const,
-      contentText: null,
-      contentJson: {
-        kind: 'pet_listening_gapfill_answer',
-        gap_number: r.number,
-        user_input: r.user_input,
-        is_correct: r.is_correct,
-      },
-    }))
-  ).catch(() => undefined);
-
-  persistMessage({
+  const completed = await completeActivity({
+    mode: 'cambridge_pet_listening_part3',
     sessionId: input.sessionId,
-    userId: input.userId,
-    role: 'bob',
-    msgType: 'evaluation',
-    contentText: null,
-    contentJson: {
+    plan,
+    answers: gap_results.map((r) => ({
+      kind: 'pet_listening_gapfill_answer',
+      gap_number: r.number,
+      user_input: r.user_input,
+      is_correct: r.is_correct,
+    })),
+    evaluation: {
       kind: 'pet_listening_gapfill_evaluation',
       score: correct_count,
       score_max: total,
       gap_results,
-      is_final: true,
     },
-  }).catch(() => undefined);
+  });
+  if (!completed.ok) return { error: completed.code };
 
-  return { correct_count, total, gap_results };
+  return { sessionId: completed.data.sessionId, correct_count, total, gap_results };
 }

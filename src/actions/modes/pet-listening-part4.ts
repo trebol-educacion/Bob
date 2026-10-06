@@ -4,9 +4,9 @@ import { z } from 'zod';
 import { getPrompt } from '@/lib/prompts/db-prompts';
 import { stripDashes } from '@/lib/text';
 import { callGemini, isOk } from '@/lib/gemini-client';
-import { persistMessage, persistMessages } from '@/lib/persist-activity';
-import { createSessionAction } from '@/actions/sessions';
-import { createSupabaseServer } from '@/lib/supabase/server';
+import { completeActivity } from '@/lib/session/complete';
+import { currentUserId } from '@/lib/session/lifecycle';
+import { sealPlan, unsealPlan } from '@/lib/session/sealed-plan';
 import { generateSpeechAction } from '@/actions/gemini';
 import { MODELS } from '@/lib/models';
 
@@ -41,8 +41,7 @@ export interface PETAttitudeClientItem {
 
 /** Full result returned from generatePETListeningAttitudeAction. */
 export interface PETListeningAttitudeResult {
-  sessionId: string;
-  userId: string;
+  planToken: string;
   framingText: string;
   context: string;
   items: PETAttitudeClientItem[];
@@ -58,6 +57,7 @@ export interface PETAttitudeItemResult {
 
 /** Full submit result. */
 export interface PETListeningAttitudeSubmitResult {
+  sessionId: string;
   correct_count: number;
   total: number;
   item_results: PETAttitudeItemResult[];
@@ -75,28 +75,10 @@ function safeParse<T>(schema: z.ZodType<T>, raw: string): T | null {
  * Generates 6 PET B1 Listening Part 4 attitude items.
  * Returns items WITHOUT the answer key and with empty audio; the answer key
  * stays server-side and the TTS audio is synthesized off the critical path.
- * Creates a session when none is provided.
  */
-export async function generatePETListeningAttitudeAction(input: {
-  sessionId?: string;
-}): Promise<PETListeningAttitudeResult | { error: string }> {
-  let sessionId = input.sessionId;
-  let userId: string | undefined;
-
-  if (!sessionId) {
-    const result = await createSessionAction({
-      mode: 'cambridge_pet_listening_part4',
-      title: 'Listening Part 4: Attitude & Opinion',
-    });
-    if (!result.data) return { error: result.error ?? 'Could not create session' };
-    sessionId = result.data.id;
-    userId = result.data.user_id;
-  } else {
-    const supabase = await createSupabaseServer();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return { error: 'Not authenticated' };
-    userId = user.id;
-  }
+export async function generatePETListeningAttitudeAction(): Promise<PETListeningAttitudeResult | { error: string }> {
+  const userId = await currentUserId();
+  if (!userId) return { error: 'unauthenticated' };
 
   const [generationPrompt, framingText] = await Promise.all([
     getPrompt('cambridge_pet_listening_part4_b1_generation').catch(() => null),
@@ -147,23 +129,15 @@ export async function generatePETListeningAttitudeAction(input: {
     audio_mime: 'audio/L16;codec=pcm;rate=24000',
   }));
 
-  persistMessage({
-    sessionId: sessionId!,
-    userId: userId!,
-    role: 'bob',
-    msgType: 'text',
-    contentText: null,
-    contentJson: {
-      kind: 'pet_listening_attitude_plan',
-      framing_text: cleanFramingText,
-      context: stripDashes(parsed.context),
-      items: cleanItems,
-    },
-  }).catch(() => undefined);
+  const plan = {
+    kind: 'pet_listening_attitude_plan',
+    framing_text: cleanFramingText,
+    context: stripDashes(parsed.context),
+    items: cleanItems,
+  };
 
   return {
-    sessionId: sessionId!,
-    userId: userId!,
+    planToken: sealPlan(plan, userId),
     framingText: cleanFramingText,
     context: stripDashes(parsed.context),
     items: clientItems,
@@ -182,30 +156,17 @@ export async function generatePETListeningAttitudeAudioAction(input: {
 
 /**
  * Evaluates answers deterministically against the server-side answer key and
- * persists results. No LLM involved.
+ * creates the session on this first turn and closes it. No LLM involved.
  */
 export async function submitPETListeningAttitudeAction(input: {
-  sessionId: string;
-  userId: string;
+  sessionId?: string;
+  planToken: string;
   answers: Record<number, 'A' | 'B' | 'C'>;
 }): Promise<PETListeningAttitudeSubmitResult | { error: string }> {
-  const supabase = await createSupabaseServer();
-
-  const { data: planRow, error } = await supabase
-    .from('messages')
-    .select('content_json')
-    .eq('session_id', input.sessionId)
-    .eq('user_id', input.userId)
-    .eq('role', 'bob')
-    .eq('msg_type', 'text')
-    .order('created_at', { ascending: true })
-    .limit(1)
-    .single();
-
-  if (error || !planRow) return { error: 'Could not load exercise' };
-
-  const cj = planRow.content_json as { items?: Array<{ number: number; answer: 'A' | 'B' | 'C' }> } | null;
-  const planItems = cj?.items;
+  const userId = await currentUserId();
+  if (!userId) return { error: 'unauthenticated' };
+  const plan = unsealPlan<{ items?: Array<{ number: number; answer: 'A' | 'B' | 'C' }> }>(input.planToken, userId);
+  const planItems = plan?.items;
   if (!planItems || planItems.length === 0) return { error: 'Could not load exercise' };
 
   const item_results: PETAttitudeItemResult[] = planItems.map((item) => {
@@ -221,65 +182,24 @@ export async function submitPETListeningAttitudeAction(input: {
   const correct_count = item_results.filter((r) => r.is_correct).length;
   const total = planItems.length;
 
-  persistMessages(
-    item_results.map((r) => ({
-      sessionId: input.sessionId,
-      userId: input.userId,
-      role: 'user' as const,
-      msgType: 'text' as const,
-      contentText: null,
-      contentJson: {
-        kind: 'pet_listening_attitude_answer',
-        item_number: r.number,
-        chosen: r.chosen,
-        is_correct: r.is_correct,
-      },
-    }))
-  ).catch(() => undefined);
-
-  persistMessage({
+  const completed = await completeActivity({
+    mode: 'cambridge_pet_listening_part4',
     sessionId: input.sessionId,
-    userId: input.userId,
-    role: 'bob',
-    msgType: 'evaluation',
-    contentText: null,
-    contentJson: {
+    plan,
+    answers: item_results.map((r) => ({
+      kind: 'pet_listening_attitude_answer',
+      item_number: r.number,
+      chosen: r.chosen,
+      is_correct: r.is_correct,
+    })),
+    evaluation: {
       kind: 'pet_listening_attitude_evaluation',
       score: correct_count,
       score_max: total,
       item_results,
-      is_final: true,
-    },
-  }).catch(() => undefined);
-
-  return { correct_count, total, item_results };
-}
-
-/** Persists the final evaluation explicitly when the caller already has the results. */
-export async function finalizePETListeningAttitudeAction(input: {
-  sessionId: string;
-  userId: string;
-  item_results: PETAttitudeItemResult[];
-  correct_count: number;
-  total: number;
-}): Promise<{ ok: true } | { error: string }> {
-  if (!input.sessionId || !input.userId) return { error: 'Missing session' };
-
-  const result = await persistMessage({
-    sessionId: input.sessionId,
-    userId: input.userId,
-    role: 'bob',
-    msgType: 'evaluation',
-    contentText: null,
-    contentJson: {
-      kind: 'pet_listening_attitude_evaluation',
-      score: input.correct_count,
-      score_max: input.total,
-      item_results: input.item_results,
-      is_final: true,
     },
   });
+  if (!completed.ok) return { error: completed.code };
 
-  if ('error' in result) return { error: result.error };
-  return { ok: true };
+  return { sessionId: completed.data.sessionId, correct_count, total, item_results };
 }

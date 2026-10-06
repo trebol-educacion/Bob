@@ -45,7 +45,7 @@ interface RestoredState {
   scoreMax: number;
 }
 
-function tryRestore(messages: StoredMessage[]): RestoredState | null {
+export function tryRestore(messages: StoredMessage[]): RestoredState | null {
   let statements: PETJustifyClientStatement[] | null = null;
   let audio: PETJustifyAudioTurn[] = [];
   let framingText = '';
@@ -526,7 +526,7 @@ export function PETListeningTrueFalseJustifyPractice({
   const reduceMotion = useReducedMotion();
   const [phase, setPhase] = useState<Phase>('loading');
   const [sessionId, setSessionId] = useState<string | undefined>(initialSessionId);
-  const [userId, setUserId] = useState<string | undefined>();
+  const [planToken, setPlanToken] = useState<string | null>(null);
   const [statements, setStatements] = useState<PETJustifyClientStatement[]>([]);
   const [audio, setAudio] = useState<PETJustifyAudioTurn[]>([]);
   const [framingText, setFramingText] = useState('');
@@ -557,10 +557,7 @@ export function PETListeningTrueFalseJustifyPractice({
           setScoreMax(restored.scoreMax);
           setPhase('finished');
         } else {
-          const { createSupabaseBrowser } = await import('@/lib/supabase/browser-client');
-          const { data: { user } } = await createSupabaseBrowser().auth.getUser();
-          if (user) setUserId(user.id);
-          setPhase('ready');
+          setErrorMsg('Could not restore session. Please start a new one.');
         }
         return;
       }
@@ -570,16 +567,14 @@ export function PETListeningTrueFalseJustifyPractice({
       setIsNewSession(true);
       setPhase('generating');
 
-      const result = await generatePETListeningTrueFalseJustifyAction({ sessionId: initialSessionId });
+      const result = await generatePETListeningTrueFalseJustifyAction();
 
       if ('error' in result) {
         setErrorMsg(result.error);
         return;
       }
 
-      onSessionCreated?.(result.sessionId);
-      setSessionId(result.sessionId);
-      setUserId(result.userId);
+      setPlanToken(result.planToken);
       setStatements(result.statements);
       setAudio(result.audio);
       setFramingText(result.framingText);
@@ -636,11 +631,11 @@ export function PETListeningTrueFalseJustifyPractice({
   }
 
   async function handleSubmit() {
-    if (!sessionId || !userId) return;
+    if (!planToken) return;
     stopActiveAudio();
     setPhase('submitting');
 
-    const result = await submitPETListeningTrueFalseJustifyAction({ sessionId, userId, answers });
+    const result = await submitPETListeningTrueFalseJustifyAction({ sessionId, planToken, answers });
 
     if ('error' in result) {
       setErrorMsg(result.error);
@@ -648,6 +643,8 @@ export function PETListeningTrueFalseJustifyPractice({
       return;
     }
 
+    if (!sessionId) onSessionCreated?.(result.sessionId);
+    setSessionId(result.sessionId);
     setStatementResults(result.statement_results);
     setScore(result.score);
     setScoreMax(result.score_max);
