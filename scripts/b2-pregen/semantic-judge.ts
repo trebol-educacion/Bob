@@ -67,6 +67,7 @@ export function buildJudgeInput(examPart: string, payload: Payload): unknown {
         question: item.question,
         options: item.options,
         claimed_key: item.correct_key,
+        explanation: item.explanation,
         ...(item.transcript ? { source: item.transcript } : {}),
       };
     }
