@@ -4,6 +4,8 @@ import { generateImageWithFallback } from '@/lib/yl-imagen';
 import { CHALLENGE_IMAGE_SLOTS } from '@/lib/challenge/cambridge-a2';
 import { buildChallengePrompt, challengeStoragePath } from '@/lib/challenge/image-gen';
 
+export const maxDuration = 60;
+
 const GENERATABLE_SLOTS = CHALLENGE_IMAGE_SLOTS.filter((s) => s.kind !== 'notice');
 const CHUNK_SIZE = 6;
 

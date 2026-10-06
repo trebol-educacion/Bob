@@ -7,6 +7,8 @@ import { MODE_PROMPT_KEY } from '@/lib/practice/mode-prompt-key';
 import type { PracticeActivityMode, PracticeSeed } from '@/lib/practice/types';
 import type { CefrLevel } from '@/lib/types/practice';
 
+export const maxDuration = 60;
+
 interface InitialTurnRequestBody {
   mode: PracticeActivityMode;
   seed: PracticeSeed;
