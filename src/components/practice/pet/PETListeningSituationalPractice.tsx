@@ -6,7 +6,8 @@ import { Check } from 'lucide-react';
 import { PETListeningIcon } from '@/components/icons/PETIcons';
 import { CelebrationCard } from '@/components/practice/yl/CelebrationCard';
 import { BobMascotLoader } from '@/components/chat/BobMascotLoader';
-import { PETAudioPlayer, stopActivePETAudio } from './PETAudioPlayer';
+import { PETAudioPlayer } from './PETAudioPlayer';
+import { stopActiveClip } from '@/lib/audio-clip';
 import { ActivityLoadError } from '@/components/practice/ActivityLoadError';
 import {
   generatePETListeningSituationalAction,
@@ -405,7 +406,7 @@ export function PETListeningSituationalPractice({
 
   async function handleSubmit() {
     if (!planToken) return;
-    stopActivePETAudio();
+    stopActiveClip();
     setPhase('submitting');
 
     const result = await submitPETListeningSituationalAction({ sessionId, planToken, answers });
