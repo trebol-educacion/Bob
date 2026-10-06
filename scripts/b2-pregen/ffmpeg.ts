@@ -1,6 +1,8 @@
 import { spawn } from 'node:child_process';
 
 const AUDIO_BITRATE = '64k';
+const FALLBACK_BITRATE = '48k';
+const MAX_AUDIO_BYTES = 1_500_000;
 const IMAGE_WIDTH = '1024';
 
 function runFfmpeg(args: string[], input: Buffer): Promise<Buffer> {
@@ -22,10 +24,12 @@ function runFfmpeg(args: string[], input: Buffer): Promise<Buffer> {
 
 /**
  * @param wav WAV audio
- * @returns mono MP3 at 64 kbps
+ * @returns mono MP3 at 64 kbps, or 48 kbps when 64 kbps exceeds 1.5 MB
  */
-export function wavToMp3(wav: Buffer): Promise<Buffer> {
-  return runFfmpeg(['-vn', '-ac', '1', '-codec:a', 'libmp3lame', '-b:a', AUDIO_BITRATE, '-f', 'mp3'], wav);
+export async function wavToMp3(wav: Buffer): Promise<Buffer> {
+  const encode = (bitrate: string) => runFfmpeg(['-vn', '-ac', '1', '-codec:a', 'libmp3lame', '-b:a', bitrate, '-f', 'mp3'], wav);
+  const mp3 = await encode(AUDIO_BITRATE);
+  return mp3.length > MAX_AUDIO_BYTES ? encode(FALLBACK_BITRATE) : mp3;
 }
 
 /**

@@ -106,6 +106,12 @@ describe('pickContent', () => {
     expect(await pickContent(QUERY)).toEqual({ ok: false, code: 'db_error', retryable: true });
   });
 
+  it('accepts a group without items only for item-less parts', async () => {
+    fetchGroups.mockResolvedValue({ ok: true, data: [group('g1')] });
+    fetchGroupItems.mockResolvedValue({ ok: true, data: [] });
+    expect(await pickContent({ ...QUERY, itemless: true })).toMatchObject({ ok: true, data: { items: [] } });
+  });
+
   it('reports no_content when the chosen group has no items', async () => {
     fetchGroups.mockResolvedValue({ ok: true, data: [group('g1')] });
     fetchGroupItems.mockResolvedValue({ ok: true, data: [] });

@@ -26,6 +26,7 @@ export async function generateFCEInterviewAction(): Promise<ActionResult<FCEInte
     examPart: FCE_INTERVIEW_PART,
     purpose: 'practice',
     groupsOnly: true,
+    itemless: true,
     skill: 'speaking',
     userId,
   });

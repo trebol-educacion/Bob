@@ -32,6 +32,7 @@ export async function generateFCEDiscussionAction(): Promise<ActionResult<FCEDis
     examPart: FCE_DISCUSSION_PART,
     purpose: 'practice',
     groupsOnly: true,
+    itemless: true,
     skill: 'speaking',
     userId,
     topic: linkedTopic ?? undefined,

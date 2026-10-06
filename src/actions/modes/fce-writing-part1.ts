@@ -80,6 +80,7 @@ export async function generateFCEEssayAction(): Promise<ActionResult<FCEEssayPro
     examPart: FCE_ESSAY_PART,
     purpose: 'practice',
     groupsOnly: true,
+    itemless: true,
     skill: 'writing',
   });
   if (!picked.ok) return picked;

@@ -26,7 +26,7 @@ const readingPart1: Check = (p) => {
   const found = gapNumbers(text).join(',');
   const issues = [
     ...(found === '1,2,3,4,5,6,7,8' ? [] : [`gap markers ${found || 'none'}, expected 1..8 without the example`]),
-    ...inRange('text words', countWords(text), 140, 190),
+    ...inRange('text words', countWords(text), 120, 190),
     ...inRange('title words', countWords(str(meta(p).title)), 2, 8),
   ];
   const example = meta(p).example as { sentence?: unknown; options?: unknown[]; answer?: unknown } | undefined;

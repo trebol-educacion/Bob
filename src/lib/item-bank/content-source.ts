@@ -17,6 +17,7 @@ export interface ContentQuery {
   count?: number;
   topic?: string;
   groupsOnly?: boolean;
+  itemless?: boolean;
 }
 
 export type PickedContent =
@@ -72,7 +73,7 @@ async function pickFromGroups(query: ContentQuery, userId: string | null): Promi
 
   const items = await fetchGroupItems([group.id]);
   if (!items.ok) return fail('db_error', true);
-  if (items.data.length === 0) return fail('no_content');
+  if (items.data.length === 0 && !query.itemless) return fail('no_content');
   return ok({ kind: 'group', group, items: items.data });
 }
 

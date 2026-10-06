@@ -37,18 +37,29 @@ const DiscussionRaw = z.object({ discussion_questions: z.array(z.string()) });
 
 const asOptions = (options: { id: string; text: string }[]) => options.map((o) => ({ key: o.id, label: o.text }));
 
+const EXAMPLE_MARKER = '___0___';
+
+function splitExample(raw: z.infer<typeof ClozeRaw>): { text: string; sentence: string } {
+  const sentences = raw.text_with_gaps.split(/(?<=[.!?])\s+/);
+  const found = sentences.find((sentence) => sentence.includes(EXAMPLE_MARKER));
+  if (!found) return { text: raw.text_with_gaps, sentence: raw.example.sentence };
+  const text = sentences.filter((sentence) => sentence !== found).join(' ');
+  return { text, sentence: raw.example.sentence.includes(EXAMPLE_MARKER) ? raw.example.sentence : found };
+}
+
 function clozePayload(raw: z.infer<typeof ClozeRaw>, topic: string) {
+  const { text, sentence } = splitExample(raw);
   const gaps = [...raw.gaps].sort((a, b) => a.number - b.number);
   return {
     group: {
-      stimulus_text: raw.text_with_gaps,
+      stimulus_text: text,
       metadata: {
         title: raw.title,
         topic,
         question_range: '1-8',
         example: {
           number: 0,
-          sentence: raw.example.sentence,
+          sentence,
           options: asOptions(raw.example.options),
           answer: raw.example.correct_option,
         },

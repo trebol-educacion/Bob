@@ -20,6 +20,7 @@ export async function generateFCEPictureDescriptionAction(): Promise<ActionResul
     examPart: FCE_P2_PART,
     purpose: 'practice',
     groupsOnly: true,
+    itemless: true,
     skill: 'speaking',
     userId,
   });

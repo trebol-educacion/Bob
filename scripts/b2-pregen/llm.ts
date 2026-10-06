@@ -26,8 +26,9 @@ function extractJson(text: string): unknown {
   return JSON.parse(cleaned);
 }
 
-function feedbackOf(errors: string[]): string {
-  return `\n\nYour previous answer was rejected for these reasons, fix all of them and return the complete JSON again:\n- ${errors.slice(0, 12).join('\n- ')}`;
+function feedbackOf(errors: string[], previous?: string): string {
+  const base = `\n\nYour previous answer was rejected for these reasons, fix all of them and return the complete JSON again:\n- ${errors.slice(0, 12).join('\n- ')}`;
+  return previous ? `${base}\n\nYour previous JSON, edit it and change only what is needed to fix those reasons:\n${previous}` : base;
 }
 
 /**
@@ -55,17 +56,18 @@ export async function generatePayload(
         contents: [{ role: 'user', parts: [{ text: message }] }],
         config: { systemInstruction: spec.systemPrompt(prompt, topic), responseMimeType: 'application/json', temperature: 0.9 },
       });
-      const raw = extractJson(result.text ?? '');
+      const rawText = (result.text ?? '').trim();
+      const raw = extractJson(rawText);
       const parsed = parsePayload(examPart, spec.adapt ? spec.adapt(raw, topic) : raw);
       if (!parsed.ok) {
         console.warn(`[${examPart}] attempt ${attempt} rejected: ${parsed.errors.slice(0, 6).join('; ')}`);
-        feedback = feedbackOf(parsed.errors);
+        feedback = feedbackOf(parsed.errors, rawText);
         continue;
       }
       const reviewed = await review(parsed.data);
       if (reviewed.errors.length === 0) return reviewed.payload;
       console.warn(`[${examPart}] attempt ${attempt} failed review: ${reviewed.errors.slice(0, 6).join('; ')}`);
-      feedback = feedbackOf(reviewed.errors);
+      feedback = feedbackOf(reviewed.errors, rawText);
     } catch (err) {
       console.warn(`[${examPart}] attempt ${attempt} failed: ${err instanceof Error ? err.message : err}`);
       feedback =

@@ -59,7 +59,7 @@ export function buildJudgeInput(examPart: string, payload: Payload): unknown {
   const items = payload.items.map((item, index) => {
     const number = numberOf(index, item.metadata);
     if (kind === 'cloze') {
-      return { number, options: item.options, claimed_key: item.correct_key };
+      return { number, options: item.options, claimed_key: item.correct_key, explanation: item.explanation };
     }
     if (kind === 'comprehension') {
       return {
