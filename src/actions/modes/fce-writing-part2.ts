@@ -12,7 +12,6 @@ import { ensureSession, finishSession, recordTurn } from '@/lib/session/lifecycl
 import { createSupabaseServer } from '@/lib/supabase/server';
 import { requestFceEvaluation } from '@/lib/writing/fce-evaluation';
 import { countWords } from '@/lib/writing/word-count';
-import type { WritingFormativeFeedback } from '@/lib/types/practice';
 import {
   FCE_PART2_PLAN_KIND,
   FCE_PART2_POOL_SIZE,

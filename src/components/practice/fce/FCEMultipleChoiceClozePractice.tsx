@@ -147,7 +147,7 @@ export function FCEMultipleChoiceClozePractice({
     }
 
     void init();
-  }, []);
+  }, [initialMessages, initialSessionId, t]);
 
   function handleSelect(gapNumber: number, optionId: 'A' | 'B' | 'C' | 'D') {
     setAnswers((prev) => ({ ...prev, [gapNumber]: optionId }));

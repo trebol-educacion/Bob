@@ -2,7 +2,6 @@ import { z } from 'zod';
 import { MODELS } from '@/lib/models';
 import { FormativeFeedbackSchema, type FormativeFeedback } from '@/lib/types/practice';
 import { getPrompt } from '@/lib/prompts/db-prompts';
-import { createSupabaseServer } from '@/lib/supabase/server';
 import { finishSession, openSession, recordTurn, type TurnMessage } from '@/lib/session/lifecycle';
 import { fail, ok, type ActionResult } from '@/lib/result';
 import { getOrCreateCachedContent } from '@/lib/cache';

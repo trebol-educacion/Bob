@@ -2,11 +2,13 @@
 
 import { getPrompt } from '@/lib/prompts/db-prompts';
 import { callGemini } from '@/lib/gemini-client';
-import { persistMessages } from '@/lib/persist-activity';
+import { currentUserId, finishSession, openSession, recordTurn } from '@/lib/session/lifecycle';
 import { MODELS } from '@/lib/models';
 import { validateRecordedAudio } from '@/lib/audio-guard';
-import { EvaluationSchema, type FCELongTurnReferenceVocabulary, type FCELongTurnFeedback } from './contracts';
+import { EvaluationSchema, type FCELongTurnResult, type FCELongTurnSubmission } from './contracts';
 import { safeParse } from './shared';
+
+const FCE_P2_MODE = 'cambridge_fce_p2';
 
 /**
  * Evaluates a student's audio recording for FCE Part 2 Long Turn.
@@ -14,24 +16,21 @@ import { safeParse } from './shared';
  * Returns an error discriminant when audio guard fails.
  */
 export async function evaluateFCEPictureDescriptionAction(input: {
-  sessionId: string;
-  userId: string;
-  topic: string;
-  comparisonQuestion: string;
-  scenePromptA: string;
-  scenePromptB: string;
-  referenceVocabulary: FCELongTurnReferenceVocabulary;
+  sessionId?: string;
+  plan: FCELongTurnResult;
   audioBlob: Blob;
   mimeType: string;
   audioDuration: number;
-}): Promise<FCELongTurnFeedback | { error: string }> {
+}): Promise<FCELongTurnSubmission | { error: string }> {
   const tStart = Date.now();
+  const userId = await currentUserId();
+  if (!userId) return { error: 'Not authenticated' };
+  const { plan } = input;
   const audioBytes = input.audioBlob.size;
   console.log(JSON.stringify({
     event: 'fce_p2_evaluate_start',
-    sessionId: input.sessionId,
-    userId: input.userId,
-    topic: input.topic,
+    userId,
+    topic: plan.topic,
     audioBytes,
     audioDurationSec: input.audioDuration,
     mimeType: input.mimeType,
@@ -47,7 +46,6 @@ export async function evaluateFCEPictureDescriptionAction(input: {
   if (!guard.ok) {
     console.warn(JSON.stringify({
       event: 'fce_p2_audio_guard_failed',
-      sessionId: input.sessionId,
       reason: guard.reason,
       audioBytes,
       audioDurationSec: input.audioDuration,
@@ -59,23 +57,22 @@ export async function evaluateFCEPictureDescriptionAction(input: {
   const audioBase64 = Buffer.from(arrayBuffer).toString('base64');
   console.log(JSON.stringify({
     event: 'fce_p2_audio_prepared',
-    sessionId: input.sessionId,
     audioBytes,
     base64Length: audioBase64.length,
   }));
 
   const tEvalStart = Date.now();
   const evalPromptText = await getPrompt('cambridge_fce_p2_b2_evaluation', {
-    TOPIC: input.topic,
-    COMPARISON_QUESTION: input.comparisonQuestion,
-    SCENE_A: input.scenePromptA,
-    SCENE_B: input.scenePromptB,
-    REFERENCE_VOCABULARY: JSON.stringify(input.referenceVocabulary),
+    TOPIC: plan.topic,
+    COMPARISON_QUESTION: plan.comparisonQuestion,
+    SCENE_A: plan.scenePromptA,
+    SCENE_B: plan.scenePromptB,
+    REFERENCE_VOCABULARY: JSON.stringify(plan.referenceVocabulary),
     AUDIO_DURATION_SECONDS: input.audioDuration,
   });
 
   const evalResult = await callGemini(
-    { promptKey: 'cambridge_fce_p2_b2_evaluation', model: MODELS.FLASH_LITE_PREVIEW, userId: input.userId },
+    { promptKey: 'cambridge_fce_p2_b2_evaluation', model: MODELS.FLASH_LITE_PREVIEW, userId },
     (ai) =>
       ai.models.generateContent({
         model: MODELS.FLASH_LITE_PREVIEW,
@@ -94,7 +91,6 @@ export async function evaluateFCEPictureDescriptionAction(input: {
 
   console.log(JSON.stringify({
     event: 'fce_p2_eval_response',
-    sessionId: input.sessionId,
     ok: evalResult.ok,
     latencyMs: Date.now() - tEvalStart,
   }));
@@ -102,7 +98,6 @@ export async function evaluateFCEPictureDescriptionAction(input: {
   if (!evalResult.ok) {
     console.error(JSON.stringify({
       event: 'fce_p2_eval_failed',
-      sessionId: input.sessionId,
       error: 'callGemini not ok',
     }));
     return { error: 'Could not evaluate recording' };
@@ -114,7 +109,6 @@ export async function evaluateFCEPictureDescriptionAction(input: {
   if (!feedback) {
     console.error(JSON.stringify({
       event: 'fce_p2_eval_parse_failed',
-      sessionId: input.sessionId,
       rawPreview: evalRaw.slice(0, 200),
     }));
     return { error: 'Unexpected evaluation response' };
@@ -124,7 +118,6 @@ export async function evaluateFCEPictureDescriptionAction(input: {
   const coverageHits = Object.values(feedback.coverage).filter(Boolean).length;
   console.log(JSON.stringify({
     event: 'fce_p2_eval_parsed',
-    sessionId: input.sessionId,
     understood: feedback.understood,
     coverageHits,
     coverageTotal: 6,
@@ -137,49 +130,66 @@ export async function evaluateFCEPictureDescriptionAction(input: {
     totalLatencyMs: Date.now() - tStart,
   }));
 
-  persistMessages([
-    {
-      sessionId: input.sessionId,
-      userId: input.userId,
-      role: 'user',
-      msgType: 'text',
-      contentText: transcript,
-      contentJson: {
-        kind: 'fce_long_turn_submission',
-        transcript,
-        audio_duration_seconds: input.audioDuration,
+  const session = await openSession({
+    mode: FCE_P2_MODE,
+    sessionId: input.sessionId,
+    opening: [
+      {
+        role: 'bob',
+        msgType: 'text',
+        contentText: null,
+        contentJson: {
+          kind: 'fce_long_turn_plan',
+          topic: plan.topic,
+          framing_text: plan.framingText,
+          comparison_question: plan.comparisonQuestion,
+          scene_prompt_a: plan.scenePromptA,
+          scene_prompt_b: plan.scenePromptB,
+          reference_vocabulary: plan.referenceVocabulary,
+          language_bank: plan.languageBank,
+          image_url_a: plan.imageUrlA,
+          image_url_b: plan.imageUrlB,
+        },
       },
-    },
-    {
-      sessionId: input.sessionId,
-      userId: input.userId,
-      role: 'bob',
-      msgType: 'evaluation',
-      contentText: null,
-      contentJson: {
-        kind: 'fce_long_turn_feedback',
-        understood: feedback.understood,
-        highlights: feedback.highlights,
-        suggestions: feedback.suggestions,
-        coverage: feedback.coverage,
-        fluency_band: feedback.fluency_band,
-        language_band: feedback.language_band,
-        transcript_used: feedback.transcript_used,
-        rubric: feedback.rubric ?? null,
-        is_final: true,
-      },
-    },
-  ])
-    .then(() => console.log(JSON.stringify({
-      event: 'fce_p2_persist_done',
-      sessionId: input.sessionId,
-    })))
-    .catch((err) => console.warn(JSON.stringify({
-      event: 'fce_p2_persist_failed',
-      sessionId: input.sessionId,
-      error: String(err),
-    })));
+    ],
+  });
+  if (!session.ok) return { error: session.code };
 
-  return { ...feedback, transcript, rubric: feedback.rubric };
+  const turn = await recordTurn({
+    ...session.data,
+    messages: [
+      {
+        role: 'user',
+        msgType: 'text',
+        contentText: transcript,
+        contentJson: {
+          kind: 'fce_long_turn_submission',
+          transcript,
+          audio_duration_seconds: input.audioDuration,
+        },
+      },
+    ],
+  });
+  if (!turn.ok) return { error: turn.code };
+
+  const finished = await finishSession({
+    ...session.data,
+    evaluation: {
+      kind: 'fce_long_turn_feedback',
+      understood: feedback.understood,
+      highlights: feedback.highlights,
+      suggestions: feedback.suggestions,
+      coverage: feedback.coverage,
+      fluency_band: feedback.fluency_band,
+      language_band: feedback.language_band,
+      transcript_used: feedback.transcript_used,
+      rubric: feedback.rubric ?? null,
+    },
+  });
+  if (!finished.ok) return { error: finished.code };
+
+  return {
+    sessionId: session.data.sessionId,
+    feedback: { ...feedback, transcript, rubric: feedback.rubric },
+  };
 }
-

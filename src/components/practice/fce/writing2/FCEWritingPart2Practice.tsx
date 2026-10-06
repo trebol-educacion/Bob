@@ -45,7 +45,9 @@ export function FCEWritingPart2Practice({
   const [taskNumber, setTaskNumber] = useState<number | null>(restored?.feedback ? restored.taskNumber : null);
   const [feedback, setFeedback] = useState<WritingFormativeFeedback | null>(restored?.feedback ?? null);
   const [submittedText, setSubmittedText] = useState(restored?.feedback ? (restored.text ?? '') : '');
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(() =>
+    initialSessionId && !restored?.plan ? t('fce.restoreFailed') : null,
+  );
   const initStartedRef = useRef(false);
 
   const openNewSession = useCallback(async () => {
@@ -61,14 +63,10 @@ export function FCEWritingPart2Practice({
   }, []);
 
   useEffect(() => {
-    if (initStartedRef.current || restored?.plan) return;
+    if (initStartedRef.current || restored?.plan || initialSessionId) return;
     initStartedRef.current = true;
-    if (initialSessionId) {
-      setErrorMsg(t('fce.restoreFailed'));
-      return;
-    }
     void openNewSession();
-  }, [restored, initialSessionId, openNewSession, t]);
+  }, [restored, initialSessionId, openNewSession]);
 
   const chosenTask = plan?.tasks.find((task) => task.number === taskNumber) ?? null;
 

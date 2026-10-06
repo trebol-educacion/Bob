@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { blobToBase64 } from '@/lib/audio';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
 import { useTTS } from '@/hooks/useTTS';
@@ -13,11 +13,19 @@ import type { CollaborativePhase, CollaborativePracticeConfig, CollaborativeSess
 export function useCollaborativeSession(config: CollaborativePracticeConfig, params: CollaborativeSessionParams = {}) {
   const { sessionId: initialSessionId, initialMessages, onSessionCreated, onSessionFinished } = params;
   const { actions } = config;
-  const [phase, setPhase] = useState<CollaborativePhase>('intro');
-  const [scenario, setScenario] = useState<Part3Scenario | null>(null);
-  const [history, setHistory] = useState<Part3ChatMessage[]>([]);
+  const [restored] = useState(() =>
+    initialSessionId && initialMessages && initialMessages.length > 0
+      ? restoreCollaborative(initialMessages as StoredMessage[])
+      : null,
+  );
+  const [phase, setPhase] = useState<CollaborativePhase>(() => {
+    if (restored?.feedback) return 'result';
+    return restored && restored.history.length > 0 ? 'conversation' : 'intro';
+  });
+  const [scenario, setScenario] = useState<Part3Scenario | null>(restored?.scenario ?? null);
+  const [history, setHistory] = useState<Part3ChatMessage[]>(restored?.history ?? []);
   const [discussedOptions, setDiscussedOptions] = useState<Set<number>>(new Set());
-  const [evaluation, setEvaluation] = useState<FormativeFeedback | null>(null);
+  const [evaluation, setEvaluation] = useState<FormativeFeedback | null>(restored?.feedback ?? null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [loadingScenario, setLoadingScenario] = useState(false);
   const [textInput, setTextInput] = useState('');
@@ -26,21 +34,6 @@ export function useCollaborativeSession(config: CollaborativePracticeConfig, par
   const [ttsLoading, setTtsLoading] = useState(false);
 
   const sessionIdRef = useRef<string | null>(initialSessionId ?? null);
-
-  useEffect(() => {
-    if (!initialSessionId || !initialMessages || initialMessages.length === 0) return;
-    const restored = restoreCollaborative(initialMessages as StoredMessage[]);
-    sessionIdRef.current = initialSessionId;
-    if (restored.scenario) setScenario(restored.scenario);
-    if (restored.history.length > 0) {
-      setHistory(restored.history);
-      setPhase('conversation');
-    }
-    if (restored.feedback) {
-      setEvaluation(restored.feedback);
-      setPhase('result');
-    }
-  }, [initialSessionId, initialMessages]);
 
   const adoptSession = useCallback((sessionId: string | undefined) => {
     if (!sessionId || sessionIdRef.current === sessionId) return;
