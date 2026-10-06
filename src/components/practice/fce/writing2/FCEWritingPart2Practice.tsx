@@ -25,13 +25,9 @@ export interface FCEWritingPart2PracticeProps {
 
 type Phase = 'loading' | 'choosing' | 'writing' | 'finished';
 
-interface Identity {
-  sessionId: string;
-  userId: string;
-}
-
 export function FCEWritingPart2Practice({
   onBack,
+  sessionId: initialSessionId,
   initialMessages,
   onSessionCreated,
   onSessionFinished,
@@ -45,9 +41,7 @@ export function FCEWritingPart2Practice({
     return restored.feedback ? 'finished' : 'choosing';
   });
   const [plan, setPlan] = useState<FcePart2Plan | null>(restored?.plan ?? null);
-  const [identity, setIdentity] = useState<Identity | null>(
-    restored?.sessionId && restored.userId ? { sessionId: restored.sessionId, userId: restored.userId } : null,
-  );
+  const [sessionId, setSessionId] = useState<string | undefined>(initialSessionId);
   const [taskNumber, setTaskNumber] = useState<number | null>(restored?.feedback ? restored.taskNumber : null);
   const [feedback, setFeedback] = useState<WritingFormativeFeedback | null>(restored?.feedback ?? null);
   const [submittedText, setSubmittedText] = useState(restored?.feedback ? (restored.text ?? '') : '');
@@ -62,35 +56,36 @@ export function FCEWritingPart2Practice({
       setErrorMsg(result.error);
       return;
     }
-    onSessionCreated?.(result.sessionId);
-    setIdentity({ sessionId: result.sessionId, userId: result.userId });
     setPlan(result);
     setPhase('choosing');
-  }, [onSessionCreated]);
+  }, []);
 
   useEffect(() => {
     if (initStartedRef.current || restored?.plan) return;
     initStartedRef.current = true;
+    if (initialSessionId) {
+      setErrorMsg(t('fce.restoreFailed'));
+      return;
+    }
     void openNewSession();
-  }, [restored, openNewSession]);
+  }, [restored, initialSessionId, openNewSession, t]);
 
   const chosenTask = plan?.tasks.find((task) => task.number === taskNumber) ?? null;
 
   const evaluate = useCallback(
     async (input: { text: string }): Promise<WritingFormativeFeedback | { error: string }> => {
-      if (taskNumber === null || !identity) return { error: 'No task selected' };
-      const result = await submitFCEWritingPart2Action({
-        sessionId: identity.sessionId,
-        taskNumber,
-        text: input.text,
-      });
-      if (!('error' in result)) {
-        setSubmittedText(input.text);
-        onSessionFinished?.();
+      if (taskNumber === null || !plan) return { error: 'No task selected' };
+      const result = await submitFCEWritingPart2Action({ sessionId, plan, taskNumber, text: input.text });
+      if ('error' in result) return result;
+      if (!sessionId) {
+        setSessionId(result.sessionId);
+        onSessionCreated?.(result.sessionId);
       }
-      return result;
+      setSubmittedText(input.text);
+      onSessionFinished?.();
+      return result.feedback;
     },
-    [taskNumber, identity, onSessionFinished],
+    [taskNumber, plan, sessionId, onSessionCreated, onSessionFinished],
   );
 
   if (errorMsg) {
@@ -164,7 +159,7 @@ export function FCEWritingPart2Practice({
         </div>
       )}
 
-      {phase === 'writing' && chosenTask && identity && (
+      {phase === 'writing' && chosenTask && (
         <div className="flex-1 overflow-y-auto px-4">
           <button
             type="button"
@@ -177,8 +172,6 @@ export function FCEWritingPart2Practice({
             promptKey="cambridge_fce_writing_part2_b2_evaluation"
             instructions={`${t(`fce.writing2.types.${chosenTask.taskType}`)}: ${chosenTask.situation}`}
             targetWordCount={FCE_PART2_WORD_RANGE}
-            sessionId={identity.sessionId}
-            userId={identity.userId}
             evaluateAction={evaluate}
             onComplete={(_response, result) => {
               setFeedback(result);

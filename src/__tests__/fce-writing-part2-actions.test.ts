@@ -2,9 +2,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('server-only', () => ({}));
 
-const persistMock = vi.fn();
+const recordTurnMock = vi.fn();
+const finishMock = vi.fn();
+const ensureMock = vi.fn();
 const readMessagesMock = vi.fn();
-const createSessionMock = vi.fn();
 const evaluationMock = vi.fn();
 const cacheMock = vi.fn();
 
@@ -14,10 +15,13 @@ vi.mock('@/lib/supabase/server', () => ({
   }),
 }));
 vi.mock('@/lib/persist-activity', () => ({
-  persistMessage: (...a: unknown[]) => persistMock(...a),
   readSessionMessages: (...a: unknown[]) => readMessagesMock(...a),
 }));
-vi.mock('@/actions/sessions', () => ({ createSessionAction: (...a: unknown[]) => createSessionMock(...a) }));
+vi.mock('@/lib/session/lifecycle', () => ({
+  ensureSession: (...a: unknown[]) => ensureMock(...a),
+  recordTurn: (...a: unknown[]) => recordTurnMock(...a),
+  finishSession: (...a: unknown[]) => finishMock(...a),
+}));
 vi.mock('@/lib/prompts/db-prompts', () => ({ getPrompt: async () => 'prompt' }));
 vi.mock('@/lib/gemini-client', () => ({ callGemini: vi.fn(), isOk: () => false }));
 vi.mock('@/lib/cache', () => ({ getOrCreateCachedContent: (...a: unknown[]) => cacheMock(...a) }));
@@ -33,6 +37,13 @@ const GENERATION = {
     { number: 3, task_type: 'report', situation: 'Write a report on the school library.', register: 'formal' },
     { number: 4, task_type: 'email_letter', situation: 'Write to the council about a bus stop.', register: 'formal' },
   ],
+};
+
+const PLAN = {
+  title: GENERATION.title,
+  instructions: GENERATION.instructions,
+  framingText: 'Framing',
+  tasks: GENERATION.tasks.map((t) => ({ number: t.number, taskType: t.task_type as 'article', situation: t.situation, register: t.register })),
 };
 
 const PLAN_MESSAGE = {
@@ -55,27 +66,25 @@ const EVALUATION = {
 };
 
 beforeEach(() => {
-  persistMock.mockReset().mockResolvedValue({ id: 'msg' });
+  recordTurnMock.mockReset().mockResolvedValue({ ok: true, data: { ids: [] } });
+  finishMock.mockReset().mockResolvedValue({ ok: true, data: { score10: 6.5, messageId: 'm' } });
+  ensureMock.mockReset().mockResolvedValue({ ok: true, data: { sessionId: 's1', userId: 'user-1', created: true } });
   readMessagesMock.mockReset().mockResolvedValue([PLAN_MESSAGE]);
-  createSessionMock.mockReset().mockResolvedValue({ data: { id: 's1', user_id: 'user-1' }, error: null });
   evaluationMock.mockReset().mockResolvedValue(EVALUATION);
   cacheMock.mockReset().mockResolvedValue(GENERATION);
 });
 
 describe('startFCEWritingPart2Action', () => {
-  it('returns three tasks from the cache pool and persists the plan', async () => {
+  it('returns three tasks from the cache pool without creating a session', async () => {
     const result = await startFCEWritingPart2Action();
     if ('error' in result) throw new Error(result.error);
     expect(result.tasks).toHaveLength(3);
     expect(result.tasks.map((task) => task.taskType)).toEqual(['article', 'report', 'email_letter']);
-    expect(createSessionMock).toHaveBeenCalledWith(expect.objectContaining({ mode: 'cambridge_fce_writing_part2' }));
+    expect(ensureMock).not.toHaveBeenCalled();
     expect(cacheMock).toHaveBeenCalledWith(
       expect.objectContaining({ kind: 'plan', promptKey: 'cambridge_fce_writing_part2_b2_generation' }),
       expect.any(Function),
       expect.any(Object),
-    );
-    expect(persistMock).toHaveBeenCalledWith(
-      expect.objectContaining({ contentJson: expect.objectContaining({ kind: 'writing_tasks' }) }),
     );
   });
 
@@ -87,44 +96,33 @@ describe('startFCEWritingPart2Action', () => {
 });
 
 describe('submitFCEWritingPart2Action', () => {
-  it('evaluates the chosen task, computes the mark in code and persists a final evaluation', async () => {
-    const result = await submitFCEWritingPart2Action({ sessionId: 's1', taskNumber: 3, text: 'one two three' });
+  it('evaluates the chosen task, creates the session on first submit and finishes it with the mark', async () => {
+    const result = await submitFCEWritingPart2Action({ plan: PLAN, taskNumber: 3, text: 'one two three' });
     if ('error' in result) throw new Error(result.error);
-    expect(result.score_10).toBe(6.5);
-    expect(result.fce_rubric).toEqual(RUBRIC);
-    expect(result.indicators).toEqual({ word_count: 3, target_word_count_range: [140, 190] });
+    expect(result.sessionId).toBe('s1');
+    expect(result.feedback.score_10).toBe(6.5);
+    expect(result.feedback.fce_rubric).toEqual(RUBRIC);
+    expect(result.feedback.indicators).toEqual({ word_count: 3, target_word_count_range: [140, 190] });
     expect(evaluationMock).toHaveBeenCalledWith(
       expect.objectContaining({
         variables: expect.objectContaining({ TASK_TYPE: 'report', TASK_TEXT: 'Write a report on the school library.' }),
       }),
     );
-    const evaluationCall = persistMock.mock.calls.find(([arg]) => arg.msgType === 'evaluation');
-    expect(evaluationCall?.[0].contentJson).toMatchObject({
-      is_final: true,
-      score: 13,
-      score_max: 20,
-      score_10: 6.5,
-      task_number: 3,
-    });
-    const submission = persistMock.mock.calls.find(([arg]) => arg.role === 'user');
-    expect(submission?.[0].contentJson).toMatchObject({ kind: 'writing_submission', task_number: 3 });
+    const messages = recordTurnMock.mock.calls[0][0].messages;
+    expect(messages[0].contentJson).toMatchObject({ kind: 'writing_tasks' });
+    expect(messages[1].contentJson).toMatchObject({ kind: 'writing_submission', task_number: 3 });
+    expect(finishMock.mock.calls[0][0].evaluation).toMatchObject({ score: 13, score_max: 20, score_10: 6.5, task_number: 3 });
   });
 
-  it('does not persist anything when the model output lacks a valid rubric', async () => {
+  it('does not create a session when the model output lacks a valid rubric', async () => {
     evaluationMock.mockResolvedValue(null);
-    const result = await submitFCEWritingPart2Action({ sessionId: 's1', taskNumber: 2, text: 'text' });
+    const result = await submitFCEWritingPart2Action({ plan: PLAN, taskNumber: 2, text: 'text' });
     expect(result).toEqual({ error: expect.any(String) });
-    expect(persistMock).not.toHaveBeenCalled();
+    expect(ensureMock).not.toHaveBeenCalled();
   });
 
-  it('rejects an unknown task and a foreign or missing session', async () => {
-    expect(await submitFCEWritingPart2Action({ sessionId: 's1', taskNumber: 9, text: 't' })).toEqual({
-      error: 'Unknown task',
-    });
-    readMessagesMock.mockResolvedValue([]);
-    expect(await submitFCEWritingPart2Action({ sessionId: 'other', taskNumber: 2, text: 't' })).toEqual({
-      error: 'Session not found',
-    });
+  it('rejects an unknown task', async () => {
+    expect(await submitFCEWritingPart2Action({ plan: PLAN, taskNumber: 9, text: 't' })).toEqual({ error: 'Unknown task' });
     expect(evaluationMock).not.toHaveBeenCalled();
   });
 
@@ -133,7 +131,7 @@ describe('submitFCEWritingPart2Action', () => {
       PLAN_MESSAGE,
       { ...PLAN_MESSAGE, id: 'm2', msg_type: 'evaluation', content_json: { is_final: true } },
     ]);
-    expect(await submitFCEWritingPart2Action({ sessionId: 's1', taskNumber: 2, text: 't' })).toEqual({
+    expect(await submitFCEWritingPart2Action({ sessionId: 's1', plan: PLAN, taskNumber: 2, text: 't' })).toEqual({
       error: 'Already submitted',
     });
     expect(evaluationMock).not.toHaveBeenCalled();

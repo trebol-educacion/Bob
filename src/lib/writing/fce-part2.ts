@@ -26,9 +26,9 @@ export interface FcePart2Plan {
   framingText: string;
 }
 
-export interface FcePart2Start extends FcePart2Plan {
+export interface FCEWritingPart2Submission {
   sessionId: string;
-  userId: string;
+  feedback: WritingFormativeFeedback;
 }
 
 const TaskSchema = z.object({

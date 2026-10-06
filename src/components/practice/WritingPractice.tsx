@@ -10,16 +10,29 @@ import { persistMessage } from '@/lib/persist-activity';
 import type { WritingResponse, WritingFormativeFeedback } from '@/lib/types/practice';
 
 /** Props for the generic WritingPractice activity component. */
-export interface WritingPracticeProps {
+export interface WritingPracticeBaseProps {
   promptKey: string;
   instructions: string;
   targetWordCount: [number, number];
   bullets?: string[];
+  onComplete?: (response: WritingResponse, feedback: WritingFormativeFeedback) => void;
+}
+
+type EvaluateResult = Promise<WritingFormativeFeedback | { error: string }>;
+
+export interface WritingSessionProps {
   sessionId: string;
   userId: string;
-  onComplete?: (response: WritingResponse, feedback: WritingFormativeFeedback) => void;
-  evaluateAction: (input: { text: string; sessionId: string; userId: string }) => Promise<WritingFormativeFeedback | { error: string }>;
+  evaluateAction: (input: { text: string; sessionId: string; userId: string }) => EvaluateResult;
 }
+
+export interface WritingSessionlessProps {
+  sessionId?: undefined;
+  userId?: undefined;
+  evaluateAction: (input: { text: string }) => EvaluateResult;
+}
+
+export type WritingPracticeProps = WritingPracticeBaseProps & (WritingSessionProps | WritingSessionlessProps);
 
 /** Reusable open writing activity with live word count, auto-save draft, and formative feedback. */
 export function WritingPractice({
@@ -43,7 +56,7 @@ export function WritingPractice({
 
   const saveDraft = useCallback(
     (currentText: string) => {
-      if (currentText === lastSavedRef.current) return;
+      if (!sessionId || !userId || currentText === lastSavedRef.current) return;
       lastSavedRef.current = currentText;
       persistMessage({
         sessionId,
@@ -79,7 +92,8 @@ export function WritingPractice({
     const finalWordCount = countWords(finalText);
     const timeSpentMs = Date.now() - startTime;
 
-    const result = await evaluateAction({ text: finalText, sessionId, userId });
+    const evaluate = evaluateAction as (input: { text: string; sessionId?: string; userId?: string }) => EvaluateResult;
+    const result = await evaluate({ text: finalText, sessionId, userId });
 
     if ('error' in result) {
       setSubmitError(result.error);
@@ -87,15 +101,17 @@ export function WritingPractice({
       return;
     }
 
-    persistMessage({
-      sessionId,
-      userId,
-      role: 'bob',
-      msgType: 'evaluation',
-      contentJson: result as unknown as Record<string, unknown>,
-    }).catch((err: unknown) => {
-      console.error('[WritingPractice] evaluation persist failed:', err);
-    });
+    if (sessionId && userId) {
+      persistMessage({
+        sessionId,
+        userId,
+        role: 'bob',
+        msgType: 'evaluation',
+        contentJson: result as unknown as Record<string, unknown>,
+      }).catch((err: unknown) => {
+        console.error('[WritingPractice] evaluation persist failed:', err);
+      });
+    }
 
     setFeedback(result);
     setSubmitting(false);

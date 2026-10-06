@@ -43,7 +43,7 @@ const TASKS = [
   { number: 3, taskType: 'review', situation: 'Situation review', register: 'semi-formal' },
   { number: 4, taskType: 'report', situation: 'Situation report', register: 'formal' },
 ];
-const START = { sessionId: 's1', userId: 'u1', title: 't', instructions: 'i', framingText: 'Framing text', tasks: TASKS };
+const START = { title: 't', instructions: 'i', framingText: 'Framing text', tasks: TASKS };
 const RUBRIC = { content: 4, communicative_achievement: 3, organisation: 3, language: 3 };
 const FEEDBACK = {
   kind: 'writing_formative',
@@ -63,7 +63,7 @@ function words(n: number): string {
 beforeEach(() => {
   vi.clearAllMocks();
   startMock.mockResolvedValue(START);
-  submitMock.mockResolvedValue(FEEDBACK);
+  submitMock.mockResolvedValue({ sessionId: 's1', feedback: FEEDBACK });
 });
 afterEach(cleanup);
 
@@ -93,13 +93,15 @@ describe('FCEWritingPart2Practice', () => {
 
   it('submits the chosen task and shows the 0-10 mark with formative feedback', async () => {
     const onFinished = vi.fn();
-    render(<FCEWritingPart2Practice onBack={vi.fn()} onSessionFinished={onFinished} />);
+    const onCreated = vi.fn();
+    render(<FCEWritingPart2Practice onBack={vi.fn()} onSessionFinished={onFinished} onSessionCreated={onCreated} />);
     await screen.findByText('Situation article');
     fireEvent.click(screen.getAllByText('fce.writing2.chooseAction')[2]);
     fireEvent.change(await screen.findByLabelText('text'), { target: { value: words(150) } });
     fireEvent.click(screen.getByText('send'));
     await waitFor(() => expect(screen.getByTestId('fce-score-10')).toHaveTextContent('6.5'));
-    expect(submitMock).toHaveBeenCalledWith({ sessionId: 's1', taskNumber: 4, text: words(150) });
+    expect(submitMock).toHaveBeenCalledWith({ sessionId: undefined, plan: START, taskNumber: 4, text: words(150) });
+    expect(onCreated).toHaveBeenCalledWith('s1');
     expect(screen.getByText('Great opening')).toBeInTheDocument();
     expect(onFinished).toHaveBeenCalled();
   });
@@ -135,7 +137,7 @@ describe('FCEWritingPart2Practice', () => {
     fireEvent.change(await screen.findByLabelText('text'), { target: { value: words(150) } });
     fireEvent.click(screen.getByText('send'));
     await waitFor(() => expect(screen.getByTestId('fce-score-10')).toBeInTheDocument());
-    expect(submitMock).toHaveBeenCalledWith({ sessionId: 's9', taskNumber: 2, text: words(150) });
+    expect(submitMock).toHaveBeenCalledWith(expect.objectContaining({ sessionId: 's9', taskNumber: 2, text: words(150) }));
     expect(startMock).not.toHaveBeenCalled();
   });
 

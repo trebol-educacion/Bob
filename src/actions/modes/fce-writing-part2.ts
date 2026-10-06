@@ -6,8 +6,9 @@ import { parseJsonResult } from '@/lib/llm/parse-json-result';
 import type { ActionResult } from '@/lib/result';
 import { getOrCreateCachedContent } from '@/lib/cache';
 import { MODELS } from '@/lib/models';
-import { persistMessage, readSessionMessages } from '@/lib/persist-activity';
-import { createSessionAction } from '@/actions/sessions';
+import type { FCEWritingPart2Submission } from '@/lib/writing/fce-part2';
+import { readSessionMessages } from '@/lib/persist-activity';
+import { ensureSession, finishSession, recordTurn } from '@/lib/session/lifecycle';
 import { createSupabaseServer } from '@/lib/supabase/server';
 import { requestFceEvaluation } from '@/lib/writing/fce-evaluation';
 import { countWords } from '@/lib/writing/word-count';
@@ -18,14 +19,14 @@ import {
   FCE_PART2_SUBMISSION_KIND,
   FcePart2EvaluationSchema,
   FcePart2GenerationSchema,
-  readFcePart2Plan,
   toFcePart2EvaluationJson,
   toFcePart2Feedback,
   toFcePart2Plan,
   type FcePart2Generation,
-  type FcePart2Start,
+  type FcePart2Plan,
 } from '@/lib/writing/fce-part2';
 
+const FCE_PART2_MODE = 'cambridge_fce_writing_part2';
 const GENERATION_KEY = 'cambridge_fce_writing_part2_b2_generation';
 const EVALUATION_KEY = 'cambridge_fce_writing_part2_b2_evaluation';
 const FRAMING_KEY = 'cambridge_fce_writing_part2_b2_framing';
@@ -54,63 +55,45 @@ function isValidGeneration(value: FcePart2Generation): boolean {
   return FcePart2GenerationSchema.safeParse(value).success;
 }
 
-export async function startFCEWritingPart2Action(): Promise<FcePart2Start | { error: string }> {
-  const session = await createSessionAction({
-    mode: 'cambridge_fce_writing_part2',
-    title: 'Writing Part 2, Choice task',
-  });
-  if (!session.data) return { error: session.error ?? 'Could not create session' };
-  const { id: sessionId, user_id: userId } = session.data;
+export async function startFCEWritingPart2Action(): Promise<FcePart2Plan | { error: string }> {
+  const supabase = await createSupabaseServer();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: 'Not authenticated' };
 
   const variant = Math.floor(Math.random() * FCE_PART2_POOL_SIZE);
   const [generation, framingText] = await Promise.all([
     getOrCreateCachedContent<FcePart2Generation>(
       { kind: 'plan', promptKey: GENERATION_KEY, inputs: { variant } },
-      () => generateTasks(userId),
+      () => generateTasks(user.id),
       { validate: isValidGeneration },
     ),
     getPrompt(FRAMING_KEY).catch(() => FALLBACK_FRAMING),
   ]);
   if ('error' in generation) return { error: 'Could not generate the exercise' };
 
-  const plan = toFcePart2Plan(generation, framingText);
-  await persistMessage({
-    sessionId,
-    userId,
-    role: 'bob',
-    msgType: 'text',
-    contentJson: {
-      kind: FCE_PART2_PLAN_KIND,
-      title: generation.title,
-      instructions: generation.instructions,
-      tasks: generation.tasks,
-      framing_text: framingText,
-    },
-  });
-
-  return { ...plan, sessionId, userId };
+  return toFcePart2Plan(generation, framingText);
 }
 
 export async function submitFCEWritingPart2Action(input: {
-  sessionId: string;
+  sessionId?: string;
+  plan: FcePart2Plan;
   taskNumber: number;
   text: string;
-}): Promise<WritingFormativeFeedback | { error: string }> {
+}): Promise<FCEWritingPart2Submission | { error: string }> {
   const supabase = await createSupabaseServer();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: 'Not authenticated' };
 
-  const messages = await readSessionMessages(input.sessionId, user.id);
-  const plan = messages.map((message) => readFcePart2Plan(message.content_json)).find((found) => found !== null);
-  if (!plan) return { error: 'Session not found' };
+  if (input.sessionId) {
+    const messages = await readSessionMessages(input.sessionId, user.id);
+    const alreadyEvaluated = messages.some((message) => {
+      const json = message.content_json as Record<string, unknown> | null;
+      return message.msg_type === 'evaluation' && json?.is_final === true;
+    });
+    if (alreadyEvaluated) return { error: 'Already submitted' };
+  }
 
-  const alreadyEvaluated = messages.some((message) => {
-    const json = message.content_json as Record<string, unknown> | null;
-    return message.msg_type === 'evaluation' && json?.is_final === true;
-  });
-  if (alreadyEvaluated) return { error: 'Already submitted' };
-
-  const task = plan.tasks.find((candidate) => candidate.number === input.taskNumber);
+  const task = input.plan.tasks.find((candidate) => candidate.number === input.taskNumber);
   if (!task) return { error: 'Unknown task' };
 
   const wordCount = countWords(input.text);
@@ -128,21 +111,51 @@ export async function submitFCEWritingPart2Action(input: {
   if (!evaluation) return { error: 'Could not evaluate your text' };
 
   const feedback = toFcePart2Feedback(evaluation, wordCount);
-  await persistMessage({
-    sessionId: input.sessionId,
-    userId: user.id,
-    role: 'user',
-    msgType: 'text',
-    contentText: input.text,
-    contentJson: { kind: FCE_PART2_SUBMISSION_KIND, text: input.text, task_number: task.number },
-  });
-  await persistMessage({
-    sessionId: input.sessionId,
-    userId: user.id,
-    role: 'bob',
-    msgType: 'evaluation',
-    contentJson: toFcePart2EvaluationJson(feedback, task.number, evaluation.fce_rubric),
-  });
 
-  return feedback;
+  const session = await ensureSession({ mode: FCE_PART2_MODE, sessionId: input.sessionId });
+  if (!session.ok) return { error: session.code };
+  const ref = { sessionId: session.data.sessionId, userId: session.data.userId };
+
+  const planMessages = session.data.created
+    ? [
+        {
+          role: 'bob' as const,
+          msgType: 'text' as const,
+          contentJson: {
+            kind: FCE_PART2_PLAN_KIND,
+            title: input.plan.title,
+            instructions: input.plan.instructions,
+            tasks: input.plan.tasks.map((candidate) => ({
+              number: candidate.number,
+              task_type: candidate.taskType,
+              situation: candidate.situation,
+              register: candidate.register,
+            })),
+            framing_text: input.plan.framingText,
+          },
+        },
+      ]
+    : [];
+
+  const turn = await recordTurn({
+    ...ref,
+    messages: [
+      ...planMessages,
+      {
+        role: 'user',
+        msgType: 'text',
+        contentText: input.text,
+        contentJson: { kind: FCE_PART2_SUBMISSION_KIND, text: input.text, task_number: task.number },
+      },
+    ],
+  });
+  if (!turn.ok) return { error: turn.code };
+
+  const finished = await finishSession({
+    ...ref,
+    evaluation: toFcePart2EvaluationJson(feedback, task.number, evaluation.fce_rubric),
+  });
+  if (!finished.ok) return { error: finished.code };
+
+  return { sessionId: ref.sessionId, feedback };
 }
