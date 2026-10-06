@@ -19,7 +19,6 @@
   "missing": "Missing:",
   "evaluating": "Evaluating…",
   "submit": "Submit",
-  "moreWordsNeeded": "{n, plural, one {# more word needed to submit.} other {# more words needed to submit.}}",
   "writeAnswerPlaceholder": "Write your answer here…",
   "tapToBuild": "Tap tokens below to build the sentence…",
   "check": "Check",

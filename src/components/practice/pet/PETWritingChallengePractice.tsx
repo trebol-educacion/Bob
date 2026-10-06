@@ -5,7 +5,7 @@ import { motion } from 'motion/react';
 import { Sparkles, BookOpen, MessageSquare } from 'lucide-react';
 import { PETWritingIcon } from '@/components/icons/PETIcons';
 import { BobMascotLoader } from '@/components/chat/BobMascotLoader';
-import { ChatInputBar } from '@/components/chat/ChatInputBar';
+import { WritingComposer } from '@/components/practice/writing/WritingComposer';
 import { BobAvatar } from '@/components/practice/yl/_shared';
 import {
   generatePETWritingChallengeAction,
@@ -367,34 +367,17 @@ export function PETWritingChallengePractice({
             </motion.div>
           </div>
 
-          <ChatInputBar
-            variant="text"
+          <WritingComposer
             value={text}
             placeholder="Write your text in English..."
-            disabled={phase !== 'ready'} sendDisabled={wordCount < minWords}
+            wordCount={wordCount}
+            minWords={minWords}
+            maxWords={maxWords}
+            target={`/ ${minWords}-${maxWords}`}
+            disabled={phase !== 'ready'}
             onChange={setText}
-            onSend={handleSubmit}
+            onSubmit={handleSubmit}
           />
-          <div className="shrink-0 px-4 pb-3 -mt-1 flex items-center justify-between text-xs text-gray-400 bg-white">
-            <span>
-              Words:{' '}
-              <strong
-                className={
-                  wordCount < minWords
-                    ? 'text-amber-500'
-                    : wordCount > maxWords
-                    ? 'text-red-400'
-                    : 'text-green-600'
-                }
-              >
-                {wordCount}
-              </strong>{' '}
-              / {minWords}-{maxWords}
-            </span>
-            {wordCount < minWords && (
-              <span className="text-amber-500">{minWords - wordCount} more to send</span>
-            )}
-          </div>
         </>
       )}
 

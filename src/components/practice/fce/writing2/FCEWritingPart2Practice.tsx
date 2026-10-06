@@ -158,11 +158,11 @@ export function FCEWritingPart2Practice({
       )}
 
       {phase === 'writing' && chosenTask && (
-        <div className="flex-1 overflow-y-auto px-4">
+        <div className="flex-1 flex flex-col min-h-0">
           <button
             type="button"
             onClick={() => setPhase('choosing')}
-            className="mt-3 text-xs font-semibold text-gray-400 hover:text-gray-600"
+            className="self-start mx-4 mt-3 text-xs font-semibold text-gray-400 hover:text-gray-600"
           >
             {t('fce.writing2.changeTask')}
           </button>

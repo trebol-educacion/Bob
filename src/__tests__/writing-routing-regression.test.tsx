@@ -11,16 +11,6 @@ vi.mock('next-intl', () => ({
 vi.mock('@/components/chat/BobMascotLoader', () => ({
   BobMascotLoader: ({ message }: { message: string }) => <div>{message}</div>,
 }));
-vi.mock('@/components/chat/ChatInputBar', () => ({
-  ChatInputBar: ({ value, disabled, onChange, onSend }: {
-    value: string; disabled: boolean; onChange: (v: string) => void; onSend: () => void;
-  }) => (
-    <div>
-      <textarea aria-label="text" value={value} onChange={(e) => onChange(e.target.value)} />
-      <button type="button" disabled={disabled} onClick={onSend}>send</button>
-    </div>
-  ),
-}));
 vi.mock('@/components/chat', () => ({
   InfoCard: ({ title, children }: { title: string; children: React.ReactNode }) => (
     <section><h4>{title}</h4>{children}</section>
@@ -89,8 +79,8 @@ describe('Academic Discussion and Writing routing', () => {
     render(<AcademicWritingPractice mode="toefl_writing_academic_discussion" onBack={vi.fn()} />);
     await screen.findByText(/study abroad/);
     expect(screen.getByText(/100-200/)).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText('text'), { target: { value: words(100) } });
-    fireEvent.click(screen.getByText('send'));
+    fireEvent.change(screen.getByLabelText('editorLabel'), { target: { value: words(100) } });
+    fireEvent.click(screen.getByText('submit'));
     await waitFor(() => expect(screen.getByText('Clear opinion')).toBeInTheDocument());
     expect(evaluateAcademicMock).toHaveBeenCalledWith(
       expect.objectContaining({ exam_part: 'toefl_writing_academic_discussion', targetWordCount: [100, 200], bankGroupId: 'g1' }),

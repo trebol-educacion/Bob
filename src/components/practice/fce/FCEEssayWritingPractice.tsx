@@ -6,7 +6,7 @@ import { CheckCircle, XCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { FCEWritingIcon } from '@/components/icons/FCEIcons';
 import { CelebrationCard } from '@/components/practice/yl/CelebrationCard';
 import { BobMascotLoader } from '@/components/chat/BobMascotLoader';
-import { ChatInputBar } from '@/components/chat/ChatInputBar';
+import { WritingComposer } from '@/components/practice/writing/WritingComposer';
 import { BobAvatar } from '@/components/practice/yl/_shared';
 import {
   generateFCEEssayAction,
@@ -370,37 +370,17 @@ export function FCEEssayWritingPractice({
             </motion.div>
           </div>
 
-          <ChatInputBar
-            variant="text"
+          <WritingComposer
             value={text}
             placeholder={t('fce.essay.placeholder')}
+            wordCount={wordCount}
+            minWords={MIN_WORDS}
+            maxWords={WARN_WORDS}
+            target={t('fce.essay.target')}
             disabled={phase !== 'ready'}
-            sendDisabled={wordCount < MIN_WORDS}
             onChange={setText}
-            onSend={handleSubmit}
+            onSubmit={handleSubmit}
           />
-          <div className="shrink-0 px-4 pb-3 -mt-1 flex items-center justify-between text-xs text-gray-400 bg-white">
-            <span>
-              {t('fce.essay.words')}{' '}
-              <strong
-                className={
-                  wordCount < MIN_WORDS
-                    ? 'text-amber-500'
-                    : wordCount > WARN_WORDS
-                      ? 'text-red-400'
-                      : 'text-green-600'
-                }
-              >
-                {wordCount}
-              </strong>{' '}
-              {t('fce.essay.target')}
-            </span>
-            {wordCount < MIN_WORDS && (
-              <span className="text-amber-500">
-                {t('fce.essay.moreToSend', { remaining: MIN_WORDS - wordCount })}
-              </span>
-            )}
-          </div>
         </>
       )}
 

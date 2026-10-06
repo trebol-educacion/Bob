@@ -6,7 +6,7 @@ import { CheckCircle, XCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { PETWritingIcon } from '@/components/icons/PETIcons';
 import { CelebrationCard } from '@/components/practice/yl/CelebrationCard';
 import { BobMascotLoader } from '@/components/chat/BobMascotLoader';
-import { ChatInputBar } from '@/components/chat/ChatInputBar';
+import { WritingComposer } from '@/components/practice/writing/WritingComposer';
 import { BobAvatar } from '@/components/practice/yl/_shared';
 import {
   generatePETEmailAction,
@@ -425,36 +425,17 @@ export function PETEmailWritingPractice({
             </motion.div>
           </div>
 
-          <ChatInputBar
-            variant="text"
+          <WritingComposer
             value={text}
             placeholder={t('pet.emailWriting.placeholder')}
-            disabled={phase !== 'ready'} sendDisabled={wordCount < MIN_WORDS}
+            wordCount={wordCount}
+            minWords={MIN_WORDS}
+            maxWords={WARN_WORDS}
+            target={t('pet.emailWriting.target')}
+            disabled={phase !== 'ready'}
             onChange={setText}
-            onSend={handleSubmit}
+            onSubmit={handleSubmit}
           />
-          <div className="shrink-0 px-4 pb-3 -mt-1 flex items-center justify-between text-xs text-gray-400 bg-white">
-            <span>
-              {t('pet.emailWriting.words')}{' '}
-              <strong
-                className={
-                  wordCount < MIN_WORDS
-                    ? 'text-amber-500'
-                    : wordCount > WARN_WORDS
-                    ? 'text-red-400'
-                    : 'text-green-600'
-                }
-              >
-                {wordCount}
-              </strong>{' '}
-              {t('pet.emailWriting.target')}
-            </span>
-            {wordCount < MIN_WORDS && (
-              <span className="text-amber-500">
-                {t('pet.emailWriting.moreToSend', { remaining: MIN_WORDS - wordCount })}
-              </span>
-            )}
-          </div>
         </>
       )}
 

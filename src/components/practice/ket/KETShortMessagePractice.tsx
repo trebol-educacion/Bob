@@ -6,7 +6,7 @@ import { CheckCircle, XCircle, ChevronDown, ChevronUp, Check, ArrowRight } from 
 import { KETWritingIcon } from '@/components/icons/KETIcons';
 import { CelebrationCard } from '@/components/practice/yl/CelebrationCard';
 import { BobMascotLoader } from '@/components/chat/BobMascotLoader';
-import { ChatInputBar } from '@/components/chat/ChatInputBar';
+import { WritingComposer } from '@/components/practice/writing/WritingComposer';
 import {
   generateKETShortMessageAction,
   evaluateKETShortMessageAction,
@@ -322,42 +322,18 @@ export function KETShortMessagePractice({
             </div>
           </div>
 
-          <div className="mx-auto w-full max-w-lg">
-            <ChatInputBar
-              variant="text"
-              value={text}
-              placeholder="Write your message here…"
-              disabled={phase !== 'ready'}
-              onChange={setText}
-              onSend={handleSubmit}
-            />
-            <div className="shrink-0 px-4 pb-3 -mt-1 flex items-center justify-between text-xs text-gray-400 bg-white">
-              <span>
-                Words:{' '}
-                <strong
-                  className={
-                    wordCount < MIN_WORDS
-                      ? 'text-amber-500'
-                      : wordCount > 40
-                      ? 'text-red-400'
-                      : 'text-green-600'
-                  }
-                >
-                  {wordCount}
-                </strong>{' '}
-                / target ~25
-              </span>
-              {submitError ? (
-                <span className="text-red-500">{submitError}</span>
-              ) : (
-                wordCount < MIN_WORDS && (
-                  <span className="text-amber-500">
-                    {MIN_WORDS - wordCount} more to send
-                  </span>
-                )
-              )}
-            </div>
-          </div>
+          <WritingComposer
+            value={text}
+            placeholder="Write your message here…"
+            wordCount={wordCount}
+            minWords={MIN_WORDS}
+            maxWords={40}
+            target="/ target ~25"
+            disabled={phase !== 'ready'}
+            error={submitError}
+            onChange={setText}
+            onSubmit={handleSubmit}
+          />
         </>
       )}
 

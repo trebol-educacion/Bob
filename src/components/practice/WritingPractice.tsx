@@ -1,10 +1,9 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
 import { useTranslations } from 'next-intl';
 import { WritingFeedbackView } from '@/components/practice/writing/WritingFeedbackView';
-import { ChatInputBar } from '@/components/chat/ChatInputBar';
+import { WritingComposer } from '@/components/practice/writing/WritingComposer';
 import { countWords } from '@/lib/writing/word-count';
 import type { WritingResponse, WritingFormativeFeedback } from '@/lib/types/practice';
 
@@ -14,6 +13,7 @@ export interface WritingPracticeBaseProps {
   instructions: string;
   targetWordCount: [number, number];
   bullets?: string[];
+  lead?: React.ReactNode;
   initialText?: string;
   initialFeedback?: WritingFormativeFeedback | null;
   onComplete?: (response: WritingResponse, feedback: WritingFormativeFeedback) => void;
@@ -32,6 +32,7 @@ export function WritingPractice({
   instructions,
   targetWordCount,
   bullets,
+  lead,
   initialText,
   initialFeedback,
   onComplete,
@@ -83,56 +84,36 @@ export function WritingPractice({
   if (feedback) return <WritingFeedbackView feedback={feedback} />;
 
   return (
-    <div className="flex flex-col gap-5 max-w-xl mx-auto w-full py-4">
-      <div className="bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm text-gray-700 leading-relaxed">
-        {instructions}
+    <div className="flex flex-col flex-1 min-h-0">
+      <div className="flex-1 overflow-y-auto px-4">
+        <div className="flex flex-col gap-4 max-w-3xl mx-auto w-full py-4">
+          {lead}
+          <div className="bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm text-gray-700 leading-relaxed">
+            {instructions}
+          </div>
+          {bullets && bullets.length > 0 && (
+            <ul className="list-disc list-inside space-y-1 text-sm text-gray-600 pl-1">
+              {bullets.map((b, i) => <li key={i}>{b}</li>)}
+            </ul>
+          )}
+          <p className="text-xs text-gray-400 text-right">{minutes}:{String(seconds).padStart(2, '0')}</p>
+          {submitting && (
+            <p className="text-sm text-gray-500 text-center" role="status">{t('reviewingText')}</p>
+          )}
+        </div>
       </div>
-
-      {bullets && bullets.length > 0 && (
-        <ul className="list-disc list-inside space-y-1 text-sm text-gray-600 pl-1">
-          {bullets.map((b, i) => <li key={i}>{b}</li>)}
-        </ul>
-      )}
-
-      <ChatInputBar
-        variant="text"
+      <WritingComposer
         value={text}
         placeholder={t('writeAnswerPlaceholder')}
+        wordCount={wordCount}
+        minWords={minWords}
+        maxWords={maxWords}
+        target={`/ ${minWords}-${maxWords}`}
         disabled={submitting}
-        sendDisabled={wordCount < minWords}
+        error={submitError ? tErrors('tryAgain', { message: submitError }) : null}
         onChange={setText}
-        onSend={handleSubmit}
+        onSubmit={handleSubmit}
       />
-
-      <div className="flex items-center justify-between text-xs text-gray-400 px-1">
-        <span>
-          {t('words')} <strong className={wordCount < minWords ? 'text-amber-500' : wordCount > maxWords ? 'text-red-400' : 'text-green-600'}>{wordCount}</strong> / {minWords}-{maxWords}
-        </span>
-        <span>{minutes}:{String(seconds).padStart(2, '0')}</span>
-      </div>
-
-      {submitting && (
-        <p className="text-sm text-gray-500 text-center" role="status">{t('reviewingText')}</p>
-      )}
-
-      <AnimatePresence>
-        {submitError && (
-          <motion.p
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="text-sm text-red-500"
-          >
-            {tErrors('tryAgain', { message: submitError })}
-          </motion.p>
-        )}
-      </AnimatePresence>
-
-      {wordCount < minWords && (
-        <p className="text-xs text-gray-400 text-center">
-          {t('moreWordsNeeded', { n: minWords - wordCount })}
-        </p>
-      )}
     </div>
   );
 }

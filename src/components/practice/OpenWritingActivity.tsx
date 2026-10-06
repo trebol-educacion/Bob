@@ -90,9 +90,9 @@ export function OpenWritingActivity({
   }
 
   return (
-    <div className="flex flex-col gap-4 max-w-xl mx-auto w-full py-2">
-      {renderHeader?.(taskJson)}
+    <div className="flex flex-col flex-1 min-h-0 w-full">
       <WritingPractice
+        lead={renderHeader?.(taskJson)}
         promptKey={config.exam_part}
         instructions={instructions}
         targetWordCount={config.targetWordCount}

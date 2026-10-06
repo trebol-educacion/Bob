@@ -11,16 +11,6 @@ vi.mock('next-intl', () => ({
 vi.mock('@/components/chat/BobMascotLoader', () => ({
   BobMascotLoader: ({ message }: { message: string }) => <div>{message}</div>,
 }));
-vi.mock('@/components/chat/ChatInputBar', () => ({
-  ChatInputBar: ({ value, disabled, sendDisabled, onChange, onSend }: {
-    value: string; disabled?: boolean; sendDisabled?: boolean; onChange: (v: string) => void; onSend: () => void;
-  }) => (
-    <div>
-      <textarea aria-label="text" disabled={disabled} value={value} onChange={(e) => onChange(e.target.value)} />
-      <button type="button" disabled={disabled || sendDisabled} onClick={onSend}>send</button>
-    </div>
-  ),
-}));
 vi.mock('@/components/chat', () => ({
   InfoCard: ({ title, children }: { title: string; children: React.ReactNode }) => (
     <section><h4>{title}</h4>{children}</section>
@@ -82,13 +72,13 @@ describe('FCEWritingPart2Practice', () => {
     render(<FCEWritingPart2Practice onBack={vi.fn()} />);
     await screen.findByText('Situation article');
     fireEvent.click(screen.getAllByText('fce.writing2.chooseAction')[0]);
-    const box = await screen.findByLabelText('text');
+    const box = await screen.findByLabelText('editorLabel');
     fireEvent.change(box, { target: { value: words(139) } });
-    expect(screen.getByText('send')).toBeDisabled();
+    expect(screen.getByText('submit')).toBeDisabled();
     expect(screen.getByText('139')).toBeInTheDocument();
     expect(screen.getByText(/140-190/)).toBeInTheDocument();
     fireEvent.change(box, { target: { value: words(140) } });
-    expect(screen.getByText('send')).toBeEnabled();
+    expect(screen.getByText('submit')).toBeEnabled();
   });
 
   it('submits the chosen task and shows the 0-10 mark with formative feedback', async () => {
@@ -97,8 +87,8 @@ describe('FCEWritingPart2Practice', () => {
     render(<FCEWritingPart2Practice onBack={vi.fn()} onSessionFinished={onFinished} onSessionCreated={onCreated} />);
     await screen.findByText('Situation article');
     fireEvent.click(screen.getAllByText('fce.writing2.chooseAction')[2]);
-    fireEvent.change(await screen.findByLabelText('text'), { target: { value: words(150) } });
-    fireEvent.click(screen.getByText('send'));
+    fireEvent.change(await screen.findByLabelText('editorLabel'), { target: { value: words(150) } });
+    fireEvent.click(screen.getByText('submit'));
     await waitFor(() => expect(screen.getByTestId('fce-score-10')).toHaveTextContent('6.5'));
     expect(submitMock).toHaveBeenCalledWith({ sessionId: undefined, plan: START, taskNumber: 4, text: words(150) });
     expect(onCreated).toHaveBeenCalledWith('s1');
@@ -111,11 +101,11 @@ describe('FCEWritingPart2Practice', () => {
     render(<FCEWritingPart2Practice onBack={vi.fn()} />);
     await screen.findByText('Situation article');
     fireEvent.click(screen.getAllByText('fce.writing2.chooseAction')[0]);
-    fireEvent.change(await screen.findByLabelText('text'), { target: { value: words(150) } });
-    fireEvent.click(screen.getByText('send'));
+    fireEvent.change(await screen.findByLabelText('editorLabel'), { target: { value: words(150) } });
+    fireEvent.click(screen.getByText('submit'));
     await screen.findByText(/Could not evaluate your text/);
-    expect(screen.getByLabelText('text')).toHaveValue(words(150));
-    expect(screen.getByText('send')).toBeEnabled();
+    expect(screen.getByLabelText('editorLabel')).toHaveValue(words(150));
+    expect(screen.getByText('submit')).toBeEnabled();
   });
 
   it('shows a clear error with retry when the tasks cannot be generated', async () => {
@@ -134,8 +124,8 @@ describe('FCEWritingPart2Practice', () => {
     render(<FCEWritingPart2Practice onBack={vi.fn()} sessionId="s9" initialMessages={messages} />);
     await screen.findByText('Situation article');
     fireEvent.click(screen.getAllByText('fce.writing2.chooseAction')[0]);
-    fireEvent.change(await screen.findByLabelText('text'), { target: { value: words(150) } });
-    fireEvent.click(screen.getByText('send'));
+    fireEvent.change(await screen.findByLabelText('editorLabel'), { target: { value: words(150) } });
+    fireEvent.click(screen.getByText('submit'));
     await waitFor(() => expect(screen.getByTestId('fce-score-10')).toBeInTheDocument());
     expect(submitMock).toHaveBeenCalledWith(expect.objectContaining({ sessionId: 's9', taskNumber: 2, text: words(150) }));
     expect(startMock).not.toHaveBeenCalled();

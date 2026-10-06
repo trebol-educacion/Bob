@@ -105,11 +105,7 @@
       "whatYouDidWell": "What you did well",
       "toImprove": "To improve",
       "viewModelAnswer": "View model answer",
-      "back": "Back",
-      "words": "Words:",
-      "wordGoalTarget": "/ goal ~25",
-      "moreToSend": "{remaining} more to send",
-      "sendMessage": "Send message"
+      "back": "Back"
     }
   },
   "fce": {
@@ -217,7 +213,6 @@
       "reviewingMessage": "Reviewing your essay…",
       "words": "Words:",
       "target": "/ target 140-190",
-      "moreToSend": "{remaining} more to send",
       "contextLabel": "Context",
       "titleLabel": "Essay title",
       "notesLabel": "Notes",
@@ -415,9 +410,7 @@
       "scenarioTitle": "Email received",
       "replyPointsTitle": "What to include in your reply:",
       "placeholder": "Write your email here…",
-      "words": "Words:",
       "target": "/ target ~100",
-      "moreToSend": "{remaining} more to send",
       "yourMessage": "Your message",
       "youDidIt": "Great email!",
       "reviewYourMessage": "Review your email",
