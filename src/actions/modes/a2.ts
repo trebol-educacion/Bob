@@ -6,6 +6,7 @@ import { FormativeFeedbackSchema, type FormativeFeedback } from '@/lib/types/pra
 import { getPrompt } from '@/lib/prompts/db-prompts';
 import { persistMessage, readSessionMessagesForCurrentOrUser } from '@/lib/persist-activity';
 import { getOrCreateCachedContent } from '@/lib/cache';
+import { parseJsonResult } from '@/lib/llm/parse-json-result';
 import { callGemini, safeParseFallback } from '@/lib/gemini-client';
 
 const A2SessionPlanSchema = z.object({
@@ -50,21 +51,9 @@ export async function generateA2SessionAction(sessionId: string, userId: string)
         })
       );
 
-      if (!result.ok || !result.data.text) {
-        console.error(JSON.stringify({ event: 'generateA2SessionAction', error: result.ok ? 'empty response' : result.error }));
-        return A2SessionPlanFallback;
-      }
-
-      let parsed: unknown;
-      try {
-        parsed = JSON.parse(result.data.text);
-      } catch {
-        console.error(JSON.stringify({ event: 'generateA2SessionAction', error: 'invalid JSON' }));
-        return A2SessionPlanFallback;
-      }
-      return safeParseFallback(A2SessionPlanSchema, parsed, A2SessionPlanFallback);
+      return parseJsonResult<A2SessionPlan>(result, A2SessionPlanSchema, 'generateA2SessionAction');
     },
-    { storeAs: 'json' }
+    { storeAs: 'json', validate: (plan) => A2SessionPlanSchema.safeParse(plan).success }
   );
 
   if ('error' in cached) {

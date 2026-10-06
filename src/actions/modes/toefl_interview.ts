@@ -7,6 +7,7 @@ import { FormativeFeedbackSchema, type FormativeFeedback } from '@/lib/types/pra
 import { getPrompt } from '@/lib/prompts/db-prompts';
 import { persistMessage, readSessionMessagesForCurrentOrUser } from '@/lib/persist-activity';
 import { getOrCreateCachedContent } from '@/lib/cache';
+import { parseJsonResult } from '@/lib/llm/parse-json-result';
 import { callGemini, safeParseFallback } from '@/lib/gemini-client';
 
 const ToeflQuestionSchema = z.object({
@@ -83,20 +84,9 @@ export async function generateToeflInterviewAction(): Promise<ToeflInterviewPlan
         })
       );
 
-      if (!result.ok || !result.data.text) {
-        console.error(JSON.stringify({ event: 'generateToeflInterviewAction', error: result.ok ? 'empty response' : result.error }));
-        return PlanFallback;
-      }
-
-      let parsed: unknown;
-      try {
-        parsed = JSON.parse(result.data.text);
-      } catch {
-        return PlanFallback;
-      }
-      return safeParseFallback(ToeflInterviewPlanSchema, parsed, PlanFallback);
+      return parseJsonResult<ToeflInterviewPlan>(result, ToeflInterviewPlanSchema, 'generateToeflInterviewAction');
     },
-    { storeAs: 'json' }
+    { storeAs: 'json', validate: (plan) => ToeflInterviewPlanSchema.safeParse(plan).success }
   );
 
   if ('error' in cached) {

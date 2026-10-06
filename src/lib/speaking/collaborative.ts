@@ -6,6 +6,7 @@ import { createSupabaseServer } from '@/lib/supabase/server';
 import { persistMessage, readSessionMessagesForCurrentOrUser } from '@/lib/persist-activity';
 import type { PersistMessageInput } from '@/lib/persist-activity';
 import { getOrCreateCachedContent } from '@/lib/cache';
+import { parseJsonResult } from '@/lib/llm/parse-json-result';
 import { callGemini, safeParseFallback } from '@/lib/gemini-client';
 import { toExaminerFeedback } from './examiner-score';
 import type { Part3ChatMessage, Part3Scenario } from './types';
@@ -106,6 +107,7 @@ export async function generateCollaborativeScenario(
   sessionId?: string,
 ): Promise<Part3Scenario> {
   const generationKey = `${config.promptPrefix}_generation`;
+  const scenarioSchema = config.scenarioSchema ?? Part3ScenarioSchema;
   const cached = await getOrCreateCachedContent<Part3Scenario>(
     { kind: 'plan', promptKey: config.scenarioCacheKey, inputs: {} },
     async () => {
@@ -119,20 +121,9 @@ export async function generateCollaborativeScenario(
         })
       );
 
-      if (!result.ok || !result.data.text) {
-        console.error(JSON.stringify({ event: 'generatePart3ScenarioAction', error: result.ok ? 'empty response' : result.error }));
-        return config.scenarioFallback;
-      }
-
-      let parsed: unknown;
-      try {
-        parsed = JSON.parse(result.data.text);
-      } catch {
-        return config.scenarioFallback;
-      }
-      return safeParseFallback(config.scenarioSchema ?? Part3ScenarioSchema, parsed, config.scenarioFallback);
+      return parseJsonResult<Part3Scenario>(result, scenarioSchema, 'generatePart3ScenarioAction');
     },
-    { storeAs: 'json' }
+    { storeAs: 'json', validate: (scenario) => scenarioSchema.safeParse(scenario).success }
   );
 
   if ('error' in cached) {

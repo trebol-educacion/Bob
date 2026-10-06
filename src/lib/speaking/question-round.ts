@@ -3,6 +3,7 @@ import { FormativeFeedbackSchema, type FormativeFeedback } from '@/lib/types/pra
 import { getPrompt } from '@/lib/prompts/db-prompts';
 import { persistMessage, readSessionMessagesForCurrentOrUser } from '@/lib/persist-activity';
 import { getOrCreateCachedContent } from '@/lib/cache';
+import { parseJsonResult } from '@/lib/llm/parse-json-result';
 import { callGemini, safeParseFallback } from '@/lib/gemini-client';
 import { toExaminerFeedback } from './examiner-score';
 import type { SpeakingQA } from './types';
@@ -74,21 +75,9 @@ export async function generateQuestionRoundPlan<TPlan extends object>(
         })
       );
 
-      if (!result.ok || !result.data.text) {
-        console.error(JSON.stringify({ event: `generate${config.eventName}Action`, error: result.ok ? 'empty response' : result.error }));
-        return config.planFallback;
-      }
-
-      let parsed: unknown;
-      try {
-        parsed = JSON.parse(result.data.text);
-      } catch {
-        console.error(JSON.stringify({ event: `generate${config.eventName}Action`, error: 'invalid JSON' }));
-        return config.planFallback;
-      }
-      return safeParseFallback(config.planSchema, parsed, config.planFallback);
+      return parseJsonResult<TPlan>(result, config.planSchema, `generate${config.eventName}Action`);
     },
-    { storeAs: 'json' }
+    { storeAs: 'json', validate: (plan) => config.planSchema.safeParse(plan).success }
   );
 
   if ('error' in cached) {

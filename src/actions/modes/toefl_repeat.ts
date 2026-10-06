@@ -7,6 +7,8 @@ import { RepetitionObjectiveFeedbackSchema, type RepetitionObjectiveFeedback } f
 import { getPrompt } from '@/lib/prompts/db-prompts';
 import { persistMessage, readSessionMessagesForCurrentOrUser } from '@/lib/persist-activity';
 import { getOrCreateCachedContent } from '@/lib/cache';
+import { fail, ok } from '@/lib/result';
+import { parseJsonResult } from '@/lib/llm/parse-json-result';
 import { callGemini, safeParseFallback } from '@/lib/gemini-client';
 
 const ToeflRepeatItemSchema = z.object({
@@ -79,21 +81,10 @@ export async function generateToeflRepeatSessionAction(
         })
       );
 
-      if (!result.ok || !result.data.text) {
-        console.error(JSON.stringify({ event: 'generateToeflRepeatSessionAction', error: result.ok ? 'empty response' : result.error }));
-        return SessionFallback;
-      }
-
-      let parsed: unknown;
-      try {
-        parsed = JSON.parse(result.data.text);
-      } catch {
-        return SessionFallback;
-      }
-      const validated = safeParseFallback(ToeflRepeatSessionSchema, parsed, { items: SessionFallback });
-      return validated.items;
+      const parsed = parseJsonResult(result, ToeflRepeatSessionSchema, 'generateToeflRepeatSessionAction');
+      return parsed.ok ? ok(parsed.data.items) : parsed;
     },
-    { storeAs: 'json' }
+    { storeAs: 'json', validate: (items) => ToeflRepeatSessionSchema.safeParse({ items }).success }
   );
 
   if ('error' in cached) {
@@ -153,22 +144,22 @@ export async function generateToeflRepeatAudiosAction(
 
         if (!result.ok) {
           console.error(JSON.stringify({ event: 'generateToeflRepeatAudiosAction', phrase: phrase.slice(0, 40), error: result.error }));
-          return audioFallback;
+          return fail(result.code, result.retryable);
         }
 
         const audioPart = result.data.candidates?.[0]?.content?.parts?.find((p: Part) => p.inlineData);
 
         if (!audioPart?.inlineData?.data) {
           console.error(JSON.stringify({ event: 'generateToeflRepeatAudiosAction', phrase: phrase.slice(0, 40), error: 'no audio data' }));
-          return audioFallback;
+          return fail('empty_audio', true);
         }
 
-        return {
+        return ok({
           data: audioPart.inlineData.data,
           mimeType: audioPart.inlineData.mimeType ?? 'audio/L16;codec=pcm;rate=24000',
-        };
+        });
       },
-      { storeAs: 'json' }
+      { storeAs: 'json', validate: (chunk) => chunk.data.length > 0 }
     );
 
     if ('error' in cached) {

@@ -1,7 +1,9 @@
 'use server';
 
 import { getPrompt } from '@/lib/prompts/db-prompts';
-import { callGemini, isOk } from '@/lib/gemini-client';
+import { callGemini } from '@/lib/gemini-client';
+import { parseJsonResult } from '@/lib/llm/parse-json-result';
+import type { ActionResult } from '@/lib/result';
 import { getOrCreateCachedContent } from '@/lib/cache';
 import { MODELS } from '@/lib/models';
 import { persistMessage, readSessionMessages } from '@/lib/persist-activity';
@@ -30,7 +32,7 @@ const FRAMING_KEY = 'cambridge_fce_writing_part2_b2_framing';
 const FALLBACK_FRAMING =
   'You will write ONE text in English (140-190 words) chosen from three tasks. Read each situation, choose the one you feel most confident about, and use the right register and format for that type of text.';
 
-async function generateTasks(userId: string): Promise<FcePart2Generation> {
+async function generateTasks(userId: string): Promise<ActionResult<FcePart2Generation>> {
   const promptText = await getPrompt(GENERATION_KEY);
   const result = await callGemini(
     { promptKey: GENERATION_KEY, model: MODELS.FLASH_LITE_PREVIEW, userId },
@@ -41,9 +43,11 @@ async function generateTasks(userId: string): Promise<FcePart2Generation> {
         config: { responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
       }),
   );
-  if (!isOk(result)) throw new Error('generation_failed');
-  const rawText = result.data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
-  return FcePart2GenerationSchema.parse(JSON.parse(rawText));
+  return parseJsonResult<FcePart2Generation>(
+    result.ok ? { ...result, data: { text: result.data.candidates?.[0]?.content?.parts?.[0]?.text } } : result,
+    FcePart2GenerationSchema,
+    'generateFcePart2Tasks',
+  );
 }
 
 function isValidGeneration(value: FcePart2Generation): boolean {

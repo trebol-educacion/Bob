@@ -94,7 +94,10 @@ describe('FCE question round (P1 and P4)', () => {
   });
 
   it('keys the plan cache by the linked topic and passes it to the prompt', async () => {
-    getOrCreateCachedContent.mockImplementation(async (_key: unknown, producer: () => Promise<unknown>) => producer());
+    getOrCreateCachedContent.mockImplementation(async (_key: unknown, producer: () => Promise<{ ok: boolean; data?: unknown; code?: string }>) => {
+      const produced = await producer();
+      return produced.ok ? produced.data : { error: produced.code };
+    });
     callGemini.mockResolvedValue({ ok: true, data: { text: '{"discussion_questions":["q1","q2","q3"]}' } });
     const plan = await generateQuestionRoundPlan(FCE_DISCUSSION_CONFIG, 's1', 'u1', { TOPIC: 'Transport' });
 

@@ -5,7 +5,8 @@ import { YLPlanSchema, type YLPlan, type YLExam } from '@/lib/types/yl';
 import { getPrompt } from '@/lib/prompts/db-prompts';
 import { createSupabaseServer } from '@/lib/supabase/server';
 import { getOrCreateCachedContent } from '@/lib/cache';
-import { callGemini, safeParseFallback } from '@/lib/gemini-client';
+import { fail, ok } from '@/lib/result';
+import { callGemini } from '@/lib/gemini-client';
 import { generationKey, YLPlanFallback } from './_helpers';
 
 type VocabPick = { word: string; category: string };
@@ -118,7 +119,7 @@ export async function generateYLContentAction(
 
       if (!result.ok || !result.data.text) {
         console.error(JSON.stringify({ event: 'generateYLContentAction', error: result.ok ? 'empty response' : result.error }));
-        return YLPlanFallback;
+        return result.ok ? fail('empty_response', true) : fail(result.code, result.retryable);
       }
 
       let parsed: unknown;
@@ -126,7 +127,7 @@ export async function generateYLContentAction(
         parsed = JSON.parse(result.data.text);
       } catch {
         console.error(JSON.stringify({ event: 'generateYLContentAction', error: 'invalid JSON' }));
-        return YLPlanFallback;
+        return fail('invalid_json', true);
       }
 
       const p = (parsed ?? {}) as Record<string, unknown>;
@@ -193,9 +194,10 @@ export async function generateYLContentAction(
         differences: isFindDiffs ? (p.differences as unknown[]) : undefined,
       };
 
-      return safeParseFallback(YLPlanSchema, normalized, YLPlanFallback);
+      const checked = YLPlanSchema.safeParse(normalized);
+      return checked.success ? ok(checked.data) : fail('schema_mismatch', true);
     },
-    { storeAs: 'json' }
+    { storeAs: 'json', validate: (plan) => YLPlanSchema.safeParse(plan).success }
   );
 
   if ('error' in cached) {

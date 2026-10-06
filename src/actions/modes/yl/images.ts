@@ -3,6 +3,7 @@
 import { type YLExam } from '@/lib/types/yl';
 import { createSupabaseServer } from '@/lib/supabase/server';
 import { getOrCreateCachedContent } from '@/lib/cache';
+import { fail, ok } from '@/lib/result';
 import {
   buildDirectImagenPrompt,
   generateImageWithFallback,
@@ -87,9 +88,7 @@ export async function generateYLImageAction(
       const imagenPrompt = buildDirectImagenPrompt(imagePrompt, characterDescription);
       const pixels = await generateImageWithFallback(key, imagenPrompt);
 
-      if (!pixels) {
-        throw new Error('empty image after all attempts');
-      }
+      if (!pixels) return fail('empty_image', true);
 
       const { b64: imgB64, mime } = pixels;
 
@@ -97,7 +96,7 @@ export async function generateYLImageAction(
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         console.error(JSON.stringify({ event: 'generateYLImageAction', error: 'Not authenticated for storage upload' }));
-        return `data:${mime};base64,${imgB64}`;
+        return ok(`data:${mime};base64,${imgB64}`);
       }
 
       const ext = mime.includes('jpeg') ? 'jpg' : 'png';
@@ -108,11 +107,11 @@ export async function generateYLImageAction(
         .upload(path, bytes, { contentType: mime, upsert: true });
       if (upload.error) {
         console.error('[generateYLImageAction] storage upload failed:', upload.error);
-        return `data:${mime};base64,${imgB64}`;
+        return ok(`data:${mime};base64,${imgB64}`);
       }
 
       const { data: pub } = supabase.storage.from('bob-images').getPublicUrl(path);
-      return pub.publicUrl;
+      return ok(pub.publicUrl);
     },
     { storeAs: 'blob', validate: (url) => typeof url === 'string' && url.startsWith('https://') }
   );
@@ -171,10 +170,10 @@ export async function generateYLImagesParallelAction(
           const key = imageGenKey(exam, part);
           const imagenPrompt = buildDirectImagenPrompt(item.scenePrompt, effectiveCharacter, imageType);
           const pixels = await generateImageWithFallback(key, imagenPrompt);
-          if (!pixels) throw new Error('empty image after all attempts');
+          if (!pixels) return fail('empty_image', true);
 
           const { b64: imgB64, mime } = pixels;
-          if (!user) return `data:${mime};base64,${imgB64}`;
+          if (!user) return ok(`data:${mime};base64,${imgB64}`);
 
           const ext = mime.includes('jpeg') ? 'jpg' : 'png';
           const path = `${user.id}/${sessionId}/${idx}.${ext}`;
@@ -184,10 +183,10 @@ export async function generateYLImagesParallelAction(
             .upload(path, bytes, { contentType: mime, upsert: true });
           if (upload.error) {
             console.error('[generateYLImagesParallelAction] storage upload failed:', upload.error);
-            return `data:${mime};base64,${imgB64}`;
+            return ok(`data:${mime};base64,${imgB64}`);
           }
           const { data: pub } = supabase.storage.from('bob-images').getPublicUrl(path);
-          return pub.publicUrl;
+          return ok(pub.publicUrl);
         },
         { storeAs: 'blob', validate: (url) => typeof url === 'string' && url.startsWith('https://') }
       );
