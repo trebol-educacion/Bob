@@ -4,9 +4,9 @@ import { z } from 'zod';
 import { getPrompt } from '@/lib/prompts/db-prompts';
 import { stripDashes } from '@/lib/text';
 import { callGemini, isOk } from '@/lib/gemini-client';
-import { persistMessage, persistMessages } from '@/lib/persist-activity';
-import { createSessionAction } from '@/actions/sessions';
-import { createSupabaseServer } from '@/lib/supabase/server';
+import { currentUserId } from '@/lib/session/lifecycle';
+import { completeActivity } from '@/lib/session/complete';
+import { withoutAudio } from '@/lib/ket/plan';
 import { generateSpeechAction } from '@/actions/gemini';
 import { MODELS } from '@/lib/models';
 import { normalizeAnswer } from '@/lib/answer-match';
@@ -36,8 +36,6 @@ export interface ListenCompleteExercise {
 }
 
 export interface ListenCompleteResult {
-  sessionId: string;
-  userId: string;
   framing_text: string;
   exercise: ListenCompleteExercise;
 }
@@ -51,6 +49,7 @@ export interface GapResult {
 }
 
 export interface ListenCompleteSubmitResult {
+  sessionId: string;
   correct_count: number;
   total: number;
   gap_results: GapResult[];
@@ -90,27 +89,10 @@ function safeParse<T>(schema: z.ZodType<T>, raw: string): T | null {
   }
 }
 
-export async function generateKETListenCompleteAction(input: {
-  sessionId?: string;
-}): Promise<ListenCompleteResult | { error: string }> {
+export async function generateKETListenCompleteAction(): Promise<ListenCompleteResult | { error: string }> {
   const t0 = Date.now();
-  let sessionId = input.sessionId;
-  let userId: string | undefined;
-
-  if (!sessionId) {
-    const result = await createSessionAction({
-      mode: 'cambridge_ket_listening_part2',
-      title: 'Listening Part 2: Listen and Complete',
-    });
-    if (!result.data) return { error: result.error ?? 'Could not create session' };
-    sessionId = result.data.id;
-    userId = result.data.user_id;
-  } else {
-    const supabase = await createSupabaseServer();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return { error: 'Not authenticated' };
-    userId = user.id;
-  }
+  const userId = (await currentUserId()) ?? undefined;
+  if (!userId) return { error: 'Not authenticated' };
 
   const tSession = Date.now();
 
@@ -163,27 +145,7 @@ export async function generateKETListenCompleteAction(input: {
     audio_mime: 'audio/L16;codec=pcm;rate=24000',
   };
 
-  persistMessage({
-    sessionId: sessionId!,
-    userId: userId!,
-    role: 'bob',
-    msgType: 'text',
-    contentText: null,
-    contentJson: {
-      kind: 'listen_complete_plan',
-      framing_text: cleanFramingText,
-      exercise: {
-        context: exercise.context,
-        form_title: exercise.form_title,
-        transcript: exercise.transcript,
-        gaps: exercise.gaps,
-      },
-    },
-  }).catch(() => undefined);
-
   return {
-    sessionId: sessionId!,
-    userId: userId!,
     framing_text: cleanFramingText,
     exercise,
   };
@@ -197,8 +159,8 @@ export async function generateKETListenCompleteAudioAction(input: {
 }
 
 export async function submitKETListenCompleteAction(input: {
-  sessionId: string;
-  userId: string;
+  sessionId?: string;
+  framing_text: string;
   answers: Record<number, string>;
   exercise: Omit<ListenCompleteExercise, 'audio_b64' | 'audio_mime'>;
 }): Promise<ListenCompleteSubmitResult | { error: string }> {
@@ -215,36 +177,26 @@ export async function submitKETListenCompleteAction(input: {
 
   const correct_count = gap_results.filter((r) => r.is_correct).length;
 
-  persistMessages(
-    gap_results.map((r) => ({
-      sessionId: input.sessionId,
-      userId: input.userId,
-      role: 'user' as const,
-      msgType: 'text' as const,
-      contentText: null,
-      contentJson: {
+  const completed = await completeActivity({
+    mode: 'cambridge_ket_listening_part2',
+    sessionId: input.sessionId,
+    plan: { kind: 'listen_complete_plan', framing_text: input.framing_text, exercise: withoutAudio(input.exercise) },
+    answers: gap_results.map((r) => ({
         kind: 'listen_complete_answer',
         gap_number: r.number,
         user_input: r.user_input,
         is_correct: r.is_correct,
-      },
-    }))
-  ).catch(() => undefined);
-
-  persistMessage({
-    sessionId: input.sessionId,
-    userId: input.userId,
-    role: 'bob',
-    msgType: 'evaluation',
-    contentText: null,
-    contentJson: {
+      })),
+    evaluation: {
       kind: 'listen_complete_evaluation',
       score: correct_count,
       score_max: input.exercise.gaps.length,
       gap_results,
       is_final: true,
     },
-  }).catch(() => undefined);
+  });
+  if (!completed.ok) return { error: completed.code };
 
-  return { correct_count, total: input.exercise.gaps.length, gap_results };
+  return {
+    sessionId: completed.data.sessionId, correct_count, total: input.exercise.gaps.length, gap_results };
 }

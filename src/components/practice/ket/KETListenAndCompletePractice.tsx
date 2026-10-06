@@ -16,6 +16,8 @@ import {
   type GapResult,
 } from '@/actions/modes/ket-listening-part2';
 import type { StoredMessage } from '@/actions/messages';
+import { restoreExercise } from '@/lib/ket/restore-plan';
+import { EMPTY_AUDIO } from '@/lib/ket/plan';
 import { resolveActivityBoot } from '@/lib/activity/boot';
 
 const ACCENT = '#F8AC37';
@@ -43,28 +45,8 @@ interface RestoredState {
 }
 
 function tryRestore(messages: StoredMessage[]): RestoredState | null {
-  let exercise: ListenCompleteExercise | null = null;
-  let framingText = '';
-  let gapResults: GapResult[] | null = null;
-  let correctCount = 0;
-
-  for (const msg of messages) {
-    const cj = msg.content_json as Record<string, unknown> | null;
-    if (!cj) continue;
-
-    if (msg.role === 'bob' && cj.kind === 'listen_complete_plan') {
-      const raw = cj.exercise as ListenCompleteExercise;
-      exercise = { ...raw, audio_b64: '', audio_mime: 'audio/L16;codec=pcm;rate=24000' };
-      framingText = String(cj.framing_text ?? '');
-    }
-    if (msg.role === 'bob' && msg.msg_type === 'evaluation' && cj.is_final === true) {
-      gapResults = cj.gap_results as GapResult[];
-      correctCount = Number(cj.score ?? 0);
-    }
-  }
-
-  if (exercise) return { exercise, framingText, gapResults, correctCount };
-  return null;
+  const r = restoreExercise<ListenCompleteExercise, GapResult>(messages, 'listen_complete_plan', 'gap_results', { mapExercise: (raw) => ({ ...raw, ...EMPTY_AUDIO }) });
+  return r ? { exercise: r.exercise, framingText: r.framingText, gapResults: r.results, correctCount: r.correctCount } : null;
 }
 
 let _activeAudio: HTMLAudioElement | null = null;
@@ -398,7 +380,6 @@ export function KETListenAndCompletePractice({
 }: KETListenAndCompletePracticeProps) {
   const [phase, setPhase] = useState<Phase>('loading');
   const [sessionId, setSessionId] = useState<string | undefined>(initialSessionId);
-  const [userId, setUserId] = useState<string | undefined>();
   const [exercise, setExercise] = useState<ListenCompleteExercise | null>(null);
   const [framingText, setFramingText] = useState('');
   const [answers, setAnswers] = useState<Record<number, string>>({});
@@ -443,9 +424,6 @@ export function KETListenAndCompletePractice({
           setCorrectCount(restored.correctCount);
           setPhase('finished');
         } else {
-          const { createSupabaseBrowser } = await import('@/lib/supabase/browser-client');
-          const { data: { user } } = await createSupabaseBrowser().auth.getUser();
-          if (user) setUserId(user.id);
           setPhase('ready');
         }
         return;
@@ -456,16 +434,12 @@ export function KETListenAndCompletePractice({
       setIsNewSession(true);
       setPhase('generating');
 
-      const result = await generateKETListenCompleteAction({ sessionId: initialSessionId });
+      const result = await generateKETListenCompleteAction();
 
       if ('error' in result) {
         setErrorMsg(result.error);
         return;
       }
-
-      onSessionCreated?.(result.sessionId);
-      setSessionId(result.sessionId);
-      setUserId(result.userId);
       setExercise(result.exercise);
       setFramingText(result.framing_text);
       setPhase('ready');
@@ -503,13 +477,13 @@ export function KETListenAndCompletePractice({
   }, [exercise?.transcript]);
 
   async function handleSubmit() {
-    if (!sessionId || !userId || !exercise) return;
+    if (!exercise) return;
     stopActiveAudio();
     setPhase('submitting');
 
     const result = await submitKETListenCompleteAction({
       sessionId,
-      userId,
+      framing_text: framingText,
       answers,
       exercise,
     });
@@ -523,6 +497,8 @@ export function KETListenAndCompletePractice({
     setGapResults(result.gap_results);
     setCorrectCount(result.correct_count);
     setPhase('finished');
+    if (!sessionId) onSessionCreated?.(result.sessionId);
+    setSessionId(result.sessionId);
     onSessionFinished?.();
   }
 

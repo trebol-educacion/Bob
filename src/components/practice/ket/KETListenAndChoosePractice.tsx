@@ -17,6 +17,7 @@ import {
   type ListenAnswerResult,
 } from '@/actions/modes/ket-listening-part1';
 import type { StoredMessage } from '@/actions/messages';
+import { restoreExercise } from '@/lib/ket/restore-plan';
 
 const ACCENT = '#F8AC37';
 const ACCENT_DARK = '#D8881C';
@@ -43,27 +44,8 @@ interface RestoredState {
 }
 
 function tryRestore(messages: StoredMessage[]): RestoredState | null {
-  let items: ListenItem[] | null = null;
-  let framingText = '';
-  let results: ListenAnswerResult[] | null = null;
-  let correctCount = 0;
-
-  for (const msg of messages) {
-    const cj = msg.content_json as Record<string, unknown> | null;
-    if (!cj) continue;
-
-    if (msg.role === 'bob' && cj.kind === 'listening_plan') {
-      items = cj.items as ListenItem[];
-      framingText = String(cj.framing_text ?? '');
-    }
-    if (msg.role === 'bob' && msg.msg_type === 'evaluation' && cj.is_final === true) {
-      results = cj.results as ListenAnswerResult[];
-      correctCount = Number(cj.score ?? 0);
-    }
-  }
-
-  if (items) return { items, framingText, results, correctCount };
-  return null;
+  const r = restoreExercise<ListenItem[], ListenAnswerResult>(messages, 'listening_plan', 'results', { exerciseKey: 'items' });
+  return r ? { items: r.exercise, framingText: r.framingText, results: r.results, correctCount: r.correctCount } : null;
 }
 
 let _activeAudio: HTMLAudioElement | null = null;
@@ -551,7 +533,6 @@ export function KETListenAndChoosePractice({
 
   const [phase, setPhase] = useState<Phase>('loading');
   const [sessionId, setSessionId] = useState<string | undefined>(initialSessionId);
-  const [userId, setUserId] = useState<string | undefined>();
   const [items, setItems] = useState<ListenItem[]>([]);
   const [framingText, setFramingText] = useState('');
   const [answers, setAnswers] = useState<Record<number, 'A' | 'B' | 'C'>>({});
@@ -576,10 +557,6 @@ export function KETListenAndChoosePractice({
             setCorrectCount(restored.correctCount);
             setPhase('finished');
           } else {
-            const { createSupabaseBrowser } = await import('@/lib/supabase/browser-client');
-            const supabase = createSupabaseBrowser();
-            const { data: { user } } = await supabase.auth.getUser();
-            if (user) setUserId(user.id);
             setPhase('ready');
           }
           return;
@@ -593,19 +570,12 @@ export function KETListenAndChoosePractice({
       setIsNewSession(true);
       setPhase('generating');
 
-      const result = await generateKETListenAndChooseAction({ sessionId: initialSessionId });
+      const result = await generateKETListenAndChooseAction();
 
       if ('error' in result) {
         setErrorMsg(result.error);
         return;
       }
-
-      if (!initialSessionId) {
-        onSessionCreated?.(result.sessionId);
-      }
-
-      setSessionId(result.sessionId);
-      setUserId(result.userId);
       setItems(result.items);
       setFramingText(result.framingText);
       setPhase('ready');
@@ -619,13 +589,12 @@ export function KETListenAndChoosePractice({
   }
 
   async function handleSubmit() {
-    if (!sessionId || !userId) return;
     stopActiveAudio();
     setPhase('submitting');
 
     const result = await submitKETListenAnswersAction({
       sessionId,
-      userId,
+      framingText,
       answers,
       items,
     });
@@ -639,6 +608,8 @@ export function KETListenAndChoosePractice({
     setResults(result.results);
     setCorrectCount(result.correctCount);
     setPhase('finished');
+    if (!sessionId) onSessionCreated?.(result.sessionId);
+    setSessionId(result.sessionId);
     onSessionFinished?.();
   }
 

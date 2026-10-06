@@ -3,9 +3,9 @@
 import { z } from 'zod';
 import { getPrompt } from '@/lib/prompts/db-prompts';
 import { callGemini, isOk } from '@/lib/gemini-client';
-import { persistMessage, persistMessages } from '@/lib/persist-activity';
-import { createSessionAction } from '@/actions/sessions';
-import { createSupabaseServer } from '@/lib/supabase/server';
+import { currentUserId } from '@/lib/session/lifecycle';
+import { completeActivity } from '@/lib/session/complete';
+import { withoutAudio } from '@/lib/ket/plan';
 import { generateSpeechAction } from '@/actions/gemini';
 import { MODELS } from '@/lib/models';
 import { stripDashes } from '@/lib/text';
@@ -44,16 +44,12 @@ export interface ShortTalksExercise {
 }
 
 export interface ShortTalksResult {
-  sessionId: string;
-  userId: string;
   framing_text: string;
   exercise: ShortTalksExercise;
 }
 
 /** Plan without audio, returned by the fast first-phase action. */
 export interface ShortTalksPlan {
-  sessionId: string;
-  userId: string;
   framing_text: string;
   people: Person[];
   characteristics: Characteristic[];
@@ -68,6 +64,7 @@ export interface PersonResult {
 }
 
 export interface ShortTalksSubmitResult {
+  sessionId: string;
   correct_count: number;
   total: number;
   person_results: PersonResult[];
@@ -87,27 +84,10 @@ function safeParse<T>(schema: z.ZodType<T>, raw: string): T | null {
  * The component calls this first, renders the exercise immediately,
  * then loads audio per person in the background via generateKETPersonAudioAction.
  */
-export async function generateKETShortTalksPlanAction(input: {
-  sessionId?: string;
-}): Promise<ShortTalksPlan | { error: string }> {
+export async function generateKETShortTalksPlanAction(): Promise<ShortTalksPlan | { error: string }> {
   const t0 = Date.now();
-  let sessionId = input.sessionId;
-  let userId: string | undefined;
-
-  if (!sessionId) {
-    const result = await createSessionAction({
-      mode: 'cambridge_ket_listening_part4',
-      title: 'Listening Part 4, Short Talks',
-    });
-    if (!result.data) return { error: result.error ?? 'Could not create session' };
-    sessionId = result.data.id;
-    userId = result.data.user_id;
-  } else {
-    const supabase = await createSupabaseServer();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return { error: 'Not authenticated' };
-    userId = user.id;
-  }
+  const userId = (await currentUserId()) ?? undefined;
+  if (!userId) return { error: 'Not authenticated' };
 
   const tSession = Date.now();
 
@@ -154,22 +134,7 @@ export async function generateKETShortTalksPlanAction(input: {
     text: stripDashes(c.text),
   }));
 
-  persistMessage({
-    sessionId: sessionId!,
-    userId: userId!,
-    role: 'bob',
-    msgType: 'text',
-    contentText: null,
-    contentJson: {
-      kind: 'short_talks_plan',
-      framing_text: framingText,
-      exercise: { people, characteristics },
-    },
-  }).catch(() => undefined);
-
   return {
-    sessionId: sessionId!,
-    userId: userId!,
     framing_text: framingText,
     people,
     characteristics,
@@ -187,112 +152,9 @@ export async function generateKETPersonAudioAction(
   return { audio_b64: result.data, audio_mime: result.mimeType };
 }
 
-/** Legacy full action kept for internal use (restore path already has audio in memory). */
-export async function generateKETShortTalksAction(input: {
-  sessionId?: string;
-}): Promise<ShortTalksResult | { error: string }> {
-  let sessionId = input.sessionId;
-  let userId: string | undefined;
-
-  if (!sessionId) {
-    const result = await createSessionAction({
-      mode: 'cambridge_ket_listening_part4',
-      title: 'Listening Part 4, Short Talks',
-    });
-    if (!result.data) return { error: result.error ?? 'Could not create session' };
-    sessionId = result.data.id;
-    userId = result.data.user_id;
-  } else {
-    const supabase = await createSupabaseServer();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return { error: 'Not authenticated' };
-    userId = user.id;
-  }
-
-  const [generationPrompt, framingTextRaw] = await Promise.all([
-    getPrompt('cambridge_ket_listening_part4_a2_generation').catch(() => null),
-    getPrompt('cambridge_ket_listening_part4_a2_framing').catch(
-      () =>
-        'You will hear five people talking about themselves. Match each person to the correct description, A to H. There are three descriptions you do not need.'
-    ),
-  ]);
-
-  if (!generationPrompt) return { error: 'Could not load generation prompt' };
-
-  const geminiResult = await callGemini(
-    { promptKey: 'cambridge_ket_listening_part4_a2_generation', model: MODELS.FLASH_LITE, userId },
-    (ai) =>
-      ai.models.generateContent({
-        model: MODELS.FLASH_LITE,
-        contents: [{ role: 'user', parts: [{ text: generationPrompt }] }],
-        config: { responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
-      })
-  );
-
-  if (!isOk(geminiResult)) return { error: 'Could not generate exercise' };
-
-  const rawText = geminiResult.data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
-  const parsed = safeParse(GenerationSchema, rawText);
-  if (!parsed) return { error: 'Unexpected model response' };
-
-  const framingText = stripDashes(framingTextRaw);
-  const people: Person[] = parsed.people.map((p) => ({
-    ...p,
-    name: stripDashes(p.name),
-    monologue: stripDashes(p.monologue),
-  }));
-  const characteristics: Characteristic[] = parsed.characteristics.map((c) => ({
-    ...c,
-    text: stripDashes(c.text),
-  }));
-
-  const audios = await Promise.all(
-    people.map((p) =>
-      generateSpeechAction(p.monologue).catch(() => ({
-        data: '',
-        mimeType: 'audio/L16;codec=pcm;rate=24000',
-      }))
-    )
-  );
-
-  const peopleWithAudio: PersonWithAudio[] = people.map((p, i) => ({
-    ...p,
-    audio_b64: audios[i]?.data ?? '',
-    audio_mime: audios[i]?.mimeType ?? 'audio/L16;codec=pcm;rate=24000',
-  }));
-
-  const exercise: ShortTalksExercise = {
-    people: peopleWithAudio,
-    characteristics,
-  };
-
-  persistMessage({
-    sessionId: sessionId!,
-    userId: userId!,
-    role: 'bob',
-    msgType: 'text',
-    contentText: null,
-    contentJson: {
-      kind: 'short_talks_plan',
-      framing_text: framingText,
-      exercise: {
-        people,
-        characteristics,
-      },
-    },
-  }).catch(() => undefined);
-
-  return {
-    sessionId: sessionId!,
-    userId: userId!,
-    framing_text: framingText,
-    exercise,
-  };
-}
-
 export async function submitKETShortTalksAction(input: {
-  sessionId: string;
-  userId: string;
+  sessionId?: string;
+  framing_text: string;
   answers: Record<number, CharKey | null>;
   exercise: { people: Person[]; characteristics: Characteristic[] };
 }): Promise<ShortTalksSubmitResult | { error: string }> {
@@ -309,29 +171,17 @@ export async function submitKETShortTalksAction(input: {
 
   const correct_count = person_results.filter((r) => r.is_correct).length;
 
-  persistMessages(
-    person_results.map((r) => ({
-      sessionId: input.sessionId,
-      userId: input.userId,
-      role: 'user' as const,
-      msgType: 'text' as const,
-      contentText: null,
-      contentJson: {
+  const completed = await completeActivity({
+    mode: 'cambridge_ket_listening_part4',
+    sessionId: input.sessionId,
+    plan: { kind: 'short_talks_plan', framing_text: input.framing_text, exercise: withoutAudio(input.exercise) },
+    answers: person_results.map((r) => ({
         kind: 'short_talks_answer',
         person_number: r.number,
         chosen: r.chosen,
         is_correct: r.is_correct,
-      },
-    }))
-  ).catch(() => undefined);
-
-  persistMessage({
-    sessionId: input.sessionId,
-    userId: input.userId,
-    role: 'bob',
-    msgType: 'evaluation',
-    contentText: null,
-    contentJson: {
+      })),
+    evaluation: {
       kind: 'short_talks_evaluation',
       score: correct_count,
       score_max: input.exercise.people.length,
@@ -339,9 +189,11 @@ export async function submitKETShortTalksAction(input: {
       characteristics: input.exercise.characteristics,
       is_final: true,
     },
-  }).catch(() => undefined);
+  });
+  if (!completed.ok) return { error: completed.code };
 
   return {
+    sessionId: completed.data.sessionId,
     correct_count,
     total: input.exercise.people.length,
     person_results,

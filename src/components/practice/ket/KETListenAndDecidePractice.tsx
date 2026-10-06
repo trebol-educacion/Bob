@@ -17,6 +17,8 @@ import {
   type ConversationTurn,
 } from '@/actions/modes/ket-listening-part3';
 import type { StoredMessage } from '@/actions/messages';
+import { restoreExercise } from '@/lib/ket/restore-plan';
+import { EMPTY_AUDIO } from '@/lib/ket/plan';
 import { resolveActivityBoot } from '@/lib/activity/boot';
 
 const ACCENT = '#F8AC37';
@@ -46,31 +48,8 @@ interface RestoredState {
 }
 
 function tryRestore(messages: StoredMessage[]): RestoredState | null {
-  let exercise: ListenDecideExercise | null = null;
-  let framingText = '';
-  let itemResults: ItemResult[] | null = null;
-  let correctCount = 0;
-  let conversation: ConversationTurn[] = [];
-
-  for (const msg of messages) {
-    const cj = msg.content_json as Record<string, unknown> | null;
-    if (!cj) continue;
-
-    if (msg.role === 'bob' && cj.kind === 'listen_decide_plan') {
-      const raw = cj.exercise as ListenDecideExercise;
-      exercise = { ...raw, audio_b64: '', audio_mime: 'audio/L16;codec=pcm;rate=24000' };
-      framingText = String(cj.framing_text ?? '');
-      conversation = raw.conversation ?? [];
-    }
-    if (msg.role === 'bob' && msg.msg_type === 'evaluation' && cj.is_final === true) {
-      itemResults = cj.item_results as ItemResult[];
-      correctCount = Number(cj.score ?? 0);
-      conversation = (cj.conversation as ConversationTurn[]) ?? conversation;
-    }
-  }
-
-  if (exercise) return { exercise, framingText, itemResults, correctCount, conversation };
-  return null;
+  const r = restoreExercise<ListenDecideExercise, ItemResult>(messages, 'listen_decide_plan', 'item_results', { mapExercise: (raw) => ({ ...raw, ...EMPTY_AUDIO }) });
+  return r ? { exercise: r.exercise, framingText: r.framingText, itemResults: r.results, correctCount: r.correctCount, conversation: r.exercise.conversation ?? [] } : null;
 }
 
 let _activeAudio: HTMLAudioElement | null = null;
@@ -529,7 +508,6 @@ export function KETListenAndDecidePractice({
   const reduceMotion = useReducedMotion();
   const [phase, setPhase] = useState<Phase>('loading');
   const [sessionId, setSessionId] = useState<string | undefined>(initialSessionId);
-  const [userId, setUserId] = useState<string | undefined>();
   const [exercise, setExercise] = useState<ListenDecideExercise | null>(null);
   const [framingText, setFramingText] = useState('');
   const [answers, setAnswers] = useState<Record<number, 'A' | 'B' | 'C'>>({});
@@ -560,9 +538,6 @@ export function KETListenAndDecidePractice({
           setCorrectCount(restored.correctCount);
           setPhase('finished');
         } else {
-          const { createSupabaseBrowser } = await import('@/lib/supabase/browser-client');
-          const { data: { user } } = await createSupabaseBrowser().auth.getUser();
-          if (user) setUserId(user.id);
           setPhase('ready');
         }
         return;
@@ -573,16 +548,12 @@ export function KETListenAndDecidePractice({
       setIsNewSession(true);
       setPhase('generating');
 
-      const result = await generateKETListenDecideAction({ sessionId: initialSessionId });
+      const result = await generateKETListenDecideAction();
 
       if ('error' in result) {
         setErrorMsg(result.error);
         return;
       }
-
-      onSessionCreated?.(result.sessionId);
-      setSessionId(result.sessionId);
-      setUserId(result.userId);
       setExercise(result.exercise);
       setFramingText(result.framing_text);
       setConversation(result.exercise.conversation);
@@ -621,13 +592,13 @@ export function KETListenAndDecidePractice({
   }, [phase, conversation]);
 
   async function handleSubmit() {
-    if (!sessionId || !userId || !exercise) return;
+    if (!exercise) return;
     stopActiveAudio();
     setPhase('submitting');
 
     const result = await submitKETListenDecideAction({
       sessionId,
-      userId,
+      framing_text: framingText,
       answers,
       exercise,
     });
@@ -642,6 +613,8 @@ export function KETListenAndDecidePractice({
     setCorrectCount(result.correct_count);
     setConversation(result.conversation);
     setPhase('finished');
+    if (!sessionId) onSessionCreated?.(result.sessionId);
+    setSessionId(result.sessionId);
     onSessionFinished?.();
   }
 

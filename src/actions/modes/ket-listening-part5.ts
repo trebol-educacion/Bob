@@ -4,9 +4,9 @@ import { z } from 'zod';
 import { getPrompt } from '@/lib/prompts/db-prompts';
 import { stripDashes } from '@/lib/text';
 import { callGemini, isOk } from '@/lib/gemini-client';
-import { persistMessage, persistMessages } from '@/lib/persist-activity';
-import { createSessionAction } from '@/actions/sessions';
-import { createSupabaseServer } from '@/lib/supabase/server';
+import { currentUserId } from '@/lib/session/lifecycle';
+import { completeActivity } from '@/lib/session/complete';
+import { withoutAudio } from '@/lib/ket/plan';
 import { generateSpeechAction } from '@/actions/gemini';
 import { MODELS } from '@/lib/models';
 
@@ -41,8 +41,6 @@ export interface TFDSExercise {
 }
 
 export interface TFDSResult {
-  sessionId: string;
-  userId: string;
   framing_text: string;
   exercise: TFDSExercise;
 }
@@ -56,6 +54,7 @@ export interface StatementResult {
 }
 
 export interface TFDSSubmitResult {
+  sessionId: string;
   correct_count: number;
   total: number;
   statement_results: StatementResult[];
@@ -77,26 +76,9 @@ function safeParse<T>(schema: z.ZodType<T>, raw: string): T | null {
   }
 }
 
-export async function generateKETTFDSAction(input: {
-  sessionId?: string;
-}): Promise<TFDSResult | { error: string }> {
-  let sessionId = input.sessionId;
-  let userId: string | undefined;
-
-  if (!sessionId) {
-    const result = await createSessionAction({
-      mode: 'cambridge_ket_listening_part5',
-      title: 'Listening Part 5: True, False or Doesn\'t Say',
-    });
-    if (!result.data) return { error: result.error ?? 'Could not create session' };
-    sessionId = result.data.id;
-    userId = result.data.user_id;
-  } else {
-    const supabase = await createSupabaseServer();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return { error: 'Not authenticated' };
-    userId = user.id;
-  }
+export async function generateKETTFDSAction(): Promise<TFDSResult | { error: string }> {
+  const userId = (await currentUserId()) ?? undefined;
+  if (!userId) return { error: 'Not authenticated' };
 
   const [generationPrompt, framingText] = await Promise.all([
     getPrompt('cambridge_ket_listening_part5_a2_generation').catch(() => null),
@@ -136,26 +118,7 @@ export async function generateKETTFDSAction(input: {
     audio_mime: 'audio/L16;codec=pcm;rate=24000',
   };
 
-  persistMessage({
-    sessionId: sessionId!,
-    userId: userId!,
-    role: 'bob',
-    msgType: 'text',
-    contentText: null,
-    contentJson: {
-      kind: 'tfds_plan',
-      framing_text: cleanFramingText,
-      exercise: {
-        context: exercise.context,
-        audio: exercise.audio,
-        statements: exercise.statements,
-      },
-    },
-  }).catch(() => undefined);
-
   return {
-    sessionId: sessionId!,
-    userId: userId!,
     framing_text: cleanFramingText,
     exercise,
   };
@@ -169,8 +132,8 @@ export async function generateKETTFDSAudioAction(input: {
 }
 
 export async function submitKETTFDSAction(input: {
-  sessionId: string;
-  userId: string;
+  sessionId?: string;
+  framing_text: string;
   answers: Record<number, Verdict | null>;
   exercise: { statements: Statement[]; audio: AudioTurn[] };
 }): Promise<TFDSSubmitResult | { error: string }> {
@@ -187,29 +150,17 @@ export async function submitKETTFDSAction(input: {
 
   const correct_count = statement_results.filter((r) => r.is_correct).length;
 
-  persistMessages(
-    statement_results.map((r) => ({
-      sessionId: input.sessionId,
-      userId: input.userId,
-      role: 'user' as const,
-      msgType: 'text' as const,
-      contentText: null,
-      contentJson: {
+  const completed = await completeActivity({
+    mode: 'cambridge_ket_listening_part5',
+    sessionId: input.sessionId,
+    plan: { kind: 'tfds_plan', framing_text: input.framing_text, exercise: withoutAudio(input.exercise) },
+    answers: statement_results.map((r) => ({
         kind: 'tfds_answer',
         statement_number: r.number,
         chosen: r.chosen,
         is_correct: r.is_correct,
-      },
-    }))
-  ).catch(() => undefined);
-
-  persistMessage({
-    sessionId: input.sessionId,
-    userId: input.userId,
-    role: 'bob',
-    msgType: 'evaluation',
-    contentText: null,
-    contentJson: {
+      })),
+    evaluation: {
       kind: 'tfds_evaluation',
       score: correct_count,
       score_max: input.exercise.statements.length,
@@ -217,9 +168,11 @@ export async function submitKETTFDSAction(input: {
       audio: input.exercise.audio,
       is_final: true,
     },
-  }).catch(() => undefined);
+  });
+  if (!completed.ok) return { error: completed.code };
 
   return {
+    sessionId: completed.data.sessionId,
     correct_count,
     total: input.exercise.statements.length,
     statement_results,

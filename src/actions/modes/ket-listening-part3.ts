@@ -4,9 +4,9 @@ import { z } from 'zod';
 import { getPrompt } from '@/lib/prompts/db-prompts';
 import { stripDashes } from '@/lib/text';
 import { callGemini, isOk } from '@/lib/gemini-client';
-import { persistMessage, persistMessages } from '@/lib/persist-activity';
-import { createSessionAction } from '@/actions/sessions';
-import { createSupabaseServer } from '@/lib/supabase/server';
+import { currentUserId } from '@/lib/session/lifecycle';
+import { completeActivity } from '@/lib/session/complete';
+import { withoutAudio } from '@/lib/ket/plan';
 import { generateSpeechAction } from '@/actions/gemini';
 import { MODELS } from '@/lib/models';
 
@@ -44,8 +44,6 @@ export interface ListenDecideExercise {
 }
 
 export interface ListenDecideResult {
-  sessionId: string;
-  userId: string;
   framing_text: string;
   exercise: ListenDecideExercise;
 }
@@ -58,6 +56,7 @@ export interface ItemResult {
 }
 
 export interface ListenDecideSubmitResult {
+  sessionId: string;
   correct_count: number;
   total: number;
   item_results: ItemResult[];
@@ -78,26 +77,9 @@ function safeParse<T>(schema: z.ZodType<T>, raw: string): T | null {
   }
 }
 
-export async function generateKETListenDecideAction(input: {
-  sessionId?: string;
-}): Promise<ListenDecideResult | { error: string }> {
-  let sessionId = input.sessionId;
-  let userId: string | undefined;
-
-  if (!sessionId) {
-    const result = await createSessionAction({
-      mode: 'cambridge_ket_listening_part3',
-      title: 'Listening Part 3: Listen and Decide',
-    });
-    if (!result.data) return { error: result.error ?? 'Could not create session' };
-    sessionId = result.data.id;
-    userId = result.data.user_id;
-  } else {
-    const supabase = await createSupabaseServer();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return { error: 'Not authenticated' };
-    userId = user.id;
-  }
+export async function generateKETListenDecideAction(): Promise<ListenDecideResult | { error: string }> {
+  const userId = (await currentUserId()) ?? undefined;
+  if (!userId) return { error: 'Not authenticated' };
 
   const [generationPrompt, framingText] = await Promise.all([
     getPrompt('cambridge_ket_listening_part3_a2_generation').catch(() => null),
@@ -144,26 +126,7 @@ export async function generateKETListenDecideAction(input: {
     audio_mime: 'audio/L16;codec=pcm;rate=24000',
   };
 
-  persistMessage({
-    sessionId: sessionId!,
-    userId: userId!,
-    role: 'bob',
-    msgType: 'text',
-    contentText: null,
-    contentJson: {
-      kind: 'listen_decide_plan',
-      framing_text: cleanFramingText,
-      exercise: {
-        context: exercise.context,
-        conversation: exercise.conversation,
-        items: exercise.items,
-      },
-    },
-  }).catch(() => undefined);
-
   return {
-    sessionId: sessionId!,
-    userId: userId!,
     framing_text: cleanFramingText,
     exercise,
   };
@@ -177,8 +140,8 @@ export async function generateKETListenDecideAudioAction(input: {
 }
 
 export async function submitKETListenDecideAction(input: {
-  sessionId: string;
-  userId: string;
+  sessionId?: string;
+  framing_text: string;
   answers: Record<number, 'A' | 'B' | 'C'>;
   exercise: Omit<ListenDecideExercise, 'audio_b64' | 'audio_mime'>;
 }): Promise<ListenDecideSubmitResult | { error: string }> {
@@ -194,29 +157,17 @@ export async function submitKETListenDecideAction(input: {
 
   const correct_count = item_results.filter((r) => r.is_correct).length;
 
-  persistMessages(
-    item_results.map((r) => ({
-      sessionId: input.sessionId,
-      userId: input.userId,
-      role: 'user' as const,
-      msgType: 'text' as const,
-      contentText: null,
-      contentJson: {
+  const completed = await completeActivity({
+    mode: 'cambridge_ket_listening_part3',
+    sessionId: input.sessionId,
+    plan: { kind: 'listen_decide_plan', framing_text: input.framing_text, exercise: withoutAudio(input.exercise) },
+    answers: item_results.map((r) => ({
         kind: 'listen_decide_answer',
         item_number: r.number,
         chosen: r.chosen,
         is_correct: r.is_correct,
-      },
-    }))
-  ).catch(() => undefined);
-
-  persistMessage({
-    sessionId: input.sessionId,
-    userId: input.userId,
-    role: 'bob',
-    msgType: 'evaluation',
-    contentText: null,
-    contentJson: {
+      })),
+    evaluation: {
       kind: 'listen_decide_evaluation',
       score: correct_count,
       score_max: input.exercise.items.length,
@@ -224,9 +175,11 @@ export async function submitKETListenDecideAction(input: {
       conversation: input.exercise.conversation,
       is_final: true,
     },
-  }).catch(() => undefined);
+  });
+  if (!completed.ok) return { error: completed.code };
 
   return {
+    sessionId: completed.data.sessionId,
     correct_count,
     total: input.exercise.items.length,
     item_results,

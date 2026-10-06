@@ -32,6 +32,8 @@ import {
   type ShortTalksExercise,
 } from '@/actions/modes/ket-listening-part4';
 import type { StoredMessage } from '@/actions/messages';
+import { restoreExercise } from '@/lib/ket/restore-plan';
+import { EMPTY_AUDIO } from '@/lib/ket/plan';
 import { resolveActivityBoot } from '@/lib/activity/boot';
 
 const ACCENT = '#F8AC37';
@@ -60,34 +62,8 @@ interface RestoredState {
 }
 
 function tryRestore(messages: StoredMessage[]): RestoredState | null {
-  let exercise: ShortTalksExercise | null = null;
-  let framingText = '';
-  let personResults: PersonResult[] | null = null;
-  let correctCount = 0;
-  let characteristics: Characteristic[] = [];
-
-  for (const msg of messages) {
-    const cj = msg.content_json as Record<string, unknown> | null;
-    if (!cj) continue;
-
-    if (msg.role === 'bob' && cj.kind === 'short_talks_plan') {
-      const raw = cj.exercise as { people: Person[]; characteristics: Characteristic[] };
-      exercise = {
-        people: raw.people.map((p) => ({ ...p, audio_b64: '', audio_mime: 'audio/L16;codec=pcm;rate=24000' })),
-        characteristics: raw.characteristics,
-      };
-      characteristics = raw.characteristics;
-      framingText = String(cj.framing_text ?? '');
-    }
-    if (msg.role === 'bob' && msg.msg_type === 'evaluation' && cj.is_final === true) {
-      personResults = cj.person_results as PersonResult[];
-      correctCount = Number(cj.score ?? 0);
-      characteristics = (cj.characteristics as Characteristic[]) ?? characteristics;
-    }
-  }
-
-  if (exercise) return { exercise, framingText, personResults, correctCount, characteristics };
-  return null;
+  const r = restoreExercise<ShortTalksExercise, PersonResult>(messages, 'short_talks_plan', 'person_results', { mapExercise: (raw) => ({ ...raw, people: raw.people.map((p) => ({ ...p, ...EMPTY_AUDIO })) }) });
+  return r ? { exercise: r.exercise, framingText: r.framingText, personResults: r.results, correctCount: r.correctCount, characteristics: r.exercise.characteristics } : null;
 }
 
 let _activeAudio: HTMLAudioElement | null = null;
@@ -524,7 +500,6 @@ export function KETShortTalksPractice({
   const reduceMotion = useReducedMotion();
   const [phase, setPhase] = useState<Phase>('loading');
   const [sessionId, setSessionId] = useState<string | undefined>(initialSessionId);
-  const [userId, setUserId] = useState<string | undefined>();
   const [exercise, setExercise] = useState<ShortTalksExercise | null>(null);
   const [framingText, setFramingText] = useState('');
   const [answers, setAnswers] = useState<Record<number, CharKey | null>>({});
@@ -591,9 +566,6 @@ export function KETShortTalksPractice({
           setCorrectCount(restored.correctCount);
           setPhase('finished');
         } else {
-          const { createSupabaseBrowser } = await import('@/lib/supabase/browser-client');
-          const { data: { user } } = await createSupabaseBrowser().auth.getUser();
-          if (user) setUserId(user.id);
           setPhase('ready');
           void loadAudiosInBackground(restored.exercise.people);
         }
@@ -605,16 +577,12 @@ export function KETShortTalksPractice({
       setIsNewSession(true);
       setPhase('generating');
 
-      const plan = await generateKETShortTalksPlanAction({ sessionId: initialSessionId });
+      const plan = await generateKETShortTalksPlanAction();
 
       if ('error' in plan) {
         setErrorMsg(plan.error);
         return;
       }
-
-      onSessionCreated?.(plan.sessionId);
-      setSessionId(plan.sessionId);
-      setUserId(plan.userId);
       setExercise({
         people: plan.people.map((p) => ({ ...p, audio_b64: '', audio_mime: 'audio/L16;codec=pcm;rate=24000' })),
         characteristics: plan.characteristics,
@@ -703,14 +671,14 @@ export function KETShortTalksPractice({
   }
 
   async function handleSubmit() {
-    if (!sessionId || !userId || !exercise) return;
+    if (!exercise) return;
     stopActiveAudio();
     setActivePerson(null);
     setPhase('submitting');
 
     const result = await submitKETShortTalksAction({
       sessionId,
-      userId,
+      framing_text: framingText,
       answers,
       exercise: {
         people: exercise.people,
@@ -728,6 +696,8 @@ export function KETShortTalksPractice({
     setCorrectCount(result.correct_count);
     setCharacteristics(result.characteristics);
     setPhase('finished');
+    if (!sessionId) onSessionCreated?.(result.sessionId);
+    setSessionId(result.sessionId);
     onSessionFinished?.();
   }
 
