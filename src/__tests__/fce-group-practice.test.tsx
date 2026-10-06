@@ -10,6 +10,7 @@ import {
   L3_GROUP, L3_ITEMS, R7_GROUP, R7_ITEMS,
 } from './fce-group-fixtures';
 
+vi.mock('next-intl', async () => (await import('./stubs/intl')).intlMock());
 vi.mock('@/components/chat/BobMascotLoader', () => ({
   BobMascotLoader: ({ message }: { message: string }) => <div>{message}</div>,
 }));
@@ -157,6 +158,7 @@ describe('FCEListeningMatchingPractice (Listening P3)', () => {
     createdAudio[0].onerror?.();
     await screen.findByText('The audio is not available right now.');
     fireEvent.click(screen.getAllByRole('button', { name: /Try again/ })[0]);
-    expect(screen.getAllByRole('button', { name: /^Play Speaker/ }).length).toBeGreaterThan(0);
+    expect(createdAudio.length).toBe(2);
+    expect(playMock).toHaveBeenCalledTimes(2);
   });
 });

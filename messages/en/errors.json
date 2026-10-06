@@ -7,5 +7,14 @@
   "retry": "Try again",
   "activityNoContent": "There are no exercises available for this activity yet. Go back and try another one.",
   "activityLoadFailed": "We could not load this exercise. Go back or try again.",
-  "activityBack": "Back"
+  "activityBack": "Back",
+  "activityComingSoon": "Coming soon",
+  "activityErrorTitle": "Something went wrong",
+  "audioUnavailable": "The audio is not available right now.",
+  "audioLoading": "Loading audio…",
+  "audioPlay": "Play audio",
+  "audioPlayAgain": "Play again",
+  "audioPlayed": "Audio played",
+  "audioPlaysLeft": "{count, plural, one {# play remaining} other {# plays remaining}}",
+  "audioMaxReached": "Maximum plays reached"
 }

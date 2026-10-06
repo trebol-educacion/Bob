@@ -1,7 +1,8 @@
 'use client';
 
 import React from 'react';
-import { ChevronRight, RotateCcw } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
+import { ActivityErrorState } from '@/components/activity/ActivityErrorState';
 import { BobMascotLoader } from '@/components/chat/BobMascotLoader';
 import { CelebrationCard } from '@/components/practice/yl/CelebrationCard';
 import type { ChoiceGroupController } from './types';
@@ -40,26 +41,6 @@ function Header({ title, subtitle, onBack }: Pick<GroupExerciseFrameProps, 'titl
   );
 }
 
-function ErrorState({ message, onRetry, onBack }: { message: string | null; onRetry: () => void; onBack: () => void }) {
-  return (
-    <div className="flex flex-col items-center justify-center flex-1 p-8 gap-6 text-center">
-      <p className="text-lg font-bold text-gray-800">Something went wrong</p>
-      <p className="text-sm text-gray-500 max-w-xs">{message}</p>
-      <button
-        type="button"
-        onClick={onRetry}
-        className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white rounded-xl font-semibold text-sm hover:bg-indigo-700 transition cursor-pointer"
-      >
-        <RotateCcw size={16} />
-        Try again
-      </button>
-      <button type="button" onClick={onBack} className="text-sm text-gray-400 hover:text-gray-600 transition cursor-pointer">
-        Go back
-      </button>
-    </div>
-  );
-}
-
 export function GroupExerciseFrame({ controller, title, subtitle, onBack, onOpenDashboard, children }: GroupExerciseFrameProps) {
   const { phase, exercise, answers, result, errorMessage, isNewSession, submit, retry } = controller;
   const answeredCount = Object.values(answers).filter((value) => value.trim() !== '').length;
@@ -79,7 +60,7 @@ export function GroupExerciseFrame({ controller, title, subtitle, onBack, onOpen
     return (
       <div className="flex flex-col h-full">
         <Header title={title} subtitle={subtitle} onBack={onBack} />
-        <ErrorState message={errorMessage} onRetry={retry} onBack={onBack} />
+        <ActivityErrorState message={errorMessage} onRetry={retry} onBack={onBack} />
       </div>
     );
   }

@@ -8,6 +8,7 @@ import {
   L2_GROUP, L2_ITEMS, L4_GROUP, L4_ITEMS,
 } from './fce-group-fixtures';
 
+vi.mock('next-intl', async () => (await import('./stubs/intl')).intlMock());
 vi.mock('@/components/chat/BobMascotLoader', () => ({
   BobMascotLoader: ({ message }: { message: string }) => <div>{message}</div>,
 }));

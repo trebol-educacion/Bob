@@ -2,7 +2,9 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { motion } from 'motion/react';
-import { ChevronRight, RotateCcw, Volume2 } from 'lucide-react';
+import { ChevronRight, Volume2 } from 'lucide-react';
+import { ActivityErrorState } from '@/components/activity/ActivityErrorState';
+import { GroupAudioPlayer } from '@/components/practice/group-exercise/GroupAudioPlayer';
 import { BobMascotLoader } from '@/components/chat/BobMascotLoader';
 import { BobAvatar } from '@/components/practice/yl/_shared';
 import { CelebrationCard } from '@/components/practice/yl/CelebrationCard';
@@ -96,16 +98,6 @@ function tryRestore(messages: StoredMessage[]): RestoredState | null {
   return { items, turns, finalScore };
 }
 
-let _activeAudio: HTMLAudioElement | null = null;
-
-function stopActiveAudio(): void {
-  if (_activeAudio) {
-    _activeAudio.pause();
-    _activeAudio.src = '';
-    _activeAudio = null;
-  }
-}
-
 function ProgressDots({
   total,
   currentIdx,
@@ -144,44 +136,6 @@ function ProgressDots({
   );
 }
 
-function AudioButton({
-  audioUrl: _audioUrl,
-  playsUsed,
-  onPlay,
-}: {
-  audioUrl: string;
-  playsUsed: number;
-  onPlay: () => void;
-}) {
-  const canPlay = playsUsed < MAX_PLAYS;
-
-  return (
-    <div className="flex flex-col items-center gap-1.5">
-      <button
-        type="button"
-        onClick={onPlay}
-        disabled={!canPlay}
-        className={[
-          'flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm transition cursor-pointer',
-          canPlay
-            ? 'bg-indigo-600 text-white hover:bg-indigo-700'
-            : 'bg-gray-100 text-gray-400 cursor-not-allowed',
-        ].join(' ')}
-      >
-        <Volume2 size={16} />
-        {playsUsed === 0 ? 'Play audio' : playsUsed >= MAX_PLAYS ? 'Audio played' : 'Play again'}
-      </button>
-      <p className="text-xs text-gray-400">
-        {playsUsed === 0
-          ? `You can listen up to ${MAX_PLAYS} times`
-          : playsUsed >= MAX_PLAYS
-          ? 'Maximum plays reached'
-          : `${MAX_PLAYS - playsUsed} play${MAX_PLAYS - playsUsed !== 1 ? 's' : ''} remaining`}
-      </p>
-    </div>
-  );
-}
-
 /** FCE B2 Listening Part 1, 8 short extracts, 3-option multiple choice. */
 export function FCEShortExtractsPractice({
   onBack,
@@ -196,13 +150,11 @@ export function FCEShortExtractsPractice({
   const [items, setItems] = useState<FCEShortExtractsItem[]>([]);
   const [currentIdx, setCurrentIdx] = useState(0);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
-  const [playsUsed, setPlaysUsed] = useState(0);
   const [turns, setTurns] = useState<TurnRecord[]>([]);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isNewSession, setIsNewSession] = useState(false);
   const [finalScore, setFinalScore] = useState<number | null>(null);
   const initStartedRef = useRef(false);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     if (initStartedRef.current) return;
@@ -247,28 +199,12 @@ export function FCEShortExtractsPractice({
     void init();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handlePlay = useCallback(() => {
-    const item = items[currentIdx];
-    if (!item || playsUsed >= MAX_PLAYS) return;
-
-    stopActiveAudio();
-
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? '';
-    const fullUrl = `${supabaseUrl}/storage/v1/object/public/bob-listening${item.stimulus_audio_url}`;
-    const audio = new Audio(fullUrl);
-    audioRef.current = audio;
-    _activeAudio = audio;
-    audio.play().catch(() => {});
-    setPlaysUsed((prev) => prev + 1);
-  }, [items, currentIdx, playsUsed]);
-
   const handleNext = useCallback(async () => {
     if (selectedIndex === null) return;
     const item = items[currentIdx];
     if (!item) return;
 
     setPhase('submitting');
-    stopActiveAudio();
 
     const result = await submitFCEListeningAnswerAction({
       sessionId,
@@ -315,8 +251,6 @@ export function FCEShortExtractsPractice({
     } else {
       setCurrentIdx((prev) => prev + 1);
       setSelectedIndex(null);
-      setPlaysUsed(0);
-      audioRef.current = null;
       setPhase('ready');
     }
   }, [selectedIndex, sessionId, items, currentIdx, turns, onSessionCreated, onSessionFinished]);
@@ -328,11 +262,9 @@ export function FCEShortExtractsPractice({
     setItems([]);
     setCurrentIdx(0);
     setSelectedIndex(null);
-    setPlaysUsed(0);
     setTurns([]);
     setErrorMsg(null);
     setFinalScore(null);
-    audioRef.current = null;
 
     startFCEListeningPart1Action().then((result) => {
       if ('error' in result) {
@@ -365,25 +297,7 @@ export function FCEShortExtractsPractice({
     return (
       <div className="flex flex-col h-full">
         <Header onBack={onBack} currentIdx={0} total={ITEMS_PER_SESSION} turns={[]} phase="error" />
-        <div className="flex flex-col items-center justify-center flex-1 p-8 gap-6 text-center">
-          <p className="text-lg font-bold text-gray-800">Something went wrong</p>
-          <p className="text-sm text-gray-500 max-w-xs">{errorMsg}</p>
-          <button
-            type="button"
-            onClick={handleRetry}
-            className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white rounded-xl font-semibold text-sm hover:bg-indigo-700 transition cursor-pointer"
-          >
-            <RotateCcw size={16} />
-            Try again
-          </button>
-          <button
-            type="button"
-            onClick={onBack}
-            className="text-sm text-gray-400 hover:text-gray-600 transition"
-          >
-            Go back
-          </button>
-        </div>
+        <ActivityErrorState message={errorMsg} onRetry={handleRetry} onBack={onBack} />
       </div>
     );
   }
@@ -524,11 +438,7 @@ export function FCEShortExtractsPractice({
               <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 flex flex-col gap-4">
                 {currentItem && (
                   <>
-                    <AudioButton
-                      audioUrl={currentItem.stimulus_audio_url}
-                      playsUsed={playsUsed}
-                      onPlay={handlePlay}
-                    />
+                    <GroupAudioPlayer key={currentItem.id} audioPath={currentItem.stimulus_audio_url} maxPlays={MAX_PLAYS} />
 
                     <p className="text-base font-bold text-gray-800 text-center">
                       {currentItem.question}
