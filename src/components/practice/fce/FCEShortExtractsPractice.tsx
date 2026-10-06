@@ -240,8 +240,6 @@ export function FCEShortExtractsPractice({
         return;
       }
 
-      onSessionCreated?.(result.session_id);
-      setSessionId(result.session_id);
       setItems(result.items);
       setPhase('ready');
     }
@@ -265,19 +263,29 @@ export function FCEShortExtractsPractice({
   }, [items, currentIdx, playsUsed]);
 
   const handleNext = useCallback(async () => {
-    if (selectedIndex === null || !sessionId) return;
+    if (selectedIndex === null) return;
     const item = items[currentIdx];
     if (!item) return;
 
     setPhase('submitting');
     stopActiveAudio();
 
-    const result = await submitFCEListeningAnswerAction(sessionId, item.id, selectedIndex);
+    const result = await submitFCEListeningAnswerAction({
+      sessionId,
+      itemIds: items.map((entry) => entry.id),
+      itemId: item.id,
+      selectedIndex,
+    });
 
     if ('error' in result) {
       setErrorMsg('Could not submit answer. Please try again.');
       setPhase('ready');
       return;
+    }
+
+    if (!sessionId) {
+      setSessionId(result.sessionId);
+      onSessionCreated?.(result.sessionId);
     }
 
     const newTurn: TurnRecord = {
@@ -293,8 +301,7 @@ export function FCEShortExtractsPractice({
     const isLastItem = currentIdx === items.length - 1;
 
     if (isLastItem) {
-      const correctCount = updatedTurns.filter((t) => t.correct).length;
-      const finalResult = await finalizeFCEListeningSessionAction(sessionId, correctCount);
+      const finalResult = await finalizeFCEListeningSessionAction(result.sessionId);
 
       if ('error' in finalResult) {
         setErrorMsg('Could not save final result. Please try again.');
@@ -312,7 +319,7 @@ export function FCEShortExtractsPractice({
       audioRef.current = null;
       setPhase('ready');
     }
-  }, [selectedIndex, sessionId, items, currentIdx, turns, onSessionFinished]);
+  }, [selectedIndex, sessionId, items, currentIdx, turns, onSessionCreated, onSessionFinished]);
 
   const handleRetry = useCallback(() => {
     initStartedRef.current = false;
@@ -333,13 +340,11 @@ export function FCEShortExtractsPractice({
         setPhase('error');
         return;
       }
-      onSessionCreated?.(result.session_id);
-      setSessionId(result.session_id);
       setItems(result.items);
       setIsNewSession(true);
       setPhase('ready');
     });
-  }, [onSessionCreated]);
+  }, []);
 
   const OPTION_LABELS = ['A', 'B', 'C', 'D'];
 
