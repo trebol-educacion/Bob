@@ -71,7 +71,8 @@ export interface FCEClozeSubmitResult {
 function safeParse<T>(schema: z.ZodType<T>, raw: string): T | null {
   try {
     return schema.parse(JSON.parse(raw));
-  } catch {
+  } catch (error) {
+    console.error(JSON.stringify({ event: 'fce_cloze_parse_issue', issue: String(error).slice(0, 600) }));
     return null;
   }
 }
