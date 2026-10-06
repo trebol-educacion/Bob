@@ -26,14 +26,10 @@ vi.mock('@/components/chat', () => ({
     <section><h4>{title}</h4>{children}</section>
   ),
 }));
-vi.mock('@/lib/persist-activity', () => ({ persistMessage: vi.fn(() => Promise.resolve({ id: 'x' })) }));
 
 const evaluateAcademicMock = vi.fn();
 vi.mock('@/actions/modes/writing-academic', () => ({
   evaluateAcademicAction: (...a: unknown[]) => evaluateAcademicMock(...a),
-}));
-vi.mock('@/actions/sessions', () => ({
-  createSessionAction: vi.fn(async () => ({ data: { id: 's1', user_id: 'u1' } })),
 }));
 
 import { AcademicWritingPractice } from '@/components/practice/AcademicWritingPractice';
@@ -60,11 +56,14 @@ describe('Academic Discussion and Writing routing', () => {
 
   it('keeps the TOEFL Academic Discussion flow: forum, 100-200 range and formative feedback without mark', async () => {
     evaluateAcademicMock.mockResolvedValue({
-      kind: 'writing_formative',
-      understood: true,
-      highlights: ['Clear opinion'],
-      suggestions: ['Add an example'],
-      indicators: { word_count: 100, target_word_count_range: [100, 200] },
+      sessionId: 's1',
+      feedback: {
+        kind: 'writing_formative',
+        understood: true,
+        highlights: ['Clear opinion'],
+        suggestions: ['Add an example'],
+        indicators: { word_count: 100, target_word_count_range: [100, 200] },
+      },
     });
     render(<AcademicWritingPractice mode="toefl_writing_academic_discussion" onBack={vi.fn()} />);
     await screen.findByText(/study abroad/);
@@ -73,7 +72,7 @@ describe('Academic Discussion and Writing routing', () => {
     fireEvent.click(screen.getByText('send'));
     await waitFor(() => expect(screen.getByText('Clear opinion')).toBeInTheDocument());
     expect(evaluateAcademicMock).toHaveBeenCalledWith(
-      expect.objectContaining({ framework: 'toefl', exam_part: 'toefl_writing_academic_discussion', targetWordCount: [100, 200] }),
+      expect.objectContaining({ exam_part: 'toefl_writing_academic_discussion', targetWordCount: [100, 200] }),
     );
     expect(screen.queryByTestId('fce-score-card')).not.toBeInTheDocument();
   });
