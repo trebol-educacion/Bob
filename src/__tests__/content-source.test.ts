@@ -118,3 +118,37 @@ describe('pickContent', () => {
     expect(await pickContent(QUERY)).toMatchObject({ ok: false, code: 'no_content' });
   });
 });
+
+describe('pickContent for placement', () => {
+  const PLACEMENT: ContentQuery = {
+    framework: 'cefr',
+    cefr: 'a1',
+    examPart: 'placement_reading',
+    purpose: 'placement',
+    skill: 'reading',
+    userId: 'u1',
+    groupsOnly: true,
+  };
+
+  it('only queries placement groups and never falls back to loose practice items', async () => {
+    fetchGroups.mockResolvedValue({ ok: true, data: [] });
+    const result = await pickContent(PLACEMENT);
+    expect(fetchGroups).toHaveBeenCalledWith(expect.objectContaining({ purpose: 'placement', exam: 'cefr', exam_part: 'placement_reading' }));
+    expect(fetchPublishedItems).not.toHaveBeenCalled();
+    expect(result).toEqual({ ok: false, code: 'no_content', retryable: false });
+  });
+
+  it('skips the groups already answered in the attempt', async () => {
+    fetchGroups.mockResolvedValue({ ok: true, data: [group('g1'), group('g2')] });
+    for (let i = 0; i < 10; i++) {
+      const result = await pickContent({ ...PLACEMENT, excludeGroupIds: ['g1'] });
+      expect(result).toMatchObject({ ok: true, data: { group: { id: 'g2' } } });
+    }
+  });
+
+  it('reports no_content when every group of the level was already answered', async () => {
+    fetchGroups.mockResolvedValue({ ok: true, data: [group('g1')] });
+    const result = await pickContent({ ...PLACEMENT, excludeGroupIds: ['g1'] });
+    expect(result).toEqual({ ok: false, code: 'no_content', retryable: false });
+  });
+});

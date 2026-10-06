@@ -18,6 +18,7 @@ export interface ContentQuery {
   topic?: string;
   groupsOnly?: boolean;
   itemless?: boolean;
+  excludeGroupIds?: readonly string[];
 }
 
 export type PickedContent =
@@ -65,10 +66,11 @@ async function pickFromGroups(query: ContentQuery, userId: string | null): Promi
     status: 'published',
   });
   if (!groups.ok) return fail('db_error', true);
-  if (groups.data.length === 0) return null;
+  const candidates = groups.data.filter((g) => !query.excludeGroupIds?.includes(g.id));
+  if (candidates.length === 0) return null;
 
   const recent = userId ? await recentGroupIds(userId, query.examPart) : [];
-  const group = pickGroup(preferTopic(groups.data, query.topic), recent);
+  const group = pickGroup(preferTopic(candidates, query.topic), recent);
   if (!group) return null;
 
   const items = await fetchGroupItems([group.id]);

@@ -5,14 +5,14 @@ import { getPrompt } from '@/lib/prompts/db-prompts';
 import { fetchOpenTasks } from '@/actions/item-bank/repository';
 import { loadStudentFrameworks } from '@/lib/organization/student-frameworks';
 import { hasPendingAssessment } from './queue-guard';
+import { resolveCooldownDays } from './shared';
 import { FALLBACK_SPEAKING_PROMPTS, openTaskQuestionsToPrompts } from './speaking-fallback';
 import type { Skill } from '@/lib/types/skills';
-import type { AssessmentListeningItem, AssessmentReadingItem, StartAssessmentResult } from './types';
+import type { StartAssessmentResult } from './types';
 
 /**
- * Starts an Assessment session for the given skill.
- * For speaking: returns question prompts from BD.
- * For listening: returns a random selection of items from bob_closed_items.
+ * @param skill Skill speaking or writing; reading and listening run through placement
+ * @returns Promise<StartAssessmentResult>
  */
 export async function startAssessmentAction(skill: Skill): Promise<StartAssessmentResult> {
   const supabase = await createSupabaseServer();
@@ -38,13 +38,7 @@ export async function startAssessmentAction(skill: Skill): Promise<StartAssessme
   if (profileResult.error || !profileResult.data) return { status: 'error', code: 'db_error' };
   const profile = profileResult.data;
 
-  const { data: org } = await supabase
-    .schema('public').from('organizations')
-    .select('assessment_cooldown_days')
-    .eq('id', profile.organization_id)
-    .maybeSingle();
-
-  const cooldownDays = org?.assessment_cooldown_days ?? 7;
+  const cooldownDays = await resolveCooldownDays(supabase, user.id);
 
   const lastAssessmentRow = historyResult.data?.[0];
   if (lastAssessmentRow?.occurred_at) {
@@ -70,62 +64,8 @@ export async function startAssessmentAction(skill: Skill): Promise<StartAssessme
 
   const assessment_id = crypto.randomUUID();
 
-  if (skill === 'listening') {
-    const { data: rawItems, error: itemsError } = await supabase
-      .from('closed_items')
-      .select('id, stimulus_audio_url, transcript, question, options')
-      .eq('skill', 'listening')
-      .eq('status', 'published')
-      .in('cefr_level', ['a1', 'a2', 'b1', 'b2']);
-
-    if (itemsError || !rawItems || rawItems.length === 0) {
-      return { status: 'error', code: 'no_items' };
-    }
-
-    const shuffled = [...rawItems].sort(() => Math.random() - 0.5);
-    const selected = shuffled.slice(0, Math.min(10, shuffled.length));
-
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? '';
-    const items: AssessmentListeningItem[] = selected.map(row => {
-      const rawPath = (row.stimulus_audio_url as string) ?? '';
-      const fullUrl = rawPath.startsWith('http')
-        ? rawPath
-        : `${supabaseUrl}/storage/v1/object/public/bob-listening${rawPath}`;
-      return {
-        id: row.id as string,
-        audio_url: fullUrl,
-        transcript: (row.transcript as string | null) ?? null,
-        question: row.question as string,
-        options: row.options as Array<{ key: string; label: string }>,
-      };
-    });
-
-    return { status: 'ok', skill: 'listening', assessment_id, items };
-  }
-
-  if (skill === 'reading') {
-    const { data: rawItems, error: itemsError } = await supabase
-      .from('closed_items')
-      .select('id, stimulus_text, question, options')
-      .eq('skill', 'reading')
-      .eq('status', 'published')
-      .in('cefr_level', ['a1', 'a2', 'b1', 'b2']);
-
-    if (itemsError || !rawItems || rawItems.length === 0) {
-      return { status: 'error', code: 'no_items' };
-    }
-
-    const shuffled = [...rawItems].sort(() => Math.random() - 0.5);
-    const selected = shuffled.slice(0, Math.min(10, shuffled.length));
-
-    const items: AssessmentReadingItem[] = selected.map(row => ({
-      id: row.id as string,
-      stimulus_text: (row.stimulus_text as string) ?? '',
-      question: row.question as string,
-      options: row.options as Array<{ key: string; label: string }>,
-    }));
-
-    return { status: 'ok', skill: 'reading', assessment_id, items };
+  if (skill === 'listening' || skill === 'reading') {
+    return { status: 'error', code: 'unsupported_skill' };
   }
 
   if (skill === 'writing') {

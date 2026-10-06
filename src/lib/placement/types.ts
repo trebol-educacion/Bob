@@ -1,6 +1,6 @@
-export type PlacementLevel = 'a2' | 'b1' | 'b2';
+export type PlacementLevel = 'a1' | 'a2' | 'b1' | 'b2';
 
-export const PLACEMENT_LEVELS: readonly PlacementLevel[] = ['a2', 'b1', 'b2'];
+export const PLACEMENT_LEVELS: readonly PlacementLevel[] = ['a1', 'a2', 'b1', 'b2'];
 
 export interface PlacementConfig {
   levels: readonly PlacementLevel[];
@@ -21,4 +21,4 @@ export interface PlacementEngineState {
 
 export type PlacementStepDecision =
   | { done: false; nextLevel: PlacementLevel; groupIndex: number }
-  | { done: true; resultLevel: PlacementLevel | null };
+  | { done: true; resultLevel: PlacementLevel };

@@ -8,8 +8,6 @@ export const DEFAULT_PLACEMENT_CONFIG: PlacementConfig = {
   failsToStop: 2,
 };
 
-export const DEFAULT_PLACEMENT_COOLDOWN_DAYS = 7;
-
 /**
  * @param raw Record<string, unknown>
  * @returns PlacementConfig
@@ -25,13 +23,4 @@ export function parsePlacementConfig(raw: Record<string, unknown> | null | undef
   const failsToStop = typeof raw.failsToStop === 'number' ? raw.failsToStop : DEFAULT_PLACEMENT_CONFIG.failsToStop;
 
   return { levels, groupsPerLevel, passThreshold, failsToStop };
-}
-
-/**
- * @param raw Record<string, unknown>
- * @returns number
- */
-export function parsePlacementCooldownDays(raw: Record<string, unknown> | null | undefined): number {
-  if (!raw || typeof raw.cooldownDays !== 'number') return DEFAULT_PLACEMENT_COOLDOWN_DAYS;
-  return raw.cooldownDays;
 }

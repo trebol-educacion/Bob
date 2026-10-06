@@ -46,7 +46,8 @@ export function nextPlacementStep(
   state: PlacementEngineState,
   config: PlacementConfig
 ): PlacementStepDecision {
-  let lastPassedLevel: PlacementLevel | null = null;
+  const floorLevel = config.levels[0];
+  let lastPassedLevel: PlacementLevel = floorLevel;
 
   for (const level of config.levels) {
     const levelOutcomes = outcomesAtLevel(state.outcomes, level);
@@ -64,4 +65,23 @@ export function nextPlacementStep(
   }
 
   return { done: true, resultLevel: lastPassedLevel };
+}
+
+/**
+ * @param outcomes readonly PlacementGroupOutcome[]
+ * @param config PlacementConfig
+ * @returns PlacementLevel highest fully passed level, or the floor level
+ */
+export function currentPlacementLevel(
+  outcomes: readonly PlacementGroupOutcome[],
+  config: PlacementConfig
+): PlacementLevel {
+  let passed: PlacementLevel = config.levels[0];
+  for (const level of config.levels) {
+    const levelOutcomes = outcomesAtLevel(outcomes, level);
+    if (levelOutcomes.length < config.groupsPerLevel) break;
+    if (countFails(levelOutcomes, config.passThreshold) >= config.failsToStop) break;
+    passed = level;
+  }
+  return passed;
 }

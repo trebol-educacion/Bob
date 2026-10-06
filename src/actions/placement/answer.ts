@@ -3,7 +3,7 @@
 import { createSupabaseServer } from '@/lib/supabase/server';
 import { fetchGroupItems } from '@/actions/item-bank/repository';
 import { scoreClosedAnswers } from '@/lib/item-bank/scoring';
-import { nextPlacementStep } from '@/lib/placement/engine';
+import { currentPlacementLevel, nextPlacementStep } from '@/lib/placement/engine';
 import { fetchStepContent, parseStoredPlacementState, resolvePlacementConfig } from './shared';
 import type { PlacementSkill, StoredPlacementOutcome } from './shared';
 import type { ClosedAnswer } from '@/lib/item-bank/scoring';
@@ -12,7 +12,7 @@ import type { PlacementLevel } from '@/lib/placement/types';
 
 export type AnswerPlacementStepResult =
   | { status: 'ok'; done: false; attempt_id: string; level: PlacementLevel; group: PublicItemGroup; items: PublicBankItem[] }
-  | { status: 'ok'; done: true; attempt_id: string; result_level: PlacementLevel | null }
+  | { status: 'ok'; done: true; attempt_id: string; result_level: PlacementLevel }
   | { status: 'error'; code: 'unauthenticated' | 'invalid_step' | 'db_error' };
 
 /**
@@ -46,11 +46,13 @@ export async function answerPlacementStepAction(
     if (!attempt) return { status: 'error', code: 'invalid_step' };
 
     const state = parseStoredPlacementState(attempt.state);
+    const config = await resolvePlacementConfig(supabase);
     if (state.outcomes.some((outcome) => outcome.groupId === groupId)) {
-      return { status: 'error', code: 'invalid_step' };
+      const settled = nextPlacementStep({ outcomes: state.outcomes }, config);
+      if (!settled.done) return { status: 'error', code: 'invalid_step' };
+      return await finishAttempt(supabase, user.id, attemptId, skill, settled.resultLevel);
     }
 
-    const config = await resolvePlacementConfig(supabase);
     const pendingDecision = nextPlacementStep({ outcomes: state.outcomes }, config);
     if (pendingDecision.done) return { status: 'error', code: 'invalid_step' };
 
@@ -89,10 +91,11 @@ export async function answerPlacementStepAction(
 
     if (!decision.done) {
       const content = await fetchStepContent(skill, decision.nextLevel, newOutcomes.map((o) => o.groupId));
-      if (!content) {
-        return await finishAttempt(supabase, user.id, attemptId, skill, null);
+      if (!content.ok) {
+        if (content.code !== 'no_content') return { status: 'error', code: 'db_error' };
+        return await finishAttempt(supabase, user.id, attemptId, skill, currentPlacementLevel(newOutcomes, config));
       }
-      return { status: 'ok', done: false, attempt_id: attemptId, level: decision.nextLevel, group: content.group, items: content.items };
+      return { status: 'ok', done: false, attempt_id: attemptId, level: decision.nextLevel, group: content.data.group, items: content.data.items };
     }
 
     return await finishAttempt(supabase, user.id, attemptId, skill, decision.resultLevel);
@@ -114,29 +117,32 @@ async function finishAttempt(
   userId: string,
   attemptId: string,
   skill: PlacementSkill,
-  resultLevel: PlacementLevel | null
+  resultLevel: PlacementLevel
 ): Promise<AnswerPlacementStepResult> {
+  const { error } = await supabase
+    .from('skill_levels')
+    .upsert(
+      {
+        user_id: userId,
+        skill,
+        cefr_level: resultLevel,
+        origin: 'assessment',
+        confidence: null,
+        last_assessment_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'user_id,skill' }
+    );
+
+  if (error) {
+    console.error('[answerPlacementStepAction] skill_levels upsert failed:', error.message);
+    return { status: 'error', code: 'db_error' };
+  }
+
   await supabase
     .from('placement_attempts')
     .update({ status: 'completed', completed_at: new Date().toISOString(), result_level: resultLevel })
     .eq('id', attemptId);
-
-  if (resultLevel) {
-    await supabase
-      .from('skill_levels')
-      .upsert(
-        {
-          user_id: userId,
-          skill,
-          cefr_level: resultLevel,
-          origin: 'assessment',
-          confidence: null,
-          last_assessment_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: 'user_id,skill' }
-      );
-  }
 
   return { status: 'ok', done: true, attempt_id: attemptId, result_level: resultLevel };
 }
