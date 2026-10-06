@@ -1,26 +1,16 @@
 'use server';
 
-import { z } from 'zod';
 import { Type, Part } from '@google/genai';
 import { MODELS } from '@/lib/models';
 import { RepetitionObjectiveFeedbackSchema, type RepetitionObjectiveFeedback } from '@/lib/types/practice';
+import { ToeflRepeatSessionSchema, REPEAT_ANSWER_KIND, buildRepeatEvaluation, restoreRepeat, type ToeflRepeatItem } from '@/lib/toefl/repeat';
+import { currentUserId, finishSession, openSession, recordTurn } from '@/lib/session/lifecycle';
 import { getPrompt } from '@/lib/prompts/db-prompts';
-import { persistMessage, readSessionMessagesForCurrentOrUser } from '@/lib/persist-activity';
+import { readSessionMessages } from '@/lib/persist-activity';
 import { getOrCreateCachedContent } from '@/lib/cache';
 import { fail, ok } from '@/lib/result';
 import { parseJsonResult } from '@/lib/llm/parse-json-result';
-import { callGemini, safeParseFallback } from '@/lib/gemini-client';
-
-const ToeflRepeatItemSchema = z.object({
-  text: z.string(),
-  difficulty: z.number().min(1).max(5),
-});
-
-const ToeflRepeatSessionSchema = z.object({
-  items: z.array(ToeflRepeatItemSchema).length(10),
-});
-
-export type ToeflRepeatItem = z.infer<typeof ToeflRepeatItemSchema>;
+import { callGemini } from '@/lib/gemini-client';
 
 export type ToeflAudioChunk = {
   data: string;
@@ -32,22 +22,9 @@ const SessionFallback: ToeflRepeatItem[] = Array.from({ length: 10 }, (_, i) => 
   difficulty: Math.min(5, Math.floor(i / 2) + 1),
 }));
 
-const ObjectiveFeedbackFallback: RepetitionObjectiveFeedback = {
-  kind: 'repetition_objective',
-  exact_repetition: false,
-  missing_words: [],
-  extra_words: [],
-  transcribed_text: '',
-  original_text: '',
-};
-
-/**
- * Generates 10 progressive TOEFL Listen & Repeat items and persists the phrase plan.
- */
-export async function generateToeflRepeatSessionAction(
-  sessionId: string,
-  userId: string
-): Promise<ToeflRepeatItem[]> {
+/** Generates 10 progressive TOEFL Listen & Repeat items; persists nothing until the first graded repetition. */
+export async function generateToeflRepeatSessionAction(): Promise<ToeflRepeatItem[]> {
+  const userId = (await currentUserId()) ?? undefined;
   const cached = await getOrCreateCachedContent<ToeflRepeatItem[]>(
     { kind: 'plan', promptKey: 'toefl-listen-repeat-b1-plan', inputs: {} },
     async () => {
@@ -90,17 +67,6 @@ export async function generateToeflRepeatSessionAction(
   if ('error' in cached) {
     console.error(JSON.stringify({ event: 'generateToeflRepeatSessionAction_cache', error: cached.error }));
     return SessionFallback;
-  }
-
-  const persistResult = await persistMessage({
-    sessionId,
-    userId,
-    role: 'bob',
-    msgType: 'phrase',
-    contentJson: { phrases: cached },
-  });
-  if ('error' in persistResult) {
-    console.error('[ToeflRepeat persist] phrase plan failed:', persistResult.error);
   }
 
   return cached;
@@ -178,15 +144,22 @@ export async function generateToeflRepeatAudiosAction(
   return results;
 }
 
-/** Evaluates a repetition attempt; returns objective word-level metrics (no subjective score). */
-export async function evaluateRepetitionAction(
-  originalText: string,
-  audioBase64: string,
-  mimeType: string,
-  sessionId: string,
-  userId: string,
-  phraseIndex: number
-): Promise<RepetitionObjectiveFeedback> {
+const MODE = 'toefl_listen_repeat';
+
+export interface RepetitionInput {
+  items: ToeflRepeatItem[];
+  phraseIndex: number;
+  audioBase64: string;
+  mimeType: string;
+  sessionId?: string;
+}
+
+export interface RepetitionOutcome {
+  sessionId: string;
+  feedback: RepetitionObjectiveFeedback;
+}
+
+async function evaluateRepetition(originalText: string, audioBase64: string, mimeType: string): Promise<RepetitionObjectiveFeedback | null> {
   const prompt = `You are evaluating a Listen & Repeat exercise.
 
 Target sentence: "${originalText}"
@@ -203,88 +176,67 @@ Return ONLY a JSON object with these fields:
 
 Return ONLY valid JSON. No score, no pronunciation rating, no subjective assessment.`;
 
+  const userId = (await currentUserId()) ?? undefined;
   const result = await callGemini(
     { promptKey: 'toefl_listen_repeat_b1_objective', model: MODELS.FLASH_LITE_PREVIEW, userId },
     (ai) => ai.models.generateContent({
       model: MODELS.FLASH_LITE_PREVIEW,
-      contents: [
-        {
-          role: 'user',
-          parts: [
-            { inlineData: { mimeType, data: audioBase64 } },
-            { text: prompt },
-          ],
-        },
-      ],
+      contents: [{ role: 'user', parts: [{ inlineData: { mimeType, data: audioBase64 } }, { text: prompt }] }],
       config: { responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
     })
   );
-
   if (!result.ok || !result.data.text) {
-    console.error(JSON.stringify({ event: 'evaluateRepetitionAction', error: result.ok ? 'empty response' : result.error }));
-    return { ...ObjectiveFeedbackFallback, original_text: originalText };
+    console.error(JSON.stringify({ event: 'evaluateRepetition', error: result.ok ? 'empty response' : result.error }));
+    return null;
   }
-
-  let parsed: unknown;
   try {
-    parsed = JSON.parse(result.data.text);
+    const parsed = RepetitionObjectiveFeedbackSchema.safeParse(JSON.parse(result.data.text));
+    return parsed.success ? { ...parsed.data, original_text: originalText } : null;
   } catch {
-    return { ...ObjectiveFeedbackFallback, original_text: originalText };
-  }
-
-  const feedback = safeParseFallback(RepetitionObjectiveFeedbackSchema, parsed, { ...ObjectiveFeedbackFallback, original_text: originalText });
-
-  const audioResult = await persistMessage({
-    sessionId,
-    userId,
-    role: 'user',
-    msgType: 'user_audio',
-    contentText: feedback.transcribed_text || null,
-    contentJson: { phraseIndex, exact_repetition: feedback.exact_repetition },
-  });
-  if ('error' in audioResult) {
-    console.error('[ToeflRepeat persist] user_audio failed:', audioResult.error);
-  }
-
-  const evalResult = await persistMessage({
-    sessionId,
-    userId,
-    role: 'bob',
-    msgType: 'evaluation',
-    contentJson: { phraseIndex, ...feedback },
-  });
-  if ('error' in evalResult) {
-    console.error('[ToeflRepeat persist] evaluation failed:', evalResult.error);
-  }
-
-  return feedback;
-}
-
-/**
- * Persists the session-level summary after all items are completed.
- */
-export async function saveToeflRepeatSummaryAction(
-  sessionId: string,
-  userId: string,
-  summary: { exactCount: number; totalCount: number; itemCount: number }
-): Promise<void> {
-  const result = await persistMessage({
-    sessionId,
-    userId,
-    role: 'bob',
-    msgType: 'evaluation',
-    contentText: `Session complete. Exact repetitions: ${summary.exactCount} of ${summary.totalCount}`,
-    contentJson: { ...summary, is_final: true },
-  });
-  if ('error' in result) {
-    console.error('[ToeflRepeat persist] summary failed:', result.error);
+    return null;
   }
 }
 
-/** Reads all persisted messages for a TOEFL Listen & Repeat session. */
-export async function getToeflRepeatSessionMessagesAction(
-  sessionId: string,
-  userId: string
-) {
-  return readSessionMessagesForCurrentOrUser(sessionId, userId);
+/** Evaluates a repetition objectively; opens the session on the first graded attempt and persists the turn. */
+export async function submitRepetitionAction(input: RepetitionInput): Promise<RepetitionOutcome | { error: string }> {
+  const item = input.items[input.phraseIndex];
+  if (!item) return { error: 'invalid_item' };
+  const feedback = await evaluateRepetition(item.text, input.audioBase64, input.mimeType);
+  if (!feedback) return { error: 'evaluation_failed' };
+
+  const opened = await openSession({
+    mode: MODE,
+    sessionId: input.sessionId,
+    opening: [{ role: 'bob', msgType: 'phrase', contentJson: { phrases: input.items } }],
+  });
+  if (!opened.ok) return { error: opened.code };
+
+  const turn = await recordTurn({
+    ...opened.data,
+    messages: [
+      {
+        role: 'user',
+        msgType: 'text',
+        contentText: feedback.transcribed_text || null,
+        contentJson: { kind: REPEAT_ANSWER_KIND, phraseIndex: input.phraseIndex, exact_repetition: feedback.exact_repetition },
+      },
+      { role: 'bob', msgType: 'evaluation', contentJson: { phraseIndex: input.phraseIndex, ...feedback } },
+    ],
+  });
+  if (!turn.ok) return { error: turn.code };
+  return { sessionId: opened.data.sessionId, feedback };
+}
+
+/** Closes the session with the 0-10 grade from exact repetitions over the item count. */
+export async function finishToeflRepeatAction(sessionId: string): Promise<{ score10: number | null } | { error: string }> {
+  const userId = await currentUserId();
+  if (!userId) return { error: 'unauthenticated' };
+  const restored = restoreRepeat(await readSessionMessages(sessionId, userId));
+  if (!restored) return { error: 'nothing_to_grade' };
+  const finished = await finishSession({
+    sessionId,
+    userId,
+    evaluation: buildRepeatEvaluation(restored.evaluations, restored.items.length),
+  });
+  return finished.ok ? { score10: finished.data.score10 } : { error: finished.code };
 }
