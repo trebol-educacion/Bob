@@ -139,6 +139,7 @@
       "footerFeedbackLabel": "FEEDBACK",
       "footerCollaborativeLabel": "COLLABORATIVE TASK"
     },
+    "restoreFailed": "We could not reopen this session. Go back and start a new one.",
     "cloze": {
       "back": "Back",
       "headerTitle": "Multiple-Choice Cloze",

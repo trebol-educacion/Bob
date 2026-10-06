@@ -14,6 +14,7 @@ import {
   type ClozeGapResult,
 } from '@/actions/modes/fce-reading-part1';
 import type { StoredMessage } from '@/actions/messages';
+import { resolveActivityBoot } from '@/lib/activity/boot';
 import { useTranslations } from 'next-intl';
 
 export interface FCEMultipleChoiceClozePracticeProps {
@@ -93,7 +94,6 @@ export function FCEMultipleChoiceClozePractice({
 
   const [phase, setPhase] = useState<Phase>('loading');
   const [sessionId, setSessionId] = useState<string | undefined>(initialSessionId);
-  const [userId, setUserId] = useState<string | undefined>();
   const [title, setTitle] = useState('');
   const [textWithGaps, setTextWithGaps] = useState('');
   const [gaps, setGaps] = useState<ClozeGap[]>([]);
@@ -110,46 +110,35 @@ export function FCEMultipleChoiceClozePractice({
     initStartedRef.current = true;
 
     async function init() {
-      if (initialMessages && initialMessages.length > 0) {
-        const restored = tryRestore(initialMessages);
-        if (restored) {
-          setTitle(restored.title);
-          setTextWithGaps(restored.text_with_gaps);
-          setGaps(restored.gaps);
-          setFramingText(restored.framingText);
-          if (restored.results) {
-            setResults(restored.results);
-            setCorrectCount(restored.correctCount);
-            setPhase('finished');
-          } else {
-            const { createSupabaseBrowser } = await import('@/lib/supabase/browser-client');
-            const supabase = createSupabaseBrowser();
-            const { data: { user } } = await supabase.auth.getUser();
-            if (user) setUserId(user.id);
-            setPhase('ready');
-          }
-          return;
+      const boot = resolveActivityBoot({ initialMessages, sessionId: initialSessionId, tryRestore });
+      if (boot.kind === 'restore') {
+        const restored = boot.data;
+        setTitle(restored.title);
+        setTextWithGaps(restored.text_with_gaps);
+        setGaps(restored.gaps);
+        setFramingText(restored.framingText);
+        if (restored.results) {
+          setResults(restored.results);
+          setCorrectCount(restored.correctCount);
+          setPhase('finished');
+        } else {
+          setPhase('ready');
         }
+        return;
       }
-
-      if (initialSessionId) {
+      if (boot.kind === 'restore-failed') {
+        setErrorMsg(t('fce.restoreFailed'));
         return;
       }
 
       setIsNewSession(true);
-      const result = await generateFCEClozeAction({ sessionId: initialSessionId });
+      const result = await generateFCEClozeAction();
 
       if ('error' in result) {
         setErrorMsg(result.error);
         return;
       }
 
-      if (!initialSessionId) {
-        onSessionCreated?.(result.sessionId);
-      }
-
-      setSessionId(result.sessionId);
-      setUserId(result.userId);
       setTitle(result.title);
       setTextWithGaps(result.text_with_gaps);
       setGaps(result.gaps);
@@ -165,12 +154,13 @@ export function FCEMultipleChoiceClozePractice({
   }
 
   async function handleSubmit() {
-    if (!sessionId || !userId) return;
     setPhase('submitting');
 
     const result = await submitFCEClozeAnswersAction({
       sessionId,
-      userId,
+      title,
+      text_with_gaps: textWithGaps,
+      framingText,
       answers,
       gaps,
     });
@@ -181,6 +171,8 @@ export function FCEMultipleChoiceClozePractice({
       return;
     }
 
+    if (!sessionId) onSessionCreated?.(result.sessionId);
+    setSessionId(result.sessionId);
     setResults(result.results);
     setCorrectCount(result.correctCount);
     setPhase('finished');

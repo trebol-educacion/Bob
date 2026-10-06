@@ -3,10 +3,10 @@
 import { z } from 'zod';
 import { getPrompt } from '@/lib/prompts/db-prompts';
 import { callGemini, isOk } from '@/lib/gemini-client';
-import { persistMessage, persistMessages } from '@/lib/persist-activity';
-import { createSessionAction } from '@/actions/sessions';
-import { createSupabaseServer } from '@/lib/supabase/server';
+import { ensureSession, finishSession, recordTurn } from '@/lib/session/lifecycle';
 import { MODELS } from '@/lib/models';
+
+const FCE_CLOZE_MODE = 'cambridge_fce_reading_part1';
 
 const ClozeOptionSchema = z.object({
   id: z.enum(['A', 'B', 'C', 'D']),
@@ -45,8 +45,6 @@ export interface ClozeText {
 
 /** Full result of a successful generation call. */
 export interface FCEClozeResult {
-  sessionId: string;
-  userId: string;
   title: string;
   text_with_gaps: string;
   gaps: ClozeGap[];
@@ -64,6 +62,7 @@ export interface ClozeGapResult {
 
 /** Full submit result. */
 export interface FCEClozeSubmitResult {
+  sessionId: string;
   correctCount: number;
   total: number;
   results: ClozeGapResult[];
@@ -77,32 +76,8 @@ function safeParse<T>(schema: z.ZodType<T>, raw: string): T | null {
   }
 }
 
-/** Generates 1 FCE B2 multiple-choice cloze text with 8 gaps; creates a session when none is provided. */
-export async function generateFCEClozeAction(input: {
-  sessionId?: string;
-}): Promise<FCEClozeResult | { error: string }> {
-  let sessionId = input.sessionId;
-  let userId: string | undefined;
-
-  if (!sessionId) {
-    const result = await createSessionAction({
-      mode: 'cambridge_fce_reading_part1',
-      title: 'Reading Part 1, Multiple-Choice Cloze',
-    });
-    if (!result.data) {
-      return { error: result.error ?? 'Could not create session' };
-    }
-    sessionId = result.data.id;
-    userId = result.data.user_id;
-  } else {
-    const supabase = await createSupabaseServer();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) return { error: 'Not authenticated' };
-    userId = user.id;
-  }
-
+/** Generates 1 FCE B2 multiple-choice cloze text with 8 gaps; persists nothing until the first submit. */
+export async function generateFCEClozeAction(): Promise<FCEClozeResult | { error: string }> {
   const [generationPrompt, framingText] = await Promise.all([
     getPrompt('cambridge_fce_reading_part1_b2_generation').catch(() => null),
     getPrompt('cambridge_fce_reading_part1_b2_framing').catch(
@@ -116,7 +91,7 @@ export async function generateFCEClozeAction(input: {
   }
 
   const geminiResult = await callGemini(
-    { promptKey: 'cambridge_fce_reading_part1_b2_generation', model: MODELS.FLASH_LITE_PREVIEW, userId },
+    { promptKey: 'cambridge_fce_reading_part1_b2_generation', model: MODELS.FLASH_LITE_PREVIEW },
     (ai) =>
       ai.models.generateContent({
         model: MODELS.FLASH_LITE_PREVIEW,
@@ -137,24 +112,7 @@ export async function generateFCEClozeAction(input: {
     return { error: 'Unexpected model response' };
   }
 
-  persistMessage({
-    sessionId,
-    userId,
-    role: 'bob',
-    msgType: 'text',
-    contentText: null,
-    contentJson: {
-      kind: 'cloze_plan',
-      title: parsed.title,
-      text_with_gaps: parsed.text_with_gaps,
-      gaps: parsed.gaps,
-      framing_text: framingText,
-    },
-  }).catch(() => undefined);
-
   return {
-    sessionId,
-    userId,
     title: parsed.title,
     text_with_gaps: parsed.text_with_gaps,
     gaps: parsed.gaps,
@@ -162,10 +120,12 @@ export async function generateFCEClozeAction(input: {
   };
 }
 
-/** Evaluates student answers deterministically (no LLM) and persists results. */
+/** Evaluates student answers deterministically (no LLM); creates the session on this first turn and closes it. */
 export async function submitFCEClozeAnswersAction(input: {
-  sessionId: string;
-  userId: string;
+  sessionId?: string;
+  title: string;
+  text_with_gaps: string;
+  framingText: string;
   answers: Record<number, 'A' | 'B' | 'C' | 'D'>;
   gaps: ClozeGap[];
 }): Promise<FCEClozeSubmitResult | { error: string }> {
@@ -183,45 +143,47 @@ export async function submitFCEClozeAnswersAction(input: {
   const correctCount = results.filter((r) => r.isCorrect).length;
   const total = input.gaps.length;
 
-  const answerMessages = results.map((r) => ({
-    sessionId: input.sessionId,
-    userId: input.userId,
-    role: 'user' as const,
-    msgType: 'text' as const,
-    contentText: null,
-    contentJson: {
-      kind: 'cloze_answer',
-      gap_number: r.number,
-      chosen: r.chosen,
-      isCorrect: r.isCorrect,
-    },
-  }));
+  const session = await ensureSession({ mode: FCE_CLOZE_MODE, sessionId: input.sessionId });
+  if (!session.ok) return { error: session.code };
 
-  persistMessages(answerMessages).catch(() => undefined);
+  const planMessages = session.data.created
+    ? [
+        {
+          role: 'bob' as const,
+          msgType: 'text' as const,
+          contentText: null,
+          contentJson: {
+            kind: 'cloze_plan',
+            title: input.title,
+            text_with_gaps: input.text_with_gaps,
+            gaps: input.gaps,
+            framing_text: input.framingText,
+          },
+        },
+      ]
+    : [];
 
-  persistMessage({
-    sessionId: input.sessionId,
-    userId: input.userId,
-    role: 'bob',
-    msgType: 'evaluation',
-    contentText: null,
-    contentJson: {
-      kind: 'cloze_evaluation',
-      score: correctCount,
-      score_max: total,
-      results,
-      is_final: true,
-    },
-  }).catch(() => undefined);
+  const turn = await recordTurn({
+    sessionId: session.data.sessionId,
+    userId: session.data.userId,
+    messages: [
+      ...planMessages,
+      ...results.map((r) => ({
+        role: 'user' as const,
+        msgType: 'text' as const,
+        contentText: null,
+        contentJson: { kind: 'cloze_answer', gap_number: r.number, chosen: r.chosen, isCorrect: r.isCorrect },
+      })),
+    ],
+  });
+  if (!turn.ok) return { error: turn.code };
 
-  console.log(
-    JSON.stringify({
-      event: 'fce_cloze_submit',
-      sessionId: input.sessionId,
-      correctCount,
-      total,
-    })
-  );
+  const finished = await finishSession({
+    sessionId: session.data.sessionId,
+    userId: session.data.userId,
+    evaluation: { kind: 'cloze_evaluation', score: correctCount, score_max: total, results },
+  });
+  if (!finished.ok) return { error: finished.code };
 
-  return { correctCount, total, results };
+  return { sessionId: session.data.sessionId, correctCount, total, results };
 }

@@ -118,6 +118,7 @@ describe('FCEMultipleChoiceClozePractice characterization', () => {
 
   it('submit sends the chosen answers and renders the finished review', async () => {
     submitMock.mockResolvedValue({
+      sessionId: 's1',
       correctCount: 1,
       total: 2,
       results: (finalEvaluation.content_json as { results: unknown[] }).results,
@@ -132,7 +133,9 @@ describe('FCEMultipleChoiceClozePractice characterization', () => {
     await waitFor(() => expect(screen.getByTestId('celebration')).toBeInTheDocument());
     expect(submitMock).toHaveBeenCalledWith({
       sessionId: 's1',
-      userId: 'user-1',
+      title: 'Cloze title',
+      text_with_gaps: 'Start ___1___ middle ___2___ end.',
+      framingText: 'Framing text',
       answers: { 1: 'B', 2: 'C' },
       gaps,
     });
