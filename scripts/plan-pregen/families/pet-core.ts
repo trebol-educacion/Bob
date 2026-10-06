@@ -89,7 +89,7 @@ const comprehension = definePart<PetReadingComprehensionPlan>({
     input: {
       text: plan.text,
       items: plan.questions.flatMap((q) =>
-        q.type === 'mcq'
+        q.type === 'mcq' && q.section !== 'grammar'
           ? [
               {
                 number: q.number,
