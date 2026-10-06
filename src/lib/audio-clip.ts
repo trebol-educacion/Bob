@@ -6,11 +6,29 @@ export interface AudioClipHandlers {
   onPlaying?: () => void;
   onEnded?: () => void;
   onError?: () => void;
+  onProgress?: (fraction: number) => void;
+  onStopped?: () => void;
 }
 
 export interface AudioClip {
   play: () => void;
   stop: () => void;
+}
+
+let activeClip: { interrupt: () => void } | null = null;
+
+function claimActive(owner: { interrupt: () => void }): void {
+  if (activeClip && activeClip !== owner) activeClip.interrupt();
+  activeClip = owner;
+}
+
+function releaseActive(owner: { interrupt: () => void }): void {
+  if (activeClip === owner) activeClip = null;
+}
+
+export function stopActiveClip(): void {
+  activeClip?.interrupt();
+  activeClip = null;
 }
 
 /**
@@ -41,6 +59,7 @@ export function createAudioClip(
   function fail() {
     if (disposed) return;
     clearTimer();
+    releaseActive(owner);
     audio.pause();
     handlers.onError?.();
   }
@@ -58,12 +77,40 @@ export function createAudioClip(
   audio.onended = () => {
     if (disposed) return;
     clearTimer();
+    releaseActive(owner);
+    handlers.onProgress?.(1);
     handlers.onEnded?.();
   };
+  audio.ontimeupdate = () => {
+    if (disposed || !(audio.duration > 0)) return;
+    handlers.onProgress?.(audio.currentTime / audio.duration);
+  };
+
+  const owner = {
+    interrupt() {
+      if (disposed) return;
+      dispose();
+      handlers.onStopped?.();
+    },
+  };
+
+  function dispose() {
+    disposed = true;
+    clearTimer();
+    releaseActive(owner);
+    audio.onerror = null;
+    audio.onstalled = null;
+    audio.oncanplay = null;
+    audio.onplaying = null;
+    audio.onended = null;
+    audio.ontimeupdate = null;
+    audio.pause();
+  }
 
   return {
     play() {
       if (disposed) return;
+      claimActive(owner);
       handlers.onLoading?.();
       armTimer();
       const started: Promise<void> | undefined = audio.play();
@@ -77,14 +124,7 @@ export function createAudioClip(
       });
     },
     stop() {
-      disposed = true;
-      clearTimer();
-      audio.onerror = null;
-      audio.onstalled = null;
-      audio.oncanplay = null;
-      audio.onplaying = null;
-      audio.onended = null;
-      audio.pause();
+      dispose();
     },
   };
 }
@@ -106,6 +146,7 @@ export function playClip(src: string, hooks: { onStart?: () => void; onError?: (
   });
   const clip = createAudioClip(src, {
     onEnded: () => settle('ended'),
+    onStopped: () => settle('stopped'),
     onError: () => {
       hooks.onError?.();
       settle('error');

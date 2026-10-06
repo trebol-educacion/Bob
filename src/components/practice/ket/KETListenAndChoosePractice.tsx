@@ -17,6 +17,9 @@ import {
   type ListenAnswerResult,
 } from '@/actions/modes/ket-listening-part1';
 import type { StoredMessage } from '@/actions/messages';
+import { useAudioClip } from '@/hooks/useAudioClip';
+import { stopActiveClip } from '@/lib/audio-clip';
+import { PauseIcon, PlayIcon, ReplayIcon } from '@/components/activity/audio-icons';
 import { restoreExercise } from '@/lib/ket/restore-plan';
 
 const ACCENT = '#F8AC37';
@@ -48,102 +51,15 @@ function tryRestore(messages: StoredMessage[]): RestoredState | null {
   return r ? { items: r.exercise, framingText: r.framingText, results: r.results, correctCount: r.correctCount } : null;
 }
 
-let _activeAudio: HTMLAudioElement | null = null;
-
-function stopActiveAudio(): void {
-  if (_activeAudio) {
-    _activeAudio.pause();
-    _activeAudio.src = '';
-    _activeAudio = null;
-  }
-}
-
-function PlayIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
-      <path d="M8 5v14l11-7z" />
-    </svg>
-  );
-}
-
-function PauseIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
-      <rect x="6" y="5" width="4" height="14" rx="1" />
-      <rect x="14" y="5" width="4" height="14" rx="1" />
-    </svg>
-  );
-}
-
-function ReplayIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
-      <path d="M3 12a9 9 0 1 0 3-6.7" />
-      <polyline points="3 4 3 10 9 10" />
-    </svg>
-  );
-}
-
 function AudioPlayer({ audioUrl, itemNumber }: { audioUrl: string; itemNumber: number }) {
   const t = useTranslations('cambridge');
   const tErrors = useTranslations('errors');
-  const [failed, setFailed] = useState(false);
   const reduceMotion = useReducedMotion();
-  const [playing, setPlaying] = useState(false);
-  const [hasPlayed, setHasPlayed] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  const stopLocal = () => {
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current = null;
-    }
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
-    }
-    setPlaying(false);
-    if (_activeAudio === audioRef.current) _activeAudio = null;
-  };
-
-  useEffect(() => () => stopLocal(), []);
-
-  const handlePlay = async () => {
-    if (playing) {
-      stopLocal();
-      setProgress(0);
-      return;
-    }
-
-    stopActiveAudio();
-
-    setFailed(false);
-    const audio = new Audio(audioUrl);
-    audioRef.current = audio;
-    _activeAudio = audio;
-
-    audio.onended = () => {
-      stopLocal();
-      setHasPlayed(true);
-      setProgress(1);
-      setTimeout(() => setProgress(0), 600);
-    };
-    audio.onerror = () => { stopLocal(); setFailed(true); };
-
-    setPlaying(true);
-    intervalRef.current = setInterval(() => {
-      if (audio.duration > 0) setProgress(audio.currentTime / audio.duration);
-    }, 100);
-
-    try {
-      await audio.play();
-    } catch {
-      stopLocal();
-      setFailed(true);
-    }
-  };
+  const clip = useAudioClip({ src: audioUrl });
+  const playing = clip.isPlaying;
+  const progress = clip.progress;
+  const hasPlayed = clip.hasPlayed;
+  const failed = clip.failed;
 
   const label = failed
     ? tErrors('retry')
@@ -168,7 +84,7 @@ function AudioPlayer({ audioUrl, itemNumber }: { audioUrl: string; itemNumber: n
         )}
         <button
           type="button"
-          onClick={handlePlay}
+          onClick={clip.toggle}
           aria-label={label}
           className="relative w-14 h-14 rounded-full flex items-center justify-center transition-transform active:scale-95 text-white"
           style={{ background: ACCENT }}
@@ -593,7 +509,7 @@ export function KETListenAndChoosePractice({
   }
 
   async function handleSubmit() {
-    stopActiveAudio();
+    stopActiveClip();
     setPhase('submitting');
 
     const result = await submitKETListenAnswersAction({

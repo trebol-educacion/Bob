@@ -14,8 +14,13 @@ export interface UseAudioClipOptions {
 export interface UseAudioClip {
   state: AudioClipState;
   playsUsed: number;
+  progress: number;
   remaining: number | null;
   canPlay: boolean;
+  isPlaying: boolean;
+  hasPlayed: boolean;
+  failed: boolean;
+  toggle: () => void;
   play: () => void;
   retry: () => void;
   stop: () => void;
@@ -26,6 +31,7 @@ export function useAudioClip({ src, maxPlays, loadTimeoutMs }: UseAudioClipOptio
   const [rawState, setState] = useState<AudioClipState>('idle');
   const state: AudioClipState = src ? rawState : 'error';
   const [playsUsed, setPlaysUsed] = useState(0);
+  const [progress, setProgress] = useState(0);
   const clipRef = useRef<AudioClip | null>(null);
 
   const dispose = useCallback(() => {
@@ -38,6 +44,7 @@ export function useAudioClip({ src, maxPlays, loadTimeoutMs }: UseAudioClipOptio
     setTrackedSrc(src);
     setState('idle');
     setPlaysUsed(0);
+    setProgress(0);
   }
 
   useEffect(() => dispose, [src, dispose]);
@@ -59,8 +66,19 @@ export function useAudioClip({ src, maxPlays, loadTimeoutMs }: UseAudioClipOptio
           counted = true;
           setPlaysUsed((used) => used + 1);
         },
-        onEnded: () => setState('ready'),
-        onError: () => setState('error'),
+        onEnded: () => {
+          setState('ready');
+          setProgress(0);
+        },
+        onError: () => {
+          setState('error');
+          setProgress(0);
+        },
+        onProgress: setProgress,
+        onStopped: () => {
+          setState('ready');
+          setProgress(0);
+        },
       },
       loadTimeoutMs,
     );
@@ -76,13 +94,33 @@ export function useAudioClip({ src, maxPlays, loadTimeoutMs }: UseAudioClipOptio
   const stop = useCallback(() => {
     dispose();
     setState('idle');
+    setProgress(0);
   }, [dispose]);
+
+  const isPlaying = state === 'loading' || state === 'playing';
+
+  const toggle = useCallback(() => {
+    if (isPlaying) {
+      stop();
+      return;
+    }
+    if (state === 'error') {
+      start();
+      return;
+    }
+    play();
+  }, [isPlaying, state, stop, start, play]);
 
   return {
     state,
     playsUsed,
+    progress,
     remaining: maxPlays === undefined ? null : Math.max(0, maxPlays - playsUsed),
     canPlay: Boolean(src) && !exhausted,
+    isPlaying,
+    hasPlayed: playsUsed > 0 && !isPlaying,
+    failed: state === 'error',
+    toggle,
     play,
     retry: start,
     stop,
