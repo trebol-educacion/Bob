@@ -7,7 +7,7 @@ import { Mic, Square, Volume2, ChevronDown, ChevronUp, RotateCcw, Check, X } fro
 import { KETSpeakingIcon } from '@/components/icons/KETIcons';
 import { CelebrationCard } from '@/components/practice/yl/CelebrationCard';
 import { BobMascotLoader } from '@/components/chat/BobMascotLoader';
-import { pcmToWavBase64, blobToBase64 } from '@/lib/audio';
+import { blobToBase64 } from '@/lib/audio';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
 
 const ACCENT = '#3660AB';
@@ -34,8 +34,7 @@ export interface KETSpeakingPracticeProps {
   partLabel: string;
   title: string;
   recordingSeconds: number;
-  instructionAudioB64: string;
-  instructionAudioMime: string;
+  instructionAudioUrl?: string;
   instructionText: string;
   bulletPoints?: string[];
   imageUrl?: string;
@@ -59,7 +58,7 @@ function rubricTotal(rubric: SpeakingRubric): number {
   return rubric.task_coverage + rubric.grammar + rubric.vocabulary + rubric.fluency;
 }
 
-function InstructionAudioButton({ audioB64, audioMime }: { audioB64: string; audioMime: string }) {
+function InstructionAudioButton({ audioUrl }: { audioUrl: string }) {
   const reduceMotion = useReducedMotion();
   const [playing, setPlaying] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -80,8 +79,7 @@ function InstructionAudioButton({ audioB64, audioMime }: { audioB64: string; aud
       setPlaying(false);
       return;
     }
-    const url = pcmToWavBase64(audioB64, audioMime);
-    const audio = new Audio(url);
+    const audio = new Audio(audioUrl);
     audioRef.current = audio;
     audio.onended = () => { audioRef.current = null; setPlaying(false); };
     audio.onerror = () => { audioRef.current = null; setPlaying(false); };
@@ -245,8 +243,7 @@ export function KETSpeakingPractice({
   partLabel,
   title,
   recordingSeconds,
-  instructionAudioB64,
-  instructionAudioMime,
+  instructionAudioUrl,
   instructionText,
   bulletPoints,
   imageUrl,
@@ -414,9 +411,7 @@ export function KETSpeakingPractice({
                 <KETSpeakingIcon size={20} />
               </span>
               <p className="text-sm text-gray-700 leading-relaxed flex-1">{instructionText}</p>
-              {instructionAudioB64 && (
-                <InstructionAudioButton audioB64={instructionAudioB64} audioMime={instructionAudioMime} />
-              )}
+              {instructionAudioUrl && <InstructionAudioButton audioUrl={instructionAudioUrl} />}
             </div>
 
             {imageUrl ? (

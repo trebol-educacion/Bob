@@ -1,5 +1,7 @@
 import { KetMatchPlanSchema, type KetMatchPlan } from '../../../src/lib/bank-plans/ket-reading-part2';
 import { stripAllDashes } from '../clean';
+import { KET_MEDIA_PARTS } from './ket-core-media';
+import { KET_READING_PARTS } from './ket-core-reading';
 import { definePart, type PlanPart } from '../types';
 import { duplicateIssues, keyDistributionIssues } from '../rules';
 
@@ -46,4 +48,4 @@ const ketMatch = definePart<KetMatchPlan>({
   labelOf: (plan) => plan.topic,
 });
 
-export const KET_CORE_PARTS: PlanPart[] = [ketMatch];
+export const KET_CORE_PARTS: PlanPart[] = [...KET_READING_PARTS.slice(0, 1), ketMatch, ...KET_READING_PARTS.slice(1), ...KET_MEDIA_PARTS];

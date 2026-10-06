@@ -7,6 +7,8 @@ export const A2SessionPlanSchema = z.object({
   topic2: z.string(),
   topic2_questions: z.array(z.string()).length(3),
   final_question: z.string(),
+  exam_part: z.string().optional(),
+  bank_group_id: z.string().optional(),
 });
 
 export type A2SessionPlan = z.infer<typeof A2SessionPlanSchema>;

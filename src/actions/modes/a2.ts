@@ -1,11 +1,11 @@
 'use server';
 
 import { A2_SESSION_PLAN_FALLBACK, A2SessionPlanSchema, type A2SessionPlan } from '@/lib/speaking/ket-content';
-import type { ActionResult } from '@/lib/result';
+import { pickPlan } from '@/lib/item-bank/plan-bank';
+import { fail, ok, type ActionResult } from '@/lib/result';
 import { currentUserId } from '@/lib/session/lifecycle';
 import {
   evaluateQuestionRound,
-  generateQuestionRoundPlan,
   processQuestionRoundAnswer,
   type QuestionRoundConfig,
 } from '@/lib/speaking/question-round';
@@ -15,6 +15,8 @@ import type {
   QuestionRoundEvaluation,
   SpeakingQA,
 } from '@/lib/speaking/types';
+
+const KET_P1_PART = 'ket_part1';
 
 const KET_P1_CONFIG: QuestionRoundConfig<A2SessionPlan> = {
   mode: 'cambridge_ket_part1',
@@ -29,10 +31,19 @@ const KET_P1_CONFIG: QuestionRoundConfig<A2SessionPlan> = {
   scoredEvaluation: true,
 };
 
-export async function generateA2SessionAction(): Promise<A2SessionPlan> {
+export async function generateA2SessionAction(): Promise<ActionResult<A2SessionPlan>> {
   const userId = await currentUserId();
-  if (!userId) return KET_P1_CONFIG.planFallback;
-  return generateQuestionRoundPlan(KET_P1_CONFIG, userId);
+  if (!userId) return fail('unauthenticated');
+  const picked = await pickPlan({
+    exam: 'ket',
+    cefr: 'a2',
+    examPart: KET_P1_PART,
+    skill: 'speaking',
+    schema: A2SessionPlanSchema,
+    userId,
+  });
+  if (!picked.ok) return picked;
+  return ok({ ...picked.data.plan, exam_part: KET_P1_PART, bank_group_id: picked.data.groupId });
 }
 
 export async function processA2AnswerAction(

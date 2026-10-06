@@ -1,6 +1,5 @@
 import { z } from 'zod';
 
-export const KET_AUDIO_MIME = 'audio/L16;codec=pcm;rate=24000';
 export const HOBBY_PLAN_KIND = 'hobby_talk_prompt';
 export const HOBBY_FEEDBACK_KIND = 'hobby_talk_feedback';
 export const PICTURE_PLAN_KIND = 'picture_desc_prompt';
@@ -35,6 +34,9 @@ export const HobbyPlanSchema = z.object({
   bullet_points: z.array(z.string()).min(2).max(4),
   image_prompt: z.string(),
   image_url: z.string().optional(),
+  instruction_audio_url: z.string().optional(),
+  exam_part: z.string().optional(),
+  bank_group_id: z.string().optional(),
 });
 
 export type HobbyPlan = z.infer<typeof HobbyPlanSchema>;
@@ -44,8 +46,9 @@ export const PicturePlanSchema = z.object({
   instruction: z.string(),
   image_prompt: z.string(),
   image_url: z.string().optional(),
-  instruction_audio_b64: z.string().optional(),
-  instruction_audio_mime: z.string().optional(),
+  instruction_audio_url: z.string().optional(),
+  exam_part: z.string().optional(),
+  bank_group_id: z.string().optional(),
 });
 
 export type PicturePlan = z.infer<typeof PicturePlanSchema>;
