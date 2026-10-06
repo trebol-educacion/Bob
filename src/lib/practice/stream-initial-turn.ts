@@ -8,22 +8,36 @@ export interface StreamInitialTurnParams {
   level: CefrLevel;
 }
 
-export interface StreamInitialTurnResult {
+export interface InitialTurnContent {
   framing: string;
   message: string;
 }
 
+export type StreamInitialTurnResult =
+  | ({ ok: true } & InitialTurnContent)
+  | { ok: false; code: string; retryable: boolean; aborted: boolean };
+
 export interface StreamInitialTurnCallbacks {
   signal: AbortSignal;
-  onUpdate: (state: StreamInitialTurnResult) => void;
+  onUpdate: (state: InitialTurnContent) => void;
 }
 
-const FALLBACK_MESSAGE = "Hello! I'm ready to start when you are.";
+async function readErrorCode(response: Response): Promise<{ code: string; retryable: boolean }> {
+  try {
+    const body = (await response.json()) as { code?: unknown; retryable?: unknown };
+    return {
+      code: typeof body.code === 'string' ? body.code : `http_${response.status}`,
+      retryable: body.retryable === true,
+    };
+  } catch {
+    return { code: `http_${response.status}`, retryable: response.status >= 500 };
+  }
+}
 
 /**
- * @param params StreamInitialTurnParams
- * @param callbacks StreamInitialTurnCallbacks
- * @returns StreamInitialTurnResult
+ * @param params - mode, seed and level of the run
+ * @param callbacks - abort signal and progressive update callback
+ * @returns the complete opening or an explicit error code; never a placeholder message
  */
 export async function streamInitialTurn(
   params: StreamInitialTurnParams,
@@ -37,12 +51,16 @@ export async function streamInitialTurn(
       signal,
     });
 
-    if (!response.ok || !response.body) return { framing: '', message: FALLBACK_MESSAGE };
+    if (!response.ok) {
+      const { code, retryable } = await readErrorCode(response);
+      return { ok: false, code, retryable, aborted: false };
+    }
+    if (!response.body) return { ok: false, code: 'empty_stream', retryable: true, aborted: false };
 
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
     let buffer = '';
-    let latest = { framing: '', message: '', messageComplete: false };
+    let latest = parseInitialTurnStream('');
 
     while (true) {
       const { done, value } = await reader.read();
@@ -52,11 +70,11 @@ export async function streamInitialTurn(
       onUpdate({ framing: latest.framing, message: latest.message });
     }
 
-    if (!latest.message) return { framing: latest.framing, message: FALLBACK_MESSAGE };
-    return { framing: latest.framing, message: latest.message };
+    if (!latest.message.trim()) return { ok: false, code: 'empty_opening', retryable: true, aborted: false };
+    return { ok: true, framing: latest.framing, message: latest.message };
   } catch (error) {
-    if (signal.aborted) return { framing: '', message: '' };
+    if (signal.aborted) return { ok: false, code: 'aborted', retryable: false, aborted: true };
     console.error('[streamInitialTurn] failed:', error);
-    return { framing: '', message: FALLBACK_MESSAGE };
+    return { ok: false, code: 'stream_failed', retryable: true, aborted: false };
   }
 }

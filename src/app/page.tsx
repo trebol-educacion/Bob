@@ -10,6 +10,7 @@ import { useAssessmentFlow } from '@/hooks/useAssessmentFlow';
 import { useUsageHeartbeat } from '@/hooks/useUsageHeartbeat';
 import { isBrandNewStudent } from '@/lib/placement/first-entry-gate';
 import { isConversationMode, isExamMode, type AppState } from '@/lib/routing';
+import { parsePracticeSessionMode } from '@/lib/practice/mode-prompt-key';
 import type { PracticeMode } from '@/lib/types/practice';
 import type { PracticeActivityMode } from '@/lib/practice/types';
 
@@ -93,12 +94,6 @@ export default function App() {
   }, [setSelectedSkill]);
 
   const onSelectExam = useCallback(() => setAppState('skill-selection'), []);
-  const onSelectPractice = useCallback(() => setAppState('practice-mode-select'), []);
-  const onSelectPracticeMode = useCallback((selected: PracticeActivityMode) => {
-    setPracticeMode(selected);
-    setAppState('practice-session');
-  }, []);
-
   const {
     sessions,
     activeSessionId,
@@ -113,6 +108,17 @@ export default function App() {
     refreshSessions,
   } = useSessionState(userEmail);
 
+  const onSelectPractice = useCallback(() => {
+    clearActiveSession();
+    setAppState('practice-mode-select');
+  }, [clearActiveSession]);
+
+  const onSelectPracticeMode = useCallback((selected: PracticeActivityMode) => {
+    clearActiveSession();
+    setPracticeMode(selected);
+    setAppState('practice-session');
+  }, [clearActiveSession]);
+
   const leavePractice = useCallback((target: AppState) => {
     clearActiveSession();
     setAppState(target);
@@ -125,7 +131,11 @@ export default function App() {
   const onSelectSession = useCallback(async (id: string) => {
     await handleSelectSession(id, (sessionMode, sessionTopic) => {
       setMode(sessionMode as PracticeMode);
-      if (isConversationMode(sessionMode)) {
+      const reopenedPractice = parsePracticeSessionMode(sessionMode);
+      if (reopenedPractice) {
+        setPracticeMode(reopenedPractice);
+        setAppState('practice-session');
+      } else if (isConversationMode(sessionMode)) {
         setTopic(sessionTopic);
         setAppState('conversation-practicing');
       } else if (isExamMode(sessionMode)) {

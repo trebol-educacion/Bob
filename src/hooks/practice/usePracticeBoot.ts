@@ -1,149 +1,128 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import { resolvePracticeSessionAction } from '@/actions/practice/start';
-import { addPracticeTurnAction } from '@/actions/practice/repository';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { preparePracticeAction } from '@/actions/practice/start';
+import { getPracticeResumeAction } from '@/actions/practice/resume';
 import { streamInitialTurn } from '@/lib/practice/stream-initial-turn';
-import { pickPracticeSeed } from '@/lib/practice/seed';
-import { resolveEffectiveLevel } from '@/lib/levels/effective-level';
+import { restorePractice, type PracticeResultPayload, type StoredPracticeMessage } from '@/lib/practice/messages';
 import type { PracticeActivityMode, PracticeSeed } from '@/lib/practice/types';
 import type { PracticeTurnSignal } from '@/lib/grading/practice-rubric';
 import type { ChatMessage } from '@/actions/gemini/types';
 import type { CefrLevel } from '@/lib/types/practice';
 import type { SkillLevelMap } from '@/lib/types/skills';
-import type { Organization } from '@/lib/organization';
+
+export interface PracticeResumeInput {
+  sessionId: string;
+  messages: StoredPracticeMessage[];
+}
 
 export interface UsePracticeBootArgs {
   mode: PracticeActivityMode;
-  organization: Organization | null;
   cefrActiveLevel: CefrLevel | null;
   skillLevels: SkillLevelMap | null;
+  resume?: PracticeResumeInput;
 }
 
-export interface PracticeBootState {
-  phase: 'booting' | 'ready';
-  framing: string;
-  message: string;
+export interface PracticeReadyState {
+  phase: 'ready';
   sessionId: string | null;
   mode: PracticeActivityMode;
   seed: PracticeSeed;
   level: CefrLevel;
+  framing: string;
   messages: ChatMessage[];
   turnSignals: PracticeTurnSignal[];
+  imageUrl: string | null;
+  result: PracticeResultPayload | null;
 }
 
-const DEFAULT_LEVEL: CefrLevel = 'b1';
+export type PracticeBootState =
+  | { phase: 'booting'; framing: string; message: string }
+  | { phase: 'error'; code: string; retryable: boolean }
+  | PracticeReadyState;
 
-/** @param args UsePracticeBootArgs */
-function buildBootingState(args: UsePracticeBootArgs, seed: PracticeSeed, level: CefrLevel): PracticeBootState {
+const BOOTING: PracticeBootState = { phase: 'booting', framing: '', message: '' };
+const BOOT_FAILED: PracticeBootState = { phase: 'error', code: 'boot_failed', retryable: true };
+
+async function bootResumed(resume: PracticeResumeInput): Promise<PracticeBootState> {
+  const meta = await getPracticeResumeAction(resume.sessionId);
+  if (!meta.ok) return { phase: 'error', code: meta.code, retryable: meta.retryable };
+  const restored = restorePractice(resume.messages);
   return {
-    phase: 'booting',
-    framing: '',
-    message: '',
-    sessionId: null,
-    mode: args.mode,
-    seed,
-    level,
-    messages: [],
-    turnSignals: [],
+    phase: 'ready',
+    sessionId: resume.sessionId,
+    mode: meta.data.mode,
+    seed: meta.data.seed,
+    level: meta.data.level,
+    framing: restored.framing,
+    messages: restored.messages,
+    turnSignals: restored.turnSignals,
+    imageUrl: restored.imageUrl,
+    result: restored.result,
   };
 }
 
 /**
- * @param args UsePracticeBootArgs
- * @returns PracticeBootState and a restart callback
+ * @param args - mode and level inputs read once per attempt; resume reopens a stored session
+ * @returns boot state machine, a restart callback and an instance key that changes on every restart
  */
-export function usePracticeBoot(args: UsePracticeBootArgs): PracticeBootState & { restart: () => void } {
-  const { mode, organization, cefrActiveLevel, skillLevels } = args;
+export function usePracticeBoot(args: UsePracticeBootArgs): PracticeBootState & { restart: () => void; instance: number } {
+  const argsRef = useRef(args);
   const [attempt, setAttempt] = useState(0);
-
-  const level = useMemo(
-    () => resolveEffectiveLevel(skillLevels, cefrActiveLevel, 'speaking').level ?? DEFAULT_LEVEL,
-    [skillLevels, cefrActiveLevel]
-  );
-
-  const [state, setState] = useState<PracticeBootState>(() => buildBootingState(args, pickPracticeSeed(mode), level));
+  const [state, setState] = useState<PracticeBootState>(BOOTING);
+  const resumeId = args.resume?.sessionId ?? null;
 
   useEffect(() => {
-    const seed = pickPracticeSeed(mode);
+    const { mode, skillLevels, cefrActiveLevel, resume } = argsRef.current;
     const controller = new AbortController();
-    let cancelled = false;
 
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setState(buildBootingState(args, seed, level));
+    const run = async (): Promise<PracticeBootState | null> => {
+      if (resume) return bootResumed(resume);
 
-    const streamPromise = streamInitialTurn(
-      { mode, seed, level },
-      {
-        signal: controller.signal,
-        onUpdate: ({ framing, message }) => {
-          if (cancelled) return;
-          setState((prev) => (prev.phase === 'ready' ? prev : { ...prev, framing, message }));
-        },
-      }
-    );
+      const prepared = await preparePracticeAction({ mode, skillLevels, cefrActiveLevel });
+      if (!prepared.ok) return { phase: 'error', code: prepared.code, retryable: prepared.retryable };
+      const { level, seed } = prepared.data;
 
-    (async () => {
-      try {
-        const session = await resolvePracticeSessionAction({
-          mode,
-          skillLevels,
-          cefrActiveLevel,
-          organizationId: organization?.id ?? null,
-        });
-        if (cancelled) return;
-
-        if (session.resumed) {
-          controller.abort();
-          setState({
-            phase: 'ready',
-            framing: '',
-            message: '',
-            sessionId: session.sessionId,
-            mode: session.mode,
-            seed: session.seed,
-            level: session.level,
-            messages: session.messages,
-            turnSignals: session.turnSignals,
-          });
-          return;
+      const opening = await streamInitialTurn(
+        { mode, seed, level },
+        {
+          signal: controller.signal,
+          onUpdate: ({ framing, message }) => setState({ phase: 'booting', framing, message }),
         }
-
-        const streamed = await streamPromise;
-        if (cancelled) return;
-
-        if (session.sessionId && streamed.message) {
-          void addPracticeTurnAction({
-            sessionId: session.sessionId,
-            role: 'bob',
-            content: streamed.message,
-          }).catch((error) => console.error('[usePracticeBoot] persist initial turn failed:', error));
-        }
-
-        setState({
-          phase: 'ready',
-          framing: streamed.framing,
-          message: streamed.message,
-          sessionId: session.sessionId,
-          mode: session.mode,
-          seed: session.seed,
-          level: session.level,
-          messages: streamed.message ? [{ role: 'model', text: streamed.message }] : [],
-          turnSignals: [],
-        });
-      } catch (error) {
-        if (cancelled) return;
-        console.error('[usePracticeBoot] boot failed:', error);
-        setState((prev) => ({ ...prev, phase: 'ready' }));
+      );
+      if (!opening.ok) {
+        return opening.aborted ? null : { phase: 'error', code: opening.code, retryable: opening.retryable };
       }
-    })();
-
-    return () => {
-      cancelled = true;
-      controller.abort();
+      return {
+        phase: 'ready',
+        sessionId: null,
+        mode,
+        seed,
+        level,
+        framing: opening.framing,
+        messages: [{ role: 'model', text: opening.message }],
+        turnSignals: [],
+        imageUrl: null,
+        result: null,
+      };
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, skillLevels, cefrActiveLevel, organization, level, attempt]);
 
-  return { ...state, restart: () => setAttempt((n) => n + 1) };
+    run()
+      .then((next) => {
+        if (next && !controller.signal.aborted) setState(next);
+      })
+      .catch((error) => {
+        console.error('[usePracticeBoot] boot failed:', error);
+        if (!controller.signal.aborted) setState(BOOT_FAILED);
+      });
+
+    return () => controller.abort();
+  }, [attempt, resumeId]);
+
+  const restart = useCallback(() => {
+    setState(BOOTING);
+    setAttempt((n) => n + 1);
+  }, []);
+
+  return { ...state, restart, instance: attempt };
 }

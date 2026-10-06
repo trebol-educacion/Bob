@@ -1,114 +1,44 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
 vi.mock('server-only', () => ({}));
 
-vi.mock('@/actions/practice/repository', () => ({
-  createPracticeSessionAction: vi.fn(),
-  findOpenPracticeSessionAction: vi.fn(),
-  listPracticeMessagesAction: vi.fn(),
+const pickSpy = vi.fn();
+vi.mock('@/lib/practice/seed', () => ({
+  pickPracticeSeed: (...args: unknown[]) => pickSpy(...args),
 }));
 
-import {
-  createPracticeSessionAction,
-  findOpenPracticeSessionAction,
-  listPracticeMessagesAction,
-} from '@/actions/practice/repository';
+const SERVER_SEED = { angle: 'a', character: 'a friend', tone: 'warm', topic: 'server topic' };
 
-const BASE_INPUT = {
-  mode: 'conversation' as const,
-  skillLevels: null,
-  cefrActiveLevel: null,
-  organizationId: 'org-1',
-};
-
-describe('resolvePracticeSessionAction — arranque y reanudacion sin bloquear en Gemini (P2.2, P2.6)', () => {
+describe('preparePracticeAction - seed unica elegida en el servidor', () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    pickSpy.mockReturnValue(SERVER_SEED);
   });
 
-  it('sin sesion abierta: crea una sesion nueva sin llamar a Gemini', async () => {
-    (findOpenPracticeSessionAction as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, data: null });
-    (createPracticeSessionAction as ReturnType<typeof vi.fn>).mockResolvedValue({
-      ok: true,
-      data: { id: 'session-new', mode: 'conversation' },
+  it('elige la seed una sola vez y la devuelve junto al nivel efectivo, sin sesion ni LLM', async () => {
+    const { preparePracticeAction } = await import('@/actions/practice/start');
+    const result = await preparePracticeAction({
+      mode: 'conversation',
+      skillLevels: { speaking: { cefr_level: 'a2' } } as never,
+      cefrActiveLevel: null,
     });
 
-    const { resolvePracticeSessionAction } = await import('@/actions/practice/start');
-    const result = await resolvePracticeSessionAction(BASE_INPUT);
-
-    expect(result.resumed).toBe(false);
-    expect(result.sessionId).toBe('session-new');
-    expect(result.messages).toEqual([]);
-    expect(result.turnSignals).toEqual([]);
+    expect(result).toEqual({ ok: true, data: { mode: 'conversation', level: 'a2', seed: SERVER_SEED } });
+    expect(pickSpy).toHaveBeenCalledTimes(1);
+    expect(pickSpy).toHaveBeenCalledWith('conversation');
   });
 
-  it('con sesion abierta y turnos previos: restaura los mensajes en vez de crear una sesion nueva', async () => {
-    (findOpenPracticeSessionAction as ReturnType<typeof vi.fn>).mockResolvedValue({
-      ok: true,
-      data: {
-        id: 'session-open',
-        mode: 'situation',
-        cefr_level: 'a2',
-        seed: { angle: 'a', character: 'b', tone: 'c', topic: 'ordering food' },
-      },
-    });
-    (listPracticeMessagesAction as ReturnType<typeof vi.fn>).mockResolvedValue({
-      ok: true,
-      data: [
-        { role: 'bob', content: 'Hi there!', hint_used: false, model_answer_used: false, audio_url: null },
-        { role: 'student', content: 'Hello!', hint_used: true, model_answer_used: false, audio_url: null },
-        { role: 'bob', content: 'Nice to meet you.', hint_used: false, model_answer_used: false, audio_url: null },
-      ],
-    });
+  it('un modo desconocido falla con codigo explicito', async () => {
+    const { preparePracticeAction } = await import('@/actions/practice/start');
+    const result = await preparePracticeAction({ mode: 'karaoke' as never, skillLevels: null, cefrActiveLevel: null });
 
-    const { resolvePracticeSessionAction } = await import('@/actions/practice/start');
-    const result = await resolvePracticeSessionAction(BASE_INPUT);
-
-    expect(result.resumed).toBe(true);
-    expect(result.sessionId).toBe('session-open');
-    expect(result.mode).toBe('situation');
-    expect(result.messages).toHaveLength(3);
-    expect(result.messages[0]).toEqual({ role: 'model', text: 'Hi there!' });
-    expect(result.messages[1]).toEqual({ role: 'user', text: 'Hello!' });
-    expect(result.turnSignals).toHaveLength(1);
-    expect(result.turnSignals[0]).toMatchObject({ hintUsed: true, modelAnswerUsed: false });
-    expect(createPracticeSessionAction).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ ok: false, code: 'invalid_mode' });
+    expect(pickSpy).not.toHaveBeenCalled();
   });
 
-  it('sesion abierta pero sin turnos guardados todavia: no restaura, crea una sesion nueva', async () => {
-    (findOpenPracticeSessionAction as ReturnType<typeof vi.fn>).mockResolvedValue({
-      ok: true,
-      data: { id: 'session-empty', mode: 'conversation', cefr_level: 'b1', seed: null },
-    });
-    (listPracticeMessagesAction as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, data: [] });
-    (createPracticeSessionAction as ReturnType<typeof vi.fn>).mockResolvedValue({
-      ok: true,
-      data: { id: 'session-new-2', mode: 'conversation' },
-    });
-
-    const { resolvePracticeSessionAction } = await import('@/actions/practice/start');
-    const result = await resolvePracticeSessionAction(BASE_INPUT);
-
-    expect(result.resumed).toBe(false);
-    expect(result.sessionId).toBe('session-new-2');
-  });
-
-  it('el repositorio degradado (tablas sin migrar) no rompe: arranca sesion nueva sin sessionId', async () => {
-    (findOpenPracticeSessionAction as ReturnType<typeof vi.fn>).mockResolvedValue({
-      ok: false,
-      code: 'degraded',
-      degraded: true,
-    });
-    (createPracticeSessionAction as ReturnType<typeof vi.fn>).mockResolvedValue({
-      ok: false,
-      code: 'degraded',
-      degraded: true,
-    });
-
-    const { resolvePracticeSessionAction } = await import('@/actions/practice/start');
-    const result = await resolvePracticeSessionAction(BASE_INPUT);
-
-    expect(result.resumed).toBe(false);
-    expect(result.degraded).toBe(true);
-    expect(result.sessionId).toBeNull();
-    expect(result.messages).toEqual([]);
+  it('el cliente ya no sortea ninguna seed', async () => {
+    const { readFileSync } = await import('node:fs');
+    const boot = readFileSync('src/hooks/practice/usePracticeBoot.ts', 'utf8');
+    expect(boot).not.toContain('pickPracticeSeed');
   });
 });

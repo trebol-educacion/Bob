@@ -127,6 +127,11 @@ export function AppShellRoutes({
     void refreshSessions();
   }, [setActiveSessionId, refreshSessions]);
 
+  const onPracticeAgain = useCallback(() => leavePractice('practice-mode-select'), [leavePractice]);
+
+  const practiceResume =
+    selectedMessages.length > 0 && activeSessionId ? { sessionId: activeSessionId, messages: selectedMessages } : undefined;
+
   const activityProps: ActivityRenderProps = {
     onBack: onBackToCatalog,
     sessionId: selectedMessages.length > 0 ? activeSessionId ?? undefined : undefined,
@@ -157,6 +162,10 @@ export function AppShellRoutes({
             practiceMode={practiceMode}
             onSelectPracticeMode={onSelectPracticeMode}
             onExitPractice={onBackHome}
+            resume={practiceResume}
+            onSessionCreated={handleSessionCreated}
+            onSessionFinished={refreshSessions}
+            onPracticeAgain={onPracticeAgain}
           />
         </motion.div>
       )}
