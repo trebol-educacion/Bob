@@ -15,7 +15,7 @@ import { PracticeView } from './views/PracticeView';
 import { DashboardView } from './views/DashboardView';
 import { AssessmentView } from './views/AssessmentView';
 import type { StoredMessage } from '@/actions/messages';
-import type { AssessmentPrompt, AssessmentListeningItem, AssessmentReadingItem, AssessmentWritingTask } from '@/actions/assessment';
+import type { AssessmentPrompt, AssessmentWritingTask } from '@/actions/assessment';
 import type { AppState, ActivityRenderProps } from '@/lib/routing';
 import { getRouteForMode, isConversationMode } from '@/lib/routing';
 import type { Organization } from '@/lib/organization';
@@ -23,7 +23,6 @@ import type { AvailableMode } from '@/lib/organization/types';
 import type { PracticeMode, CefrLevel, ModeKey } from '@/lib/types/practice';
 import type { PracticeActivityMode } from '@/lib/practice/types';
 import type { Skill, SkillLevelMap } from '@/lib/types/skills';
-import type { AssessmentResultUnion } from '@/hooks/useAssessmentFlow';
 import type { PracticeTrack } from '@/lib/modes';
 
 export interface AppShellRoutesProps {
@@ -62,11 +61,7 @@ export interface AppShellRoutesProps {
   assessmentId: string | null;
   assessmentPrompts: AssessmentPrompt[];
   assessmentIsYl: boolean;
-  assessmentListeningItems: AssessmentListeningItem[];
-  assessmentReadingItems: AssessmentReadingItem[];
   assessmentWritingTask: AssessmentWritingTask | null;
-  assessmentResult: AssessmentResultUnion | null;
-  setAssessmentResult: (result: AssessmentResultUnion | null) => void;
   track: PracticeTrack;
   setTrack: (track: PracticeTrack) => void;
 }
@@ -108,11 +103,7 @@ export function AppShellRoutes({
   assessmentId,
   assessmentPrompts,
   assessmentIsYl,
-  assessmentListeningItems,
-  assessmentReadingItems,
   assessmentWritingTask,
-  assessmentResult,
-  setAssessmentResult,
   track,
   setTrack,
 }: AppShellRoutesProps) {
@@ -209,7 +200,7 @@ export function AppShellRoutes({
         </motion.div>
       )}
 
-      {(appState === 'assessment-invite' || appState === 'assessment-running' || appState === 'assessment-result') && (
+      {(appState === 'assessment-invite' || appState === 'assessment-running') && (
         <motion.div
           key={`assessment-${appState}`}
           initial={{ opacity: 0, y: 20 }}
@@ -230,11 +221,7 @@ export function AppShellRoutes({
             assessmentId={assessmentId}
             assessmentPrompts={assessmentPrompts}
             assessmentIsYl={assessmentIsYl}
-            assessmentListeningItems={assessmentListeningItems}
-            assessmentReadingItems={assessmentReadingItems}
             assessmentWritingTask={assessmentWritingTask}
-            assessmentResult={assessmentResult}
-            setAssessmentResult={setAssessmentResult}
           />
         </motion.div>
       )}

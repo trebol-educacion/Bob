@@ -74,30 +74,31 @@ describe('usePlacementRunner — se activa solo con contenido curado', () => {
     expect(result.current.step?.group.id).toBe('group-1');
   });
 
-  it('con status "fallback" (sin item_groups publicados) no entra en curated, deja el flujo actual intacto', async () => {
-    vi.mocked(startPlacementAction).mockResolvedValue({ status: 'fallback' });
+  it('con error no_content no entra en curated y expone el fallo para mostrarlo', async () => {
+    vi.mocked(startPlacementAction).mockResolvedValue({ status: 'error', code: 'no_content', retryable: false });
 
     const { result } = renderHook(() => usePlacementRunner());
 
     await act(async () => {
       const outcome = await result.current.begin('listening');
-      expect(outcome).toBe('fallback');
+      expect(outcome).toBe('unavailable');
     });
 
     await waitFor(() => {
-      expect(result.current.status).toBe('fallback');
+      expect(result.current.status).toBe('unavailable');
     });
     expect(result.current.step).toBeNull();
+    expect(result.current.startFailure).toEqual({ code: 'no_content', retryable: false });
   });
 
-  it('con status "pending"/"cooldown"/"error" tampoco entra en curated', async () => {
+  it('con status "pending" tampoco entra en curated', async () => {
     vi.mocked(startPlacementAction).mockResolvedValue({ status: 'pending' });
 
     const { result } = renderHook(() => usePlacementRunner());
 
     await act(async () => {
       const outcome = await result.current.begin('reading');
-      expect(outcome).toBe('fallback');
+      expect(outcome).toBe('pending');
     });
     expect(result.current.step).toBeNull();
   });

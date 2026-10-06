@@ -3,5 +3,12 @@
   "cancelButton": "Cancel level test",
   "retryButton": "Try the level test again",
   "readyToLevelUpBody": "Your recent sessions show strong accuracy. Take a Level Test to confirm your next level.",
-  "takeTestButton": "Take Level Test"
+  "takeTestButton": "Take Level Test",
+  "unavailableTitle": "We could not load your level test",
+  "unavailableNoContent": "There are no questions available for this level test yet.",
+  "unavailableError": "Something went wrong while preparing your level test.",
+  "unavailableRetry": "Try again",
+  "unavailableContinue": "Continue without the test",
+  "unavailableBack": "Back",
+  "audioPlay": "Play audio"
 }

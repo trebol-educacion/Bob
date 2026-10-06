@@ -7,14 +7,13 @@ import { ConfirmLeaveDialog } from '@/components/assessment/ConfirmLeaveDialog';
 import { AppShellRoutes } from './AppShellRoutes';
 import type { BobSession } from '@/actions/sessions';
 import type { StoredMessage } from '@/actions/messages';
-import type { AssessmentPrompt, AssessmentListeningItem, AssessmentReadingItem, AssessmentWritingTask } from '@/actions/assessment';
+import type { AssessmentPrompt, AssessmentWritingTask } from '@/actions/assessment';
 import type { AppState } from '@/lib/routing';
 import { useOrganization, type AvailableMode } from '@/contexts/OrganizationContext';
 import type { Organization } from '@/lib/organization';
 import type { PracticeMode, CefrLevel, ModeKey } from '@/lib/types/practice';
 import type { PracticeActivityMode } from '@/lib/practice/types';
 import type { Skill, SkillLevelMap } from '@/lib/types/skills';
-import type { AssessmentResultUnion } from '@/hooks/useAssessmentFlow';
 
 export interface AppShellProps {
   userEmail?: string;
@@ -59,11 +58,7 @@ export interface AppShellProps {
   assessmentId: string | null;
   assessmentPrompts: AssessmentPrompt[];
   assessmentIsYl: boolean;
-  assessmentListeningItems: AssessmentListeningItem[];
-  assessmentReadingItems: AssessmentReadingItem[];
   assessmentWritingTask: AssessmentWritingTask | null;
-  assessmentResult: AssessmentResultUnion | null;
-  setAssessmentResult: (result: AssessmentResultUnion | null) => void;
 }
 
 export function AppShell({
@@ -109,11 +104,7 @@ export function AppShell({
   assessmentId,
   assessmentPrompts,
   assessmentIsYl,
-  assessmentListeningItems,
-  assessmentReadingItems,
   assessmentWritingTask,
-  assessmentResult,
-  setAssessmentResult,
 }: AppShellProps) {
   const { track, setTrack } = useOrganization();
 
@@ -205,11 +196,7 @@ export function AppShell({
             assessmentId={assessmentId}
             assessmentPrompts={assessmentPrompts}
             assessmentIsYl={assessmentIsYl}
-            assessmentListeningItems={assessmentListeningItems}
-            assessmentReadingItems={assessmentReadingItems}
             assessmentWritingTask={assessmentWritingTask}
-            assessmentResult={assessmentResult}
-            setAssessmentResult={setAssessmentResult}
             track={track}
             setTrack={setTrack}
           />

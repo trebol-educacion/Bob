@@ -3,6 +3,7 @@
 import React, { useEffect } from 'react';
 import { usePlacementRunner, type PlacementRunnerSkill } from '@/hooks/usePlacementRunner';
 import { PlacementStepRunner } from './PlacementStepRunner';
+import { PlacementUnavailable } from './PlacementUnavailable';
 import { BobMascotLoader } from '@/components/chat/BobMascotLoader';
 import type { AppState } from '@/lib/routing';
 
@@ -16,14 +17,14 @@ const GATE_SKILL: PlacementRunnerSkill = 'reading';
 
 /** @param props PlacementRequiredProps */
 export function PlacementRequired({ setAppState, refreshSkillLevels, refreshPendingAssessments }: PlacementRequiredProps) {
-  const { begin, status, step, stepsCompleted, submitStep, cancel, reset } = usePlacementRunner();
+  const { begin, status, step, stepsCompleted, startFailure, submitStep, cancel, reset } = usePlacementRunner();
 
   useEffect(() => {
     void begin(GATE_SKILL);
   }, [begin]);
 
   useEffect(() => {
-    if (status !== 'fallback') return;
+    if (status !== 'cooldown' && status !== 'pending') return;
     reset();
     setAppState('skill-selection');
   }, [status, reset, setAppState]);
@@ -42,6 +43,22 @@ export function PlacementRequired({ setAppState, refreshSkillLevels, refreshPend
     void cancel();
     setAppState('skill-selection');
   };
+
+  const handleLeave = () => {
+    reset();
+    setAppState('skill-selection');
+  };
+
+  if (status === 'unavailable') {
+    return (
+      <PlacementUnavailable
+        failure={startFailure}
+        onRetry={() => void begin(GATE_SKILL)}
+        onLeave={handleLeave}
+        leaveLabel="continue"
+      />
+    );
+  }
 
   if (step) {
     return (

@@ -58,7 +58,6 @@ export type AppState =
   | 'practice-session'
   | 'assessment-invite'
   | 'assessment-running'
-  | 'assessment-result'
   | 'mode-selection'
   | 'catalog-filtered'
   | 'practicing'

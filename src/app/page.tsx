@@ -231,11 +231,7 @@ export default function App() {
       assessmentId={assessment.assessmentId}
       assessmentPrompts={assessment.assessmentPrompts}
       assessmentIsYl={assessment.assessmentIsYl}
-      assessmentListeningItems={assessment.assessmentListeningItems}
-      assessmentReadingItems={assessment.assessmentReadingItems}
       assessmentWritingTask={assessment.assessmentWritingTask}
-      assessmentResult={assessment.assessmentResult}
-      setAssessmentResult={assessment.setAssessmentResult}
     />
   );
 }

@@ -15,13 +15,28 @@ export interface PlacementStep {
   items: PublicBankItem[];
 }
 
-export type PlacementRunnerStatus = 'idle' | 'loading' | 'curated' | 'fallback' | 'submitting' | 'done' | 'error';
+export type PlacementRunnerStatus =
+  | 'idle'
+  | 'loading'
+  | 'curated'
+  | 'unavailable'
+  | 'cooldown'
+  | 'pending'
+  | 'submitting'
+  | 'done'
+  | 'error';
+
+export interface PlacementStartFailure {
+  code: string;
+  retryable: boolean;
+}
 
 export interface UsePlacementRunnerResult {
   status: PlacementRunnerStatus;
   step: PlacementStep | null;
   stepsCompleted: number;
   resultLevel: PlacementLevel | null;
+  startFailure: PlacementStartFailure | null;
   begin: (skill: PlacementRunnerSkill) => Promise<PlacementRunnerStatus>;
   submitStep: (answers: ClosedAnswer[]) => Promise<void>;
   cancel: () => Promise<void>;
@@ -37,6 +52,7 @@ export function usePlacementRunner(): UsePlacementRunnerResult {
   const [step, setStep] = useState<PlacementStep | null>(null);
   const [stepsCompleted, setStepsCompleted] = useState(0);
   const [resultLevel, setResultLevel] = useState<PlacementLevel | null>(null);
+  const [startFailure, setStartFailure] = useState<PlacementStartFailure | null>(null);
 
   const reset = useCallback(() => {
     setStatus('idle');
@@ -44,6 +60,7 @@ export function usePlacementRunner(): UsePlacementRunnerResult {
     setStep(null);
     setStepsCompleted(0);
     setResultLevel(null);
+    setStartFailure(null);
   }, []);
 
   const begin = useCallback(async (targetSkill: PlacementRunnerSkill): Promise<PlacementRunnerStatus> => {
@@ -51,6 +68,7 @@ export function usePlacementRunner(): UsePlacementRunnerResult {
     setSkill(targetSkill);
     setStepsCompleted(0);
     setResultLevel(null);
+    setStartFailure(null);
 
     const started = await startPlacementAction(targetSkill);
     if (started.status === 'ok') {
@@ -60,8 +78,13 @@ export function usePlacementRunner(): UsePlacementRunnerResult {
     }
 
     setStep(null);
-    setStatus('fallback');
-    return 'fallback';
+    if (started.status === 'cooldown' || started.status === 'pending') {
+      setStatus(started.status);
+      return started.status;
+    }
+    setStartFailure({ code: started.code, retryable: started.retryable });
+    setStatus('unavailable');
+    return 'unavailable';
   }, []);
 
   const submitStep = useCallback(async (answers: ClosedAnswer[]) => {
@@ -95,5 +118,5 @@ export function usePlacementRunner(): UsePlacementRunnerResult {
     reset();
   }, [step, reset]);
 
-  return { status, step, stepsCompleted, resultLevel, begin, submitStep, cancel, reset };
+  return { status, step, stepsCompleted, resultLevel, startFailure, begin, submitStep, cancel, reset };
 }
