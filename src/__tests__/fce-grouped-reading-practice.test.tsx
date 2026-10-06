@@ -69,8 +69,7 @@ describe.each(CASES)('FCEGroupedReadingPractice $part', ({ part, group, items, a
     submitMock.mockReset();
     startMock.mockResolvedValue({ sessionId: 'session-1', exercise });
     submitMock.mockImplementation(async (input: { answers: Record<number, string> }) => {
-      const graded = gradeExercise(part, items, input.answers);
-      return graded;
+      return { sessionId: 'session-1', result: gradeExercise(part, items, input.answers) };
     });
   });
 
@@ -92,7 +91,8 @@ describe.each(CASES)('FCEGroupedReadingPractice $part', ({ part, group, items, a
     const expected = gradeExercise(part, items, answers);
     await waitFor(() => expect(screen.getByTestId('celebration')).toHaveTextContent(`${expected.correct}/${expected.total}`));
     expect(submitMock).toHaveBeenCalledWith({
-      sessionId: 'session-1',
+      sessionId: undefined,
+      groupId: exercise.groupId,
       part,
       answers,
     });

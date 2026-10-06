@@ -6,6 +6,7 @@ import { resolveActivityBoot } from '@/lib/activity/boot';
 import {
   isGroupFailure,
   type GroupStartOutcome,
+  type GroupSubmitInput,
   type GroupSubmitOutcome,
   type RestoredGroupSession,
 } from '@/lib/item-bank/group-session-types';
@@ -16,7 +17,7 @@ type AnswerKey = string | number;
 
 export interface GroupExerciseApi<E, K extends AnswerKey, R> {
   start: () => Promise<GroupStartOutcome<E>>;
-  submit: (sessionId: string, answers: Record<K, string>) => Promise<GroupSubmitOutcome<R>>;
+  submit: (input: GroupSubmitInput<Record<K, string>>) => Promise<GroupSubmitOutcome<R>>;
   restore: (messages: StoredMessage[]) => RestoredGroupSession<E, R> | null;
   answersOf?: (result: R) => Record<K, string>;
 }
@@ -95,15 +96,13 @@ export function useGroupExercise<E extends { groupId: string }, K extends Answer
         return;
       }
       setIsNewSession(true);
-      setSessionId(started.sessionId);
       setExercise(started.exercise);
       setAnswers({} as Record<K, string>);
       setResult(null);
       setErrorMessage(null);
-      onSessionCreated?.(started.sessionId);
       setPhase('ready');
     },
-    [onSessionCreated],
+    [],
   );
 
   useEffect(() => {
@@ -117,22 +116,26 @@ export function useGroupExercise<E extends { groupId: string }, K extends Answer
   }, []);
 
   const submit = useCallback(async () => {
-    if (!sessionId) return;
+    if (!exercise) return;
     setPhase('submitting');
-    const outcome = await api.submit(sessionId, answers);
+    const outcome = await api.submit({ sessionId, groupId: exercise.groupId, answers });
     if (isGroupFailure(outcome)) {
       setErrorMessage(outcome.error);
       setPhase('ready');
       return;
     }
     setErrorMessage(null);
-    setResult(outcome);
+    if (!sessionId) {
+      setSessionId(outcome.sessionId);
+      onSessionCreated?.(outcome.sessionId);
+    }
+    setResult(outcome.result);
     setPhase('finished');
     onSessionFinished?.();
-  }, [api, sessionId, answers, onSessionFinished]);
+  }, [api, exercise, sessionId, answers, onSessionCreated, onSessionFinished]);
 
   const retry = useCallback(() => {
-    if (exercise && sessionId) {
+    if (exercise) {
       setPhase('ready');
       setErrorMessage(null);
       return;
@@ -140,7 +143,7 @@ export function useGroupExercise<E extends { groupId: string }, K extends Answer
     setPhase('loading');
     setErrorMessage(null);
     void api.start().then(applyStart);
-  }, [api, exercise, sessionId, applyStart]);
+  }, [api, exercise, applyStart]);
 
   return { phase, exercise, answers, result, errorMessage, isNewSession, setAnswer, submit, retry };
 }

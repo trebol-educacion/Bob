@@ -68,8 +68,10 @@ const props = { onBack: vi.fn() };
 describe('FCEReadingMatchingPractice (Reading P7)', () => {
   it('muestra cuatro secciones y 10 preguntas, admite repetir letra, corrige y muestra nota', async () => {
     startMocks.r7.mockResolvedValue({ sessionId: 's1', exercise: r7 });
-    submitMocks.r7.mockImplementation(async (_s: string, answers: Record<string, string>) =>
-      gradeGroupAnswers(R7_ITEMS, answers, matchesLetterKey),
+    submitMocks.r7.mockImplementation(async (input: { answers: Record<string, string> }) => ({
+      sessionId: 'sx',
+      result: gradeGroupAnswers(R7_ITEMS, input.answers, matchesLetterKey),
+      }),
     );
     render(<FCEReadingMatchingPractice {...props} />);
 
@@ -85,7 +87,7 @@ describe('FCEReadingMatchingPractice (Reading P7)', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Check answers \(3\/10\)/ }));
     await waitFor(() => expect(screen.getByTestId('score-10')).toHaveTextContent('Score: 3 / 10'));
-    expect(submitMocks.r7).toHaveBeenCalledWith('s1', { 'r7-item-1': 'A', 'r7-item-8': 'A', 'r7-item-10': 'A' });
+    expect(submitMocks.r7).toHaveBeenCalledWith({ sessionId: undefined, groupId: r7.groupId, answers: { 'r7-item-1': 'A', 'r7-item-8': 'A', 'r7-item-10': 'A' } });
     expect(screen.getByLabelText('Question 44: D')).toBeDisabled();
   });
 
@@ -124,8 +126,10 @@ describe('FCEReadingMatchingPractice (Reading P7)', () => {
 describe('FCEListeningMatchingPractice (Listening P3)', () => {
   it('cinco clips con audio individual, ocho opciones A-H y tres sobrantes', async () => {
     startMocks.l3.mockResolvedValue({ sessionId: 's3', exercise: l3 });
-    submitMocks.l3.mockImplementation(async (_s: string, answers: Record<string, string>) =>
-      gradeGroupAnswers(L3_ITEMS, answers, matchesLetterKey),
+    submitMocks.l3.mockImplementation(async (input: { answers: Record<string, string> }) => ({
+      sessionId: 'sx',
+      result: gradeGroupAnswers(L3_ITEMS, input.answers, matchesLetterKey),
+      }),
     );
     render(<FCEListeningMatchingPractice {...props} />);
 
