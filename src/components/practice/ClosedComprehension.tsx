@@ -6,24 +6,24 @@ import { motion, AnimatePresence } from 'motion/react';
 import { CheckCircle, XCircle } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { InfoCard } from '@/components/chat';
-import { persistMessage } from '@/lib/persist-activity';
 import type { ClosedItem, ClosedEvaluation } from '@/lib/types/practice';
 
 /** Props for the ClosedComprehension activity component. */
 export interface ClosedComprehensionProps {
   items: ClosedItem[];
-  sessionId: string;
-  userId: string;
-  onComplete?: (results: ClosedEvaluation[]) => void;
+  initialResults?: ClosedEvaluation[];
+  submitError?: string | null;
+  onFinish?: (results: ClosedEvaluation[]) => void;
+  onDone?: () => void;
 }
 
 /** Generic closed-comprehension activity, listening, reading, or image-based. Deterministic scoring; no LLM involved. */
-export function ClosedComprehension({ items, sessionId, userId, onComplete }: ClosedComprehensionProps) {
+export function ClosedComprehension({ items, initialResults, submitError, onFinish, onDone }: ClosedComprehensionProps) {
   const t = useTranslations('resultcard');
   const [index, setIndex] = useState(0);
   const [answered, setAnswered] = useState<ClosedEvaluation | null>(null);
-  const [results, setResults] = useState<ClosedEvaluation[]>([]);
-  const [done, setDone] = useState(false);
+  const [results, setResults] = useState<ClosedEvaluation[]>(initialResults ?? []);
+  const [done, setDone] = useState(Boolean(initialResults));
 
   const item = items[index];
 
@@ -44,11 +44,25 @@ export function ClosedComprehension({ items, sessionId, userId, onComplete }: Cl
             </span>
           </div>
         ))}
+        {submitError && (
+          <div className="flex flex-col items-center gap-2">
+            <p className="text-sm text-red-500">{submitError}</p>
+            <button
+              onClick={() => onFinish?.(results)}
+              className="text-sm text-blue-600 underline"
+            >
+              {t('retrySave')}
+            </button>
+          </div>
+        )}
+        {onDone && (
+          <button onClick={onDone} className="text-sm text-blue-600 underline">{t('done')}</button>
+        )}
       </div>
     );
   }
 
-  async function handleSelect(key: string) {
+  function handleSelect(key: string) {
     if (answered) return;
 
     const evaluation: ClosedEvaluation = {
@@ -60,27 +74,6 @@ export function ClosedComprehension({ items, sessionId, userId, onComplete }: Cl
     };
 
     setAnswered(evaluation);
-
-    persistMessage({
-      sessionId,
-      userId,
-      role: 'user',
-      msgType: 'text',
-      contentText: key,
-      contentJson: { variant_id: item.variant_id, kind: 'closed_answer' },
-    }).catch((err: unknown) => {
-      console.error('[ClosedComprehension] persist user answer failed:', err);
-    });
-
-    persistMessage({
-      sessionId,
-      userId,
-      role: 'bob',
-      msgType: 'evaluation',
-      contentJson: evaluation as unknown as Record<string, unknown>,
-    }).catch((err: unknown) => {
-      console.error('[ClosedComprehension] persist evaluation failed:', err);
-    });
   }
 
   function handleNext() {
@@ -92,7 +85,7 @@ export function ClosedComprehension({ items, sessionId, userId, onComplete }: Cl
 
     if (index + 1 >= items.length) {
       setDone(true);
-      onComplete?.(nextResults);
+      onFinish?.(nextResults);
     } else {
       setIndex(index + 1);
     }
