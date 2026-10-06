@@ -4,6 +4,7 @@ import { createSupabaseServer } from '@/lib/supabase/server';
 import { currentUserId, openSession, recordTurn, finishSession } from '@/lib/session/lifecycle';
 import { readSessionMessages } from '@/lib/persist-activity';
 import { pickContent } from '@/lib/item-bank/content-source';
+import { fail, ok, type ActionResult } from '@/lib/result';
 
 const ITEMS_PER_SESSION = 6;
 const MODE = 'cambridge_pet_listening_part2';
@@ -42,9 +43,9 @@ export interface PETListeningFinalResult {
 /**
  * Picks 6 items from the bank; persists nothing, the session is created on the first answer.
  */
-export async function startPETListeningPart2Action(): Promise<{ items: PETListeningItem[] } | { error: string }> {
+export async function startPETListeningPart2Action(): Promise<ActionResult<{ items: PETListeningItem[] }>> {
   const userId = await currentUserId();
-  if (!userId) return { error: 'Not authenticated' };
+  if (!userId) return fail('unauthenticated');
 
   const picked = await pickContent({
     framework: 'pet',
@@ -55,7 +56,7 @@ export async function startPETListeningPart2Action(): Promise<{ items: PETListen
     userId,
     count: ITEMS_PER_SESSION,
   });
-  if (!picked.ok) return { error: 'Could not load listening items' };
+  if (!picked.ok) return picked;
 
   const clientItems: PETListeningItem[] = picked.data.items.map((item) => ({
     id: item.id,
@@ -65,7 +66,7 @@ export async function startPETListeningPart2Action(): Promise<{ items: PETListen
     options: item.options,
   }));
 
-  return { items: clientItems };
+  return ok({ items: clientItems });
 }
 
 async function loadPlanItems(itemIds: string[]): Promise<PlanItem[] | null> {

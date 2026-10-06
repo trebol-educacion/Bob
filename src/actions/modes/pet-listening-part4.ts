@@ -1,42 +1,26 @@
 'use server';
 
-import { z } from 'zod';
 import { getPrompt } from '@/lib/prompts/db-prompts';
-import { stripDashes } from '@/lib/text';
-import { callGemini, isOk } from '@/lib/gemini-client';
+import { PetAttitudePlanSchema, type PetAttitudePlan } from '@/lib/bank-plans/pet-listening-part4';
+import { bankStamp, pickPlan } from '@/lib/item-bank/plan-bank';
+import { fail, ok, type ActionResult } from '@/lib/result';
 import { completeActivity } from '@/lib/session/complete';
 import { currentUserId } from '@/lib/session/lifecycle';
 import { sealPlan, unsealPlan } from '@/lib/session/sealed-plan';
-import { generateSpeechAction } from '@/actions/gemini';
-import { MODELS } from '@/lib/models';
 
-const ItemSchema = z.object({
-  number: z.number().int().min(1).max(6),
-  monologue: z.string(),
-  question: z.string(),
-  options: z.object({
-    A: z.string(),
-    B: z.string(),
-    C: z.string(),
-  }),
-  answer: z.enum(['A', 'B', 'C']),
-});
+const EXAM_PART = 'pet_listening_part4';
+const FRAMING_FALLBACK =
+  'Vas a escuchar a varias personas hablando solas. Después de cada una, decide cómo se siente, qué opina o qué quiere hacer y elige la respuesta correcta, A, B o C.';
 
-const GenerationSchema = z.object({
-  context: z.string(),
-  items: z.array(ItemSchema).length(6),
-});
+export type PETAttitudeItem = PetAttitudePlan['items'][number];
 
-export type PETAttitudeItem = z.infer<typeof ItemSchema>;
-
-/** A single PET Listening Part 4 item without the answer key, plus its TTS audio slot. */
+/** A single PET Listening Part 4 item without the answer key, plus its audio URL. */
 export interface PETAttitudeClientItem {
   number: number;
   monologue: string;
   question: string;
   options: { A: string; B: string; C: string };
-  audio_b64: string;
-  audio_mime: string;
+  audio_url: string;
 }
 
 /** Full result returned from generatePETListeningAttitudeAction. */
@@ -63,95 +47,42 @@ export interface PETListeningAttitudeSubmitResult {
   item_results: PETAttitudeItemResult[];
 }
 
-function safeParse<T>(schema: z.ZodType<T>, raw: string): T | null {
-  try {
-    return schema.parse(JSON.parse(raw));
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Generates 6 PET B1 Listening Part 4 attitude items.
- * Returns items WITHOUT the answer key and with empty audio; the answer key
- * stays server-side and the TTS audio is synthesized off the critical path.
- */
-export async function generatePETListeningAttitudeAction(): Promise<PETListeningAttitudeResult | { error: string }> {
+export async function generatePETListeningAttitudeAction(): Promise<ActionResult<PETListeningAttitudeResult>> {
   const userId = await currentUserId();
-  if (!userId) return { error: 'unauthenticated' };
+  if (!userId) return fail('unauthenticated');
 
-  const [generationPrompt, framingText] = await Promise.all([
-    getPrompt('cambridge_pet_listening_part4_b1_generation').catch(() => null),
-    getPrompt('cambridge_pet_listening_part4_b1_framing').catch(
-      () =>
-        'Vas a escuchar a varias personas hablando solas. Después de cada una, decide cómo se siente, qué opina o qué quiere hacer y elige la respuesta correcta, A, B o C.'
-    ),
-  ]);
+  const picked = await pickPlan({
+    exam: 'pet',
+    cefr: 'b1',
+    examPart: EXAM_PART,
+    skill: 'listening',
+    schema: PetAttitudePlanSchema,
+    userId,
+  });
+  if (!picked.ok) return picked;
 
-  const cleanFramingText = stripDashes(framingText);
-
-  if (!generationPrompt) return { error: 'Could not load generation prompt' };
-
-  const geminiResult = await callGemini(
-    { promptKey: 'cambridge_pet_listening_part4_b1_generation', model: MODELS.FLASH_LITE, userId },
-    (ai) =>
-      ai.models.generateContent({
-        model: MODELS.FLASH_LITE,
-        contents: [{ role: 'user', parts: [{ text: generationPrompt }] }],
-        config: { responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
-      })
-  );
-
-  if (!isOk(geminiResult)) return { error: 'Could not generate exercise' };
-
-  const rawText = geminiResult.data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
-  const parsed = safeParse(GenerationSchema, rawText);
-  if (!parsed) return { error: 'Unexpected model response' };
-
-  const cleanItems = parsed.items.map((item) => ({
-    number: item.number,
-    monologue: stripDashes(item.monologue),
-    question: stripDashes(item.question),
-    options: {
-      A: stripDashes(item.options.A),
-      B: stripDashes(item.options.B),
-      C: stripDashes(item.options.C),
-    },
-    answer: item.answer,
-  }));
-
-  const clientItems: PETAttitudeClientItem[] = cleanItems.map((item) => ({
-    number: item.number,
-    monologue: item.monologue,
-    question: item.question,
-    options: item.options,
-    audio_b64: '',
-    audio_mime: 'audio/L16;codec=pcm;rate=24000',
-  }));
-
-  const plan = {
+  const framingText = await getPrompt('cambridge_pet_listening_part4_b1_framing').catch(() => FRAMING_FALLBACK);
+  const { plan, groupId } = picked.data;
+  const sealed = {
     kind: 'pet_listening_attitude_plan',
-    framing_text: cleanFramingText,
-    context: stripDashes(parsed.context),
-    items: cleanItems,
+    framing_text: framingText,
+    context: plan.context,
+    items: plan.items,
+    ...bankStamp(EXAM_PART, groupId),
   };
 
-  return {
-    planToken: sealPlan(plan, userId),
-    framingText: cleanFramingText,
-    context: stripDashes(parsed.context),
-    items: clientItems,
-  };
-}
-
-/** Generates the TTS audio for one monologue, off the critical path. */
-export async function generatePETListeningAttitudeAudioAction(input: {
-  monologue: string;
-}): Promise<{ data: string; mimeType: string }> {
-  return generateSpeechAction(input.monologue).catch(() => ({
-    data: '',
-    mimeType: 'audio/L16;codec=pcm;rate=24000',
-  }));
+  return ok({
+    planToken: sealPlan(sealed, userId),
+    framingText,
+    context: plan.context,
+    items: plan.items.map((item) => ({
+      number: item.number,
+      monologue: item.monologue,
+      question: item.question,
+      options: item.options,
+      audio_url: item.audio_url,
+    })),
+  });
 }
 
 /**

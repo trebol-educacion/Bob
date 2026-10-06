@@ -10,6 +10,10 @@ const recordMock = vi.fn();
 const finishMock = vi.fn();
 const readMock = vi.fn();
 const closedItemsMock = vi.fn();
+const pickContentMock = vi.fn();
+const speechMock = vi.fn(() => {
+  throw new Error('TTS must not run when opening an activity');
+});
 
 vi.mock('@/lib/session/complete', () => ({ completeActivity: (...a: unknown[]) => completeMock(...a) }));
 vi.mock('@/lib/session/lifecycle', () => ({
@@ -21,25 +25,12 @@ vi.mock('@/lib/session/lifecycle', () => ({
 vi.mock('@/lib/persist-activity', () => ({ readSessionMessages: (...a: unknown[]) => readMock(...a) }));
 vi.mock('@/actions/sessions', () => ({ createSessionAction: (...a: unknown[]) => createSessionMock(...a) }));
 vi.mock('@/lib/prompts/db-prompts', () => ({ getPrompt: vi.fn().mockResolvedValue('prompt') }));
-vi.mock('@/actions/gemini', () => ({ generateSpeechAction: vi.fn().mockResolvedValue({ data: 'AUDIO', mimeType: 'audio/x' }) }));
+vi.mock('@/actions/gemini', () => ({ generateSpeechAction: (...a: unknown[]) => speechMock(...(a as [])) }));
 vi.mock('@/lib/gemini-client', () => ({
   callGemini: (...a: unknown[]) => geminiMock(...a),
   isOk: (r: { ok?: boolean }) => r.ok === true,
 }));
-vi.mock('@/lib/item-bank/content-source', () => ({
-  pickContent: vi.fn().mockResolvedValue({
-    ok: true,
-    data: {
-      items: Array.from({ length: 6 }, (_, i) => ({
-        id: `i${i}`,
-        variant_id: `v${i}`,
-        stimulus_audio_url: `/a${i}.mp3`,
-        question: 'q',
-        options: [{ key: 'A', label: 'a' }, { key: 'B', label: 'b' }],
-      })),
-    },
-  }),
-}));
+vi.mock('@/lib/item-bank/content-source', () => ({ pickContent: (...a: unknown[]) => pickContentMock(...a) }));
 vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServer: async () => ({
     from: () => ({ select: () => ({ in: (_c: string, ids: string[]) => closedItemsMock(ids) }) }),
@@ -52,11 +43,7 @@ import {
   submitPETListeningAnswerAction,
   finalizePETListeningSessionAction,
 } from '@/actions/modes/pet-listening-part2';
-import {
-  generatePETListeningGapFillAction,
-  generatePETListeningGapFillAudioAction,
-  submitPETListeningGapFillAction,
-} from '@/actions/modes/pet-listening-part3';
+import { generatePETListeningGapFillAction, submitPETListeningGapFillAction } from '@/actions/modes/pet-listening-part3';
 import { generatePETListeningAttitudeAction, submitPETListeningAttitudeAction } from '@/actions/modes/pet-listening-part4';
 import {
   generatePETListeningTrueFalseJustifyAction,
@@ -69,9 +56,17 @@ import { tryRestore as restoreP4 } from '@/components/practice/pet/PETListeningA
 import { tryRestore as restoreP5 } from '@/components/practice/pet/PETListeningTrueFalseJustifyPractice';
 import type { StoredMessage } from '@/actions/messages';
 
-function geminiJson(payload: unknown) {
-  return { ok: true, data: { candidates: [{ content: { parts: [{ text: JSON.stringify(payload) }] } }] } };
+function bankGroup(plan: unknown) {
+  return { ok: true, data: { kind: 'group', group: { id: 'bank-1', metadata: { plan } }, items: [] } };
 }
+
+const P2_ITEMS = Array.from({ length: 6 }, (_, i) => ({
+  id: `i${i}`,
+  variant_id: `v${i}`,
+  stimulus_audio_url: `/a${i}.mp3`,
+  question: 'q',
+  options: [{ key: 'A', label: 'a' }, { key: 'B', label: 'b' }],
+}));
 
 function stored(role: 'bob' | 'user', msgType: string, json: Record<string, unknown>): StoredMessage {
   return { id: 'm', session_id: 's1', user_id: 'u1', role, msg_type: msgType, content_text: null, content_json: json, created_at: '' } as unknown as StoredMessage;
@@ -97,6 +92,8 @@ beforeEach(() => {
   finishMock.mockReset().mockResolvedValue({ ok: true, data: { score10: 5, messageId: 'm' } });
   readMock.mockReset();
   closedItemsMock.mockReset();
+  pickContentMock.mockReset().mockResolvedValue({ ok: true, data: { items: P2_ITEMS } });
+  speechMock.mockClear();
 });
 
 describe('PET Listening Part 1', () => {
@@ -108,14 +105,19 @@ describe('PET Listening Part 1', () => {
       question: 'q',
       options: { A: 'a', B: 'b', C: 'c' },
       answer: 'B',
+      audio_url: 'https://cdn/p1.mp3',
     })),
   };
 
   it('seals the key, closes once and restores', async () => {
-    geminiMock.mockResolvedValue(geminiJson(plan));
-    const generated = await generatePETListeningSituationalAction();
-    if ('error' in generated) throw new Error(generated.error);
+    pickContentMock.mockResolvedValue(bankGroup(plan));
+    const opened = await generatePETListeningSituationalAction();
+    if (!opened.ok) throw new Error(opened.code);
+    const generated = opened.data;
     expect(JSON.stringify(generated)).not.toContain('"answer"');
+    expect(generated.items[0].audio_url).toBe('https://cdn/p1.mp3');
+    expect(geminiMock).not.toHaveBeenCalled();
+    expect(speechMock).not.toHaveBeenCalled();
     expect(createSessionMock).not.toHaveBeenCalled();
     expect(completeMock).not.toHaveBeenCalled();
 
@@ -146,15 +148,17 @@ describe('PET Listening Part 3', () => {
     summary: 'A [1] B [2] C [3] D [4] E [5] F [6]',
     gaps: six((number) => ({ number, answer: 'cat', accept: [] })),
     word_bank: ['cat', 'dog', 'bird', 'fish', 'cow', 'pig'],
+    audio_url: 'https://cdn/p3.mp3',
   };
 
-  it('keeps the transcript sealed, synthesizes audio from the token, closes once', async () => {
-    geminiMock.mockResolvedValue(geminiJson(plan));
-    const generated = await generatePETListeningGapFillAction();
-    if ('error' in generated) throw new Error(generated.error);
+  it('keeps the transcript sealed, serves the audio url and closes once', async () => {
+    pickContentMock.mockResolvedValue(bankGroup(plan));
+    const opened = await generatePETListeningGapFillAction();
+    if (!opened.ok) throw new Error(opened.code);
+    const generated = opened.data;
     expect(JSON.stringify(generated)).not.toContain('spoken text');
-    const audio = await generatePETListeningGapFillAudioAction({ planToken: generated.planToken });
-    expect(audio.data).toBe('AUDIO');
+    expect(generated.exercise.audio_url).toBe('https://cdn/p3.mp3');
+    expect(speechMock).not.toHaveBeenCalled();
     const result = await submitPETListeningGapFillAction({
       planToken: generated.planToken,
       answers: { 1: 'cat', 2: 'cat', 3: 'dog', 4: '', 5: 'cat', 6: 'cat' },
@@ -162,25 +166,23 @@ describe('PET Listening Part 3', () => {
     if ('error' in result) throw new Error(result.error);
     expect(result.correct_count).toBe(4);
     expect(completeMock.mock.calls[0][0].mode).toBe('cambridge_pet_listening_part3');
+    expect(completeMock.mock.calls[0][0].plan.bank_group_id).toBe('bank-1');
     const restored = restoreP3(completionMessages());
     expect(restored?.correctCount).toBe(4);
-  });
-
-  it('returns empty audio for a forged token', async () => {
-    expect((await generatePETListeningGapFillAudioAction({ planToken: 'x' })).data).toBe('');
   });
 });
 
 describe('PET Listening Part 4', () => {
   const plan = {
     context: 'c',
-    items: six((number) => ({ number, monologue: 'm', question: 'q', options: { A: 'a', B: 'b', C: 'c' }, answer: 'C' })),
+    items: six((number) => ({ number, monologue: 'm', question: 'q', options: { A: 'a', B: 'b', C: 'c' }, answer: 'C', audio_url: 'https://cdn/p4.mp3' })),
   };
 
   it('closes once with the deterministic score and restores', async () => {
-    geminiMock.mockResolvedValue(geminiJson(plan));
-    const generated = await generatePETListeningAttitudeAction();
-    if ('error' in generated) throw new Error(generated.error);
+    pickContentMock.mockResolvedValue(bankGroup(plan));
+    const opened = await generatePETListeningAttitudeAction();
+    if (!opened.ok) throw new Error(opened.code);
+    const generated = opened.data;
     const result = await submitPETListeningAttitudeAction({
       planToken: generated.planToken,
       answers: { 1: 'C', 2: 'C', 3: 'C', 4: 'C', 5: 'A', 6: 'A' },
@@ -197,6 +199,7 @@ describe('PET Listening Part 5', () => {
   const plan = {
     context: 'c',
     audio: [{ speaker: 'M', line: 'a' }, { speaker: 'W', line: 'b' }],
+    audio_url: 'https://cdn/p5.mp3',
     statements: six((number) =>
       number % 2
         ? { number, text: 't', is_true: true }
@@ -205,9 +208,10 @@ describe('PET Listening Part 5', () => {
   };
 
   it('scores verdict and justification, closes once and restores', async () => {
-    geminiMock.mockResolvedValue(geminiJson(plan));
-    const generated = await generatePETListeningTrueFalseJustifyAction();
-    if ('error' in generated) throw new Error(generated.error);
+    pickContentMock.mockResolvedValue(bankGroup(plan));
+    const opened = await generatePETListeningTrueFalseJustifyAction();
+    if (!opened.ok) throw new Error(opened.code);
+    const generated = opened.data;
     const result = await submitPETListeningTrueFalseJustifyAction({
       planToken: generated.planToken,
       answers: {
@@ -240,8 +244,8 @@ describe('PET Listening Part 2', () => {
 
   it('start does not create a session', async () => {
     const result = await startPETListeningPart2Action();
-    if ('error' in result) throw new Error(result.error);
-    expect(result.items).toHaveLength(6);
+    if (!result.ok) throw new Error(result.code);
+    expect(result.data.items).toHaveLength(6);
     expect(JSON.stringify(result)).not.toContain('correct_key');
     expect(openMock).not.toHaveBeenCalled();
   });

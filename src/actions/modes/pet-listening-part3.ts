@@ -1,32 +1,19 @@
 'use server';
 
-import { z } from 'zod';
 import { getPrompt } from '@/lib/prompts/db-prompts';
-import { stripDashes } from '@/lib/text';
-import { callGemini, isOk } from '@/lib/gemini-client';
+import { isAcceptedAnswer } from '@/lib/answer-match';
+import { PetGapFillPlanSchema, type PetGapFillPlan } from '@/lib/bank-plans/pet-listening-part3';
+import { bankStamp, pickPlan } from '@/lib/item-bank/plan-bank';
+import { fail, ok, type ActionResult } from '@/lib/result';
 import { completeActivity } from '@/lib/session/complete';
 import { currentUserId } from '@/lib/session/lifecycle';
 import { sealPlan, unsealPlan } from '@/lib/session/sealed-plan';
-import { generateSpeechAction } from '@/actions/gemini';
-import { MODELS } from '@/lib/models';
-import { isAcceptedAnswer } from '@/lib/answer-match';
 
-const GapSchema = z.object({
-  number: z.number().int().min(1).max(6),
-  answer: z.string(),
-  accept: z.array(z.string()).default([]),
-});
+const EXAM_PART = 'pet_listening_part3';
+const FRAMING_FALLBACK =
+  'Vas a escuchar una charla corta de una sola persona. Después, completa el resumen escribiendo o arrastrando la palabra que falta en cada hueco.';
 
-const GenerationSchema = z.object({
-  context: z.string(),
-  summary_title: z.string(),
-  transcript: z.string(),
-  summary: z.string(),
-  gaps: z.array(GapSchema).length(6),
-  word_bank: z.array(z.string()).min(6).max(12),
-});
-
-type GenerationGap = z.infer<typeof GapSchema>;
+type GenerationGap = PetGapFillPlan['gaps'][number];
 
 /** A gap as sent to the client: number only, never the answer key. */
 export interface PETGapFillClientGap {
@@ -40,8 +27,7 @@ export interface PETGapFillExercise {
   summary: string;
   gaps: PETGapFillClientGap[];
   word_bank: string[];
-  audio_b64: string;
-  audio_mime: string;
+  audio_url: string;
 }
 
 /** Full result returned from generatePETListeningGapFillAction. */
@@ -72,104 +58,49 @@ function isAccepted(userInput: string, gap: GenerationGap): boolean {
   return isAcceptedAnswer(userInput, [gap.answer, ...gap.accept]);
 }
 
-function safeParse<T>(schema: z.ZodType<T>, raw: string): T | null {
-  try {
-    return schema.parse(JSON.parse(raw));
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Generates one PET B1 Listening Part 3 interactive gap-fill exercise.
- * Returns the exercise WITHOUT the answer key and with empty audio; the key
- * stays server-side and the TTS audio is synthesized off the critical path.
- */
-export async function generatePETListeningGapFillAction(): Promise<PETListeningGapFillResult | { error: string }> {
+export async function generatePETListeningGapFillAction(): Promise<ActionResult<PETListeningGapFillResult>> {
   const userId = await currentUserId();
-  if (!userId) return { error: 'unauthenticated' };
+  if (!userId) return fail('unauthenticated');
 
-  const [generationPrompt, framingText] = await Promise.all([
-    getPrompt('cambridge_pet_listening_part3_b1_generation').catch(() => null),
-    getPrompt('cambridge_pet_listening_part3_b1_framing').catch(
-      () =>
-        'Vas a escuchar una charla corta de una sola persona. Después, completa el resumen escribiendo o arrastrando la palabra que falta en cada hueco.'
-    ),
-  ]);
+  const picked = await pickPlan({
+    exam: 'pet',
+    cefr: 'b1',
+    examPart: EXAM_PART,
+    skill: 'listening',
+    schema: PetGapFillPlanSchema,
+    userId,
+  });
+  if (!picked.ok) return picked;
 
-  const cleanFramingText = stripDashes(framingText);
-
-  if (!generationPrompt) return { error: 'Could not load generation prompt' };
-
-  const geminiResult = await callGemini(
-    { promptKey: 'cambridge_pet_listening_part3_b1_generation', model: MODELS.FLASH_LITE, userId },
-    (ai) =>
-      ai.models.generateContent({
-        model: MODELS.FLASH_LITE,
-        contents: [{ role: 'user', parts: [{ text: generationPrompt }] }],
-        config: { responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
-      })
-  );
-
-  if (!isOk(geminiResult)) return { error: 'Could not generate exercise' };
-
-  const rawText = geminiResult.data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
-  const parsed = safeParse(GenerationSchema, rawText);
-  if (!parsed) return { error: 'Unexpected model response' };
-
-  const cleanGaps = parsed.gaps.map((gap) => ({
-    number: gap.number,
-    answer: stripDashes(gap.answer),
-    accept: gap.accept.map((alt) => stripDashes(alt)),
-  }));
-
-  const cleanWordBank = parsed.word_bank.map((w) => stripDashes(w));
-  const cleanSummary = stripDashes(parsed.summary);
-  const cleanSummaryTitle = stripDashes(parsed.summary_title);
-  const cleanContext = stripDashes(parsed.context);
-
-  const exercise: PETGapFillExercise = {
-    context: cleanContext,
-    summary_title: cleanSummaryTitle,
-    summary: cleanSummary,
-    gaps: cleanGaps.map((gap) => ({ number: gap.number })),
-    word_bank: cleanWordBank,
-    audio_b64: '',
-    audio_mime: 'audio/L16;codec=pcm;rate=24000',
-  };
-
-  const plan = {
+  const framingText = await getPrompt('cambridge_pet_listening_part3_b1_framing').catch(() => FRAMING_FALLBACK);
+  const { plan, groupId } = picked.data;
+  const sealed = {
     kind: 'pet_listening_gapfill_plan',
-    framing_text: cleanFramingText,
+    framing_text: framingText,
     exercise: {
-      context: cleanContext,
-      summary_title: cleanSummaryTitle,
-      transcript: parsed.transcript,
-      summary: cleanSummary,
-      gaps: cleanGaps,
-      word_bank: cleanWordBank,
+      context: plan.context,
+      summary_title: plan.summary_title,
+      transcript: plan.transcript,
+      summary: plan.summary,
+      gaps: plan.gaps,
+      word_bank: plan.word_bank,
+      audio_url: plan.audio_url,
     },
+    ...bankStamp(EXAM_PART, groupId),
   };
 
-  return {
-    planToken: sealPlan(plan, userId),
-    framingText: cleanFramingText,
-    exercise,
-  };
-}
-
-/** Generates the TTS audio for the monologue transcript from the sealed plan, off the critical path. */
-export async function generatePETListeningGapFillAudioAction(input: {
-  planToken: string;
-}): Promise<{ data: string; mimeType: string }> {
-  const empty = { data: '', mimeType: 'audio/L16;codec=pcm;rate=24000' };
-  const userId = await currentUserId();
-  if (!userId) return empty;
-  const plan = unsealPlan<{ exercise?: { transcript?: string } }>(input.planToken, userId);
-  const transcript = plan?.exercise?.transcript;
-  if (!transcript) return empty;
-
-  return generateSpeechAction(transcript);
+  return ok({
+    planToken: sealPlan(sealed, userId),
+    framingText,
+    exercise: {
+      context: plan.context,
+      summary_title: plan.summary_title,
+      summary: plan.summary,
+      gaps: plan.gaps.map((gap) => ({ number: gap.number })),
+      word_bank: plan.word_bank,
+      audio_url: plan.audio_url,
+    },
+  });
 }
 
 /**

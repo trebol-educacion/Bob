@@ -6,10 +6,10 @@ import { Check } from 'lucide-react';
 import { PETListeningIcon } from '@/components/icons/PETIcons';
 import { CelebrationCard } from '@/components/practice/yl/CelebrationCard';
 import { BobMascotLoader } from '@/components/chat/BobMascotLoader';
-import { pcmToWavBase64 } from '@/lib/audio';
+import { PETAudioPlayer, stopActivePETAudio } from './PETAudioPlayer';
+import { ActivityLoadError } from '@/components/practice/ActivityLoadError';
 import {
   generatePETListeningSituationalAction,
-  generatePETListeningSituationalAudioAction,
   submitPETListeningSituationalAction,
   type PETSituationalClientItem,
   type PETSituationalItemResult,
@@ -33,7 +33,6 @@ export interface PETListeningSituationalPracticeProps {
 }
 
 type Phase = 'loading' | 'generating' | 'ready' | 'submitting' | 'finished';
-type AudioStatus = 'loading' | 'ready' | 'error';
 
 interface RestoredState {
   items: PETSituationalClientItem[];
@@ -53,12 +52,8 @@ export function tryRestore(messages: StoredMessage[]): RestoredState | null {
     if (!cj) continue;
 
     if (msg.role === 'bob' && cj.kind === 'pet_listening_situational_plan') {
-      const raw = (cj.items as Array<Omit<PETSituationalClientItem, 'audio_b64' | 'audio_mime'>>) ?? [];
-      items = raw.map((item) => ({
-        ...item,
-        audio_b64: '',
-        audio_mime: 'audio/L16;codec=pcm;rate=24000',
-      }));
+      const raw = (cj.items as Array<Omit<PETSituationalClientItem, 'audio_url'> & { audio_url?: string }>) ?? [];
+      items = raw.map((item) => ({ ...item, audio_url: item.audio_url ?? '' }));
       framingText = String(cj.framing_text ?? '');
     }
     if (msg.role === 'bob' && msg.msg_type === 'evaluation' && cj.is_final === true) {
@@ -69,178 +64,6 @@ export function tryRestore(messages: StoredMessage[]): RestoredState | null {
 
   if (items) return { items, framingText, itemResults, correctCount };
   return null;
-}
-
-let _activeAudio: HTMLAudioElement | null = null;
-
-function stopActiveAudio() {
-  if (_activeAudio) {
-    _activeAudio.pause();
-    _activeAudio.src = '';
-    _activeAudio = null;
-  }
-}
-
-function PlayIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
-      <path d="M8 5v14l11-7z" />
-    </svg>
-  );
-}
-
-function PauseIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
-      <rect x="6" y="5" width="4" height="14" rx="1" />
-      <rect x="14" y="5" width="4" height="14" rx="1" />
-    </svg>
-  );
-}
-
-function ReplayIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
-      <path d="M3 12a9 9 0 1 0 3-6.7" />
-      <polyline points="3 4 3 10 9 10" />
-    </svg>
-  );
-}
-
-function Spinner() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4 animate-spin" aria-hidden>
-      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeOpacity="0.25" strokeWidth="3" />
-      <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function AudioPlayer({
-  audiob64,
-  audiomime,
-  status,
-}: {
-  audiob64: string;
-  audiomime: string;
-  status: AudioStatus;
-}) {
-  const reduceMotion = useReducedMotion();
-  const [playing, setPlaying] = useState(false);
-  const [hasPlayed, setHasPlayed] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  const stopLocal = () => {
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current = null;
-    }
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
-    }
-    setPlaying(false);
-    if (_activeAudio === audioRef.current) _activeAudio = null;
-  };
-
-  useEffect(() => () => stopLocal(), []);
-
-  const handlePlay = async () => {
-    if (playing) {
-      stopLocal();
-      setProgress(0);
-      return;
-    }
-
-    stopActiveAudio();
-
-    const url = pcmToWavBase64(audiob64, audiomime);
-    const audio = new Audio(url);
-    audioRef.current = audio;
-    _activeAudio = audio;
-
-    audio.onended = () => {
-      stopLocal();
-      setHasPlayed(true);
-      setProgress(1);
-      setTimeout(() => setProgress(0), 600);
-    };
-    audio.onerror = () => stopLocal();
-
-    setPlaying(true);
-    intervalRef.current = setInterval(() => {
-      if (audio.duration > 0) setProgress(audio.currentTime / audio.duration);
-    }, 100);
-
-    try {
-      await audio.play();
-    } catch {
-      stopLocal();
-    }
-  };
-
-  if (status === 'error') {
-    return (
-      <div className="rounded-full ring-1 ring-gray-100 bg-gray-50 px-3 py-2 flex items-center gap-3 h-12">
-        <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 bg-gray-200 text-gray-400">
-          <PlayIcon />
-        </div>
-        <p className="flex-1 text-sm font-semibold text-gray-400">Audio unavailable</p>
-      </div>
-    );
-  }
-
-  if (status === 'loading') {
-    return (
-      <div className="rounded-full ring-1 ring-emerald-100 bg-emerald-50 px-3 py-2 flex items-center gap-3 h-12">
-        <div
-          className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 text-white opacity-60"
-          style={{ background: ACCENT }}
-          aria-hidden
-        >
-          <Spinner />
-        </div>
-        <p className="flex-1 text-xs font-semibold" style={{ color: ACCENT_TEXT }}>Preparing audio…</p>
-      </div>
-    );
-  }
-
-  const label = playing ? 'Playing…' : hasPlayed ? 'Listen again' : 'Listen to the conversation';
-
-  return (
-    <div className="relative rounded-full ring-1 ring-emerald-100 bg-emerald-50 px-3 py-2 flex items-center gap-3 h-12 overflow-hidden">
-      <div className="relative shrink-0 w-10 h-10">
-        {playing && (
-          <motion.div
-            aria-hidden
-            className="absolute inset-0 rounded-full"
-            style={{ background: ACCENT }}
-            initial={{ scale: 1, opacity: 0.4 }}
-            animate={reduceMotion ? { scale: 1, opacity: 0.25 } : { scale: [1, 1.6], opacity: [0.4, 0] }}
-            transition={reduceMotion ? { duration: 0 } : { duration: 1.2, ease: 'easeOut', repeat: Infinity }}
-          />
-        )}
-        <button
-          type="button"
-          onClick={handlePlay}
-          aria-label={label}
-          className="relative w-10 h-10 rounded-full flex items-center justify-center transition-transform active:scale-95 text-white"
-          style={{ background: ACCENT }}
-        >
-          {playing ? <PauseIcon /> : hasPlayed ? <ReplayIcon /> : <PlayIcon />}
-        </button>
-      </div>
-      <p className="flex-1 text-xs font-semibold truncate" style={{ color: ACCENT_TEXT }}>{label}</p>
-      <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-[3px] bg-emerald-200/60">
-        <div
-          className="h-full transition-all"
-          style={{ width: `${Math.round(progress * 100)}%`, background: ACCENT }}
-        />
-      </div>
-    </div>
-  );
 }
 
 function AnsweredDot({ reduceMotion }: { reduceMotion: boolean }) {
@@ -327,9 +150,6 @@ function QuestionCard({
   index,
   animate,
   reduceMotion,
-  audioB64,
-  audioMime,
-  audioStatus,
 }: {
   item: PETSituationalClientItem;
   selected: 'A' | 'B' | 'C' | undefined;
@@ -338,9 +158,6 @@ function QuestionCard({
   index: number;
   animate: boolean;
   reduceMotion: boolean;
-  audioB64: string;
-  audioMime: string;
-  audioStatus: AudioStatus;
 }) {
   const opts = (['A', 'B', 'C'] as const).map((k) => ({ id: k, text: item.options[k] }));
 
@@ -353,7 +170,7 @@ function QuestionCard({
       style={{ background: CARD_SURFACE }}
     >
       <div className="px-4 pt-4">
-        <AudioPlayer audiob64={audioB64} audiomime={audioMime} status={audioStatus} />
+        <PETAudioPlayer url={item.audio_url} idleLabel="Listen to the conversation" />
       </div>
       <div className="px-4 pt-3 pb-2 flex items-start gap-2">
         <span
@@ -540,10 +357,9 @@ export function PETListeningSituationalPractice({
   const [itemResults, setItemResults] = useState<PETSituationalItemResult[]>([]);
   const [correctCount, setCorrectCount] = useState(0);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [loadErrorCode, setLoadErrorCode] = useState<string | null>(null);
   const [isNewSession, setIsNewSession] = useState(false);
-  const [audioByItem, setAudioByItem] = useState<Record<number, { b64: string; mime: string; status: AudioStatus }>>({});
   const initStartedRef = useRef(false);
-  const audioStartedRef = useRef(false);
 
   useEffect(() => {
     if (initStartedRef.current) return;
@@ -570,12 +386,13 @@ export function PETListeningSituationalPractice({
       setIsNewSession(true);
       setPhase('generating');
 
-      const result = await generatePETListeningSituationalAction();
+      const generated = await generatePETListeningSituationalAction();
 
-      if ('error' in result) {
-        setErrorMsg(result.error);
+      if (!generated.ok) {
+        setLoadErrorCode(generated.code);
         return;
       }
+      const result = generated.data;
 
       setPlanToken(result.planToken);
       setItems(result.items);
@@ -586,49 +403,9 @@ export function PETListeningSituationalPractice({
     void init();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => {
-    if (audioStartedRef.current) return;
-    if (phase !== 'ready') return;
-    if (!items.length) return;
-    audioStartedRef.current = true;
-
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setAudioByItem(
-      Object.fromEntries(
-        items.map((item) => [item.number, { b64: '', mime: 'audio/L16;codec=pcm;rate=24000', status: 'loading' as AudioStatus }])
-      )
-    );
-
-    let cancelled = false;
-    for (const item of items) {
-      (async () => {
-        try {
-          const audio = await generatePETListeningSituationalAudioAction({ conversation: item.conversation });
-          if (cancelled) return;
-          setAudioByItem((prev) => ({
-            ...prev,
-            [item.number]: audio.data
-              ? { b64: audio.data, mime: audio.mimeType, status: 'ready' }
-              : { b64: '', mime: audio.mimeType, status: 'error' },
-          }));
-        } catch {
-          if (cancelled) return;
-          setAudioByItem((prev) => ({
-            ...prev,
-            [item.number]: { b64: '', mime: 'audio/L16;codec=pcm;rate=24000', status: 'error' },
-          }));
-        }
-      })();
-    }
-
-    return () => {
-      cancelled = true;
-    };
-  }, [phase, items]);
-
   async function handleSubmit() {
     if (!planToken) return;
-    stopActiveAudio();
+    stopActivePETAudio();
     setPhase('submitting');
 
     const result = await submitPETListeningSituationalAction({ sessionId, planToken, answers });
@@ -650,6 +427,8 @@ export function PETListeningSituationalPractice({
   const answeredCount = Object.keys(answers).length;
   const allAnswered = items.length > 0 && answeredCount === items.length;
   const progressPct = items.length > 0 ? (answeredCount / items.length) * 100 : 0;
+
+  if (loadErrorCode) return <ActivityLoadError code={loadErrorCode} onBack={onBack} />;
 
   if (errorMsg) {
     return (
@@ -734,7 +513,6 @@ export function PETListeningSituationalPractice({
               </div>
 
               {items.map((item, i) => {
-                const audio = audioByItem[item.number] ?? { b64: '', mime: 'audio/L16;codec=pcm;rate=24000', status: 'loading' as AudioStatus };
                 return (
                   <QuestionCard
                     key={item.number}
@@ -745,9 +523,6 @@ export function PETListeningSituationalPractice({
                     selected={answers[item.number]}
                     onSelect={(v) => setAnswers((prev) => ({ ...prev, [item.number]: v }))}
                     disabled={false}
-                    audioB64={audio.b64}
-                    audioMime={audio.mime}
-                    audioStatus={audio.status}
                   />
                 );
               })}

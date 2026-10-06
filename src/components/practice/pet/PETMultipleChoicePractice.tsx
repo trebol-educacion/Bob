@@ -14,6 +14,7 @@ import {
 } from '@/actions/modes/pet-listening-part2';
 import type { StoredMessage } from '@/actions/messages';
 import { resolveActivityBoot } from '@/lib/activity/boot';
+import { loadErrorMessage } from '@/lib/item-bank/load-error-message';
 
 const ITEMS_PER_SESSION = 6;
 const MAX_PLAYS = 2;
@@ -203,7 +204,6 @@ export function PETMultipleChoicePractice({
   const [finalScore, setFinalScore] = useState<number | null>(null);
   const initStartedRef = useRef(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-
   useEffect(() => {
     if (initStartedRef.current) return;
     initStartedRef.current = true;
@@ -234,13 +234,13 @@ export function PETMultipleChoicePractice({
       setIsNewSession(true);
       const result = await startPETListeningPart2Action();
 
-      if ('error' in result) {
-        setErrorMsg(result.error);
+      if (!result.ok) {
+        setErrorMsg(loadErrorMessage(result.code));
         setPhase('error');
         return;
       }
 
-      setItems(result.items);
+      setItems(result.data.items);
       setPhase('ready');
     }
 
@@ -335,12 +335,12 @@ export function PETMultipleChoicePractice({
     audioRef.current = null;
 
     startPETListeningPart2Action().then((result) => {
-      if ('error' in result) {
-        setErrorMsg(result.error);
+      if (!result.ok) {
+        setErrorMsg(loadErrorMessage(result.code));
         setPhase('error');
         return;
       }
-      setItems(result.items);
+      setItems(result.data.items);
       setIsNewSession(true);
       setPhase('ready');
     });
