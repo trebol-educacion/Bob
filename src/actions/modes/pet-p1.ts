@@ -1,30 +1,24 @@
 'use server';
 
-import { z } from 'zod';
-import type { FormativeFeedback } from '@/lib/types/practice';
+import { PETInterviewPlanSchema, type PETInterviewPlan } from '@/lib/speaking/pet-content';
+import type { ActionResult } from '@/lib/result';
+import { currentUserId } from '@/lib/session/lifecycle';
 import {
   evaluateQuestionRound,
   generateQuestionRoundPlan,
   processQuestionRoundAnswer,
-  readQuestionRoundMessages,
   type QuestionRoundConfig,
 } from '@/lib/speaking/question-round';
-import type { SpeakingQA } from '@/lib/speaking/types';
+import type {
+  QuestionRoundAnswer,
+  QuestionRoundContext,
+  QuestionRoundEvaluation,
+  SpeakingQA,
+} from '@/lib/speaking/types';
 
-const PETInterviewPlanSchema = z.object({
-  phase1_questions: z.array(z.string()).min(1),
-  topicA: z.string(),
-  topicA_questions: z.array(z.string()).min(1),
-  topicA_followup: z.string(),
-  topicBC: z.string(),
-  topicBC_questions: z.array(z.string()).min(1),
-  topicBC_followup: z.string(),
-  closing: z.string(),
-});
-
-export type PETInterviewPlan = z.infer<typeof PETInterviewPlanSchema>;
 
 const PET_P1_CONFIG: QuestionRoundConfig<PETInterviewPlan> = {
+  mode: 'cambridge_pet_p1',
   promptPrefix: 'cambridge_pet_p1_b1',
   transcribePromptKey: 'cambridge_ket_part1_a2_transcribe',
   planCacheKey: 'cambridge-pet-p1-b1-plan',
@@ -43,32 +37,24 @@ const PET_P1_CONFIG: QuestionRoundConfig<PETInterviewPlan> = {
   eventName: 'PETInterview',
 };
 
-export async function generatePETInterviewAction(sessionId: string, userId: string): Promise<PETInterviewPlan> {
-  return generateQuestionRoundPlan(PET_P1_CONFIG, sessionId, userId);
+export async function generatePETInterviewAction(): Promise<PETInterviewPlan> {
+  const userId = await currentUserId();
+  if (!userId) return PET_P1_CONFIG.planFallback;
+  return generateQuestionRoundPlan(PET_P1_CONFIG, userId);
 }
 
 export async function processPETInterviewAnswerAction(
   audioBase64: string,
   mimeType: string,
   question: string,
-  sessionId: string,
-  userId: string,
-): Promise<{ transcribed: string; reaction: string }> {
-  return processQuestionRoundAnswer(PET_P1_CONFIG, audioBase64, mimeType, question, sessionId, userId);
+  context: QuestionRoundContext<PETInterviewPlan>,
+): Promise<ActionResult<QuestionRoundAnswer>> {
+  return processQuestionRoundAnswer(PET_P1_CONFIG, audioBase64, mimeType, question, context);
 }
 
 export async function evaluatePETInterviewAction(
   questionsAndAnswers: SpeakingQA[],
-  sessionId: string,
-  userId: string,
-): Promise<FormativeFeedback> {
-  return evaluateQuestionRound(PET_P1_CONFIG, questionsAndAnswers, sessionId, userId);
-}
-
-export async function getPETInterviewMessagesAction(sessionId: string): Promise<{
-  plan: PETInterviewPlan | null;
-  qas: SpeakingQA[];
-  feedback: FormativeFeedback | null;
-}> {
-  return readQuestionRoundMessages(PET_P1_CONFIG, sessionId);
+  context: QuestionRoundContext<PETInterviewPlan>,
+): Promise<ActionResult<QuestionRoundEvaluation>> {
+  return evaluateQuestionRound(PET_P1_CONFIG, questionsAndAnswers, context);
 }

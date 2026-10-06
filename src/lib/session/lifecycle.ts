@@ -26,7 +26,8 @@ export interface FinishedSession {
   messageId: string;
 }
 
-async function currentUserId(): Promise<string | null> {
+/** @returns id of the authenticated user, or null */
+export async function currentUserId(): Promise<string | null> {
   const supabase = await createSupabaseServer();
   const {
     data: { user },
@@ -62,6 +63,29 @@ export async function ensureSession(input: {
     return fail(code, code === 'session_create_failed');
   }
   return ok({ sessionId: created.data.id, userId: created.data.user_id, created: true });
+}
+
+/**
+ * @param input.mode - session mode key
+ * @param input.sessionId - existing session to reuse
+ * @param input.topic - optional topic stored on the session
+ * @param input.opening - messages persisted only when this call creates the session
+ * @returns session reference with the opening already persisted
+ */
+export async function openSession(input: {
+  mode: string;
+  sessionId?: string | null;
+  topic?: string | null;
+  opening: TurnMessage[];
+}): Promise<ActionResult<SessionRef>> {
+  const session = await ensureSession({ mode: input.mode, sessionId: input.sessionId, topic: input.topic });
+  if (!session.ok) return session;
+  const ref = { sessionId: session.data.sessionId, userId: session.data.userId };
+  if (session.data.created) {
+    const turn = await recordTurn({ ...ref, messages: input.opening });
+    if (!turn.ok) return turn;
+  }
+  return ok(ref);
 }
 
 /**

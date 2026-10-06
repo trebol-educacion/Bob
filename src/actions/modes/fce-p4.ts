@@ -1,6 +1,7 @@
 'use server';
 
-import type { FormativeFeedback } from '@/lib/types/practice';
+import type { ActionResult } from '@/lib/result';
+import { currentUserId } from '@/lib/session/lifecycle';
 import { FCE_DISCUSSION_CONFIG } from '@/lib/speaking/fce-configs';
 import {
   FCE_COLLABORATIVE_MODE,
@@ -12,13 +13,19 @@ import {
   evaluateQuestionRound,
   generateQuestionRoundPlan,
   processQuestionRoundAnswer,
-  readQuestionRoundMessages,
 } from '@/lib/speaking/question-round';
-import type { SpeakingQA } from '@/lib/speaking/types';
+import type {
+  QuestionRoundAnswer,
+  QuestionRoundContext,
+  QuestionRoundEvaluation,
+  SpeakingQA,
+} from '@/lib/speaking/types';
 
-export async function generateFCEDiscussionAction(sessionId: string, userId: string): Promise<FCEDiscussionPlan> {
+export async function generateFCEDiscussionAction(): Promise<FCEDiscussionPlan> {
+  const userId = await currentUserId();
+  if (!userId) return FCE_DISCUSSION_CONFIG.planFallback;
   const linkedTopic = await readRecentSessionTopic(userId, FCE_COLLABORATIVE_MODE);
-  return generateQuestionRoundPlan(FCE_DISCUSSION_CONFIG, sessionId, userId, {
+  return generateQuestionRoundPlan(FCE_DISCUSSION_CONFIG, userId, {
     TOPIC: linkedTopic ?? FCE_OWN_DISCUSSION_TOPIC,
   });
 }
@@ -27,24 +34,14 @@ export async function processFCEDiscussionAnswerAction(
   audioBase64: string,
   mimeType: string,
   question: string,
-  sessionId: string,
-  userId: string,
-): Promise<{ transcribed: string; reaction: string }> {
-  return processQuestionRoundAnswer(FCE_DISCUSSION_CONFIG, audioBase64, mimeType, question, sessionId, userId);
+  context: QuestionRoundContext<FCEDiscussionPlan>,
+): Promise<ActionResult<QuestionRoundAnswer>> {
+  return processQuestionRoundAnswer(FCE_DISCUSSION_CONFIG, audioBase64, mimeType, question, context);
 }
 
 export async function evaluateFCEDiscussionAction(
   questionsAndAnswers: SpeakingQA[],
-  sessionId: string,
-  userId: string,
-): Promise<FormativeFeedback> {
-  return evaluateQuestionRound(FCE_DISCUSSION_CONFIG, questionsAndAnswers, sessionId, userId);
-}
-
-export async function getFCEDiscussionMessagesAction(sessionId: string): Promise<{
-  plan: FCEDiscussionPlan | null;
-  qas: SpeakingQA[];
-  feedback: FormativeFeedback | null;
-}> {
-  return readQuestionRoundMessages(FCE_DISCUSSION_CONFIG, sessionId);
+  context: QuestionRoundContext<FCEDiscussionPlan>,
+): Promise<ActionResult<QuestionRoundEvaluation>> {
+  return evaluateQuestionRound(FCE_DISCUSSION_CONFIG, questionsAndAnswers, context);
 }

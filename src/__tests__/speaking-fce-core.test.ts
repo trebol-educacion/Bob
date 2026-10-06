@@ -11,10 +11,14 @@ vi.mock('@/lib/gemini-client', async () => {
 const getPrompt = vi.fn();
 vi.mock('@/lib/prompts/db-prompts', () => ({ getPrompt: (...args: unknown[]) => getPrompt(...args) }));
 
-const persistMessage = vi.fn();
-vi.mock('@/lib/persist-activity', () => ({
-  persistMessage: (...args: unknown[]) => persistMessage(...args),
-  readSessionMessagesForCurrentOrUser: vi.fn(),
+const openSession = vi.fn();
+const recordTurn = vi.fn();
+const finishSession = vi.fn();
+vi.mock('@/lib/session/lifecycle', () => ({
+  currentUserId: async () => 'u1',
+  openSession: (...args: unknown[]) => openSession(...args),
+  recordTurn: (...args: unknown[]) => recordTurn(...args),
+  finishSession: (...args: unknown[]) => finishSession(...args),
 }));
 
 const getOrCreateCachedContent = vi.fn();
@@ -22,9 +26,6 @@ vi.mock('@/lib/cache', () => ({
   getOrCreateCachedContent: (...args: unknown[]) => getOrCreateCachedContent(...args),
 }));
 
-vi.mock('@/lib/supabase/server', () => ({
-  createSupabaseServer: async () => ({ auth: { getUser: async () => ({ data: { user: { id: 'u1' } } }) } }),
-}));
 
 import {
   evaluateQuestionRound,
@@ -62,33 +63,45 @@ const scenario = {
 beforeEach(() => {
   vi.clearAllMocks();
   getPrompt.mockResolvedValue('PROMPT');
-  persistMessage.mockResolvedValue({ id: 'm1' });
+  openSession.mockResolvedValue({ ok: true, data: { sessionId: 's1', userId: 'u1' } });
+  recordTurn.mockResolvedValue({ ok: true, data: { ids: [] } });
+  finishSession.mockResolvedValue({ ok: true, data: { score10: 7, messageId: 'm1' } });
 });
 
 describe('FCE question round (P1 and P4)', () => {
   it('persists a final evaluation with score, score_max and the derived grade', async () => {
     callGemini.mockResolvedValue({ ok: true, data: { text: evalJson } });
-    const feedback = await evaluateQuestionRound(FCE_INTERVIEW_CONFIG, [{ question: 'Q1', answer: 'A1' }], 's1', 'u1');
+    const result = await evaluateQuestionRound(FCE_INTERVIEW_CONFIG, [{ question: 'Q1', answer: 'A1' }], {
+      sessionId: 's1',
+      plan: FCE_INTERVIEW_CONFIG.planFallback,
+    });
+    if (!result.ok) throw new Error(result.code);
 
-    expect(feedback.score10).toBe(7);
+    expect(result.data.feedback.score10).toBe(7);
     expect(getPrompt).toHaveBeenCalledWith('cambridge_fce_p1_b2_evaluation');
-    const persisted = persistMessage.mock.calls[0][0];
-    expect(persisted.msgType).toBe('evaluation');
-    expect(persisted.contentJson).toMatchObject({ score: 14, score_max: 20, is_final: true, score10: 7 });
+    expect(finishSession.mock.calls[0][0].evaluation).toMatchObject({ score: 14, score_max: 20, score10: 7 });
   });
 
   it('does not persist a fake evaluation when the model reply is invalid', async () => {
     callGemini.mockResolvedValue({ ok: true, data: { text: '{"nope":1}' } });
-    const feedback = await evaluateQuestionRound(FCE_DISCUSSION_CONFIG, [{ question: 'Q', answer: 'A' }], 's1', 'u1');
-    expect(feedback.score10).toBeUndefined();
-    expect(feedback.suggestions.length).toBeGreaterThan(0);
-    expect(persistMessage).not.toHaveBeenCalled();
+    const result = await evaluateQuestionRound(FCE_DISCUSSION_CONFIG, [{ question: 'Q', answer: 'A' }], {
+      sessionId: 's1',
+      plan: FCE_DISCUSSION_CONFIG.planFallback,
+    });
+    if (!result.ok) throw new Error(result.code);
+    expect(result.data.feedback.score10).toBeUndefined();
+    expect(result.data.feedback.suggestions.length).toBeGreaterThan(0);
+    expect(finishSession).not.toHaveBeenCalled();
   });
 
   it('skips the examiner reaction and uses the FCE transcribe prompt', async () => {
     callGemini.mockResolvedValue({ ok: true, data: { text: '{"transcript":"hello there"}' } });
-    const result = await processQuestionRoundAnswer(FCE_INTERVIEW_CONFIG, 'b64', 'audio/webm', 'Q', 's1', 'u1');
-    expect(result).toEqual({ transcribed: 'hello there', reaction: '' });
+    const result = await processQuestionRoundAnswer(FCE_INTERVIEW_CONFIG, 'b64', 'audio/webm', 'Q', {
+      sessionId: 's1',
+      plan: FCE_INTERVIEW_CONFIG.planFallback,
+    });
+    expect(result).toEqual({ ok: true, data: { transcribed: 'hello there', reaction: '', sessionId: 's1' } });
+    expect(recordTurn.mock.calls[0][0].messages[0]).toMatchObject({ role: 'user', contentText: 'hello there' });
     expect(callGemini).toHaveBeenCalledTimes(1);
     expect(getPrompt).toHaveBeenCalledWith('cambridge_fce_p1_b2_transcribe');
   });
@@ -99,7 +112,7 @@ describe('FCE question round (P1 and P4)', () => {
       return produced.ok ? produced.data : { error: produced.code };
     });
     callGemini.mockResolvedValue({ ok: true, data: { text: '{"discussion_questions":["q1","q2","q3"]}' } });
-    const plan = await generateQuestionRoundPlan(FCE_DISCUSSION_CONFIG, 's1', 'u1', { TOPIC: 'Transport' });
+    const plan = await generateQuestionRoundPlan(FCE_DISCUSSION_CONFIG, 'u1', { TOPIC: 'Transport' });
 
     expect(plan).toEqual({ discussion_questions: ['q1', 'q2', 'q3'] });
     expect(getOrCreateCachedContent.mock.calls[0][0]).toMatchObject({ inputs: { TOPIC: 'Transport' } });
@@ -110,16 +123,17 @@ describe('FCE question round (P1 and P4)', () => {
 describe('FCE collaborative (P3)', () => {
   it('reads the evaluation prompt from the database and persists the graded result', async () => {
     callGemini.mockResolvedValue({ ok: true, data: { text: evalJson } });
-    const feedback = await evaluateCollaborative(
+    const result = await evaluateCollaborative(
       FCE_COLLABORATIVE_CONFIG,
       [{ role: 'user', text: 'I think the first idea is best.' }],
       scenario,
       's1',
     );
+    if (!result.ok) throw new Error(result.code);
 
     expect(getPrompt).toHaveBeenCalledWith('cambridge_fce_p3_b2_evaluation', expect.objectContaining({ TOPIC: 'Transport' }));
-    expect(feedback.score10).toBe(7);
-    expect(persistMessage.mock.calls[0][0].contentJson).toMatchObject({ score: 14, score_max: 20, is_final: true });
+    expect(result.data.feedback.score10).toBe(7);
+    expect(finishSession.mock.calls[0][0].evaluation).toMatchObject({ score: 14, score_max: 20 });
   });
 
   it('passes the turn number to the partner prompt and unwraps a JSON text reply', async () => {
@@ -132,7 +146,8 @@ describe('FCE collaborative (P3)', () => {
       's1',
     );
 
-    expect(result.examinerResponse).toBe('What about the second idea?');
+    if (!result.ok) throw new Error(result.code);
+    expect(result.data.examinerResponse).toBe('What about the second idea?');
     expect(getPrompt).toHaveBeenCalledWith('cambridge_fce_p3_b2_partner_turn', expect.objectContaining({ TURN_INDEX: '2' }));
   });
 
@@ -142,6 +157,17 @@ describe('FCE collaborative (P3)', () => {
       data: { text: '{"transcribed":"I prefer cheaper tickets","examiner_response":"Why is that?"}' },
     });
     const result = await chatCollaborativeAudio(FCE_COLLABORATIVE_CONFIG, 'b64', 'audio/webm', [], scenario, 's1');
-    expect(result).toEqual({ transcribed: 'I prefer cheaper tickets', examinerResponse: 'Why is that?' });
+    expect(result).toEqual({
+      ok: true,
+      data: { transcribed: 'I prefer cheaper tickets', examinerResponse: 'Why is that?', sessionId: 's1' },
+    });
+  });
+
+  it('creates the session on the first turn with scenario and opening, never before', async () => {
+    callGemini.mockResolvedValue({ ok: true, data: { text: '{"partner_turn":"Go on."}' } });
+    await chatCollaborativeText(FCE_COLLABORATIVE_CONFIG, 'hi', [{ role: 'examiner', text: 'open' }], scenario);
+    const opening = openSession.mock.calls[0][0];
+    expect(opening).toMatchObject({ mode: 'cambridge_fce_p3', sessionId: undefined, topic: 'Transport' });
+    expect(opening.opening.map((m: { msgType: string }) => m.msgType)).toEqual(['phrase', 'text']);
   });
 });

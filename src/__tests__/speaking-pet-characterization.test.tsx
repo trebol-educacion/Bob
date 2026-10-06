@@ -2,6 +2,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import '@testing-library/jest-dom/vitest';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import type { StoredMessage } from '@/actions/messages';
 
 vi.mock('server-only', () => ({}));
 vi.mock('@/components/practice/yl/_shared', () => ({ BobAvatar: () => <span data-testid="bob-avatar" /> }));
@@ -40,11 +41,6 @@ vi.mock('motion/react', async () => {
 
 vi.mock('@/components/chat/BobMascotLoader', () => ({
   BobMascotLoader: ({ message }: { message: string }) => <div>{message}</div>,
-}));
-
-const createSessionMock = vi.fn();
-vi.mock('@/actions/sessions', () => ({
-  createSessionAction: (...args: unknown[]) => createSessionMock(...args),
 }));
 
 vi.mock('@/lib/audio', () => ({ blobToBase64: async () => 'b64' }));
@@ -95,13 +91,11 @@ const p3Scenario = vi.fn();
 const p3Audio = vi.fn();
 const p3Text = vi.fn();
 const p3Evaluate = vi.fn();
-const p3Restore = vi.fn();
 vi.mock('@/actions/modes/part3', () => ({
   generatePart3ScenarioAction: (...args: unknown[]) => p3Scenario(...args),
   chatPart3Action: (...args: unknown[]) => p3Audio(...args),
   chatPart3TextAction: (...args: unknown[]) => p3Text(...args),
   evaluatePart3Action: (...args: unknown[]) => p3Evaluate(...args),
-  getB1SessionMessagesAction: (...args: unknown[]) => p3Restore(...args),
 }));
 
 import { PETInterviewPractice } from '@/components/PETInterviewPractice';
@@ -136,6 +130,13 @@ const discussionPlan = {
   closing: 'Bye',
 };
 
+const answered = (transcribed: string, reaction: string) => ({
+  ok: true as const,
+  data: { transcribed, reaction, sessionId: 'sess-1' },
+});
+
+const evaluated = { ok: true as const, data: { feedback, sessionId: 'sess-1' } };
+
 const audioBlob = () => new Blob(['x'.repeat(1024)], { type: 'audio/webm' });
 
 async function recordAnswer() {
@@ -152,7 +153,6 @@ beforeEach(() => {
   recorder.opts = null;
   recorder.start.mockResolvedValue(undefined);
   ttsStart.mockResolvedValue(undefined);
-  createSessionMock.mockResolvedValue({ data: { id: 'sess-1', user_id: 'user-1' } });
   URL.createObjectURL = vi.fn(() => 'blob:mock');
   URL.revokeObjectURL = vi.fn();
   Element.prototype.scrollIntoView = vi.fn();
@@ -161,24 +161,26 @@ beforeEach(() => {
 describe('PETInterviewPractice characterization (Speaking P1)', () => {
   beforeEach(() => {
     p1Generate.mockResolvedValue(interviewPlan);
-    p1Process.mockResolvedValue({ transcribed: 'my answer', reaction: '' });
-    p1Evaluate.mockResolvedValue(feedback);
+    p1Process.mockResolvedValue(answered('my answer', ''));
+    p1Evaluate.mockResolvedValue(evaluated);
   });
 
   it('boots the session and renders the first question', async () => {
     const { container } = render(<PETInterviewPractice onBack={vi.fn()} />);
     await screen.findByText('Q-phase1');
-    expect(createSessionMock).toHaveBeenCalledWith({ mode: 'cambridge_pet_p1', title: 'B1 Speaking, Part 1' });
-    expect(p1Generate).toHaveBeenCalledWith('sess-1', 'user-1');
+    expect(p1Generate).toHaveBeenCalledWith();
+    expect(p1Process).not.toHaveBeenCalled();
     expect(container.innerHTML).toMatchSnapshot();
   });
 
   it('review step then a full run sends each answer and evaluates the transcript', async () => {
-    p1Process.mockResolvedValueOnce({ transcribed: 'my answer', reaction: 'Nice!' });
+    p1Process.mockResolvedValueOnce(answered('my answer', 'Nice!'));
     const { container } = render(<PETInterviewPractice onBack={vi.fn()} />);
     fireEvent.click(await recordAnswer());
     expect(container.innerHTML).toMatchSnapshot();
-    await waitFor(() => expect(p1Process).toHaveBeenCalledWith('b64', 'audio/webm', 'Q-phase1', 'sess-1', 'user-1'));
+    await waitFor(() =>
+      expect(p1Process).toHaveBeenCalledWith('b64', 'audio/webm', 'Q-phase1', { sessionId: undefined, plan: interviewPlan }),
+    );
     await screen.findByText('Nice!');
     expect(ttsStart).toHaveBeenCalledWith('Nice!');
     expect(container.innerHTML).toMatchSnapshot();
@@ -189,8 +191,7 @@ describe('PETInterviewPractice characterization (Speaking P1)', () => {
     await screen.findByText('Interview complete!', undefined, { timeout: 3000 });
     expect(p1Evaluate).toHaveBeenCalledWith(
       interviewQuestions.map((question) => ({ question, answer: 'my answer' })),
-      'sess-1',
-      'user-1',
+      { sessionId: 'sess-1', plan: interviewPlan },
     );
     expect(container.innerHTML).toMatchSnapshot();
   }, 20000);
@@ -229,15 +230,14 @@ describe('PETInterviewPractice characterization (Speaking P1)', () => {
 describe('PETDiscussionPractice characterization (Speaking P4)', () => {
   beforeEach(() => {
     p4Generate.mockResolvedValue(discussionPlan);
-    p4Process.mockResolvedValue({ transcribed: 'my answer', reaction: '' });
-    p4Evaluate.mockResolvedValue(feedback);
+    p4Process.mockResolvedValue(answered('my answer', ''));
+    p4Evaluate.mockResolvedValue(evaluated);
   });
 
   it('boots the session and renders topic card plus first question', async () => {
     const { container } = render(<PETDiscussionPractice onBack={vi.fn()} />);
     await screen.findByText('D-one');
-    expect(createSessionMock).toHaveBeenCalledWith({ mode: 'cambridge_pet_p4', title: 'B1 Speaking, Part 4' });
-    expect(p4Generate).toHaveBeenCalledWith('sess-1', 'user-1');
+    expect(p4Generate).toHaveBeenCalledWith();
     expect(screen.getByText('Free time')).toBeInTheDocument();
     expect(container.innerHTML).toMatchSnapshot();
   });
@@ -245,7 +245,9 @@ describe('PETDiscussionPractice characterization (Speaking P4)', () => {
   it('full run sends answers, hides the topic card after the first question and evaluates', async () => {
     const { container } = render(<PETDiscussionPractice onBack={vi.fn()} />);
     fireEvent.click(await recordAnswer());
-    await waitFor(() => expect(p4Process).toHaveBeenCalledWith('b64', 'audio/webm', 'D-one', 'sess-1', 'user-1'));
+    await waitFor(() =>
+      expect(p4Process).toHaveBeenCalledWith('b64', 'audio/webm', 'D-one', { sessionId: undefined, plan: discussionPlan }),
+    );
     await screen.findByText('D-two', undefined, { timeout: 3000 });
     expect(screen.queryByText('Free time')).not.toBeInTheDocument();
     expect(container.innerHTML).toMatchSnapshot();
@@ -256,26 +258,27 @@ describe('PETDiscussionPractice characterization (Speaking P4)', () => {
         { question: 'D-one', answer: 'my answer' },
         { question: 'D-two', answer: 'my answer' },
       ],
-      'sess-1',
-      'user-1',
+      { sessionId: 'sess-1', plan: discussionPlan },
     );
     expect(container.innerHTML).toMatchSnapshot();
   }, 20000);
 
-  it('session creation failure shows the error screen', async () => {
-    createSessionMock.mockResolvedValueOnce({ error: 'no session' });
+  it('plan generation failure shows the error screen', async () => {
+    p4Generate.mockRejectedValueOnce(new Error('no plan'));
     const { container } = render(<PETDiscussionPractice onBack={vi.fn()} />);
-    await screen.findByText('no session');
+    await screen.findByText('no plan');
     expect(container.innerHTML).toMatchSnapshot();
   });
 });
 
 describe('B1CollaborativePractice characterization (Speaking P3)', () => {
   beforeEach(() => {
-    p3Audio.mockResolvedValue({ transcribed: 'Let us go and visit', examinerResponse: 'Why is that?' });
-    p3Text.mockResolvedValue({ examinerResponse: 'Interesting.' });
-    p3Evaluate.mockResolvedValue(feedback);
-    p3Restore.mockResolvedValue({ history: [], feedback: null });
+    p3Audio.mockResolvedValue({
+      ok: true,
+      data: { transcribed: 'Let us go and visit', examinerResponse: 'Why is that?', sessionId: 'sess-1' },
+    });
+    p3Text.mockResolvedValue({ ok: true, data: { examinerResponse: 'Interesting.', sessionId: 'sess-1' } });
+    p3Evaluate.mockResolvedValue({ ok: true, data: { feedback, sessionId: 'sess-1' } });
   });
 
   async function startWithFirstPreset() {
@@ -310,13 +313,10 @@ describe('B1CollaborativePractice characterization (Speaking P3)', () => {
     await waitFor(() => expect(screen.queryByText('Generated situation')).not.toBeInTheDocument());
   });
 
-  it('start creates the session, opens with the examiner line and speaks it', async () => {
+  it('start opens with the examiner line and speaks it without creating a session', async () => {
     const { container } = await startWithFirstPreset();
-    expect(createSessionMock).toHaveBeenCalledWith({
-      mode: 'cambridge_pet_p3',
-      topic: 'Planning a Class Trip',
-      title: 'B1 Collaborative: Planning a Class Trip',
-    });
+    expect(p3Audio).not.toHaveBeenCalled();
+    expect(p3Text).not.toHaveBeenCalled();
     const opening =
       'Let\'s talk about "Planning a Class Trip". Your class is planning a one-day trip. You need to decide which activities to include. Which activities would be most fun and educational for the class?';
     expect(ttsStart).toHaveBeenCalledWith(opening);
@@ -334,7 +334,7 @@ describe('B1CollaborativePractice characterization (Speaking P3)', () => {
       'audio/webm;codecs=opus',
       [expect.objectContaining({ role: 'examiner' })],
       expect.objectContaining({ topic: 'Planning a Class Trip' }),
-      'sess-1',
+      undefined,
     );
     expect(container.innerHTML).toMatchSnapshot();
     for (let turn = 0; turn < 3; turn += 1) {
@@ -364,22 +364,28 @@ describe('B1CollaborativePractice characterization (Speaking P3)', () => {
     expect(container.innerHTML).toMatchSnapshot();
   }, 20000);
 
-  it('restores a finished session from the persisted messages', async () => {
-    p3Restore.mockResolvedValue({
-      history: [
-        { role: 'examiner', text: 'Opening' },
-        { role: 'user', text: 'Answer' },
-      ],
-      feedback,
-    });
-    const { container } = render(<B1CollaborativePractice onBack={vi.fn()} sessionId="restored-1" />);
+  it('restores a finished session from the stored messages', async () => {
+    const scenario = {
+      topic: 'Planning a Class Trip',
+      situation: 'Your class is planning a trip.',
+      prompt_question: 'Which activities?',
+      options: ['a', 'b', 'c', 'd', 'e'],
+    };
+    const stored = [
+      { role: 'bob', msg_type: 'phrase', content_json: scenario },
+      { role: 'bob', msg_type: 'text', content_text: 'Opening' },
+      { role: 'user', msg_type: 'text', content_text: 'Answer' },
+      { role: 'bob', msg_type: 'evaluation', content_json: { ...feedback, is_final: true } },
+    ] as unknown as StoredMessage[];
+    const { container } = render(
+      <B1CollaborativePractice onBack={vi.fn()} sessionId="restored-1" initialMessages={stored} />,
+    );
     await screen.findByText('Great discussion, your ideas came through clearly!');
-    expect(p3Restore).toHaveBeenCalledWith('restored-1');
     expect(container.innerHTML).toMatchSnapshot();
   });
 
   it('evaluation failure still shows the fallback feedback', async () => {
-    p3Evaluate.mockRejectedValueOnce(new Error('fail'));
+    p3Evaluate.mockResolvedValueOnce({ ok: false, code: 'persist_failed', retryable: true });
     await startWithFirstPreset();
     for (let turn = 0; turn < 4; turn += 1) {
       fireEvent.click(screen.getByText('b1.collaborative.typeInstead'));

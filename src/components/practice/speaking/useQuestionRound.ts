@@ -1,16 +1,24 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { createSessionAction } from '@/actions/sessions';
 import { blobToBase64 } from '@/lib/audio';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
 import { useTTS } from '@/hooks/useTTS';
 import type { FormativeFeedback } from '@/lib/types/practice';
+import { restoreQuestionRound } from '@/lib/speaking/question-round-restore';
 import type { SpeakingQA } from '@/lib/speaking/types';
 import { RECORDING_MAX_SECONDS, REACTION_PAUSE_MS } from './speaking-theme';
-import type { QuestionRoundConfig, QuestionRoundStep } from './types';
+import type { QuestionRoundConfig, QuestionRoundSessionParams, QuestionRoundStep } from './types';
 
-export function useQuestionRound<TPlan>(config: QuestionRoundConfig<TPlan>) {
+const PLACEMENT_MESSAGE = 'Complete your level test first to unlock this activity.';
+const SAVE_MESSAGE = 'We could not save your answer. Please try again.';
+
+function describeFailure(code: string): string {
+  return code === 'placement_required' ? PLACEMENT_MESSAGE : SAVE_MESSAGE;
+}
+
+export function useQuestionRound<TPlan>(config: QuestionRoundConfig<TPlan>, params: QuestionRoundSessionParams = {}) {
+  const { sessionId: initialSessionId, initialMessages, onSessionCreated, onSessionFinished } = params;
   const [ready, setReady] = useState(false);
   const [plan, setPlan] = useState<TPlan | null>(null);
   const [questions, setQuestions] = useState<string[]>([]);
@@ -26,8 +34,9 @@ export function useQuestionRound<TPlan>(config: QuestionRoundConfig<TPlan>) {
   const [micDenied, setMicDenied] = useState(false);
   const [hearingQuestion, setHearingQuestion] = useState(false);
 
-  const sessionIdRef = useRef<string>('');
-  const userIdRef = useRef<string>('');
+  const sessionIdRef = useRef<string | undefined>(initialSessionId);
+  const restoreAttemptedRef = useRef(false);
+  const evaluationStartedRef = useRef(false);
   const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const recordedBlobRef = useRef<Blob | null>(null);
 
@@ -80,13 +89,15 @@ export function useQuestionRound<TPlan>(config: QuestionRoundConfig<TPlan>) {
     releasePlayback();
   }, [stopTimer, releasePlayback]);
 
+  const adoptSession = useCallback((sessionId: string | undefined) => {
+    if (!sessionId || sessionIdRef.current === sessionId) return;
+    sessionIdRef.current = sessionId;
+    onSessionCreated?.(sessionId);
+  }, [onSessionCreated]);
+
   const startSession = useCallback(async () => {
     try {
-      const sessionResult = await createSessionAction({ mode: config.mode, title: config.sessionTitle });
-      if (!sessionResult.data) throw new Error(sessionResult.error ?? 'Failed to create session');
-      sessionIdRef.current = sessionResult.data.id;
-      userIdRef.current = sessionResult.data.user_id;
-      const sessionPlan = await config.actions.generate(sessionIdRef.current, userIdRef.current);
+      const sessionPlan = await config.actions.generate();
       setPlan(sessionPlan);
       setQuestions(config.toQuestions(sessionPlan));
       setStep('answer');
@@ -97,8 +108,26 @@ export function useQuestionRound<TPlan>(config: QuestionRoundConfig<TPlan>) {
   }, [config]);
 
   useEffect(() => {
+    if (restoreAttemptedRef.current) return;
+    restoreAttemptedRef.current = true;
+    if (initialSessionId) {
+      const restored = initialMessages ? restoreQuestionRound(initialMessages, config.planSchema) : null;
+      if (!restored) {
+        setError('We could not reopen this session. Go back and start a new one.');
+        return;
+      }
+      const restoredQuestions = config.toQuestions(restored.plan);
+      setPlan(restored.plan);
+      setQuestions(restoredQuestions);
+      setQas(restored.qas);
+      setQuestionIndex(Math.min(restored.qas.length, Math.max(restoredQuestions.length - 1, 0)));
+      setEvaluation(restored.feedback);
+      setEvaluating(!restored.feedback && restored.qas.length >= restoredQuestions.length);
+      setReady(true);
+      return;
+    }
     void startSession();
-  }, [startSession]);
+  }, [initialSessionId, initialMessages, config, startSession]);
 
   const advanceToNext = useCallback(() => {
     const nextIndex = questionIndex + 1;
@@ -161,15 +190,15 @@ export function useQuestionRound<TPlan>(config: QuestionRoundConfig<TPlan>) {
       let reaction = '';
       if (blob && blob.size > 0) {
         const audioBase64 = await blobToBase64(blob);
-        const result = await actions.processAnswer(
-          audioBase64,
-          blob.type || 'audio/webm',
-          currentQuestion,
-          sessionIdRef.current,
-          userIdRef.current,
-        );
-        transcribed = result.transcribed;
-        reaction = result.reaction;
+        if (!plan) throw new Error('Session not ready');
+        const result = await actions.processAnswer(audioBase64, blob.type || 'audio/webm', currentQuestion, {
+          sessionId: sessionIdRef.current,
+          plan,
+        });
+        if (!result.ok) throw new Error(describeFailure(result.code));
+        adoptSession(result.data.sessionId);
+        transcribed = result.data.transcribed;
+        reaction = result.data.reaction;
       }
       setQas((prev) => [...prev, { question: currentQuestion, answer: transcribed }]);
       setCurrentReaction(reaction);
@@ -184,18 +213,23 @@ export function useQuestionRound<TPlan>(config: QuestionRoundConfig<TPlan>) {
   }
 
   useEffect(() => {
-    if (!evaluating) return;
+    if (!evaluating || evaluationStartedRef.current) return;
+    evaluationStartedRef.current = true;
     void (async () => {
       try {
-        const result = await actions.evaluate(qas, sessionIdRef.current, userIdRef.current);
-        setEvaluation(result);
+        if (!plan) throw new Error('Session not ready');
+        const result = await actions.evaluate(qas, { sessionId: sessionIdRef.current, plan });
+        if (!result.ok) throw new Error(describeFailure(result.code));
+        adoptSession(result.data.sessionId);
+        setEvaluation(result.data.feedback);
+        onSessionFinished?.();
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Evaluation failed');
       } finally {
         setEvaluating(false);
       }
     })();
-  }, [evaluating, qas, actions]);
+  }, [evaluating, qas, actions, plan, adoptSession, onSessionFinished]);
 
   function handleTryAgain() {
     stopTTS();
@@ -210,6 +244,8 @@ export function useQuestionRound<TPlan>(config: QuestionRoundConfig<TPlan>) {
     setError(null);
     setMicDenied(false);
     setCurrentReaction('');
+    sessionIdRef.current = undefined;
+    evaluationStartedRef.current = false;
     releasePlayback();
     void startSession();
   }

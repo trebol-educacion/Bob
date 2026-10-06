@@ -92,3 +92,16 @@ describe('finishSession', () => {
     expect(persistResultMock).not.toHaveBeenCalled();
   });
 });
+
+describe('openSession', () => {
+  it('persiste el opening solo si crea la sesión', async () => {
+    const opening = [{ role: 'bob' as const, msgType: 'phrase' as const, contentJson: { a: 1 } }];
+    const { openSession } = await import('@/lib/session/lifecycle');
+    const created = await openSession({ mode: 'cambridge_fce_p1', opening });
+    expect(created).toEqual({ ok: true, data: { sessionId: 's1', userId: 'u1' } });
+    expect(persistMessagesMock).toHaveBeenCalledTimes(1);
+    persistMessagesMock.mockClear();
+    await openSession({ mode: 'cambridge_fce_p1', sessionId: 's9', opening });
+    expect(persistMessagesMock).not.toHaveBeenCalled();
+  });
+});

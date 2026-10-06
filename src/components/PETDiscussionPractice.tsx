@@ -5,14 +5,16 @@ import {
   generatePETDiscussionAction,
   processPETDiscussionAnswerAction,
   evaluatePETDiscussionAction,
-  type PETDiscussionPlan,
 } from '@/actions/modes/pet-p4';
+import type { ActivityRenderProps } from '@/lib/routing';
+import { PETDiscussionPlanSchema, type PETDiscussionPlan } from '@/lib/speaking/pet-content';
 import { QuestionRoundPractice, type QuestionRoundConfig } from '@/components/practice/speaking';
 import { ACCENT_DARK, ACCENT_TINT } from '@/components/practice/speaking/speaking-theme';
 
-export interface PETDiscussionPracticeProps {
-  onBack: () => void;
-}
+export type PETDiscussionPracticeProps = Pick<
+  ActivityRenderProps,
+  'onBack' | 'sessionId' | 'initialMessages' | 'onSessionCreated' | 'onSessionFinished'
+>;
 
 function renderDiscussionTopic(plan: PETDiscussionPlan) {
   return (
@@ -25,8 +27,7 @@ function renderDiscussionTopic(plan: PETDiscussionPlan) {
 }
 
 const PET_DISCUSSION_CONFIG: QuestionRoundConfig<PETDiscussionPlan> = {
-  mode: 'cambridge_pet_p4',
-  sessionTitle: 'B1 Speaking, Part 4',
+  planSchema: PETDiscussionPlanSchema,
   headerTitle: 'Speaking · Part 4: Discussion',
   headerSubtitle: 'Cambridge B1 Preliminary',
   levelBadge: 'B1',
@@ -42,6 +43,6 @@ const PET_DISCUSSION_CONFIG: QuestionRoundConfig<PETDiscussionPlan> = {
   },
 };
 
-export function PETDiscussionPractice({ onBack }: PETDiscussionPracticeProps) {
-  return <QuestionRoundPractice config={PET_DISCUSSION_CONFIG} onBack={onBack} />;
+export function PETDiscussionPractice(props: PETDiscussionPracticeProps) {
+  return <QuestionRoundPractice config={PET_DISCUSSION_CONFIG} {...props} />;
 }

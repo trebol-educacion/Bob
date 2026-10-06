@@ -11,10 +11,10 @@ import type { CollaborativePracticeProps } from './types';
 
 const DEFAULT_SCOPE = 'b1.collaborative';
 
-export function CollaborativePractice({ config, onBack, sessionId }: CollaborativePracticeProps) {
+export function CollaborativePractice({ config, onBack, ...sessionParams }: CollaborativePracticeProps) {
   const t = useTranslations('cambridge');
   const translationScope = config.translationScope ?? DEFAULT_SCOPE;
-  const session = useCollaborativeSession(config, sessionId);
+  const session = useCollaborativeSession(config, sessionParams);
 
   if (session.phase === 'intro') {
     return (
