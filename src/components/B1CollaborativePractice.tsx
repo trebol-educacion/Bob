@@ -7,6 +7,7 @@ import {
   chatPart3TextAction,
   evaluatePart3Action,
 } from '@/actions/modes/part3';
+import { unwrapContent } from '@/lib/content/unwrap-content';
 import type { ActivityRenderProps } from '@/lib/routing';
 import type { Part3Scenario } from '@/lib/speaking/types';
 import {
@@ -65,7 +66,7 @@ const B1_COLLABORATIVE_CONFIG: CollaborativePracticeConfig = {
   maxTurns: 8,
   finishEarlyAfterTurns: 4,
   actions: {
-    generateScenario: generatePart3ScenarioAction,
+    generateScenario: async () => unwrapContent(await generatePart3ScenarioAction()),
     chatAudio: chatPart3Action,
     chatText: chatPart3TextAction,
     evaluate: evaluatePart3Action,

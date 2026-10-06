@@ -1,12 +1,14 @@
 'use server';
 
-import type { ActionResult } from '@/lib/result';
+import { fail, type ActionResult } from '@/lib/result';
+import { currentUserId } from '@/lib/session/lifecycle';
+import { PetCollaborativePlanSchema } from '@/lib/bank-plans/pet-p3';
+import { pickPetPlan } from '@/lib/speaking/pet-bank';
 import type { FormativeFeedback } from '@/lib/types/practice';
 import {
   chatCollaborativeAudio,
   chatCollaborativeText,
   evaluateCollaborative,
-  generateCollaborativeScenario,
   type CollaborativeConfig,
 } from '@/lib/speaking/collaborative';
 import type { Part3ChatMessage, Part3Scenario } from '@/lib/speaking/types';
@@ -25,8 +27,10 @@ const PET_P3_CONFIG: CollaborativeConfig = {
   logTag: 'B1',
 };
 
-export async function generatePart3ScenarioAction(): Promise<Part3Scenario> {
-  return generateCollaborativeScenario(PET_P3_CONFIG);
+export async function generatePart3ScenarioAction(): Promise<ActionResult<Part3Scenario>> {
+  const userId = await currentUserId();
+  if (!userId) return fail('unauthenticated');
+  return pickPetPlan({ schema: PetCollaborativePlanSchema, examPart: 'pet_p3', userId });
 }
 
 export async function chatPart3Action(

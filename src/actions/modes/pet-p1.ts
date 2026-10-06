@@ -1,11 +1,12 @@
 'use server';
 
 import { PETInterviewPlanSchema, type PETInterviewPlan } from '@/lib/speaking/pet-content';
-import type { ActionResult } from '@/lib/result';
+import { PET_INTERVIEW_PART } from '@/lib/speaking/pet-content';
+import { pickPetPlan } from '@/lib/speaking/pet-bank';
+import { fail, type ActionResult } from '@/lib/result';
 import { currentUserId } from '@/lib/session/lifecycle';
 import {
   evaluateQuestionRound,
-  generateQuestionRoundPlan,
   processQuestionRoundAnswer,
   type QuestionRoundConfig,
 } from '@/lib/speaking/question-round';
@@ -37,10 +38,10 @@ const PET_P1_CONFIG: QuestionRoundConfig<PETInterviewPlan> = {
   eventName: 'PETInterview',
 };
 
-export async function generatePETInterviewAction(): Promise<PETInterviewPlan> {
+export async function generatePETInterviewAction(): Promise<ActionResult<PETInterviewPlan>> {
   const userId = await currentUserId();
-  if (!userId) return PET_P1_CONFIG.planFallback;
-  return generateQuestionRoundPlan(PET_P1_CONFIG, userId);
+  if (!userId) return fail('unauthenticated');
+  return pickPetPlan({ schema: PETInterviewPlanSchema, examPart: PET_INTERVIEW_PART, userId });
 }
 
 export async function processPETInterviewAnswerAction(

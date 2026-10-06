@@ -6,6 +6,7 @@ import {
   processPETDiscussionAnswerAction,
   evaluatePETDiscussionAction,
 } from '@/actions/modes/pet-p4';
+import { unwrapContent } from '@/lib/content/unwrap-content';
 import type { ActivityRenderProps } from '@/lib/routing';
 import { PETDiscussionPlanSchema, type PETDiscussionPlan } from '@/lib/speaking/pet-content';
 import { QuestionRoundPractice, type QuestionRoundConfig } from '@/components/practice/speaking';
@@ -37,7 +38,7 @@ const PET_DISCUSSION_CONFIG: QuestionRoundConfig<PETDiscussionPlan> = {
   toQuestions: (plan) => [...plan.questions],
   renderPlanIntro: renderDiscussionTopic,
   actions: {
-    generate: generatePETDiscussionAction,
+    generate: async () => unwrapContent(await generatePETDiscussionAction()),
     processAnswer: processPETDiscussionAnswerAction,
     evaluate: evaluatePETDiscussionAction,
   },

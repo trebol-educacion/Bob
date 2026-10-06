@@ -20,6 +20,7 @@ import {
   type PETPictureDescriptionFeedback,
   type PictureDescriptionReferenceVocabulary,
 } from '@/actions/modes/pet-p2';
+import { ActivityLoadError } from '@/components/practice/ActivityLoadError';
 import type { StoredMessage } from '@/actions/messages';
 import { resolveActivityBoot } from '@/lib/activity/boot';
 
@@ -386,6 +387,8 @@ export function PETPictureDescriptionPractice({
     linkers: [],
   });
   const [imageUrl, setImageUrl] = useState('');
+  const [bankGroupId, setBankGroupId] = useState<string | undefined>(undefined);
+  const [loadErrorCode, setLoadErrorCode] = useState<string | null>(null);
   const [audioDuration, setAudioDuration] = useState(0);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [mimeType, setMimeType] = useState('audio/webm');
@@ -463,17 +466,18 @@ export function PETPictureDescriptionPractice({
       setIsNewSession(true);
       const result = await generatePETPictureDescriptionAction();
 
-      if ('error' in result) {
-        setErrorMsg(result.error);
+      if (!result.ok) {
+        setLoadErrorCode(result.code);
         return;
       }
 
-      setTopic(result.topic);
-      setFramingText(result.framingText);
-      setScenePrompt(result.scenePrompt);
-      setReferenceVocabulary(result.referenceVocabulary);
-      setLanguageBank(result.languageBank);
-      setImageUrl(result.imageUrl);
+      setTopic(result.data.topic);
+      setFramingText(result.data.framingText);
+      setScenePrompt(result.data.scenePrompt);
+      setReferenceVocabulary(result.data.referenceVocabulary);
+      setLanguageBank(result.data.languageBank);
+      setImageUrl(result.data.imageUrl);
+      setBankGroupId(result.data.bankGroupId);
       setPhase('instructions');
     }
 
@@ -496,7 +500,7 @@ export function PETPictureDescriptionPractice({
   async function handleEvaluate(blob: Blob, mime: string, duration: number) {
     const result = await evaluatePETPictureDescriptionAction({
       sessionId,
-      plan: { topic, framingText, scenePrompt, referenceVocabulary, languageBank, imageUrl },
+      plan: { topic, framingText, scenePrompt, referenceVocabulary, languageBank, imageUrl, bankGroupId },
       audioBlob: blob,
       mimeType: mime,
       audioDuration: duration,
@@ -525,6 +529,8 @@ export function PETPictureDescriptionPractice({
   const coverageHits = feedback
     ? Object.values(feedback.coverage).filter(Boolean).length
     : 0;
+
+  if (loadErrorCode) return <ActivityLoadError code={loadErrorCode} onBack={onBack} />;
 
   if (errorMsg) {
     return (

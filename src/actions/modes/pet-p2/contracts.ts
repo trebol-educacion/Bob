@@ -47,6 +47,7 @@ export interface PETPictureDescriptionResult {
   referenceVocabulary: PictureDescriptionReferenceVocabulary;
   languageBank: PictureDescriptionLanguageBank;
   imageUrl: string;
+  bankGroupId?: string;
 }
 
 const RubricSchema = z

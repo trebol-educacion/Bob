@@ -6,6 +6,7 @@ import {
   processPETInterviewAnswerAction,
   evaluatePETInterviewAction,
 } from '@/actions/modes/pet-p1';
+import { unwrapContent } from '@/lib/content/unwrap-content';
 import type { ActivityRenderProps } from '@/lib/routing';
 import { PETInterviewPlanSchema, type PETInterviewPlan } from '@/lib/speaking/pet-content';
 import { QuestionRoundPractice, type QuestionRoundConfig } from '@/components/practice/speaking';
@@ -35,7 +36,7 @@ const PET_INTERVIEW_CONFIG: QuestionRoundConfig<PETInterviewPlan> = {
   completeSubtitle: 'Cambridge B1 · Part 1',
   toQuestions: petInterviewQuestions,
   actions: {
-    generate: generatePETInterviewAction,
+    generate: async () => unwrapContent(await generatePETInterviewAction()),
     processAnswer: processPETInterviewAnswerAction,
     evaluate: evaluatePETInterviewAction,
   },

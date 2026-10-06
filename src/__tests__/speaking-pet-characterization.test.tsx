@@ -160,7 +160,7 @@ beforeEach(() => {
 
 describe('PETInterviewPractice characterization (Speaking P1)', () => {
   beforeEach(() => {
-    p1Generate.mockResolvedValue(interviewPlan);
+    p1Generate.mockResolvedValue({ ok: true, data: interviewPlan });
     p1Process.mockResolvedValue(answered('my answer', ''));
     p1Evaluate.mockResolvedValue(evaluated);
   });
@@ -229,7 +229,7 @@ describe('PETInterviewPractice characterization (Speaking P1)', () => {
 
 describe('PETDiscussionPractice characterization (Speaking P4)', () => {
   beforeEach(() => {
-    p4Generate.mockResolvedValue(discussionPlan);
+    p4Generate.mockResolvedValue({ ok: true, data: discussionPlan });
     p4Process.mockResolvedValue(answered('my answer', ''));
     p4Evaluate.mockResolvedValue(evaluated);
   });
@@ -264,9 +264,9 @@ describe('PETDiscussionPractice characterization (Speaking P4)', () => {
   }, 20000);
 
   it('plan generation failure shows the error screen', async () => {
-    p4Generate.mockRejectedValueOnce(new Error('no plan'));
+    p4Generate.mockResolvedValueOnce({ ok: false, code: 'no_content', retryable: false });
     const { container } = render(<PETDiscussionPractice onBack={vi.fn()} />);
-    await screen.findByText('no plan');
+    await screen.findByText('There are no exercises available for this part yet. Go back and try another activity.');
     expect(container.innerHTML).toMatchSnapshot();
   });
 });
@@ -299,16 +299,19 @@ describe('B1CollaborativePractice characterization (Speaking P3)', () => {
 
   it('surprise me uses the generated scenario and falls back to a preset on failure', async () => {
     p3Scenario.mockResolvedValueOnce({
-      topic: 'Generated topic',
-      situation: 'Generated situation',
-      prompt_question: 'Generated question?',
-      options: ['a', 'b', 'c', 'd', 'e'],
+      ok: true,
+      data: {
+        topic: 'Generated topic',
+        situation: 'Generated situation',
+        prompt_question: 'Generated question?',
+        options: ['a', 'b', 'c', 'd', 'e'],
+      },
     });
     render(<B1CollaborativePractice onBack={vi.fn()} />);
     fireEvent.click(screen.getByText('b1.collaborative.surpriseMe'));
     await screen.findByText('Generated situation');
     expect(p3Scenario).toHaveBeenCalledWith();
-    p3Scenario.mockRejectedValueOnce(new Error('fail'));
+    p3Scenario.mockResolvedValueOnce({ ok: false, code: 'no_content', retryable: false });
     fireEvent.click(screen.getByText('b1.collaborative.surpriseMe'));
     await waitFor(() => expect(screen.queryByText('Generated situation')).not.toBeInTheDocument());
   });

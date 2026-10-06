@@ -41,6 +41,8 @@ export type Part3Scenario = {
   situation: string;
   prompt_question: string;
   options: string[];
+  exam_part?: string;
+  bank_group_id?: string;
 };
 
 export type Part3ChatMessage = {

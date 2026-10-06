@@ -7,6 +7,7 @@ import { currentUserId } from '@/lib/session/lifecycle';
 import { MODELS } from '@/lib/models';
 import { validateRecordedAudio } from '@/lib/audio-guard';
 import { EvaluationSchema, type PETPictureDescriptionFeedback, type PETPictureDescriptionResult } from './contracts';
+import { bankStamp } from '@/lib/item-bank/plan-bank';
 import { safeParse } from './shared';
 
 export async function evaluatePETPictureDescriptionAction(input: {
@@ -124,6 +125,7 @@ export async function evaluatePETPictureDescriptionAction(input: {
   const completed = await completeActivity({
     mode: 'cambridge_pet_p2',
     sessionId: input.sessionId,
+    bank: bankStamp('pet_p2', plan.bankGroupId),
     plan: {
       kind: 'picture_description_plan',
       topic: plan.topic,
