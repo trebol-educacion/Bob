@@ -3,11 +3,11 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import { isActiveTick, clampSeconds, HEARTBEAT_INTERVAL_MS } from '@/lib/usage/heartbeat';
 
-vi.mock('@/actions/usage', () => ({
-  trackUsageAction: vi.fn().mockResolvedValue({ ok: true }),
+vi.mock('@/lib/usage/send-usage', () => ({
+  sendUsage: vi.fn(),
 }));
 
-import { trackUsageAction } from '@/actions/usage';
+import { sendUsage } from '@/lib/usage/send-usage';
 import { useUsageHeartbeat } from '@/hooks/useUsageHeartbeat';
 
 function setVisibility(state: DocumentVisibilityState) {
@@ -21,17 +21,17 @@ describe('isActiveTick / clampSeconds — pure', () => {
     expect(isActiveTick({ visible: true, lastInteractionAt: 0, now: 3 * 60_000 })).toBe(false);
   });
 
-  it('clamps seconds between 0 and 60', () => {
+  it('clamps seconds between 0 and 150', () => {
     expect(clampSeconds(-5)).toBe(0);
     expect(clampSeconds(30)).toBe(30);
-    expect(clampSeconds(500)).toBe(60);
+    expect(clampSeconds(500)).toBe(150);
   });
 });
 
 describe('useUsageHeartbeat', () => {
   beforeEach(() => {
     vi.useFakeTimers();
-    vi.mocked(trackUsageAction).mockClear();
+    vi.mocked(sendUsage).mockClear();
     setVisibility('visible');
   });
 
@@ -45,7 +45,7 @@ describe('useUsageHeartbeat', () => {
     window.dispatchEvent(new Event('keydown'));
     await vi.advanceTimersByTimeAsync(HEARTBEAT_INTERVAL_MS);
 
-    expect(trackUsageAction).toHaveBeenCalledWith('cambridge_ket_reading', 30);
+    expect(sendUsage).toHaveBeenCalledWith('cambridge_ket_reading', 120);
     unmount();
   });
 
@@ -55,7 +55,7 @@ describe('useUsageHeartbeat', () => {
 
     await vi.advanceTimersByTimeAsync(HEARTBEAT_INTERVAL_MS);
 
-    expect(trackUsageAction).not.toHaveBeenCalled();
+    expect(sendUsage).not.toHaveBeenCalled();
   });
 
   it('does not send after more than 2 minutes without interaction', async () => {
@@ -63,17 +63,29 @@ describe('useUsageHeartbeat', () => {
 
     await vi.advanceTimersByTimeAsync(3 * 60_000);
 
-    expect(trackUsageAction).not.toHaveBeenCalled();
+    expect(sendUsage).not.toHaveBeenCalled();
   });
 
-  it('caps a single tick at 60 seconds', () => {
+  it('ticks every 120 seconds, not more often', async () => {
+    renderHook(() => useUsageHeartbeat('cambridge_ket_reading'));
+    window.dispatchEvent(new Event('keydown'));
+
+    await vi.advanceTimersByTimeAsync(HEARTBEAT_INTERVAL_MS - 1000);
+    expect(sendUsage).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(sendUsage).toHaveBeenCalledTimes(1);
+    expect(HEARTBEAT_INTERVAL_MS).toBe(120_000);
+  });
+
+  it('caps a single tick at 150 seconds', () => {
     renderHook(() => useUsageHeartbeat('cambridge_ket_reading'));
 
+    vi.setSystemTime(Date.now() + 170_000);
     window.dispatchEvent(new Event('keydown'));
-    vi.setSystemTime(Date.now() + 90_000);
     window.dispatchEvent(new Event('pagehide'));
 
-    expect(trackUsageAction).toHaveBeenCalledWith('cambridge_ket_reading', 60);
+    expect(sendUsage).toHaveBeenCalledWith('cambridge_ket_reading', 150);
   });
 
   it('does nothing when there is no active mode', async () => {
@@ -81,6 +93,6 @@ describe('useUsageHeartbeat', () => {
 
     await vi.advanceTimersByTimeAsync(HEARTBEAT_INTERVAL_MS);
 
-    expect(trackUsageAction).not.toHaveBeenCalled();
+    expect(sendUsage).not.toHaveBeenCalled();
   });
 });
