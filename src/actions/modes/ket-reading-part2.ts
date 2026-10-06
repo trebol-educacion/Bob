@@ -1,38 +1,17 @@
 'use server';
 
-import { z } from 'zod';
 import { getPrompt } from '@/lib/prompts/db-prompts';
-import { callGemini, isOk } from '@/lib/gemini-client';
+import { pickPlan, bankStamp } from '@/lib/item-bank/plan-bank';
+import { fail, ok, type ActionResult } from '@/lib/result';
+import { KetMatchPlanSchema, type KetMatchPlan } from '@/lib/bank-plans/ket-reading-part2';
 import { currentUserId } from '@/lib/session/lifecycle';
 import { completeActivity } from '@/lib/session/complete';
-import { MODELS } from '@/lib/models';
-import { stripDashes } from '@/lib/text';
 
-const TextSchema = z.object({
-  label: z.enum(['A', 'B', 'C']),
-  author: z.string(),
-  text: z.string(),
-});
+export type ReadingText = KetMatchPlan['texts'][number];
+export type MatchQuestion = KetMatchPlan['questions'][number];
 
-const QuestionSchema = z.object({
-  number: z.number().int().min(1).max(6),
-  text: z.string(),
-  answer: z.enum(['A', 'B', 'C']),
-});
-
-const GenerationSchema = z.object({
-  topic: z.string(),
-  texts: z.array(TextSchema).length(3),
-  questions: z.array(QuestionSchema).length(6),
-});
-
-export type ReadingText = z.infer<typeof TextSchema>;
-export type MatchQuestion = z.infer<typeof QuestionSchema>;
-
-export interface MatchExercise {
-  topic: string;
-  texts: ReadingText[];
-  questions: MatchQuestion[];
+export interface MatchExercise extends KetMatchPlan {
+  bank_group_id?: string;
 }
 
 export interface MatchResult {
@@ -54,47 +33,24 @@ export interface MatchSubmitResult {
   question_results: QuestionResult[];
 }
 
-function safeParse<T>(schema: z.ZodType<T>, raw: string): T | null {
-  try { return schema.parse(JSON.parse(raw)); } catch { return null; }
-}
+const FRAMING_FALLBACK = 'Read the three texts. Then match each question to the correct person, A, B or C.';
 
-export async function generateKETMatchQuestionAction(): Promise<MatchResult | { error: string }> {
-  const userId = (await currentUserId()) ?? undefined;
-  if (!userId) return { error: 'Not authenticated' };
+export async function generateKETMatchQuestionAction(): Promise<ActionResult<MatchResult>> {
+  const userId = await currentUserId();
+  if (!userId) return fail('unauthenticated');
 
-  const [generationPrompt, framingText] = await Promise.all([
-    getPrompt('cambridge_ket_reading_part2_a2_generation').catch(() => null),
-    getPrompt('cambridge_ket_reading_part2_a2_framing').catch(() => 'Read the three texts. Then match each question to the correct person, A, B or C.'),
-  ]);
+  const picked = await pickPlan({
+    exam: 'ket',
+    cefr: 'a2',
+    examPart: 'ket_reading_part2',
+    skill: 'reading',
+    schema: KetMatchPlanSchema,
+    userId,
+  });
+  if (!picked.ok) return picked;
 
-  if (!generationPrompt) return { error: 'Could not load generation prompt' };
-
-  let parsed: z.infer<typeof GenerationSchema> | null = null;
-  for (let attempt = 0; attempt < 3 && !parsed; attempt += 1) {
-    const geminiResult = await callGemini(
-      { promptKey: 'cambridge_ket_reading_part2_a2_generation', model: MODELS.FLASH_LITE, userId },
-      (ai) => ai.models.generateContent({
-        model: MODELS.FLASH_LITE,
-        contents: [{ role: 'user', parts: [{ text: generationPrompt }] }],
-        config: { responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
-      })
-    );
-    if (!isOk(geminiResult)) continue;
-    const rawText = geminiResult.data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
-    parsed = safeParse(GenerationSchema, rawText);
-  }
-
-  if (!parsed) return { error: 'Unexpected model response' };
-
-  const exercise: MatchExercise = {
-    topic: parsed.topic,
-    texts: parsed.texts.map((t) => ({ ...t, author: stripDashes(t.author), text: stripDashes(t.text) })),
-    questions: parsed.questions.map((q) => ({ ...q, text: stripDashes(q.text) })),
-  };
-
-  const cleanFramingText = stripDashes(framingText);
-
-  return { framing_text: cleanFramingText, exercise };
+  const framingText = await getPrompt('cambridge_ket_reading_part2_a2_framing').catch(() => FRAMING_FALLBACK);
+  return ok({ framing_text: framingText, exercise: { ...picked.data.plan, bank_group_id: picked.data.groupId } });
 }
 
 export async function submitKETMatchQuestionAction(input: {
@@ -113,6 +69,7 @@ export async function submitKETMatchQuestionAction(input: {
   const completed = await completeActivity({
     mode: 'cambridge_ket_reading_part2',
     sessionId: input.sessionId,
+    bank: bankStamp('ket_reading_part2', input.exercise.bank_group_id),
     plan: { kind: 'reading_match_plan', framing_text: input.framing_text, exercise: input.exercise },
     answers: question_results.map((r) => ({ kind: 'reading_match_answer', question_number: r.number, chosen: r.chosen, is_correct: r.is_correct })),
     evaluation: { kind: 'reading_match_evaluation', score: correct_count, score_max: input.exercise.questions.length, question_results, is_final: true },

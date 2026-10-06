@@ -29,6 +29,7 @@ import {
 } from '@/actions/modes/ket-reading-part2';
 import type { StoredMessage } from '@/actions/messages';
 import { resolveActivityBoot } from '@/lib/activity/boot';
+import { ActivityLoadError } from '@/components/practice/ActivityLoadError';
 import { restoreExercise } from '@/lib/ket/restore-plan';
 
 const ACCENT = '#469E7B';
@@ -346,6 +347,7 @@ export function KETMatchQuestionPractice({
   const [results, setResults] = useState<QuestionResult[]>([]);
   const [correctCount, setCorrectCount] = useState(0);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [loadErrorCode, setLoadErrorCode] = useState<string | null>(null);
   const [isNewSession, setIsNewSession] = useState(false);
   const [draggingLabel, setDraggingLabel] = useState<TextLabel | null>(null);
   const initRef = useRef(false);
@@ -371,8 +373,8 @@ export function KETMatchQuestionPractice({
       if (boot.kind === 'restore-failed') { setErrorMsg('Could not restore session. Please start a new one.'); return; }
       setIsNewSession(true); setPhase('generating');
       const result = await generateKETMatchQuestionAction();
-      if ('error' in result) { setErrorMsg(result.error); return; }
-      setExercise(result.exercise); setFramingText(result.framing_text); setPhase('ready');
+      if (!result.ok) { setLoadErrorCode(result.code); return; }
+      setExercise(result.data.exercise); setFramingText(result.data.framing_text); setPhase('ready');
     }
     void init();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -459,6 +461,8 @@ export function KETMatchQuestionPractice({
   const total = exercise ? exercise.questions.length : 0;
   const allAnswered = exercise ? answeredCount === total : false;
   const progressPct = total > 0 ? (answeredCount / total) * 100 : 0;
+
+  if (loadErrorCode) return <ActivityLoadError code={loadErrorCode} onBack={onBack} />;
 
   if (errorMsg) return (
     <div className="flex flex-col items-center justify-center gap-4 p-8 text-center min-h-[40vh]">

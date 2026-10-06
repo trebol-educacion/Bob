@@ -1,5 +1,6 @@
 import { ensureSession, finishSession, recordTurn, type TurnMessage } from '@/lib/session/lifecycle';
 import { ok, type ActionResult } from '@/lib/result';
+import type { BankStamp } from '@/lib/item-bank/plan-bank';
 
 export interface CompletedActivity {
   sessionId: string;
@@ -10,6 +11,7 @@ export interface CompletedActivity {
  * @param input.mode - session mode key
  * @param input.sessionId - existing session; none creates the row on this first turn
  * @param input.plan - exercise payload persisted only when the session is created here
+ * @param input.bank - bank group stamp merged into the persisted plan
  * @param input.answers - student answers persisted as user turns
  * @param input.answerTexts - free-text student turns persisted with their text
  * @param input.evaluation - final evaluation payload
@@ -20,6 +22,7 @@ export async function completeActivity(input: {
   sessionId?: string | null;
   topic?: string | null;
   plan: object | null;
+  bank?: BankStamp;
   answers: Array<Record<string, unknown>>;
   answerTexts?: Array<{ contentText: string; contentJson: Record<string, unknown> | null }>;
   evaluation: Record<string, unknown>;
@@ -30,7 +33,7 @@ export async function completeActivity(input: {
 
   const messages: TurnMessage[] = [];
   if (session.data.created && input.plan) {
-    messages.push({ role: 'bob', msgType: 'text', contentText: null, contentJson: input.plan as Record<string, unknown> });
+    messages.push({ role: 'bob', msgType: 'text', contentText: null, contentJson: { ...(input.plan as Record<string, unknown>), ...(input.bank ?? {}) } });
   }
   for (const answer of input.answers) {
     messages.push({ role: 'user', msgType: 'text', contentText: null, contentJson: answer });

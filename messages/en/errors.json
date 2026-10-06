@@ -4,5 +4,8 @@
   "couldNotLoadItems": "Could not load items. Please try again.",
   "noItemsAvailable": "No items available yet. Please check back soon.",
   "failedCreateSession": "Failed to create session",
-  "retry": "Try again"
+  "retry": "Try again",
+  "activityNoContent": "There are no exercises available for this activity yet. Go back and try another one.",
+  "activityLoadFailed": "We could not load this exercise. Go back or try again.",
+  "activityBack": "Back"
 }

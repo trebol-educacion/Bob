@@ -11,6 +11,10 @@ vi.mock('@/actions/sessions', () => ({ createSessionAction: (...a: unknown[]) =>
 vi.mock('@/lib/prompts/db-prompts', () => ({ getPrompt: vi.fn(async () => 'prompt') }));
 vi.mock('@/lib/gemini-client', () => ({ callGemini: vi.fn(async () => ({ ok: false })), isOk: () => false }));
 vi.mock('@/actions/modes/yl', () => ({ generateYLImagesParallelAction: vi.fn() }));
+vi.mock('@/lib/item-bank/plan-bank', async (original) => ({
+  ...(await original<typeof import('@/lib/item-bank/plan-bank')>()),
+  pickPlan: async () => ({ ok: false, code: 'no_content', retryable: false }),
+}));
 
 import { generateKETSignsAndNoticesAction, submitKETSignsAnswersAction } from '@/actions/modes/ket-reading-part1';
 import { generateKETMatchQuestionAction, submitKETMatchQuestionAction } from '@/actions/modes/ket-reading-part2';
