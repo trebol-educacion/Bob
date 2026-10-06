@@ -1,36 +1,29 @@
 'use server';
 
-import { pickContent } from '@/lib/item-bank/content-source';
+import { pickPlan } from '@/lib/item-bank/plan-bank';
+import { ToeflChooseResponsePlanSchema } from '@/lib/bank-plans/toefl-choose-response';
+import { CHOOSE_RESPONSE_PART, toClosedItems } from '@/lib/toefl/choose-response-bank';
+import { currentUserId } from '@/lib/session/lifecycle';
+import { fail, ok, type ActionResult } from '@/lib/result';
 import type { ClosedItem } from '@/lib/types/practice';
 
-interface GetClosedItemsInput {
-  framework: string;
-  exam_part: string;
-  cefr_level: string | null;
+export interface ChooseResponseSet {
+  items: ClosedItem[];
+  bankGroupId: string;
 }
 
-/** Fetches closed-comprehension items from bob_closed_items for the given context. */
-export async function getClosedItemsAction(
-  input: GetClosedItemsInput
-): Promise<{ items: ClosedItem[] } | { error: string }> {
-  try {
-    const picked = await pickContent({
-      framework: 'toefl',
-      cefr: input.cefr_level,
-      examPart: input.exam_part,
-      purpose: 'practice',
-      skill: 'listening',
-    });
-    if (!picked.ok) {
-      return { error: picked.code };
-    }
-
-    const items: ClosedItem[] = picked.data.items;
-
-    return { items };
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'Unknown error';
-    console.error('[getClosedItemsAction] Unexpected error:', message);
-    return { error: message };
-  }
+/** Reads one pregenerated Listen and Choose a Response set with MP3 audio from the bank; no model or TTS call. */
+export async function getClosedItemsAction(): Promise<ActionResult<ChooseResponseSet>> {
+  const userId = await currentUserId();
+  if (!userId) return fail('unauthenticated');
+  const picked = await pickPlan({
+    exam: 'toefl',
+    cefr: 'b1',
+    examPart: CHOOSE_RESPONSE_PART,
+    skill: 'listening',
+    schema: ToeflChooseResponsePlanSchema,
+    userId,
+  });
+  if (!picked.ok) return picked;
+  return ok({ items: toClosedItems(picked.data.plan, picked.data.groupId), bankGroupId: picked.data.groupId });
 }

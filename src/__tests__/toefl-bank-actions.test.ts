@@ -26,6 +26,7 @@ vi.mock('@/lib/session/complete', () => ({ completeActivity: vi.fn() }));
 
 import { generateToeflRepeatSessionAction } from '@/actions/modes/toefl_repeat';
 import { generateToeflInterviewAction } from '@/actions/modes/toefl_interview';
+import { getClosedItemsAction } from '@/actions/modes/listen-choose-response';
 import { getBuildSentenceItemsAction } from '@/actions/modes/writing-build-sentence';
 import { getEmailTaskAction } from '@/actions/modes/writing-email';
 import { getAcademicTaskAction } from '@/actions/modes/writing-academic';
@@ -161,5 +162,36 @@ describe('TOEFL writing activities open from the bank', () => {
       { role: 'bob', msg_type: 'evaluation', content_json: { is_final: true, understood: true, highlights: [], suggestions: [], indicators: { word_count: 1 } } },
     ]);
     expect(restored).toMatchObject({ instructions: 'write', task: EMAIL_PLAN, text: 'hello' });
+  });
+});
+
+const CHOOSE_PLAN = {
+  items: Array.from({ length: 8 }, (_, i) => ({
+    speaker: i % 2 ? 'Man' : 'Woman',
+    utterance: `Utterance ${i}?`,
+    options: ['A', 'B', 'C', 'D'].map((key) => ({ key, label: `Reply ${key}` })),
+    correct_key: 'B',
+    explanation: 'Because.',
+    audio_url: `https://x/lcr-${i}.mp3`,
+  })),
+};
+
+describe('TOEFL Listen and Choose a Response opens from the bank', () => {
+  it('returns closed items with MP3 URLs, stable ids and no Gemini or TTS', async () => {
+    pickContent.mockResolvedValue(groupOf(CHOOSE_PLAN));
+    const result = await getClosedItemsAction();
+    expect(result).toMatchObject({ ok: true, data: { bankGroupId: 'g1' } });
+    if (result.ok) {
+      expect(result.data.items).toHaveLength(8);
+      expect(result.data.items[0]).toMatchObject({ variant_id: 'g1-q1', stimulus_audio_url: 'https://x/lcr-0.mp3', correct_key: 'B', exam_part: 'listen_choose_response' });
+    }
+    expect(pickContent).toHaveBeenCalledWith(expect.objectContaining({ examPart: 'listen_choose_response', skill: 'listening' }));
+    expect(callGemini).not.toHaveBeenCalled();
+    expect(generateSpeech).not.toHaveBeenCalled();
+  });
+
+  it('returns no_content with an empty bank', async () => {
+    pickContent.mockResolvedValue({ ok: false, code: 'no_content', retryable: false });
+    expect(await getClosedItemsAction()).toMatchObject({ ok: false, code: 'no_content' });
   });
 });
