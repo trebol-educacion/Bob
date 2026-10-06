@@ -1,110 +1,73 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { BobMascotLoader } from '@/components/chat/BobMascotLoader';
 import { KETSpeakingPractice } from './KETSpeakingPractice';
 import {
   generateKETHobbyTalkPlanAction,
   generateKETHobbyTalkMediaAction,
   evaluateKETHobbyTalkAction,
-  type HobbyTalkPlan,
   type HobbyTalkMedia,
 } from '@/actions/modes/ket-speaking-part2';
-import type { StoredMessage } from '@/actions/messages';
+import type { ActivityRenderProps } from '@/lib/routing';
+import {
+  HOBBY_PLAN_KIND,
+  HobbyPlanSchema,
+  KET_AUDIO_MIME,
+  restoreKetSpeaking,
+  type HobbyPlan,
+} from '@/lib/speaking/ket-speaking';
 
-export interface KETHobbyTalkPracticeProps {
-  onBack: () => void;
-  sessionId?: string;
-  initialMessages?: StoredMessage[];
-  onSessionCreated?: (sessionId: string) => void;
-  onSessionFinished?: () => void;
-  onOpenDashboard?: () => void;
-}
-
-interface RestoredPlan {
-  hobby: string;
-  instruction: string;
-  bullet_points: string[];
-  image_prompt: string;
-  image_url: string;
-}
-
-function tryRestore(messages: StoredMessage[]): RestoredPlan | null {
-  for (const msg of messages) {
-    const cj = msg.content_json as Record<string, unknown> | null;
-    if (cj?.kind === 'hobby_talk_prompt') {
-      return {
-        hobby: String(cj.hobby ?? ''),
-        instruction: String(cj.instruction ?? ''),
-        bullet_points: (cj.bullet_points as string[]) ?? [],
-        image_prompt: String(cj.image_prompt ?? ''),
-        image_url: String(cj.image_url ?? ''),
-      };
-    }
-  }
-  return null;
-}
+export type KETHobbyTalkPracticeProps = ActivityRenderProps;
 
 const EMPTY_MEDIA: HobbyTalkMedia = {
   instruction_audio_b64: '',
-  instruction_audio_mime: 'audio/L16;codec=pcm;rate=24000',
+  instruction_audio_mime: KET_AUDIO_MIME,
   image_url: '',
 };
 
-/** KET Speaking Part 2, Talk About a Hobby (two-phase loading). */
 export function KETHobbyTalkPractice({
   onBack, sessionId: initialSessionId, initialMessages, onSessionCreated, onSessionFinished, onOpenDashboard,
 }: KETHobbyTalkPracticeProps) {
-  const [loading, setLoading] = useState(true);
-  const [plan, setPlan] = useState<HobbyTalkPlan | null>(null);
-  const [media, setMedia] = useState<HobbyTalkMedia>(EMPTY_MEDIA);
+  const [restored] = useState(() =>
+    initialMessages?.length ? restoreKetSpeaking(initialMessages, HOBBY_PLAN_KIND, HobbyPlanSchema) : null,
+  );
+  const [plan, setPlan] = useState<HobbyPlan | null>(restored?.plan ?? null);
+  const [sessionId, setSessionId] = useState(initialSessionId);
+  const [media, setMedia] = useState<HobbyTalkMedia>(
+    restored?.plan.image_url ? { ...EMPTY_MEDIA, image_url: restored.plan.image_url } : EMPTY_MEDIA,
+  );
   const [mediaLoading, setMediaLoading] = useState(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(initialSessionId && !restored ? 'Could not reopen this session.' : null);
   const initRef = useRef(false);
 
-  async function loadMedia(p: HobbyTalkPlan) {
+  const loadMedia = useCallback(async (p: HobbyPlan) => {
     setMediaLoading(true);
-    const m = await generateKETHobbyTalkMediaAction({
+    const loaded = await generateKETHobbyTalkMediaAction({
       instruction: p.instruction,
       image_prompt: p.image_prompt,
-      sessionId: p.sessionId,
     }).catch(() => EMPTY_MEDIA);
-    setMedia(m);
+    setMedia(loaded);
     setMediaLoading(false);
-  }
+  }, []);
 
   useEffect(() => {
     if (initRef.current) return;
     initRef.current = true;
 
     async function init() {
-      if (initialMessages?.length) {
-        const r = tryRestore(initialMessages);
-        if (r) {
-          const { createSupabaseBrowser } = await import('@/lib/supabase/browser-client');
-          const { data: { user } } = await createSupabaseBrowser().auth.getUser();
-          const p: HobbyTalkPlan = {
-            sessionId: initialSessionId ?? '', userId: user?.id ?? '',
-            hobby: r.hobby, instruction: r.instruction, bullet_points: r.bullet_points, image_prompt: r.image_prompt,
-          };
-          setPlan(p);
-          if (r.image_url) setMedia({ instruction_audio_b64: '', instruction_audio_mime: 'audio/L16;codec=pcm;rate=24000', image_url: r.image_url });
-          else if (initialSessionId) void loadMedia(p);
-          setLoading(false);
-          return;
-        }
+      if (restored) {
+        if (!restored.feedback && !restored.plan.image_url) await loadMedia(restored.plan);
+        return;
       }
-      if (initialSessionId) { setLoading(false); return; }
-
-      const result = await generateKETHobbyTalkPlanAction({ sessionId: initialSessionId });
-      if ('error' in result) { setErrorMsg(result.error); setLoading(false); return; }
-      onSessionCreated?.(result.sessionId);
+      if (initialSessionId) return;
+      const result = await generateKETHobbyTalkPlanAction();
+      if ('error' in result) { setErrorMsg(result.error); return; }
       setPlan(result);
-      setLoading(false);
-      void loadMedia(result);
+      await loadMedia(result);
     }
     void init();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [restored, initialSessionId, loadMedia]);
 
   if (errorMsg) return (
     <div className="flex flex-col items-center justify-center gap-4 p-8 text-center min-h-[40vh]">
@@ -113,7 +76,7 @@ export function KETHobbyTalkPractice({
     </div>
   );
 
-  if (loading || !plan) return <div className="flex-1 flex flex-col min-h-0"><BobMascotLoader message="Preparing speaking exercise…" /></div>;
+  if (!plan) return <div className="flex-1 flex flex-col min-h-0"><BobMascotLoader message="Preparing speaking exercise…" /></div>;
 
   return (
     <KETSpeakingPractice
@@ -127,17 +90,21 @@ export function KETHobbyTalkPractice({
       imageUrl={media.image_url || undefined}
       mediaLoading={mediaLoading}
       imageRequired={false}
+      initialFeedback={restored?.feedback ?? null}
       onSubmit={async ({ base64, mime }) => {
         const result = await evaluateKETHobbyTalkAction({
-          sessionId: plan.sessionId,
-          userId: plan.userId,
+          sessionId,
+          plan: { ...plan, image_url: media.image_url },
           audioBase64: base64,
           audioMime: mime,
-          hobby: plan.hobby,
-          bullet_points: plan.bullet_points,
         });
-        if (!('error' in result)) onSessionFinished?.();
-        return result;
+        if ('error' in result) return result;
+        if (!sessionId) {
+          setSessionId(result.sessionId);
+          onSessionCreated?.(result.sessionId);
+        }
+        onSessionFinished?.();
+        return result.feedback;
       }}
       onBack={onBack}
       onOpenDashboard={onOpenDashboard}

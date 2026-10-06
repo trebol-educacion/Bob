@@ -1,117 +1,80 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { BobMascotLoader } from '@/components/chat/BobMascotLoader';
 import { KETSpeakingPractice } from './KETSpeakingPractice';
 import {
   generateKETPictureDescPlanAction,
   generateKETPictureDescMediaAction,
   evaluateKETPictureDescAction,
-  type PictureDescPlan,
   type PictureDescMedia,
 } from '@/actions/modes/ket-speaking-part3';
-import type { StoredMessage } from '@/actions/messages';
+import type { ActivityRenderProps } from '@/lib/routing';
+import {
+  KET_AUDIO_MIME,
+  PICTURE_PLAN_KIND,
+  PicturePlanSchema,
+  restoreKetSpeaking,
+  type PicturePlan,
+} from '@/lib/speaking/ket-speaking';
 
-export interface KETDescribePicturePracticeProps {
-  onBack: () => void;
-  sessionId?: string;
-  initialMessages?: StoredMessage[];
-  onSessionCreated?: (sessionId: string) => void;
-  onSessionFinished?: () => void;
-  onOpenDashboard?: () => void;
-}
-
-interface RestoredPlan {
-  scene_description: string;
-  instruction: string;
-  image_prompt: string;
-  image_url: string;
-}
-
-function tryRestore(messages: StoredMessage[]): RestoredPlan | null {
-  for (const msg of messages) {
-    const cj = msg.content_json as Record<string, unknown> | null;
-    if (cj?.kind === 'picture_desc_prompt') {
-      return {
-        scene_description: String(cj.scene_description ?? ''),
-        instruction: String(cj.instruction ?? ''),
-        image_prompt: String(cj.image_prompt ?? ''),
-        image_url: String(cj.image_url ?? ''),
-      };
-    }
-  }
-  return null;
-}
+export type KETDescribePicturePracticeProps = ActivityRenderProps;
 
 const EMPTY_MEDIA: PictureDescMedia = {
   instruction_audio_b64: '',
-  instruction_audio_mime: 'audio/L16;codec=pcm;rate=24000',
+  instruction_audio_mime: KET_AUDIO_MIME,
   image_url: '',
 };
 
-/** KET Speaking Part 3, Describe the Picture (two-phase loading). */
+function mediaOf(plan: PicturePlan): PictureDescMedia {
+  return {
+    instruction_audio_b64: plan.instruction_audio_b64 ?? '',
+    instruction_audio_mime: plan.instruction_audio_mime ?? KET_AUDIO_MIME,
+    image_url: plan.image_url ?? '',
+  };
+}
+
 export function KETDescribePicturePractice({
   onBack, sessionId: initialSessionId, initialMessages, onSessionCreated, onSessionFinished, onOpenDashboard,
 }: KETDescribePicturePracticeProps) {
-  const [loading, setLoading] = useState(true);
-  const [plan, setPlan] = useState<PictureDescPlan | null>(null);
-  const [media, setMedia] = useState<PictureDescMedia>(EMPTY_MEDIA);
+  const [restored] = useState(() =>
+    initialMessages?.length ? restoreKetSpeaking(initialMessages, PICTURE_PLAN_KIND, PicturePlanSchema) : null,
+  );
+  const [plan, setPlan] = useState<PicturePlan | null>(restored?.plan ?? null);
+  const [sessionId, setSessionId] = useState(initialSessionId);
+  const [media, setMedia] = useState<PictureDescMedia>(restored ? mediaOf(restored.plan) : EMPTY_MEDIA);
   const [mediaLoading, setMediaLoading] = useState(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(initialSessionId && !restored ? 'Could not reopen this session.' : null);
   const initRef = useRef(false);
 
-  async function loadMedia(p: PictureDescPlan) {
+  const loadMedia = useCallback(async (p: PicturePlan) => {
     setMediaLoading(true);
-    const m = await generateKETPictureDescMediaAction({
+    const loaded = await generateKETPictureDescMediaAction({
       instruction: p.instruction,
       image_prompt: p.image_prompt,
-      sessionId: p.sessionId,
     }).catch(() => EMPTY_MEDIA);
-    setMedia(m);
+    setMedia(loaded);
     setMediaLoading(false);
-  }
+  }, []);
 
   useEffect(() => {
     if (initRef.current) return;
     initRef.current = true;
 
     async function init() {
-      if (initialMessages?.length) {
-        const r = tryRestore(initialMessages);
-        if (r) {
-          const { createSupabaseBrowser } = await import('@/lib/supabase/browser-client');
-          const { data: { user } } = await createSupabaseBrowser().auth.getUser();
-          const p: PictureDescPlan = {
-            sessionId: initialSessionId ?? '', userId: user?.id ?? '',
-            scene_description: r.scene_description, instruction: r.instruction, image_prompt: r.image_prompt,
-          };
-          setPlan(p);
-          if (r.image_url) setMedia({ instruction_audio_b64: '', instruction_audio_mime: 'audio/L16;codec=pcm;rate=24000', image_url: r.image_url });
-          else if (initialSessionId) void loadMedia(p);
-          setLoading(false);
-          return;
-        }
+      if (restored) {
+        if (!restored.feedback && !restored.plan.image_url) await loadMedia(restored.plan);
+        return;
       }
-      if (initialSessionId) { setLoading(false); return; }
-
-      const result = await generateKETPictureDescPlanAction({ sessionId: initialSessionId });
-      if ('error' in result) { setErrorMsg(result.error); setLoading(false); return; }
-      onSessionCreated?.(result.sessionId);
+      if (initialSessionId) return;
+      const result = await generateKETPictureDescPlanAction();
+      if ('error' in result) { setErrorMsg(result.error); return; }
       setPlan(result);
-      setLoading(false);
-      if (result.image_url) {
-        setMedia({
-          instruction_audio_b64: result.instruction_audio_b64 ?? '',
-          instruction_audio_mime: result.instruction_audio_mime ?? EMPTY_MEDIA.instruction_audio_mime,
-          image_url: result.image_url,
-        });
-        setMediaLoading(false);
-      } else {
-        void loadMedia(result);
-      }
+      if (result.image_url) setMedia(mediaOf(result));
+      else await loadMedia(result);
     }
     void init();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [restored, initialSessionId, loadMedia]);
 
   if (errorMsg) return (
     <div className="flex flex-col items-center justify-center gap-4 p-8 text-center min-h-[40vh]">
@@ -120,7 +83,7 @@ export function KETDescribePicturePractice({
     </div>
   );
 
-  if (loading || !plan) return <div className="flex-1 flex flex-col min-h-0"><BobMascotLoader message="Preparing speaking exercise…" /></div>;
+  if (!plan) return <div className="flex-1 flex flex-col min-h-0"><BobMascotLoader message="Preparing speaking exercise…" /></div>;
 
   return (
     <KETSpeakingPractice
@@ -133,16 +96,21 @@ export function KETDescribePicturePractice({
       imageUrl={media.image_url || undefined}
       mediaLoading={mediaLoading}
       imageRequired={true}
+      initialFeedback={restored?.feedback ?? null}
       onSubmit={async ({ base64, mime }) => {
         const result = await evaluateKETPictureDescAction({
-          sessionId: plan.sessionId,
-          userId: plan.userId,
+          sessionId,
+          plan: { ...plan, image_url: media.image_url },
           audioBase64: base64,
           audioMime: mime,
-          scene_description: plan.scene_description,
         });
-        if (!('error' in result)) onSessionFinished?.();
-        return result;
+        if ('error' in result) return result;
+        if (!sessionId) {
+          setSessionId(result.sessionId);
+          onSessionCreated?.(result.sessionId);
+        }
+        onSessionFinished?.();
+        return result.feedback;
       }}
       onBack={onBack}
       onOpenDashboard={onOpenDashboard}

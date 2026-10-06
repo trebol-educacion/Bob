@@ -31,26 +31,17 @@ export type SpeakingFeedback = {
 };
 
 export interface KETSpeakingPracticeProps {
-  /** Header label shown to student */
   partLabel: string;
-  /** Activity title e.g. "Talk About a Hobby" */
   title: string;
-  /** Seconds allowed to record */
   recordingSeconds: number;
-  /** Bob's spoken instruction (TTS audio) */
   instructionAudioB64: string;
   instructionAudioMime: string;
-  /** Written instruction shown on screen */
   instructionText: string;
-  /** Optional bullet points to help student */
   bulletPoints?: string[];
-  /** Main image for the exercise */
   imageUrl?: string;
-  /** True while TTS/image are still loading in the background (two-phase). */
   mediaLoading?: boolean;
-  /** True if this activity requires the image before the student can start. */
   imageRequired?: boolean;
-  /** Called with { audioBase64, audioMime } when student stops recording */
+  initialFeedback?: SpeakingFeedback | null;
   onSubmit: (audio: { base64: string; mime: string }) => Promise<SpeakingFeedback | { error: string }>;
   onBack: () => void;
   onOpenDashboard?: () => void;
@@ -261,14 +252,15 @@ export function KETSpeakingPractice({
   imageUrl,
   mediaLoading = false,
   imageRequired = false,
+  initialFeedback = null,
   onSubmit,
   onBack,
   onOpenDashboard,
 }: KETSpeakingPracticeProps) {
   const reduceMotion = useReducedMotion();
-  const [phase, setPhase] = useState<Phase>('ready');
+  const [phase, setPhase] = useState<Phase>(initialFeedback ? 'finished' : 'ready');
   const [secondsLeft, setSecondsLeft] = useState(recordingSeconds);
-  const [feedback, setFeedback] = useState<SpeakingFeedback | null>(null);
+  const [feedback, setFeedback] = useState<SpeakingFeedback | null>(initialFeedback);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [playbackUrl, setPlaybackUrl] = useState<string | null>(null);
   const pendingBlobRef = useRef<Blob | null>(null);
