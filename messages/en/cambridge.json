@@ -120,7 +120,7 @@
       "feedbackTitle": "Your Feedback",
       "evaluatingPerformance": "Evaluating your performance…",
       "howItWorks": "How it works",
-      "howItWorksLine1": "You discuss 5 ideas with an AI examiner: about 2 minutes on each option, then 1 minute to decide (up to {maxTurns} turns)",
+      "howItWorksLine1": "You discuss 5 ideas with an AI examiner: about 2 minutes discussing the options together, then 1 minute to decide which is best (up to {maxTurns} turns)",
       "howItWorksLine2": "Give reasons, compare the ideas and react to your partner",
       "howItWorksLine3": "After finishing, you get your grade out of 10 and detailed feedback",
       "startDiscussion": "Start Task",
@@ -173,7 +173,7 @@
       "keywordLabel": "Keyword",
       "keywordHint": "Use the keyword unchanged. Write between 2 and 5 words.",
       "sentenceBankTitle": "Missing sentences",
-      "markLabel": "Mark: {score} / 10",
+      "markLabel": "Score: {score} / 10",
       "celebrationAction": "See my activities",
       "parts": {
         "fce_reading_part2": {

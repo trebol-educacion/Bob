@@ -5,7 +5,6 @@ import { Mic, Image } from 'lucide-react';
 import { usePracticeChat, UsePracticeChatProps } from '@/hooks/usePracticeChat';
 import { ChatShell } from '@/components/ChatShell';
 import { MessageBubble, TypingIndicator, SuggestionChip } from '@/components/chat';
-import { ACTIVE_MODEL_LABEL } from '@/lib/models';
 import { PhrasePhase } from './PhrasePhase';
 import { ImagePhase } from './ImagePhase';
 import { CelebrationCard } from '@/components/practice/yl/CelebrationCard';
@@ -177,7 +176,6 @@ export function BobPracticeChat(props: UsePracticeChatProps) {
         modeLabel: situationLevelHeader
           ? props.level === 'b1' ? 'B1 · PHRASE PRACTICE' : 'B2 · PHRASE PRACTICE'
           : isImageMode ? t('footerModeImage') : t('footerModeSituation'),
-        modelName: ACTIVE_MODEL_LABEL,
       }}
       inputSlot={inputArea}
       animationKey={props.mode}

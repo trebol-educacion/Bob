@@ -8,7 +8,6 @@ import { ArrowLeft } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { ListenAndPointIcon } from '@/components/icons/ModeIcons';
 import { CelebrationCard } from './CelebrationCard';
-import { ACTIVE_MODEL_LABEL } from '@/lib/models';
 import {
   startYLSessionAction,
   saveYLTurnAction,
@@ -343,7 +342,7 @@ export function YLPointingPractice({
     return (
       <ChatShell
         headerConfig={{ icon: ListenAndPointIcon, title: t('pointing.title'), subtitle: t('common.practiceHistory'), accentColor: 'violet', leftSlot: backButton, rightSlot: <div className="flex items-center gap-3">{progressDots}{partBadge}</div>, online: false }}
-        footerConfig={{ modeLabel: t('pointing.footerLabel'), modelName: ACTIVE_MODEL_LABEL }}
+        footerConfig={{ modeLabel: t('pointing.footerLabel') }}
         inputSlot={null}
         animationKey="yl-pointing-readonly"
         maxWidthClass="max-w-full"
@@ -453,7 +452,7 @@ export function YLPointingPractice({
   return (
     <ChatShell
       headerConfig={{ icon: ListenAndPointIcon, title: t('pointing.title'), subtitle: `Ages 6-8 · Round ${cueIndex + 1}/${totalCues}`, accentColor: 'violet', leftSlot: backButton, rightSlot: <div className="flex items-center gap-3">{progressDots}{partBadge}</div>, online: true }}
-      footerConfig={{ modeLabel: t('pointing.footerLabel'), modelName: ACTIVE_MODEL_LABEL }}
+      footerConfig={{ modeLabel: t('pointing.footerLabel') }}
       inputSlot={bottomBar}
       animationKey="yl-pointing"
       maxWidthClass="max-w-full"

@@ -4,7 +4,6 @@ import React from 'react';
 import { MessageSquare, RotateCcw } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { ChatShell } from '@/components/ChatShell';
-import { ACTIVE_MODEL_LABEL } from '@/lib/models';
 import type { FormativeFeedback } from '@/lib/types/practice';
 import { CollaborativeBackButton } from './CollaborativeBackButton';
 import { CollaborativeFeedbackPanel } from './CollaborativeFeedbackPanel';
@@ -48,7 +47,7 @@ export function CollaborativeResult({ feedback, translationScope, onTryAgain, on
         online: false,
         leftSlot: <CollaborativeBackButton onBack={onBack} />,
       }}
-      footerConfig={{ modeLabel: t('footerFeedbackLabel'), modelName: ACTIVE_MODEL_LABEL }}
+      footerConfig={{ modeLabel: t('footerFeedbackLabel') }}
       inputSlot={inputSlot}
       animationKey="b1-result"
     >

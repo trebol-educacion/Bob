@@ -19,7 +19,6 @@ import { restoreRepeat, type ToeflRepeatItem } from '@/lib/toefl/repeat';
 import { resolveActivityBoot } from '@/lib/activity/boot';
 import type { ActivityRenderProps } from '@/lib/routing';
 import type { RepetitionObjectiveFeedback } from '@/lib/types/practice';
-import { ACTIVE_MODEL_LABEL } from '@/lib/models';
 import { ChatShell } from '@/components/ChatShell';
 import { MessageBubble, InfoCard } from '@/components/chat';
 
@@ -294,7 +293,6 @@ export function ToeflListenRepeatPractice({
       }}
       footerConfig={{
         modeLabel: t('listenRepeat.footerMode'),
-        modelName: ACTIVE_MODEL_LABEL,
       }}
       inputSlot={null}
     >

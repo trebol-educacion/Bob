@@ -3,7 +3,6 @@ import { Loader2, Mic, MessageSquare } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { generateInitialChatAction, type ChatMessage } from '@/actions/gemini';
 import type { CefrLevel } from '@/lib/types/practice';
-import { ACTIVE_MODEL_LABEL } from '@/lib/models';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
 import { useConversationState } from '@/hooks/useConversationState';
 import { useQuestionsFlow } from '@/hooks/useQuestionsFlow';
@@ -238,7 +237,7 @@ export function ConversationPractice({
         accentColor: 'blue',
         online: true,
       }}
-      footerConfig={{ modeLabel, modelName: ACTIVE_MODEL_LABEL }}
+      footerConfig={{ modeLabel }}
       inputSlot={controlsSlot}
       animationKey={`conversation-${conv.phase}`}
     >

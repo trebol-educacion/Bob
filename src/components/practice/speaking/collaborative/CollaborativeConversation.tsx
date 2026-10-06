@@ -6,7 +6,6 @@ import { CheckCircle2, Circle, Loader2, MessageSquare, Mic, MicOff, Volume2 } fr
 import { useTranslations } from 'next-intl';
 import { ChatShell } from '@/components/ChatShell';
 import { MessageBubble } from '@/components/chat';
-import { ACTIVE_MODEL_LABEL } from '@/lib/models';
 import type { Part3ChatMessage, Part3Scenario } from '@/lib/speaking/types';
 import { CollaborativeBackButton } from './CollaborativeBackButton';
 
@@ -212,7 +211,7 @@ export function CollaborativeConversation(props: ConversationProps) {
           </span>
         ),
       }}
-      footerConfig={{ modeLabel: t('footerCollaborativeLabel'), modelName: ACTIVE_MODEL_LABEL }}
+      footerConfig={{ modeLabel: t('footerCollaborativeLabel') }}
       inputSlot={<ConversationControls {...props} />}
       animationKey="b1-conversation"
     >

@@ -8,7 +8,6 @@ import { ArrowLeft } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { WhatsThisIcon } from '@/components/icons/StartersIcons';
 import { CelebrationCard } from './CelebrationCard';
-import { ACTIVE_MODEL_LABEL } from '@/lib/models';
 import {
   startYLSessionAction,
   getYLSessionPlanAction,
@@ -448,7 +447,7 @@ export function YLWhatsThisPractice({
           ),
           online: false,
         }}
-        footerConfig={{ modeLabel: t('whatsThis.footerLabel'), modelName: ACTIVE_MODEL_LABEL }}
+        footerConfig={{ modeLabel: t('whatsThis.footerLabel') }}
         inputSlot={null}
         animationKey="yl-whatsthis-readonly"
         maxWidthClass="max-w-full"
@@ -591,7 +590,7 @@ export function YLWhatsThisPractice({
         ),
         online: true,
       }}
-      footerConfig={{ modeLabel: t('whatsThis.footerLabel'), modelName: ACTIVE_MODEL_LABEL }}
+      footerConfig={{ modeLabel: t('whatsThis.footerLabel') }}
       inputSlot={inputBar}
       animationKey="yl-whatsthis"
       maxWidthClass="max-w-full"

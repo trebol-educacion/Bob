@@ -6,7 +6,6 @@ import { ChevronRight, Loader2, MessageSquare, Shuffle } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { ChatShell } from '@/components/ChatShell';
 import { MessageBubble, InfoCard } from '@/components/chat';
-import { ACTIVE_MODEL_LABEL } from '@/lib/models';
 import type { Part3Scenario } from '@/lib/speaking/types';
 import { CollaborativeBackButton } from './CollaborativeBackButton';
 
@@ -126,7 +125,7 @@ export function CollaborativeIntro(props: IntroProps) {
         online: true,
         leftSlot: <CollaborativeBackButton onBack={props.onBack} />,
       }}
-      footerConfig={{ modeLabel: t('footerModeLabel'), modelName: ACTIVE_MODEL_LABEL }}
+      footerConfig={{ modeLabel: t('footerModeLabel') }}
       inputSlot={inputSlot}
       animationKey="b1-intro"
     >

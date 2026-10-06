@@ -8,7 +8,6 @@ import { ArrowLeft, Headphones, Image as ImageIcon } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
 import { blobToBase64 } from '@/lib/audio';
-import { ACTIVE_MODEL_LABEL } from '@/lib/models';
 import {
   startYLSessionAction,
   evaluateYLTurnAction,
@@ -311,7 +310,7 @@ export function YLPart2Practice({
     return (
       <ChatShell
         headerConfig={{ icon: headerIcon, title: headerTitle, subtitle: t('common.practiceHistory'), accentColor: 'amber', leftSlot: backButton, rightSlot: partBadge, online: false }}
-        footerConfig={{ modeLabel: `YL · ${partBadgeLabel}`, modelName: ACTIVE_MODEL_LABEL }}
+        footerConfig={{ modeLabel: `YL · ${partBadgeLabel}` }}
         inputSlot={null}
         animationKey="yl-part2-readonly"
       >
@@ -377,7 +376,7 @@ export function YLPart2Practice({
   return (
     <ChatShell
       headerConfig={{ icon: headerIcon, title: headerTitle, subtitle: `${headerSubtitle} · Q ${cueIndex + 1}/${totalCues}`, accentColor: 'amber', leftSlot: backButton, rightSlot: <div className="flex items-center gap-2">{progressBar}{partBadge}</div>, online: true }}
-      footerConfig={{ modeLabel: `YL · ${partBadgeLabel}`, modelName: ACTIVE_MODEL_LABEL }}
+      footerConfig={{ modeLabel: `YL · ${partBadgeLabel}` }}
       inputSlot={null}
       animationKey="yl-part2"
     >

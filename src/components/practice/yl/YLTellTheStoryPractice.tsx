@@ -8,7 +8,6 @@ import { ArrowLeft } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { PictureStoryMoversIcon } from '@/components/icons/MoversIcons';
 import { CelebrationCard } from './CelebrationCard';
-import { ACTIVE_MODEL_LABEL } from '@/lib/models';
 import {
   startYLSessionAction,
   getYLSessionPlanAction,
@@ -536,7 +535,7 @@ export function YLTellTheStoryPractice({
           ),
           online: false,
         }}
-        footerConfig={{ modeLabel: t('tellTheStory.footerLabel'), modelName: ACTIVE_MODEL_LABEL }}
+        footerConfig={{ modeLabel: t('tellTheStory.footerLabel') }}
         inputSlot={null}
         animationKey="yl-tellthestory-readonly"
         maxWidthClass="max-w-full"
@@ -688,7 +687,7 @@ export function YLTellTheStoryPractice({
         ),
         online: true,
       }}
-      footerConfig={{ modeLabel: t('tellTheStory.footerLabel'), modelName: ACTIVE_MODEL_LABEL }}
+      footerConfig={{ modeLabel: t('tellTheStory.footerLabel') }}
       inputSlot={inputBar}
       animationKey="yl-tellthestory"
       maxWidthClass="max-w-full"

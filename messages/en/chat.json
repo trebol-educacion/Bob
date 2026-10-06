@@ -1,7 +1,4 @@
 {
-  "shell": {
-    "poweredBy": "BOB • Powered by {modelName}"
-  },
   "conversation": {
     "headerTitleChat": "Bob, Chat",
     "headerTitleConversation": "Bob, Conversation",

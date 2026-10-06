@@ -25,7 +25,6 @@ import { InterviewProgressDots } from '@/components/toefl/InterviewProgressDots'
 import { ChatShell } from '@/components/ChatShell';
 import { ActivityLoadError } from '@/components/practice/ActivityLoadError';
 import { MessageBubble, InfoCard } from '@/components/chat';
-import { ACTIVE_MODEL_LABEL } from '@/lib/models';
 
 type InterviewPhase =
   | 'loading'
@@ -462,7 +461,6 @@ export function ToeflInterviewPractice({
       }}
       footerConfig={{
         modeLabel: t('interview.footerMode'),
-        modelName: ACTIVE_MODEL_LABEL,
       }}
       inputSlot={inputSlot}
       animationKey={`toefl-interview-${phase}`}

@@ -8,7 +8,6 @@ import { ArrowLeft } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { FindTheDifferencesIcon } from '@/components/icons/MoversIcons';
 import { CelebrationCard } from './CelebrationCard';
-import { ACTIVE_MODEL_LABEL } from '@/lib/models';
 import {
   startYLSessionAction,
   getYLSessionPlanAction,
@@ -484,7 +483,7 @@ export function YLFindDifferencesPractice({
           ),
           online: false,
         }}
-        footerConfig={{ modeLabel: t('findDifferences.footerLabel'), modelName: ACTIVE_MODEL_LABEL }}
+        footerConfig={{ modeLabel: t('findDifferences.footerLabel') }}
         inputSlot={null}
         animationKey="yl-finddiffs-readonly"
         maxWidthClass="max-w-full"
@@ -611,7 +610,7 @@ export function YLFindDifferencesPractice({
         ),
         online: true,
       }}
-      footerConfig={{ modeLabel: t('findDifferences.footerLabel'), modelName: ACTIVE_MODEL_LABEL }}
+      footerConfig={{ modeLabel: t('findDifferences.footerLabel') }}
       inputSlot={inputBar}
       animationKey="yl-finddiffs"
       maxWidthClass="max-w-full"
