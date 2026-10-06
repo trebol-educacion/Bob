@@ -330,7 +330,6 @@ export function KETSignsAndNoticesPractice({
 
   const [phase, setPhase] = useState<Phase>('loading');
   const [sessionId, setSessionId] = useState<string | undefined>(initialSessionId);
-  const [userId, setUserId] = useState<string | undefined>();
   const [items, setItems] = useState<SignItem[]>([]);
   const [framingText, setFramingText] = useState('');
   const [answers, setAnswers] = useState<Record<number, 'A' | 'B' | 'C'>>({});
@@ -358,10 +357,6 @@ export function KETSignsAndNoticesPractice({
             setCorrectCount(restored.correctCount);
             setPhase('finished');
           } else {
-            const { createSupabaseBrowser } = await import('@/lib/supabase/browser-client');
-            const supabase = createSupabaseBrowser();
-            const { data: { user } } = await supabase.auth.getUser();
-            if (user) setUserId(user.id);
             setPhase('ready');
           }
           return;
@@ -373,19 +368,13 @@ export function KETSignsAndNoticesPractice({
       }
 
       setIsNewSession(true);
-      const result = await generateKETSignsAndNoticesAction({ sessionId: initialSessionId });
+      const result = await generateKETSignsAndNoticesAction();
 
       if ('error' in result) {
         setErrorMsg(result.error);
         return;
       }
 
-      if (!initialSessionId) {
-        onSessionCreated?.(result.sessionId);
-      }
-
-      setSessionId(result.sessionId);
-      setUserId(result.userId);
       setItems(result.items);
       setFramingText(result.framingText);
       setPhase('ready');
@@ -430,13 +419,12 @@ export function KETSignsAndNoticesPractice({
   }
 
   async function handleSubmit() {
-    if (!sessionId || !userId) return;
     if (advanceRef.current) clearTimeout(advanceRef.current);
     setPhase('submitting');
 
     const result = await submitKETSignsAnswersAction({
       sessionId,
-      userId,
+      framingText,
       answers,
       items,
     });
@@ -450,6 +438,8 @@ export function KETSignsAndNoticesPractice({
     setResults(result.results);
     setCorrectCount(result.correctCount);
     setPhase('finished');
+    if (!sessionId) onSessionCreated?.(result.sessionId);
+    setSessionId(result.sessionId);
     onSessionFinished?.();
   }
 

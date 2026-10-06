@@ -29,6 +29,7 @@ import {
 } from '@/actions/modes/ket-reading-part2';
 import type { StoredMessage } from '@/actions/messages';
 import { resolveActivityBoot } from '@/lib/activity/boot';
+import { restoreExercise } from '@/lib/ket/restore-plan';
 
 const ACCENT = '#469E7B';
 const ACCENT_DARK = '#37795E';
@@ -49,18 +50,8 @@ export interface KETMatchQuestionPracticeProps {
 
 type Phase = 'loading' | 'generating' | 'ready' | 'submitting' | 'finished';
 
-function tryRestore(messages: StoredMessage[]): { exercise: MatchExercise; framingText: string; results: QuestionResult[] | null; correctCount: number } | null {
-  let exercise: MatchExercise | null = null;
-  let framingText = '';
-  let results: QuestionResult[] | null = null;
-  let correctCount = 0;
-  for (const msg of messages) {
-    const cj = msg.content_json as Record<string, unknown> | null;
-    if (!cj) continue;
-    if (msg.role === 'bob' && cj.kind === 'reading_match_plan') { exercise = cj.exercise as MatchExercise; framingText = String(cj.framing_text ?? ''); }
-    if (msg.role === 'bob' && msg.msg_type === 'evaluation' && cj.is_final === true) { results = cj.question_results as QuestionResult[]; correctCount = Number(cj.score ?? 0); }
-  }
-  return exercise ? { exercise, framingText, results, correctCount } : null;
+function tryRestore(messages: StoredMessage[]) {
+  return restoreExercise<MatchExercise, QuestionResult>(messages, 'reading_match_plan', 'question_results');
 }
 
 function LetterChip({ letter, className }: { letter: string; className?: string }) {
@@ -348,7 +339,6 @@ export function KETMatchQuestionPractice({
   const reduceMotion = useReducedMotion();
   const [phase, setPhase] = useState<Phase>('loading');
   const [sessionId, setSessionId] = useState<string | undefined>(initialSessionId);
-  const [userId, setUserId] = useState<string | undefined>();
   const [exercise, setExercise] = useState<MatchExercise | null>(null);
   const [framingText, setFramingText] = useState('');
   const [answers, setAnswers] = useState<Record<number, TextLabel | null>>({});
@@ -375,14 +365,13 @@ export function KETMatchQuestionPractice({
         const r = boot.data;
         setExercise(r.exercise); setFramingText(r.framingText);
         if (r.results) { setResults(r.results); setCorrectCount(r.correctCount); setPhase('finished'); }
-        else { const { createSupabaseBrowser } = await import('@/lib/supabase/browser-client'); const { data: { user } } = await createSupabaseBrowser().auth.getUser(); if (user) setUserId(user.id); setPhase('ready'); }
+        else { setPhase('ready'); }
         return;
       }
       if (boot.kind === 'restore-failed') { setErrorMsg('Could not restore session. Please start a new one.'); return; }
       setIsNewSession(true); setPhase('generating');
-      const result = await generateKETMatchQuestionAction({ sessionId: initialSessionId });
+      const result = await generateKETMatchQuestionAction();
       if ('error' in result) { setErrorMsg(result.error); return; }
-      onSessionCreated?.(result.sessionId); setSessionId(result.sessionId); setUserId(result.userId);
       setExercise(result.exercise); setFramingText(result.framing_text); setPhase('ready');
     }
     void init();
@@ -458,12 +447,12 @@ export function KETMatchQuestionPractice({
   }
 
   async function handleSubmit() {
-    if (!sessionId || !userId || !exercise) return;
+    if (!exercise) return;
     setActiveQuestion(null);
     setPhase('submitting');
-    const result = await submitKETMatchQuestionAction({ sessionId, userId, answers, questions: exercise.questions });
+    const result = await submitKETMatchQuestionAction({ sessionId, framing_text: framingText, exercise, answers });
     if ('error' in result) { setErrorMsg(result.error); setPhase('ready'); return; }
-    setResults(result.question_results); setCorrectCount(result.correct_count); setPhase('finished'); onSessionFinished?.();
+    setResults(result.question_results); setCorrectCount(result.correct_count); setPhase('finished'); if (!sessionId) onSessionCreated?.(result.sessionId); setSessionId(result.sessionId); onSessionFinished?.();
   }
 
   const answeredCount = Object.values(answers).filter((v) => v !== null).length;

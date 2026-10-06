@@ -3,9 +3,8 @@
 import { z } from 'zod';
 import { getPrompt } from '@/lib/prompts/db-prompts';
 import { callGemini, isOk } from '@/lib/gemini-client';
-import { persistMessage, persistMessages } from '@/lib/persist-activity';
-import { createSessionAction } from '@/actions/sessions';
-import { createSupabaseServer } from '@/lib/supabase/server';
+import { currentUserId } from '@/lib/session/lifecycle';
+import { completeActivity } from '@/lib/session/complete';
 import { MODELS } from '@/lib/models';
 import { stripDashes } from '@/lib/text';
 
@@ -31,8 +30,6 @@ export interface LongTextExercise {
 }
 
 export interface LongTextResult {
-  sessionId: string;
-  userId: string;
   framing_text: string;
   exercise: LongTextExercise;
 }
@@ -45,6 +42,7 @@ export interface LongTextItemResult {
 }
 
 export interface LongTextSubmitResult {
+  sessionId: string;
   correct_count: number;
   total: number;
   item_results: LongTextItemResult[];
@@ -54,23 +52,9 @@ function safeParse<T>(schema: z.ZodType<T>, raw: string): T | null {
   try { return schema.parse(JSON.parse(raw)); } catch { return null; }
 }
 
-export async function generateKETLongTextAction(input: {
-  sessionId?: string;
-}): Promise<LongTextResult | { error: string }> {
-  let sessionId = input.sessionId;
-  let userId: string | undefined;
-
-  if (!sessionId) {
-    const result = await createSessionAction({ mode: 'cambridge_ket_reading_part3', title: 'Reading Part 3, Read and Decide' });
-    if (!result.data) return { error: result.error ?? 'Could not create session' };
-    sessionId = result.data.id;
-    userId = result.data.user_id;
-  } else {
-    const supabase = await createSupabaseServer();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return { error: 'Not authenticated' };
-    userId = user.id;
-  }
+export async function generateKETLongTextAction(): Promise<LongTextResult | { error: string }> {
+  const userId = (await currentUserId()) ?? undefined;
+  if (!userId) return { error: 'Not authenticated' };
 
   const [generationPrompt, framingText] = await Promise.all([
     getPrompt('cambridge_ket_reading_part3_a2_generation').catch(() => null),
@@ -108,39 +92,30 @@ export async function generateKETLongTextAction(input: {
 
   const cleanFraming = stripDashes(framingText);
 
-  persistMessage({
-    sessionId: sessionId!, userId: userId!, role: 'bob', msgType: 'text',
-    contentText: null,
-    contentJson: { kind: 'reading_long_plan', framing_text: cleanFraming, exercise },
-  }).catch(() => undefined);
-
-  return { sessionId: sessionId!, userId: userId!, framing_text: cleanFraming, exercise };
+  return { framing_text: cleanFraming, exercise };
 }
 
 export async function submitKETLongTextAction(input: {
-  sessionId: string;
-  userId: string;
+  sessionId?: string;
+  framing_text: string;
+  exercise: LongTextExercise;
   answers: Record<number, 'A' | 'B' | 'C' | null>;
-  items: LongTextItem[];
 }): Promise<LongTextSubmitResult | { error: string }> {
-  const item_results: LongTextItemResult[] = input.items.map((item) => {
+  const item_results: LongTextItemResult[] = input.exercise.items.map((item) => {
     const chosen = input.answers[item.number] ?? null;
     return { number: item.number, chosen, correct_answer: item.answer, is_correct: chosen === item.answer };
   });
 
   const correct_count = item_results.filter((r) => r.is_correct).length;
 
-  persistMessages(item_results.map((r) => ({
-    sessionId: input.sessionId, userId: input.userId, role: 'user' as const, msgType: 'text' as const,
-    contentText: null,
-    contentJson: { kind: 'reading_long_answer', item_number: r.number, chosen: r.chosen, is_correct: r.is_correct },
-  }))).catch(() => undefined);
+  const completed = await completeActivity({
+    mode: 'cambridge_ket_reading_part3',
+    sessionId: input.sessionId,
+    plan: { kind: 'reading_long_plan', framing_text: input.framing_text, exercise: input.exercise },
+    answers: item_results.map((r) => ({ kind: 'reading_long_answer', item_number: r.number, chosen: r.chosen, is_correct: r.is_correct })),
+    evaluation: { kind: 'reading_long_evaluation', score: correct_count, score_max: input.exercise.items.length, item_results, is_final: true },
+  });
+  if (!completed.ok) return { error: completed.code };
 
-  persistMessage({
-    sessionId: input.sessionId, userId: input.userId, role: 'bob', msgType: 'evaluation',
-    contentText: null,
-    contentJson: { kind: 'reading_long_evaluation', score: correct_count, score_max: input.items.length, item_results, is_final: true },
-  }).catch(() => undefined);
-
-  return { correct_count, total: input.items.length, item_results };
+  return { sessionId: completed.data.sessionId, correct_count, total: input.exercise.items.length, item_results };
 }

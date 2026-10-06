@@ -15,6 +15,7 @@ import {
 } from '@/actions/modes/ket-reading-part4';
 import type { StoredMessage } from '@/actions/messages';
 import { resolveActivityBoot } from '@/lib/activity/boot';
+import { restoreExercise } from '@/lib/ket/restore-plan';
 
 const ACCENT = '#469E7B';
 const ACCENT_DARK = '#37795E';
@@ -34,31 +35,8 @@ export interface KETVocabGapPracticeProps {
 type Phase = 'loading' | 'generating' | 'ready' | 'submitting' | 'finished';
 type OptionKey = 'A' | 'B' | 'C';
 
-interface RestoredState {
-  exercise: VocabGapExercise;
-  framingText: string;
-  results: VocabGapItemResult[] | null;
-  correctCount: number;
-}
-
-function tryRestore(messages: StoredMessage[]): RestoredState | null {
-  let exercise: VocabGapExercise | null = null;
-  let framingText = '';
-  let results: VocabGapItemResult[] | null = null;
-  let correctCount = 0;
-  for (const msg of messages) {
-    const cj = msg.content_json as Record<string, unknown> | null;
-    if (!cj) continue;
-    if (msg.role === 'bob' && cj.kind === 'reading_vocab_gap_plan') {
-      exercise = cj.exercise as VocabGapExercise;
-      framingText = String(cj.framing_text ?? '');
-    }
-    if (msg.role === 'bob' && msg.msg_type === 'evaluation' && cj.is_final === true) {
-      results = cj.item_results as VocabGapItemResult[];
-      correctCount = Number(cj.score ?? 0);
-    }
-  }
-  return exercise ? { exercise, framingText, results, correctCount } : null;
+function tryRestore(messages: StoredMessage[]) {
+  return restoreExercise<VocabGapExercise, VocabGapItemResult>(messages, 'reading_vocab_gap_plan', 'item_results');
 }
 
 /**
@@ -258,7 +236,6 @@ export function KETVocabGapPractice({
   const reduceMotion = useReducedMotion();
   const [phase, setPhase] = useState<Phase>('loading');
   const [sessionId, setSessionId] = useState<string | undefined>(initialSessionId);
-  const [userId, setUserId] = useState<string | undefined>();
   const [exercise, setExercise] = useState<VocabGapExercise | null>(null);
   const [framingText, setFramingText] = useState('');
   const [answers, setAnswers] = useState<Record<number, OptionKey | null>>({});
@@ -282,25 +259,17 @@ export function KETVocabGapPractice({
           setResults(r.results);
           setCorrectCount(r.correctCount);
           setPhase('finished');
-        } else {
-          const { createSupabaseBrowser } = await import('@/lib/supabase/browser-client');
-          const { data: { user } } = await createSupabaseBrowser().auth.getUser();
-          if (user) setUserId(user.id);
-          setPhase('ready');
-        }
+        } else { setPhase('ready'); }
         return;
       }
       if (boot.kind === 'restore-failed') { setErrorMsg('Could not restore session. Please start a new one.'); return; }
       setIsNewSession(true);
       setPhase('generating');
-      const result = await generateKETVocabGapAction({ sessionId: initialSessionId });
+      const result = await generateKETVocabGapAction();
       if ('error' in result) {
         setErrorMsg(result.error);
         return;
       }
-      onSessionCreated?.(result.sessionId);
-      setSessionId(result.sessionId);
-      setUserId(result.userId);
       setExercise(result.exercise);
       setFramingText(result.framing_text);
       setPhase('ready');
@@ -322,9 +291,9 @@ export function KETVocabGapPractice({
   }
 
   async function handleSubmit() {
-    if (!sessionId || !userId || !exercise) return;
+    if (!exercise) return;
     setPhase('submitting');
-    const result = await submitKETVocabGapAction({ sessionId, userId, answers, items: exercise.items });
+    const result = await submitKETVocabGapAction({ sessionId, framing_text: framingText, exercise, answers });
     if ('error' in result) {
       setErrorMsg(result.error);
       setPhase('ready');
@@ -333,6 +302,8 @@ export function KETVocabGapPractice({
     setResults(result.item_results);
     setCorrectCount(result.correct_count);
     setPhase('finished');
+    if (!sessionId) onSessionCreated?.(result.sessionId);
+    setSessionId(result.sessionId);
     onSessionFinished?.();
   }
 

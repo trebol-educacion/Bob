@@ -4,8 +4,8 @@ import { z } from 'zod';
 import { getPrompt } from '@/lib/prompts/db-prompts';
 import { stripDashes } from '@/lib/text';
 import { callGemini, isOk } from '@/lib/gemini-client';
-import { persistMessage, persistMessages } from '@/lib/persist-activity';
-import { createSessionAction } from '@/actions/sessions';
+import { currentUserId } from '@/lib/session/lifecycle';
+import { completeActivity } from '@/lib/session/complete';
 import { createSupabaseServer } from '@/lib/supabase/server';
 import { generateYLImagesParallelAction } from '@/actions/modes/yl';
 import { MODELS } from '@/lib/models';
@@ -46,8 +46,6 @@ export interface SignItem {
 
 /** Full result of a successful generation call. */
 export interface KETSignsAndNoticesResult {
-  sessionId: string;
-  userId: string;
   items: SignItem[];
   framingText: string;
 }
@@ -63,6 +61,7 @@ export interface SignAnswerResult {
 
 /** Full submit result. */
 export interface KETSignsSubmitResult {
+  sessionId: string;
   correctCount: number;
   total: number;
   results: SignAnswerResult[];
@@ -76,29 +75,10 @@ function safeParse<T>(schema: z.ZodType<T>, raw: string): T | null {
   }
 }
 
-/** Generates 6 KET A2 signs/notices items and a framing text; creates a session when none is provided. */
-export async function generateKETSignsAndNoticesAction(input: {
-  sessionId?: string;
-}): Promise<KETSignsAndNoticesResult | { error: string }> {
-  let sessionId = input.sessionId;
-  let userId: string | undefined;
-
-  if (!sessionId) {
-    const result = await createSessionAction({
-      mode: 'cambridge_ket_reading_part1',
-      title: 'Reading Part 1, Signs and Notices',
-    });
-    if (!result.data) {
-      return { error: result.error ?? 'Could not create session' };
-    }
-    sessionId = result.data.id;
-    userId = result.data.user_id;
-  } else {
-    const supabase = await createSupabaseServer();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return { error: 'Not authenticated' };
-    userId = user.id;
-  }
+/** Generates 6 KET A2 signs/notices items and a framing text; persists nothing until the first submit. */
+export async function generateKETSignsAndNoticesAction(): Promise<KETSignsAndNoticesResult | { error: string }> {
+  const userId = (await currentUserId()) ?? undefined;
+  if (!userId) return { error: 'Not authenticated' };
 
   const [generationPrompt, framingText] = await Promise.all([
     getPrompt('cambridge_ket_reading_part1_a2_generation').catch(() => null),
@@ -142,22 +122,7 @@ export async function generateKETSignsAndNoticesAction(input: {
   }));
   const cleanFraming = stripDashes(framingText);
 
-  persistMessage({
-    sessionId,
-    userId,
-    role: 'bob',
-    msgType: 'text',
-    contentText: null,
-    contentJson: {
-      kind: 'reading_prompt',
-      items,
-      framing_text: cleanFraming,
-    },
-  }).catch(() => undefined);
-
   return {
-    sessionId,
-    userId,
     items,
     framingText: cleanFraming,
   };
@@ -165,8 +130,8 @@ export async function generateKETSignsAndNoticesAction(input: {
 
 /** Evaluates student answers deterministically (no LLM) and persists results. */
 export async function submitKETSignsAnswersAction(input: {
-  sessionId: string;
-  userId: string;
+  sessionId?: string;
+  framingText: string;
   answers: Record<number, 'A' | 'B' | 'C'>;
   items: SignItem[];
 }): Promise<KETSignsSubmitResult | { error: string }> {
@@ -184,38 +149,16 @@ export async function submitKETSignsAnswersAction(input: {
   const correctCount = results.filter((r) => r.isCorrect).length;
   const total = input.items.length;
 
-  const answerMessages = results.map((r) => ({
+  const completed = await completeActivity({
+    mode: 'cambridge_ket_reading_part1',
     sessionId: input.sessionId,
-    userId: input.userId,
-    role: 'user' as const,
-    msgType: 'text' as const,
-    contentText: null,
-    contentJson: {
-      kind: 'reading_answer',
-      item_number: r.number,
-      chosen: r.chosen,
-      isCorrect: r.isCorrect,
-    },
-  }));
+    plan: { kind: 'reading_prompt', items: input.items, framing_text: input.framingText },
+    answers: results.map((r) => ({ kind: 'reading_answer', item_number: r.number, chosen: r.chosen, isCorrect: r.isCorrect })),
+    evaluation: { kind: 'reading_evaluation', score: correctCount, score_max: total, results },
+  });
+  if (!completed.ok) return { error: completed.code };
 
-  persistMessages(answerMessages).catch(() => undefined);
-
-  persistMessage({
-    sessionId: input.sessionId,
-    userId: input.userId,
-    role: 'bob',
-    msgType: 'evaluation',
-    contentText: null,
-    contentJson: {
-      kind: 'reading_evaluation',
-      score: correctCount,
-      score_max: total,
-      results,
-      is_final: true,
-    },
-  }).catch(() => undefined);
-
-  return { correctCount, total, results };
+  return { sessionId: completed.data.sessionId, correctCount, total, results };
 }
 
 /** One generated scene illustration mapped back to its sign number. */

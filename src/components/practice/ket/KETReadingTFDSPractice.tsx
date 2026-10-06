@@ -15,6 +15,7 @@ import {
 } from '@/actions/modes/ket-reading-part5';
 import type { StoredMessage } from '@/actions/messages';
 import { resolveActivityBoot } from '@/lib/activity/boot';
+import { restoreExercise } from '@/lib/ket/restore-plan';
 
 const ACCENT = '#469E7B';
 const ACCENT_DARK = '#37795E';
@@ -107,18 +108,8 @@ function VerdictBadge({ verdict, struck }: { verdict: Verdict; struck?: boolean 
   );
 }
 
-function tryRestore(messages: StoredMessage[]): { exercise: ReadingTFDSExercise; framingText: string; results: ReadingStatementResult[] | null; correctCount: number } | null {
-  let exercise: ReadingTFDSExercise | null = null;
-  let framingText = '';
-  let results: ReadingStatementResult[] | null = null;
-  let correctCount = 0;
-  for (const msg of messages) {
-    const cj = msg.content_json as Record<string, unknown> | null;
-    if (!cj) continue;
-    if (msg.role === 'bob' && cj.kind === 'reading_tfds_plan') { exercise = cj.exercise as ReadingTFDSExercise; framingText = String(cj.framing_text ?? ''); }
-    if (msg.role === 'bob' && msg.msg_type === 'evaluation' && cj.is_final === true) { results = cj.statement_results as ReadingStatementResult[]; correctCount = Number(cj.score ?? 0); }
-  }
-  return exercise ? { exercise, framingText, results, correctCount } : null;
+function tryRestore(messages: StoredMessage[]) {
+  return restoreExercise<ReadingTFDSExercise, ReadingStatementResult>(messages, 'reading_tfds_plan', 'statement_results');
 }
 
 function ProgressDots({
@@ -278,7 +269,6 @@ export function KETReadingTFDSPractice({
   const reduceMotion = useReducedMotion();
   const [phase, setPhase] = useState<Phase>('loading');
   const [sessionId, setSessionId] = useState<string | undefined>(initialSessionId);
-  const [userId, setUserId] = useState<string | undefined>();
   const [exercise, setExercise] = useState<ReadingTFDSExercise | null>(null);
   const [framingText, setFramingText] = useState('');
   const [answers, setAnswers] = useState<Record<number, Verdict | null>>({});
@@ -300,14 +290,13 @@ export function KETReadingTFDSPractice({
         const r = boot.data;
         setExercise(r.exercise); setFramingText(r.framingText);
         if (r.results) { setResults(r.results); setCorrectCount(r.correctCount); setPhase('finished'); }
-        else { const { createSupabaseBrowser } = await import('@/lib/supabase/browser-client'); const { data: { user } } = await createSupabaseBrowser().auth.getUser(); if (user) setUserId(user.id); setPhase('ready'); }
+        else { setPhase('ready'); }
         return;
       }
       if (boot.kind === 'restore-failed') { setErrorMsg('Could not restore session. Please start a new one.'); return; }
       setIsNewSession(true); setPhase('generating');
-      const result = await generateKETReadingTFDSAction({ sessionId: initialSessionId });
+      const result = await generateKETReadingTFDSAction();
       if ('error' in result) { setErrorMsg(result.error); return; }
-      onSessionCreated?.(result.sessionId); setSessionId(result.sessionId); setUserId(result.userId);
       setExercise(result.exercise); setFramingText(result.framing_text); setPhase('ready');
     }
     void init();
@@ -325,11 +314,11 @@ export function KETReadingTFDSPractice({
   }
 
   async function handleSubmit() {
-    if (!sessionId || !userId || !exercise) return;
+    if (!exercise) return;
     setPhase('submitting');
-    const result = await submitKETReadingTFDSAction({ sessionId, userId, answers, statements: exercise.statements });
+    const result = await submitKETReadingTFDSAction({ sessionId, framing_text: framingText, exercise, answers });
     if ('error' in result) { setErrorMsg(result.error); setPhase('ready'); return; }
-    setResults(result.statement_results); setCorrectCount(result.correct_count); setPhase('finished'); onSessionFinished?.();
+    setResults(result.statement_results); setCorrectCount(result.correct_count); setPhase('finished'); if (!sessionId) onSessionCreated?.(result.sessionId); setSessionId(result.sessionId); onSessionFinished?.();
   }
 
   const answeredCount = exercise ? Object.values(answers).filter((v) => v != null).length : 0;
