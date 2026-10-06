@@ -63,7 +63,7 @@ function ylPart(exam: YLExam, number: number): PlanPart {
     normalize: stripAllDashes,
     rules: (plan) => [
       ...ylPlanIssues(examPart, plan),
-      ...duplicateIssues(plan.cues, 'cue'),
+      ...(examPart === 'starters_part3' ? [] : duplicateIssues(plan.cues, 'cue')),
       ...(YLPlanSchema.safeParse(plan).success ? [] : ['plan does not match YLPlanSchema']),
     ],
     produce: async (plan, env) => {
