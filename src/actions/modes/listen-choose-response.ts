@@ -1,7 +1,6 @@
 'use server';
 
-import { createSupabaseServer } from '@/lib/supabase/server';
-import { ClosedItemSchema } from '@/lib/types/practice';
+import { pickContent } from '@/lib/item-bank/content-source';
 import type { ClosedItem } from '@/lib/types/practice';
 
 interface GetClosedItemsInput {
@@ -15,34 +14,18 @@ export async function getClosedItemsAction(
   input: GetClosedItemsInput
 ): Promise<{ items: ClosedItem[] } | { error: string }> {
   try {
-    const supabase = await createSupabaseServer();
-
-    let query = supabase
-      .from('closed_items')
-      .select('*')
-      .eq('framework', input.framework)
-      .eq('exam_part', input.exam_part);
-
-    if (input.cefr_level !== null) {
-      query = query.eq('cefr_level', input.cefr_level);
+    const picked = await pickContent({
+      framework: 'toefl',
+      cefr: input.cefr_level,
+      examPart: input.exam_part,
+      purpose: 'practice',
+      skill: 'listening',
+    });
+    if (!picked.ok) {
+      return { error: picked.code };
     }
 
-    const { data, error } = await query;
-
-    if (error) {
-      console.error('[getClosedItemsAction] Supabase error:', error.message);
-      return { error: error.message };
-    }
-
-    const items: ClosedItem[] = [];
-    for (const row of data ?? []) {
-      const parsed = ClosedItemSchema.safeParse(row);
-      if (parsed.success) {
-        items.push(parsed.data);
-      } else {
-        console.warn('[getClosedItemsAction] Discarding invalid row:', row.id, parsed.error.issues);
-      }
-    }
+    const items: ClosedItem[] = picked.data.items;
 
     return { items };
   } catch (err) {

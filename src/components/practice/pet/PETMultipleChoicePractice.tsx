@@ -42,7 +42,7 @@ interface RestoredState {
   finalScore: number | null;
 }
 
-function tryRestore(messages: StoredMessage[]): RestoredState | null {
+export function tryRestore(messages: StoredMessage[]): RestoredState | null {
   let items: PETListeningItem[] | null = null;
   const turns: TurnRecord[] = [];
   let finalScore: number | null = null;
@@ -240,8 +240,6 @@ export function PETMultipleChoicePractice({
         return;
       }
 
-      onSessionCreated?.(result.session_id);
-      setSessionId(result.session_id);
       setItems(result.items);
       setPhase('ready');
     }
@@ -265,19 +263,29 @@ export function PETMultipleChoicePractice({
   }, [items, currentIdx, playsUsed]);
 
   const handleNext = useCallback(async () => {
-    if (!selectedKey || !sessionId) return;
+    if (!selectedKey) return;
     const item = items[currentIdx];
     if (!item) return;
 
     setPhase('submitting');
     stopActiveAudio();
 
-    const result = await submitPETListeningAnswerAction(sessionId, item.id, selectedKey);
+    const result = await submitPETListeningAnswerAction({
+      sessionId,
+      itemIds: items.map((candidate) => candidate.id),
+      itemId: item.id,
+      selectedKey,
+    });
 
     if ('error' in result) {
       setErrorMsg('Could not submit answer. Please try again.');
       setPhase('ready');
       return;
+    }
+
+    if (!sessionId) {
+      onSessionCreated?.(result.sessionId);
+      setSessionId(result.sessionId);
     }
 
     const newTurn: TurnRecord = {
@@ -293,8 +301,7 @@ export function PETMultipleChoicePractice({
     const isLastItem = currentIdx === items.length - 1;
 
     if (isLastItem) {
-      const correctCount = updatedTurns.filter((t) => t.correct).length;
-      const finalResult = await finalizePETListeningSessionAction(sessionId, correctCount);
+      const finalResult = await finalizePETListeningSessionAction({ sessionId: result.sessionId });
 
       if ('error' in finalResult) {
         setErrorMsg('Could not save final result. Please try again.');
@@ -312,7 +319,7 @@ export function PETMultipleChoicePractice({
       audioRef.current = null;
       setPhase('ready');
     }
-  }, [selectedKey, sessionId, items, currentIdx, turns, onSessionFinished]);
+  }, [selectedKey, sessionId, items, currentIdx, turns, onSessionFinished, onSessionCreated]);
 
   const handleRetry = useCallback(() => {
     initStartedRef.current = false;
@@ -333,13 +340,11 @@ export function PETMultipleChoicePractice({
         setPhase('error');
         return;
       }
-      onSessionCreated?.(result.session_id);
-      setSessionId(result.session_id);
       setItems(result.items);
       setIsNewSession(true);
       setPhase('ready');
     });
-  }, [onSessionCreated]);
+  }, []);
 
   const currentItem = items[currentIdx];
 

@@ -79,7 +79,7 @@ async function main() {
     .from('closed_items')
     .select('id, variant_id, cefr_level, stimulus_audio_url, transcript, metadata')
     .eq('skill', 'listening')
-    .eq('status', 'enabled')
+    .eq('status', 'published')
     .not('transcript', 'is', null)
     .in('exam_part', ['assessment_listening', 'pet_listening_part2', 'fce_listening_part1']);
 

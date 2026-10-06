@@ -75,7 +75,7 @@ export async function startAssessmentAction(skill: Skill): Promise<StartAssessme
       .from('closed_items')
       .select('id, stimulus_audio_url, transcript, question, options')
       .eq('skill', 'listening')
-      .eq('status', 'enabled')
+      .eq('status', 'published')
       .in('cefr_level', ['a1', 'a2', 'b1', 'b2']);
 
     if (itemsError || !rawItems || rawItems.length === 0) {
@@ -108,7 +108,7 @@ export async function startAssessmentAction(skill: Skill): Promise<StartAssessme
       .from('closed_items')
       .select('id, stimulus_text, question, options')
       .eq('skill', 'reading')
-      .eq('status', 'enabled')
+      .eq('status', 'published')
       .in('cefr_level', ['a1', 'a2', 'b1', 'b2']);
 
     if (itemsError || !rawItems || rawItems.length === 0) {

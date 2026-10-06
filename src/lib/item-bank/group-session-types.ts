@@ -1,4 +1,4 @@
-import type { BankItem, ItemBankSkill, ItemGroup } from './types';
+import type { BankItem, ItemBankExam, ItemBankSkill, ItemGroup } from './types';
 
 export const GROUP_PLAN_KIND = 'fce_group_plan';
 export const GROUP_ANSWERS_KIND = 'fce_group_answers';
@@ -12,6 +12,8 @@ export interface GroupScoreSummary {
 
 export interface GroupSessionStrategy<E extends { groupId: string }, A, R> {
   mode: string;
+  exam: ItemBankExam;
+  cefr: string;
   examPart: string;
   skill: ItemBankSkill;
   title: string;

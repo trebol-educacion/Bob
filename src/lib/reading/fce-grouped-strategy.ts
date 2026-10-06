@@ -22,6 +22,8 @@ const TITLES: Record<FCEGroupedPart, string> = {
 export function fceGroupedStrategy(part: FCEGroupedPart): FCEGroupedStrategy {
   return {
     mode: `cambridge_${part}`,
+    exam: 'fce',
+    cefr: 'b2',
     examPart: part,
     skill: 'reading',
     title: TITLES[part],

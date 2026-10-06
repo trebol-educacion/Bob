@@ -1,6 +1,7 @@
 'use server';
 
 import { createSupabaseServer } from '@/lib/supabase/server';
+import { pickContent } from '@/lib/item-bank/content-source';
 import { readSessionMessages } from '@/lib/persist-activity';
 import { ensureSession, finishSession, recordTurn } from '@/lib/session/lifecycle';
 
@@ -38,14 +39,6 @@ interface RawClosedItem {
   correct_key: string;
 }
 
-function shuffleInPlace<T>(arr: T[]): T[] {
-  for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [arr[i], arr[j]] = [arr[j], arr[i]];
-  }
-  return arr;
-}
-
 function keyToIndex(key: string): number {
   return key.charCodeAt(0) - 'A'.charCodeAt(0);
 }
@@ -70,20 +63,18 @@ export async function startFCEListeningPart1Action(): Promise<
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: 'Not authenticated' };
 
-  const { data: rows, error: fetchError } = await supabase
-    .from('closed_items')
-    .select('id, variant_id, stimulus_audio_url, question, options, correct_key')
-    .eq('framework', 'cambridge')
-    .eq('exam_part', 'fce_listening_part1')
-    .eq('cefr_level', 'b2')
-    .eq('skill', 'listening')
-    .eq('status', 'enabled');
+  const picked = await pickContent({
+    framework: 'fce',
+    cefr: 'b2',
+    examPart: 'fce_listening_part1',
+    purpose: 'practice',
+    skill: 'listening',
+    userId: user.id,
+    count: ITEMS_PER_SESSION,
+  });
+  if (!picked.ok) return { error: 'Could not load listening items' };
 
-  if (fetchError || !rows || rows.length === 0) {
-    return { error: 'Could not load listening items' };
-  }
-
-  const pool = shuffleInPlace([...(rows as RawClosedItem[])]).slice(0, ITEMS_PER_SESSION);
+  const pool = picked.data.items;
 
   const clientItems: FCEShortExtractsItem[] = pool.map((item) => ({
     id: item.id,

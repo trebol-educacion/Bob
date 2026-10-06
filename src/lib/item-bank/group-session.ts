@@ -1,11 +1,11 @@
 import 'server-only';
 
 import { fetchGroupItems, fetchGroups } from '@/actions/item-bank/repository';
+import { pickContent } from './content-source';
 import { readSessionMessagesForCurrentOrUser } from '@/lib/persist-activity';
 import { ensureSession, finishSession, recordTurn } from '@/lib/session/lifecycle';
 import { createSupabaseServer } from '@/lib/supabase/server';
 import type { BankItem } from './types';
-import { pickGroup } from '@/lib/reading/pick-group';
 import { restoreGroupSession } from './group-restore';
 import {
   GROUP_ANSWERS_KIND,
@@ -17,43 +17,23 @@ import {
   type GroupSubmitOutcome,
 } from './group-session-types';
 
-const RECENT_PLANS_WINDOW = 20;
-
-async function recentGroupIds(examPart: string, userId: string): Promise<string[]> {
-  const supabase = await createSupabaseServer();
-  const { data, error } = await supabase
-    .from('messages')
-    .select('content_json')
-    .eq('user_id', userId)
-    .eq('content_json->>kind', GROUP_PLAN_KIND)
-    .eq('content_json->>exam_part', examPart)
-    .order('created_at', { ascending: false })
-    .limit(RECENT_PLANS_WINDOW);
-  if (error || !data) return [];
-  return data
-    .map((row) => (row.content_json as { exercise?: { groupId?: string } } | null)?.exercise?.groupId)
-    .filter((id): id is string => typeof id === 'string');
-}
-
 async function loadExercise<E extends { groupId: string }, A, R>(
   strategy: GroupSessionStrategy<E, A, R>,
   userId: string,
 ): Promise<E | { error: string }> {
-  const groups = await fetchGroups({
-    exam: 'fce',
+  const picked = await pickContent({
+    framework: strategy.exam,
+    cefr: strategy.cefr,
+    examPart: strategy.examPart,
+    purpose: 'practice',
     skill: strategy.skill,
-    cefr_level: 'b2',
-    exam_part: strategy.examPart,
-    status: 'published',
+    userId,
+    groupsOnly: true,
   });
-  if (!groups.ok) return { error: 'Could not load exercise' };
+  if (!picked.ok) return { error: picked.code === 'no_content' ? 'No exercise available' : 'Could not load exercise' };
+  if (picked.data.kind !== 'group') return { error: 'No exercise available' };
 
-  const group = pickGroup(groups.data, await recentGroupIds(strategy.examPart, userId));
-  if (!group) return { error: 'No exercise available' };
-  const items = await fetchGroupItems([group.id]);
-  if (!items.ok || items.data.length === 0) return { error: 'Could not load exercise' };
-
-  return strategy.toPublic(group, items.data);
+  return strategy.toPublic(picked.data.group, picked.data.items);
 }
 
 /**
