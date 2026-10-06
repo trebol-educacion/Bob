@@ -18,7 +18,7 @@ import {
 } from '@/actions/modes/pet-listening-part5';
 import type { StoredMessage } from '@/actions/messages';
 import { resolveActivityBoot } from '@/lib/activity/boot';
-import type { YLRenderProps } from '@/lib/routing';
+import type { ActivityRenderProps } from '@/lib/routing';
 
 const ACCENT = '#10B981';
 const ACCENT_DARK = '#0E9F6E';
@@ -522,7 +522,7 @@ export function PETListeningTrueFalseJustifyPractice({
   onSessionCreated,
   onSessionFinished,
   onOpenDashboard,
-}: YLRenderProps) {
+}: ActivityRenderProps) {
   const reduceMotion = useReducedMotion();
   const [phase, setPhase] = useState<Phase>('loading');
   const [sessionId, setSessionId] = useState<string | undefined>(initialSessionId);

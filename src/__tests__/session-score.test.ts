@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { toScore10, ratioToScore10 } from '@/lib/session/score';
+import { toScore10, ratioToScore10, formatScore10 } from '@/lib/session/score';
 
 describe('toScore10', () => {
   it('convierte score y score_max', () => {
@@ -28,5 +28,12 @@ describe('toScore10', () => {
   it('acota a 0-10', () => {
     expect(toScore10({ score_10: 12 })).toBe(10);
     expect(ratioToScore10(9, 8)).toBe(10);
+  });
+});
+
+describe('formatScore10', () => {
+  it('omite decimales en enteros y usa uno en el resto', () => {
+    expect(formatScore10(7)).toBe('7/10');
+    expect(formatScore10(7.5)).toBe('7.5/10');
   });
 });

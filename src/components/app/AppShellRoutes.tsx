@@ -17,7 +17,7 @@ import { AssessmentView } from './views/AssessmentView';
 import type { BobSession } from '@/actions/sessions';
 import type { StoredMessage } from '@/actions/messages';
 import type { AssessmentPrompt, AssessmentListeningItem, AssessmentReadingItem, AssessmentWritingTask } from '@/actions/assessment';
-import type { AppState, YLRenderProps, ExamRenderProps } from '@/lib/routing';
+import type { AppState, ActivityRenderProps } from '@/lib/routing';
 import { getRouteForMode, isConversationMode } from '@/lib/routing';
 import type { Organization } from '@/lib/organization';
 import type { AvailableMode } from '@/lib/organization/types';
@@ -125,22 +125,18 @@ export function AppShellRoutes({
   const onBackToCatalog = useCallback(() => leavePractice('catalog-filtered'), [leavePractice]);
   const onBackHome = useCallback(() => leavePractice('home'), [leavePractice]);
 
-  const handleYLSessionCreated = useCallback((newSessionId: string) => {
+  const handleSessionCreated = useCallback((newSessionId: string) => {
     setActiveSessionId(newSessionId);
     void refreshSessions();
   }, [setActiveSessionId, refreshSessions]);
 
-  const ylProps: YLRenderProps = {
+  const activityProps: ActivityRenderProps = {
     onBack: onBackToCatalog,
     sessionId: selectedMessages.length > 0 ? activeSessionId ?? undefined : undefined,
     initialMessages: selectedMessages.length > 0 ? selectedMessages : undefined,
-    onSessionCreated: handleYLSessionCreated,
+    onSessionCreated: handleSessionCreated,
     onSessionFinished: refreshSessions,
     onOpenDashboard,
-  };
-
-  const examProps: ExamRenderProps = {
-    onBack: onBackToCatalog,
   };
 
   return (
@@ -331,9 +327,7 @@ export function AppShellRoutes({
           exit={{ opacity: 0 }}
           className="flex-1 flex flex-col min-h-0"
         >
-          {getRouteForMode(mode)?.render(
-            getRouteForMode(mode)?.kind === 'yl' ? ylProps : examProps
-          )}
+          {getRouteForMode(mode)?.render(activityProps)}
         </motion.div>
       )}
 

@@ -43,3 +43,12 @@ export function toScore10(evaluation: unknown): number | null {
   if (isFiniteNumber(record.score10)) return clampToScale(Math.round(record.score10 * 10) / 10);
   return fromRubric(record.rubric);
 }
+
+/**
+ * @param score10 - canonical grade
+ * @returns label such as "7/10" or "7.5/10"
+ */
+export function formatScore10(score10: number): string {
+  const text = Number.isInteger(score10) ? String(score10) : score10.toFixed(1);
+  return `${text}/10`;
+}

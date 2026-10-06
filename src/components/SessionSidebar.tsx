@@ -26,6 +26,7 @@ import { CAEInterviewIcon, CAELongTurnIcon, CAECollaborativeIcon, CAEDiscussionI
 import { CPEInterviewIcon, CPECollaborativeIcon, CPEMonologueIcon, CPEExtendedDiscussionIcon, CPEFinalDiscussionIcon } from '@/components/icons/CPEIcons';
 import { BobSession, SessionMode } from '@/actions/sessions';
 import { cn } from '@/lib/utils';
+import { formatScore10 } from '@/lib/session/score';
 
 interface SessionSidebarProps {
   sessions: BobSession[];
@@ -272,7 +273,7 @@ export function SessionSidebar({
           const Icon = (s.mode && MODE_ICON[s.mode]) || MessageSquare;
           const isActive = s.id === activeSessionId;
           const accent = modeAccent(s.mode);
-          const completed = s.final_score != null;
+          const completed = s.score_10 != null;
 
           return (
             <div
@@ -326,7 +327,7 @@ export function SessionSidebar({
                         <>
                           <span className="text-trebol-text/25">·</span>
                           <span className="font-bold tabular-nums" style={{ color: accent.color }}>
-                            {s.final_score_max ? `${s.final_score}/${s.final_score_max}` : `${s.final_score}%`}
+                            {formatScore10(s.score_10 ?? 0)}
                           </span>
                         </>
                       )}

@@ -14,9 +14,9 @@ import {
   type PETWritingChallengeFeedback,
 } from '@/actions/modes/pet-writing-challenge';
 import type { StoredMessage } from '@/actions/messages';
-import type { YLRenderProps } from '@/lib/routing';
+import type { ActivityRenderProps } from '@/lib/routing';
 
-export type PETWritingChallengePracticeProps = YLRenderProps;
+export type PETWritingChallengePracticeProps = ActivityRenderProps;
 
 type Phase = 'loading' | 'ready' | 'evaluating' | 'finished';
 
