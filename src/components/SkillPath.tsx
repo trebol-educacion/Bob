@@ -491,7 +491,7 @@ export function SkillPath({
                 >
                   <span className="absolute rounded-full animate-ping" style={{ inset: -10, border: '3px solid #ffc73a', opacity: 0.6 }} />
                   <span className="absolute -top-8 px-2.5 py-0.5 rounded-full bg-white text-[11px] font-black whitespace-nowrap shadow-md" style={{ color: '#c97f12' }}>
-                    ¡Sube a {skill.goalLevel ?? skill.level}!
+                    Level up to {skill.goalLevel ?? skill.level}!
                   </span>
                   {content}
                 </button>
@@ -625,9 +625,9 @@ export function SkillPath({
               >
                 <Trophy size={36} color="#fff" fill="#fff" strokeWidth={2} />
               </div>
-              <span className="text-xl font-black text-trebol-text">¡Lo lograste!</span>
+              <span className="text-xl font-black text-trebol-text">You did it!</span>
               <span className="text-sm font-bold text-trebol-text/60 mt-1">
-                Ahora estás en <span style={{ color: p.c }}>{skill.goalLevel ?? skill.level}</span> 🎉
+                You are now at <span style={{ color: p.c }}>{skill.goalLevel ?? skill.level}</span> 🎉
               </span>
             </motion.div>
           </motion.div>
