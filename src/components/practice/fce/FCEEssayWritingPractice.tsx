@@ -19,6 +19,7 @@ import type { StoredMessage } from '@/actions/messages';
 import { EssayBriefCard } from '@/components/practice/fce/essay/EssayBriefCard';
 import { tryRestoreFromMessages } from '@/components/practice/fce/essay/restore';
 import { FceScoreCard, ScoreHeadline } from '@/components/practice/writing/FceScoreCard';
+import { resolveActivityBoot } from '@/lib/activity/boot';
 import { countWords } from '@/lib/writing/word-count';
 import { useTranslations } from 'next-intl';
 
@@ -217,6 +218,7 @@ export function FCEEssayWritingPractice({
 }: FCEEssayWritingPracticeProps) {
   const t = useTranslations('cambridge');
   const [phase, setPhase] = useState<Phase>('loading');
+  const [sessionId, setSessionId] = useState<string | undefined>(initialSessionId);
   const [prompt, setPrompt] = useState<FCEEssayPrompt | null>(null);
   const [text, setText] = useState('');
   const [feedback, setFeedback] = useState<FCEEssayFeedback | null>(null);
@@ -230,39 +232,36 @@ export function FCEEssayWritingPractice({
     initStartedRef.current = true;
 
     async function init() {
-      if (initialMessages && initialMessages.length > 0) {
-        const restored = tryRestoreFromMessages(initialMessages);
-        if (restored.prompt && restored.feedback) {
-          setPrompt(restored.prompt);
-          setRestoredUserText(restored.userText);
-          setFeedback(restored.feedback);
+      const boot = resolveActivityBoot({
+        initialMessages,
+        sessionId: initialSessionId,
+        tryRestore: (messages: StoredMessage[]) => {
+          const restored = tryRestoreFromMessages(messages);
+          return restored.prompt ? { ...restored, prompt: restored.prompt } : null;
+        },
+      });
+      if (boot.kind === 'restore') {
+        setPrompt(boot.data.prompt);
+        if (boot.data.feedback) {
+          setRestoredUserText(boot.data.userText);
+          setFeedback(boot.data.feedback);
           setPhase('finished');
-          return;
-        }
-        if (restored.prompt) {
-          setPrompt(restored.prompt);
+        } else {
           setPhase('ready');
-          return;
         }
+        return;
       }
-
-      if (initialSessionId) {
+      if (boot.kind === 'restore-failed') {
+        setErrorMsg(t('fce.restoreFailed'));
         return;
       }
 
       setIsNewSession(true);
-      const result = await generateFCEEssayAction({
-        sessionId: initialSessionId,
-        userId: undefined,
-      });
+      const result = await generateFCEEssayAction();
 
       if ('error' in result) {
         setErrorMsg(result.error);
         return;
-      }
-
-      if (!initialSessionId) {
-        onSessionCreated?.(result.sessionId);
       }
 
       setPrompt(result);
@@ -276,13 +275,7 @@ export function FCEEssayWritingPractice({
     if (!prompt || !text.trim()) return;
     setPhase('evaluating');
 
-    const result = await evaluateFCEEssayAction({
-      sessionId: prompt.sessionId,
-      userId: prompt.userId,
-      title: prompt.title,
-      notes: prompt.notes,
-      userText: text,
-    });
+    const result = await evaluateFCEEssayAction({ sessionId, prompt, userText: text });
 
     if ('error' in result) {
       setErrorMsg(result.error);
@@ -290,7 +283,11 @@ export function FCEEssayWritingPractice({
       return;
     }
 
-    setFeedback(result);
+    if (!sessionId) {
+      setSessionId(result.sessionId);
+      onSessionCreated?.(result.sessionId);
+    }
+    setFeedback(result.feedback);
     setPhase('finished');
     onSessionFinished?.();
   }

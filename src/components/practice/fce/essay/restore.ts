@@ -19,8 +19,6 @@ export function tryRestoreFromMessages(messages: StoredMessage[]): {
       const rawNotes = cj.notes as EssayNote[] | null;
       if (rawNotes && rawNotes.length === 3) {
         prompt = {
-          sessionId: msg.session_id ?? '',
-          userId: msg.user_id ?? '',
           title: String(cj.title ?? ''),
           essayQuestion: String(cj.essay_question ?? ''),
           context: String(cj.context ?? ''),

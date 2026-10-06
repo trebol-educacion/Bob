@@ -3,13 +3,13 @@
 import { z } from 'zod';
 import { getPrompt } from '@/lib/prompts/db-prompts';
 import { callGemini, isOk } from '@/lib/gemini-client';
-import { persistMessage } from '@/lib/persist-activity';
-import { createSessionAction } from '@/actions/sessions';
-import { createSupabaseServer } from '@/lib/supabase/server';
+import { ensureSession, finishSession, recordTurn } from '@/lib/session/lifecycle';
 import { MODELS } from '@/lib/models';
 import { requestFceEvaluation } from '@/lib/writing/fce-evaluation';
 import { countWords } from '@/lib/writing/word-count';
 import { buildFceScorePayload, parseFceRubric, type FceRubric } from '@/lib/writing/fce-rubric';
+
+const FCE_ESSAY_MODE = 'cambridge_fce_writing_part1';
 
 export interface EssayNote {
   id: number;
@@ -18,8 +18,6 @@ export interface EssayNote {
 }
 
 export interface FCEEssayPrompt {
-  sessionId: string;
-  userId: string;
   title: string;
   essayQuestion: string;
   context: string;
@@ -27,6 +25,11 @@ export interface FCEEssayPrompt {
   wordTargetMin: 140;
   wordTargetMax: 190;
   framingText: string;
+}
+
+export interface FCEEssayEvaluation {
+  sessionId: string;
+  feedback: FCEEssayFeedback;
 }
 
 export interface FCEEssayFeedback {
@@ -109,33 +112,8 @@ function buildFallbackFeedback(): FCEEssayFeedback {
   };
 }
 
-/** Generates an FCE Writing Part 1 essay task; creates a session if none provided. */
-export async function generateFCEEssayAction(input: {
-  sessionId?: string;
-  userId?: string;
-}): Promise<FCEEssayPrompt | { error: string }> {
-  let sessionId = input.sessionId;
-  let userId = input.userId;
-
-  if (!sessionId) {
-    const result = await createSessionAction({
-      mode: 'cambridge_fce_writing_part1',
-      title: 'Writing Part 1, Essay',
-    });
-    if (!result.data) {
-      return { error: result.error ?? 'Could not create session' };
-    }
-    sessionId = result.data.id;
-    userId = result.data.user_id;
-  } else if (!userId) {
-    const supabase = await createSupabaseServer();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) return { error: 'Not authenticated' };
-    userId = user.id;
-  }
-
+/** Generates an FCE Writing Part 1 essay task; persists nothing until the first submission. */
+export async function generateFCEEssayAction(): Promise<FCEEssayPrompt | { error: string }> {
   const [generationPrompt, framingText] = await Promise.all([
     getPrompt('cambridge_fce_writing_part1_b2_generation').catch(() => null),
     getPrompt('cambridge_fce_writing_part1_b2_framing').catch(
@@ -152,7 +130,6 @@ export async function generateFCEEssayAction(input: {
     {
       promptKey: 'cambridge_fce_writing_part1_b2_generation',
       model: MODELS.FLASH_LITE_PREVIEW,
-      userId,
     },
     (ai) =>
       ai.models.generateContent({
@@ -174,7 +151,6 @@ export async function generateFCEEssayAction(input: {
     console.error(
       JSON.stringify({
         event: 'fce_writing_part1_generate_parse_failed',
-        sessionId,
         rawPreview: rawText.slice(0, 500),
       })
     );
@@ -183,27 +159,7 @@ export async function generateFCEEssayAction(input: {
 
   const notes = parsed.notes as [EssayNote, EssayNote, EssayNote];
 
-  persistMessage({
-    sessionId,
-    userId,
-    role: 'bob',
-    msgType: 'text',
-    contentText: null,
-    contentJson: {
-      kind: 'essay_prompt',
-      title: parsed.title,
-      essay_question: parsed.essay_question,
-      context: parsed.context,
-      notes,
-      word_target_min: parsed.word_target_min,
-      word_target_max: parsed.word_target_max,
-      framing_text: framingText,
-    },
-  }).catch(() => undefined);
-
   return {
-    sessionId,
-    userId,
     title: parsed.title,
     essayQuestion: parsed.essay_question,
     context: parsed.context,
@@ -215,50 +171,66 @@ export async function generateFCEEssayAction(input: {
 }
 
 export async function evaluateFCEEssayAction(input: {
-  sessionId: string;
-  userId: string;
-  title: string;
-  notes: [EssayNote, EssayNote, EssayNote];
+  sessionId?: string;
+  prompt: FCEEssayPrompt;
   userText: string;
-}): Promise<FCEEssayFeedback | { error: string }> {
-  const fallback = buildFallbackFeedback();
+}): Promise<FCEEssayEvaluation | { error: string }> {
+  const { prompt } = input;
   const wordCount = countWords(input.userText);
-  const notesJoined = input.notes
+  const notesJoined = prompt.notes
     .map((n) => `${n.id}. ${n.label}: ${n.description}`)
     .join('\n');
 
-  const persistFallback = async () => {
-    await persistMessage({
-      sessionId: input.sessionId,
-      userId: input.userId,
-      role: 'bob',
-      msgType: 'evaluation',
-      contentJson: { ...fallback, is_final: true },
-    }).catch(() => undefined);
-    return fallback;
-  };
+  const session = await ensureSession({ mode: FCE_ESSAY_MODE, sessionId: input.sessionId });
+  if (!session.ok) return { error: session.code };
+  const ref = { sessionId: session.data.sessionId, userId: session.data.userId };
+
+  const promptMessages = session.data.created
+    ? [
+        {
+          role: 'bob' as const,
+          msgType: 'text' as const,
+          contentText: null,
+          contentJson: {
+            kind: 'essay_prompt',
+            title: prompt.title,
+            essay_question: prompt.essayQuestion,
+            context: prompt.context,
+            notes: prompt.notes,
+            word_target_min: prompt.wordTargetMin,
+            word_target_max: prompt.wordTargetMax,
+            framing_text: prompt.framingText,
+          },
+        },
+      ]
+    : [];
+
+  const turn = await recordTurn({
+    ...ref,
+    messages: [
+      ...promptMessages,
+      {
+        role: 'user',
+        msgType: 'text',
+        contentText: input.userText,
+        contentJson: { kind: 'writing_submission', text: input.userText },
+      },
+    ],
+  });
+  if (!turn.ok) return { error: turn.code };
 
   const parsed = await requestFceEvaluation({
     promptKey: 'cambridge_fce_writing_part1_b2_evaluation',
     variables: {
-      ESSAY_TITLE: input.title,
+      ESSAY_TITLE: prompt.title,
       NOTES_JOINED: notesJoined,
       USER_TEXT: input.userText,
       WORD_COUNT: String(wordCount),
     },
-    userId: input.userId,
+    userId: ref.userId,
     schema: EvaluationSchema,
   });
-  if (!parsed) return persistFallback();
-
-  await persistMessage({
-    sessionId: input.sessionId,
-    userId: input.userId,
-    role: 'user',
-    msgType: 'text',
-    contentText: input.userText,
-    contentJson: { kind: 'writing_submission', text: input.userText },
-  }).catch(() => undefined);
+  if (!parsed) return { sessionId: ref.sessionId, feedback: buildFallbackFeedback() };
 
   const fceRubric = parseFceRubric(parsed.fce_rubric);
   const scorePayload = fceRubric ? buildFceScorePayload(fceRubric) : null;
@@ -275,13 +247,11 @@ export async function evaluateFCEEssayAction(input: {
     fceRubric,
   };
 
-  await persistMessage({
-    sessionId: input.sessionId,
-    userId: input.userId,
-    role: 'bob',
-    msgType: 'evaluation',
-    contentJson: { ...feedback, rubric: parsed.rubric ?? null, ...scorePayload, is_final: true },
-  }).catch(() => undefined);
+  const finished = await finishSession({
+    ...ref,
+    evaluation: { ...feedback, rubric: parsed.rubric ?? null, ...scorePayload },
+  });
+  if (!finished.ok) return { error: finished.code };
 
-  return feedback;
+  return { sessionId: ref.sessionId, feedback };
 }
