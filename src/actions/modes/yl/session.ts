@@ -1,17 +1,21 @@
 'use server';
 
+import { randomUUID } from 'node:crypto';
 import { type ModeKey } from '@/lib/types/practice';
 import { YLPlanSchema, type YLPlan } from '@/lib/types/yl';
 import { createSupabaseServer } from '@/lib/supabase/server';
 import { safeParseFallback } from '@/lib/gemini-client';
+import { ensureSession, recordTurn } from '@/lib/session/lifecycle';
+import { fail, ok, type ActionResult } from '@/lib/result';
 import { getMessagesAction } from '@/actions/messages';
 import { parseYLMode, YLPlanFallback } from './_helpers';
 import { generateYLContentAction } from './content';
 
 export async function startYLSessionAction(input: {
   mode: ModeKey;
-}): Promise<{ sessionId: string; plan: YLPlan }> {
+}): Promise<{ draftId: string; plan: YLPlan }> {
   const { exam, part } = parseYLMode(input.mode);
+  const draftId = randomUUID();
 
   const supabase = await createSupabaseServer();
   const {
@@ -19,37 +23,7 @@ export async function startYLSessionAction(input: {
   } = await supabase.auth.getUser();
   if (!user) {
     console.error(JSON.stringify({ event: 'startYLSessionAction', error: 'Not authenticated' }));
-    return { sessionId: '', plan: YLPlanFallback };
-  }
-
-  const partTitles: Record<string, string> = {
-    starters_1: 'Starters Part 1, Listen and Point',
-    starters_2: 'Starters Part 2, Look and Answer',
-    starters_3: "Starters Part 3, What's This?",
-    starters_4: 'Starters Part 4, Personal Questions',
-    movers_1: 'Movers Part 1, Find the Differences',
-    movers_2: 'Movers Part 2, Information Exchange',
-    movers_3: 'Movers Part 3, Tell the Story',
-    movers_4: 'Movers Part 4, Personal Questions',
-    movers_5: 'Movers Part 5, More About You',
-  };
-  const titleKey = `${exam}_${part}`;
-  const title = partTitles[titleKey] ?? `Cambridge ${exam} Part ${part}`;
-
-  const { data: session, error: sessionErr } = await supabase
-    .from('sessions')
-    .insert({
-      user_id: user.id,
-      mode: input.mode,
-      topic: `${exam}_part${part}`,
-      title,
-    })
-    .select()
-    .single();
-
-  if (sessionErr || !session) {
-    console.error(JSON.stringify({ event: 'startYLSessionAction', error: sessionErr?.message ?? 'no session' }));
-    return { sessionId: '', plan: YLPlanFallback };
+    return { draftId, plan: YLPlanFallback };
   }
 
   const { data: recent } = await supabase
@@ -79,9 +53,38 @@ export async function startYLSessionAction(input: {
   const plan = await generateYLContentAction(exam, part, { avoidList });
   console.log(`[YL][${input.mode}] plan ready in ${Date.now() - t1}ms (cues=${plan.cues?.length ?? 0}, images=${plan.image_prompts?.length ?? 0})`);
 
-  await supabase.from('sessions').update({ plan_json: plan }).eq('id', session.id);
+  return { draftId, plan };
+}
 
-  return { sessionId: session.id as string, plan };
+export async function openYLSessionAction(input: {
+  mode: ModeKey;
+  plan: YLPlan;
+  images?: string[];
+}): Promise<ActionResult<{ sessionId: string }>> {
+  const { exam, part } = parseYLMode(input.mode);
+  const session = await ensureSession({ mode: input.mode, topic: `${exam}_part${part}` });
+  if (!session.ok) return session;
+
+  const supabase = await createSupabaseServer();
+  const { error } = await supabase
+    .from('sessions')
+    .update({ plan_json: input.plan })
+    .eq('id', session.data.sessionId)
+    .eq('user_id', session.data.userId);
+  if (error) return fail('plan_persist_failed', true);
+
+  const turn = await recordTurn({
+    sessionId: session.data.sessionId,
+    userId: session.data.userId,
+    messages: (input.images ?? []).map((image, index) => ({
+      role: 'bob' as const,
+      msgType: 'image_scene' as const,
+      contentText: null,
+      contentJson: { image_data_uri: image, image_index: index },
+    })),
+  });
+  if (!turn.ok) return turn;
+  return ok({ sessionId: session.data.sessionId });
 }
 
 export async function getSessionMessagesAction(sessionId: string) {

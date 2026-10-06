@@ -118,7 +118,7 @@ export function usePracticeChat({
   const { saveError, addBobMessage, addUserMessage, saveMsg } = useChatMessaging({ sessionIdRef, setMessages });
 
   const handleListen = async (text: string) => {
-    await playSpeech(sessionIdRef.current, text);
+    await playSpeech(text);
   };
 
   const handleTopicSubmit = async () => {
@@ -155,9 +155,8 @@ export function usePracticeChat({
       saveMsg({ role: 'bob', msg_type: 'phrase_plan', content_json: { phrases: generated, topic: t } });
       addBobMessage(renderPhrase(generated[0], 0, generated.length, handleListen));
       saveMsg({ role: 'bob', msg_type: 'phrase', content_json: { phrase: generated[0], index: 0, total: generated.length } });
-      const sidForPregen = sessionIdRef.current;
-      if (sidForPregen && generated.length > 0) {
-        void pregenerateYLCueAudiosAction(sidForPregen, generated);
+      if (generated.length > 0) {
+        void pregenerateYLCueAudiosAction(generated);
       }
       setPhase('phrase-ready');
     } catch {

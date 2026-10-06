@@ -1,17 +1,5 @@
 'use client';
 
-/**
- * YLPart4Practice, Personal questions. No images.
- *
- * Covers:
- *   - Starters Part 4: 4-5 simple personal questions (What's your name? How old are you?)
- *   - Movers   Part 4: 4-5 personal questions with more detail
- *   - Movers   Part 5: 5 personal questions A1 level (describe a picture verbally)
- *
- * `part` prop distinguishes prompt key used by the server action.
- * No images generated. Pure conversational turn loop.
- */
-
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { User, ArrowLeft, Star } from 'lucide-react';
@@ -27,6 +15,7 @@ import {
 } from '@/actions/modes/yl';
 import type { YLExam, YLPlan } from '@/lib/types/yl';
 import type { EvalResponse, ModeKey } from '@/lib/types/practice';
+import { useYLSession } from './useYLSession';
 import { ChatShell } from '@/components/ChatShell';
 import {
   RECORDING_MAX_SECONDS,
@@ -71,6 +60,7 @@ export interface YLPart4PracticeProps {
   sessionId?: string;
   initialMessages?: BobMessageShape[];
   onSessionCreated?: (sessionId: string) => void;
+  onSessionFinished?: () => void;
 }
 
 export function YLPart4Practice({
@@ -80,13 +70,14 @@ export function YLPart4Practice({
   sessionId: initialSessionId,
   initialMessages,
   onSessionCreated,
+  onSessionFinished,
 }: YLPart4PracticeProps) {
   const t = useTranslations('yl');
   const mode: ModeKey = `cambridge_${exam}_part${part}` as ModeKey;
   const isReadOnly = !!initialMessages && initialMessages.length > 0;
 
   const [phase, setPhase] = useState<Phase>(isReadOnly ? 'finished' : 'loading');
-  const [sessionId, setSessionId] = useState<string | undefined>(initialSessionId);
+  const { sessionId, stash, open } = useYLSession({ mode, initialSessionId, onSessionCreated, onSessionFinished });
   const [plan, setPlan] = useState<YLPlan | null>(null);
   const [cueIndex, setCueIndex] = useState(0);
   const [currentCue, setCurrentCue] = useState('');
@@ -118,10 +109,9 @@ export function YLPart4Practice({
 
     async function init() {
       try {
-        const { sessionId: sid, plan: p } = await startYLSessionAction({ mode });
-        setSessionId(sid);
-        onSessionCreated?.(sid);
+        const { plan: p } = await startYLSessionAction({ mode });
         setPlan(p);
+        stash(p);
         setPhase('ready');
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Error preparing the session');
@@ -201,23 +191,26 @@ export function YLPart4Practice({
           audioDuration = recordingSeconds;
         }
 
+        const sid = await open();
+        if (!sid) throw new Error('Could not save your answer');
         const evalResult = await evaluateYLTurnAction({
           mode,
           audioBase64,
           mimeType: 'audio/webm',
           audioDuration,
           cue: currentCue,
-          sessionId: sessionId!,
+          sessionId: sid,
           cueIndex,
         });
 
-        await saveYLTurnAction(sessionId!, {
+        const saved = await saveYLTurnAction(sid, {
           cue: currentCue,
           cueIndex,
           transcript: '',
           reaction: evalResult.reaction,
           evalResult,
         });
+        if (!saved.ok) throw new Error('Could not save your answer');
 
         setCurrentReaction(evalResult.reaction);
         setPhase('reaction');
@@ -250,11 +243,12 @@ export function YLPart4Practice({
         });
         setFinalEval(result);
         setPhase('finished');
+        onSessionFinished?.();
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Error in final evaluation');
       }
     })();
-  }, [phase, sessionId, plan, mode]);
+  }, [phase, sessionId, plan, mode, onSessionFinished]);
 
   const handleManualStop = useCallback(() => {
     if (isRecording) {

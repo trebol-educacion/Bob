@@ -11,7 +11,6 @@ import {
 } from '@/lib/yl-imagen';
 import { imageGenKey } from './_helpers';
 import { type YLImageType } from './types';
-import { persistYLImageAction } from './persist';
 
 const POOL_REUSE_PROBABILITY = 0.7;
 
@@ -219,7 +218,6 @@ export async function generateYLImagesAction(
   part: number,
   imagePrompts: string[],
   characterDescription?: string,
-  sessionId?: string,
 ): Promise<string[]> {
   const key = imageGenKey(exam, part);
 
@@ -240,16 +238,6 @@ export async function generateYLImagesAction(
       return YL_IMAGE_PLACEHOLDER;
     })
   );
-
-  if (sessionId) {
-    for (let i = 0; i < images.length; i++) {
-      try {
-        await persistYLImageAction(sessionId, images[i], i);
-      } catch (err) {
-        console.warn(`[YL][${exam}_part${part}] persist image ${i} failed (non-fatal):`, err);
-      }
-    }
-  }
 
   return images;
 }

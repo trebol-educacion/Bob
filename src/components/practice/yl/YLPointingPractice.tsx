@@ -1,13 +1,5 @@
 'use client';
 
-/**
- * YLPointingPractice, Cambridge Starters Part 1 (Pointing).
- *
- * El alumno ESCUCHA una nota de voz ("Point to the doll") y CLICA la imagen
- * correcta entre 4 opciones. No hay grabación de audio: la interacción es
- * click-only.
- */
-
 import React, { useEffect, useRef, useState } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { useTranslations } from 'next-intl';
@@ -18,13 +10,12 @@ import {
   startYLSessionAction,
   generateYLImagesParallelAction,
   saveYLTurnAction,
-  persistYLImagesAction,
-  saveYLFinalEvalAction,
   getYLSessionPlanAction,
   pregenerateYLCueAudiosAction,
 } from '@/actions/modes/yl';
 import type { YLExam, YLPlan } from '@/lib/types/yl';
 import type { EvalResponse, ModeKey } from '@/lib/types/practice';
+import { useYLSession } from './useYLSession';
 import { ChatShell } from '@/components/ChatShell';
 import {
   stopCurrentAudio,
@@ -34,6 +25,7 @@ import {
   YLBobTextMessage,
   YLUserTextMessage,
   YLReadOnlyMessage,
+  isYLUserTurn,
 } from './_shared';
 
 interface BobMessageShape {
@@ -72,7 +64,7 @@ export function YLPointingPractice({
   const isReadOnly = !!initialMessages && initialMessages.length > 0;
 
   const [phase, setPhase] = useState<Phase>(isReadOnly ? 'finished' : 'loading');
-  const [sessionId, setSessionId] = useState<string | undefined>(initialSessionId);
+  const { stash, open, finish } = useYLSession({ mode, initialSessionId, onSessionCreated, onSessionFinished });
   const [plan, setPlan] = useState<YLPlan | null>(null);
   const [images, setImages] = useState<string[]>([]);
   const [cueIndex, setCueIndex] = useState(0);
@@ -115,7 +107,7 @@ export function YLPointingPractice({
           if (imgs.length > 0) setImages(imgs);
 
           const userTurns = (initialMessages ?? [])
-            .filter((m) => m.role === 'user' && m.msg_type === 'user_audio')
+            .filter((m) => isYLUserTurn(m))
             .map((m) => {
               const cj = (m.content_json as Record<string, unknown> | null) ?? {};
               return {
@@ -191,17 +183,16 @@ export function YLPointingPractice({
     }
     (async () => {
       try {
-        const { sessionId: sid, plan: p } = await startYLSessionAction({ mode });
-        setSessionId(sid);
-        onSessionCreated?.(sid);
+        const { draftId: sid, plan: p } = await startYLSessionAction({ mode });
         setPlan(p);
+        let urls: string[] = [];
         if (p.option_image_prompts && p.option_image_prompts.length > 0) {
           const words = p.options ?? [];
           const items = p.option_image_prompts.map((scenePrompt, i) => ({
             word: words[i] ?? '',
             scenePrompt,
           }));
-          const urls = await generateYLImagesParallelAction(
+          urls = await generateYLImagesParallelAction(
             exam,
             part,
             items,
@@ -209,9 +200,6 @@ export function YLPointingPractice({
             p.character_description
           );
           setImages(urls);
-          persistYLImagesAction(sid, urls).catch((err) =>
-            console.warn('[YL] persist images failed:', err)
-          );
         }
 
         const cuesTexts = (p.pointing_cues ?? []).map((c) => c.text);
@@ -229,9 +217,10 @@ export function YLPointingPractice({
         }
         const allTexts = [...cuesTexts, ...reactionTexts];
         if (allTexts.length > 0) {
-          void pregenerateYLCueAudiosAction(sid, allTexts);
+          void pregenerateYLCueAudiosAction(allTexts);
         }
 
+        stash(p, urls);
         setPhase('ready');
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Error preparing the session');
@@ -248,7 +237,7 @@ export function YLPointingPractice({
   // so the user sees the playing state in the same UI that controls replay.
 
   const handleSelect = async (optionIdx: number) => {
-    if (phase !== 'ready' || chosenIndex !== null || !currentCue || !sessionId) return;
+    if (phase !== 'ready' || chosenIndex !== null || !currentCue) return;
     setChosenIndex(optionIdx);
     const correct = optionIdx === currentCue.target_index;
     setWasCorrect(correct);
@@ -272,16 +261,18 @@ export function YLPointingPractice({
       },
     ]);
 
-    try {
-      await saveYLTurnAction(sessionId, {
-        cue: currentCue.text,
-        cueIndex,
-        transcript: chosenWord,
-        reaction: reactionText,
-      });
-    } catch (err) {
-      console.warn('[YLPointing] save turn failed:', err);
+    const sid = await open();
+    if (!sid) {
+      setError('Could not save your answer');
+      return;
     }
+    const saved = await saveYLTurnAction(sid, {
+      cue: currentCue.text,
+      cueIndex,
+      transcript: chosenWord,
+      reaction: reactionText,
+    });
+    if (!saved.ok) setError('Could not save your answer');
   };
 
   const handleNext = () => {
@@ -296,7 +287,7 @@ export function YLPointingPractice({
   };
 
   useEffect(() => {
-    if (phase !== 'evaluating' || !sessionId || !plan) return;
+    if (phase !== 'evaluating' || !plan) return;
     try {
       const total = plan.pointing_cues?.length ?? 1;
       const pct = Math.round((score / total) * 100);
@@ -315,13 +306,13 @@ export function YLPointingPractice({
       setFinalEval(result);
       setPhase('finished');
 
-      void saveYLFinalEvalAction(sessionId, result)
-        .then(() => onSessionFinished?.())
-        .catch((err) => console.warn('[YLPointing] saveYLFinalEvalAction failed:', err));
+      void finish(result).then((saved) => {
+        if (!saved) setError('Could not save your result');
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error finalizing the session');
     }
-  }, [phase, sessionId, plan, score, mode, onSessionFinished]);
+  }, [phase, plan, score, finish]);
 
   if (error) return <YLErrorScreen error={error} onBack={onBack} />;
   if (phase === 'loading')
@@ -405,10 +396,9 @@ export function YLPointingPractice({
           // images saved separately, they would duplicate the conversation.
           .filter((m) => m.msg_type !== 'evaluation' && m.msg_type !== 'yl_tts' && m.msg_type !== 'image_scene')
           .flatMap((m): React.ReactElement[] => {
-            // For user_audio rows, the cue lives in content_json.cue.
             // Render the cue as a SEPARATE Bob bubble on the left BEFORE the
             // user's pick on the right, instead of inline as a label.
-            if (m.role === 'user' && m.msg_type === 'user_audio') {
+            if (isYLUserTurn(m)) {
               const cue = (m.content_json as { cue?: string } | null)?.cue ?? '';
               const bubbles: React.ReactElement[] = [];
               if (cue) {
@@ -534,23 +524,19 @@ export function YLPointingPractice({
         <React.Fragment key={t.id}>
           <YLBobTextMessage text={t.cueText} />
           <YLUserTextMessage text={`👉 ${t.userPicked} ${t.correct ? '✓' : '✗'}`} />
-          {sessionId && (
-            <YLVoiceNote
-              text={t.reactionText}
-              side="bob"
-              sessionId={sessionId}
-              autoPlay={phase === 'answered' && t.id === `turn-${cueIndex}`}
-            />
-          )}
+          <YLVoiceNote
+            text={t.reactionText}
+            side="bob"
+            autoPlay={phase === 'answered' && t.id === `turn-${cueIndex}`}
+          />
         </React.Fragment>
       ))}
 
-      {currentCue && sessionId && phase === 'ready' && (
+      {currentCue && phase === 'ready' && (
         <YLVoiceNote
           key={`cue-${cueIndex}`}
           text={currentCue.text}
           side="bob"
-          sessionId={sessionId}
           autoPlay
         />
       )}

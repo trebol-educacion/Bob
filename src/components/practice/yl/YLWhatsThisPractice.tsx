@@ -1,16 +1,5 @@
 'use client';
 
-/**
- * YLWhatsThisPractice, Cambridge Starters Part 3 "What's This?".
- *
- * Bob shows 4 object cards one at a time. For each card the child answers
- * 2 spoken questions: "What's this?" and "Have you got a [X]?".
- * Total: 4 cards × 2 questions = 8 turns.
- *
- * The child always initiates recording via an explicit mic button click.
- * No auto-recording, no countdown.
- */
-
 import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'motion/react';
 import { ArrowLeft } from 'lucide-react';
@@ -21,8 +10,6 @@ import { ACTIVE_MODEL_LABEL } from '@/lib/models';
 import {
   startYLSessionAction,
   generateYLImagesParallelAction,
-  persistYLImagesAction,
-  saveYLFinalEvalAction,
   getYLSessionPlanAction,
   pregenerateYLCueAudiosAction,
   evaluateWhatsThisAnswerAction,
@@ -31,6 +18,7 @@ import { useAudioRecorder } from '@/hooks/useAudioRecorder';
 import { blobToBase64 } from '@/lib/audio';
 import type { YLExam, YLPlan, WhatsThisCard } from '@/lib/types/yl';
 import type { EvalResponse, ModeKey } from '@/lib/types/practice';
+import { useYLSession } from './useYLSession';
 import { ChatShell } from '@/components/ChatShell';
 import {
   stopCurrentAudio,
@@ -41,6 +29,7 @@ import {
   YLUserTextMessage,
   YLChatMicBar,
   YLReadOnlyMessage,
+  isYLUserTurn,
 } from './_shared';
 
 const TOTAL_CARDS = 4;
@@ -101,7 +90,7 @@ export function YLWhatsThisPractice({
   const isReadOnly = !!initialMessages && initialMessages.length > 0;
 
   const [phase, setPhase] = useState<Phase>(isReadOnly ? 'finished' : 'loading');
-  const [sessionId, setSessionId] = useState<string | undefined>(initialSessionId);
+  const { stash, open, finish } = useYLSession({ mode, initialSessionId, onSessionCreated, onSessionFinished });
   const [plan, setPlan] = useState<YLPlan | null>(null);
   const [images, setImages] = useState<string[]>([]);
   const [cardIndex, setCardIndex] = useState(0);
@@ -156,7 +145,7 @@ export function YLWhatsThisPractice({
           if (imgs.length > 0) setImages(imgs);
 
           const userTurns = (initialMessages ?? [])
-            .filter((m) => m.role === 'user' && m.msg_type === 'user_audio')
+            .filter((m) => isYLUserTurn(m))
             .map((m) => {
               const cj = (m.content_json as Record<string, unknown> | null) ?? {};
               return {
@@ -243,10 +232,9 @@ export function YLWhatsThisPractice({
 
     void (async () => {
       try {
-        const { sessionId: sid, plan: p } = await startYLSessionAction({ mode });
-        setSessionId(sid);
-        onSessionCreated?.(sid);
+        const { draftId: sid, plan: p } = await startYLSessionAction({ mode });
         setPlan(p);
+        stash(p);
 
         if (p.object_cards && p.object_cards.length > 0) {
           setPhase('generating-images');
@@ -263,9 +251,7 @@ export function YLWhatsThisPractice({
             'object_card'
           );
           setImages(urls);
-          persistYLImagesAction(sid, urls).catch((err) =>
-            console.warn('[YLWhatsThis] persist images failed:', err)
-          );
+          stash(p, urls);
 
           const questionTexts = p.object_cards.flatMap((card) =>
             card.questions.map((q) => q.text)
@@ -278,7 +264,7 @@ export function YLWhatsThisPractice({
             reactionTexts.push(`Good try! Keep going!`);
           }
           const allTexts = [...questionTexts, ...reactionTexts];
-          void pregenerateYLCueAudiosAction(sid, allTexts);
+          void pregenerateYLCueAudiosAction(allTexts);
         }
 
         setPhase('ready');
@@ -289,7 +275,7 @@ export function YLWhatsThisPractice({
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (phase !== 'evaluating' || !sessionId || !plan) return;
+    if (phase !== 'evaluating' || !plan) return;
     const total = TOTAL_TURNS;
     const pct = Math.round((correctCount / total) * 100);
     const result: EvalResponse = {
@@ -306,10 +292,10 @@ export function YLWhatsThisPractice({
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setFinalEval(result);
     setPhase('finished');
-    void saveYLFinalEvalAction(sessionId, result)
-      .then(() => onSessionFinished?.())
-      .catch((err) => console.warn('[YLWhatsThis] saveYLFinalEvalAction failed:', err));
-  }, [phase, sessionId, plan, correctCount, onSessionFinished]);
+    void finish(result).then((saved) => {
+      if (!saved) setError('Could not save your result');
+    });
+  }, [phase, plan, correctCount, finish]);
 
   const handleStartRecording = async () => {
     if (phase !== 'ready' || isRecording) return;
@@ -342,12 +328,17 @@ export function YLWhatsThisPractice({
     const duration = recordingSeconds;
     recordedBlobRef.current = null;
 
-    if (!sessionId || !currentQuestion || !currentCard) return;
+    if (!currentQuestion || !currentCard) return;
 
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setPhase('processing');
 
     void (async () => {
+      const sid = await open();
+      if (!sid) {
+        setError('Could not save your answer');
+        return;
+      }
       try {
         const audioBase64 = await blobToBase64(blob);
         const mimeType = blob.type || 'audio/webm;codecs=opus';
@@ -357,7 +348,7 @@ export function YLWhatsThisPractice({
 
         stopCurrentAudio();
         const evalResult = await evaluateWhatsThisAnswerAction({
-          sessionId,
+          sessionId: sid,
           cardIndex,
           questionIndex,
           question: currentQuestion.text,
@@ -507,7 +498,7 @@ export function YLWhatsThisPractice({
         {sourceMessages
           .filter((m) => m.msg_type !== 'evaluation' && m.msg_type !== 'yl_tts' && m.msg_type !== 'image_scene')
           .flatMap((m): React.ReactElement[] => {
-            if (m.role === 'user' && m.msg_type === 'user_audio') {
+            if (isYLUserTurn(m)) {
               const cue = (m.content_json as { cue?: string } | null)?.cue ?? '';
               const bubbles: React.ReactElement[] = [];
               if (cue) bubbles.push(<YLBobTextMessage key={`${m.id}-cue`} text={cue} />);
@@ -678,24 +669,18 @@ export function YLWhatsThisPractice({
           : `Say: "Yes, I have" or "No, I haven't"`;
         return (
           <React.Fragment key={t.id}>
-            {sessionId && (
-              <YLVoiceNote
-                key={`cue-prev-${t.id}`}
-                text={t.question}
-                side="bob"
-                sessionId={sessionId}
-                autoPlay={false}
-              />
-            )}
+            <YLVoiceNote
+              key={`cue-prev-${t.id}`}
+              text={t.question}
+              side="bob"
+              autoPlay={false}
+            />
             <YLUserTextMessage text={`${t.transcript} ${t.correct ? '✓' : '✗'}`} />
-            {sessionId && (
-              <YLVoiceNote
-                text={t.reactionText}
-                side="bob"
-                sessionId={sessionId}
-                autoPlay={phase === 'reaction' && t.id === `turn-${cueIndex}`}
-              />
-            )}
+            <YLVoiceNote
+              text={t.reactionText}
+              side="bob"
+              autoPlay={phase === 'reaction' && t.id === `turn-${cueIndex}`}
+            />
             {!t.correct && hintText && (
               <div className="flex justify-start pl-12 -mt-1">
                 <div className="font-nunito text-xs font-bold text-violet-700/80 bg-violet-50 ring-1 ring-violet-200 rounded-full px-3 py-1.5 inline-flex items-center gap-1.5">
@@ -708,12 +693,11 @@ export function YLWhatsThisPractice({
         );
       })}
 
-      {currentQuestion && phase === 'ready' && sessionId && (
+      {currentQuestion && phase === 'ready' && (
         <YLVoiceNote
           key={`cue-${cueIndex}`}
           text={currentQuestion.text}
           side="bob"
-          sessionId={sessionId}
           autoPlay
         />
       )}

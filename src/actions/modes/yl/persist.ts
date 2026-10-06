@@ -1,59 +1,19 @@
 'use server';
 
 import { type EvalResponse } from '@/lib/types/practice';
-import { createSupabaseServer } from '@/lib/supabase/server';
-import { persistMessage, persistMessages } from '@/lib/persist-activity';
-
-export async function persistYLImageAction(
-  sessionId: string,
-  imageDataUri: string,
-  imageIndex: number
-): Promise<void> {
-  const supabase = await createSupabaseServer();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    console.error(JSON.stringify({ event: 'persistYLImageAction', error: 'Not authenticated' }));
-    return;
-  }
-
-  await persistMessage({
-    sessionId,
-    userId: user.id,
-    role: 'bob',
-    msgType: 'image_scene',
-    contentText: null,
-    contentJson: { image_data_uri: imageDataUri, image_index: imageIndex },
-  });
-}
-
-/** @deprecated Kept for backwards compatibility, iterates one image at a time. */
-export async function persistYLImagesAction(
-  sessionId: string,
-  imageDataUris: string[]
-): Promise<void> {
-  for (let i = 0; i < imageDataUris.length; i++) {
-    await persistYLImageAction(sessionId, imageDataUris[i], i);
-  }
-}
+import { persistMessages } from '@/lib/persist-activity';
+import { currentUserId, finishSession } from '@/lib/session/lifecycle';
+import { fail, ok, type ActionResult } from '@/lib/result';
 
 export async function saveYLFinalEvalAction(
   sessionId: string,
   evalResult: EvalResponse
-): Promise<void> {
-  const supabase = await createSupabaseServer();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    console.error(JSON.stringify({ event: 'saveYLFinalEvalAction', error: 'Not authenticated' }));
-    return;
-  }
-  await persistMessage({
-    sessionId,
-    userId: user.id,
-    role: 'bob',
-    msgType: 'evaluation',
-    contentText: null,
-    contentJson: { ...evalResult, is_final: true },
-  });
+): Promise<ActionResult<{ score10: number | null }>> {
+  const userId = await currentUserId();
+  if (!userId) return fail('unauthenticated');
+  const finished = await finishSession({ sessionId, userId, evaluation: { ...evalResult } });
+  if (!finished.ok) return finished;
+  return ok({ score10: finished.data.score10 });
 }
 
 export async function saveYLTurnAction(
@@ -66,24 +26,19 @@ export async function saveYLTurnAction(
     score?: number;
     evalResult?: EvalResponse;
   }
-): Promise<void> {
-  const supabase = await createSupabaseServer();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    console.error(JSON.stringify({ event: 'saveYLTurnAction', error: 'Not authenticated' }));
-    return;
-  }
+): Promise<ActionResult<{ saved: number }>> {
+  const userId = await currentUserId();
+  if (!userId) return fail('unauthenticated');
 
   const result = await persistMessages([
     {
       sessionId,
-      userId: user.id,
+      userId,
       role: 'user',
-      msgType: 'user_audio',
+      msgType: 'text',
       contentText: turn.transcript,
       contentJson: {
+        kind: 'yl_turn',
         cue: turn.cue,
         cue_index: turn.cueIndex,
         transcribed: turn.transcript,
@@ -91,7 +46,7 @@ export async function saveYLTurnAction(
     },
     {
       sessionId,
-      userId: user.id,
+      userId,
       role: 'bob',
       msgType: 'yl_cue',
       contentText: turn.reaction,
@@ -105,5 +60,7 @@ export async function saveYLTurnAction(
 
   if ('error' in result) {
     console.error(JSON.stringify({ event: 'saveYLTurnAction', error: result.error }));
+    return fail('persist_failed', true);
   }
+  return ok({ saved: result.ids.length });
 }

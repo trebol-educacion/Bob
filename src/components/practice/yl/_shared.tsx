@@ -11,7 +11,6 @@ import { motion } from 'motion/react';
 import { ArrowLeft, Mic, MicOff, CheckCircle } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { generateSpeechAction } from '@/actions/gemini';
-import { getOrCreateCueAudioAction } from '@/actions/modes/yl';
 import { pcmToWavBase64 } from '@/lib/audio';
 import type { EvalResponse } from '@/lib/types/practice';
 import { BobMascotLoader } from '@/components/chat/BobMascotLoader';
@@ -306,18 +305,25 @@ function VoiceNoteLabel({ playing, hasPlayed }: { playing: boolean; hasPlayed: b
   return <span>{t('shared.voiceNote')}</span>;
 }
 
+export function isYLUserTurn(message: {
+  role: string;
+  msg_type: string;
+  content_json?: Record<string, unknown> | null;
+}): boolean {
+  if (message.role !== 'user') return false;
+  if (message.msg_type === 'user_audio') return true;
+  return message.msg_type === 'text' && message.content_json?.kind === 'yl_turn';
+}
+
 export function YLVoiceNote({
   text,
   side = 'bob',
   durationHint,
-  sessionId,
   autoPlay,
 }: {
   text: string;
   side?: 'bob' | 'user';
   durationHint?: number; // seconds, optional
-  /** When provided, audio is cached per (sessionId, text) in the DB. */
-  sessionId?: string;
   /** Auto-play once on mount. After playback, the button switches to a replay icon. */
   autoPlay?: boolean;
 }) {
@@ -352,19 +358,7 @@ export function YLVoiceNote({
     }
     try {
       stopCurrentAudio();
-      // Prefer the cached-on-DB action when we have a sessionId so we don't
-      // hit Gemini twice for the same cue.
-      let data: string;
-      let mimeType: string;
-      if (sessionId) {
-        const cached = await getOrCreateCueAudioAction(sessionId, text);
-        data = cached.data;
-        mimeType = cached.mimeType;
-      } else {
-        const fresh = await generateSpeechAction(text);
-        data = fresh.data;
-        mimeType = fresh.mimeType;
-      }
+      const { data, mimeType } = await generateSpeechAction(text);
       const url = pcmToWavBase64(data, mimeType);
       const audio = new Audio(url);
       audioRef.current = audio;
@@ -387,7 +381,7 @@ export function YLVoiceNote({
     } catch {
       stop();
     }
-  }, [playing, stop, text, sessionId, side]);
+  }, [playing, stop, text, side]);
 
   React.useEffect(() => {
     if (!autoPlay || autoPlayedRef.current) return;
