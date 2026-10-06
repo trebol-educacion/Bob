@@ -19,14 +19,12 @@ import {
 import { KETListeningIcon } from '@/components/icons/KETIcons';
 import { CelebrationCard } from '@/components/practice/yl/CelebrationCard';
 import { BobMascotLoader } from '@/components/chat/BobMascotLoader';
-import { pcmToWavBase64 } from '@/lib/audio';
+import { ActivityLoadError } from '@/components/practice/ActivityLoadError';
 import {
   generateKETShortTalksPlanAction,
-  generateKETPersonAudioAction,
   submitKETShortTalksAction,
   type CharKey,
   type Person,
-  type PersonWithAudio,
   type Characteristic,
   type PersonResult,
   type ShortTalksExercise,
@@ -93,29 +91,11 @@ function PauseIcon() {
   );
 }
 
-function Spinner() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4 animate-spin" aria-hidden>
-      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeOpacity="0.25" strokeWidth="3" />
-      <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function PersonAudioButton({
-  audiob64,
-  audiomime,
-  name,
-  loading,
-}: {
-  audiob64: string;
-  audiomime: string;
-  name: string;
-  loading: boolean;
-}) {
+function PersonAudioButton({ audioUrl, name }: { audioUrl: string; name: string }) {
   const reduceMotion = useReducedMotion();
   const [playing, setPlaying] = useState(false);
   const [hasPlayed, setHasPlayed] = useState(false);
+  const [failed, setFailed] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const stopLocal = () => {
@@ -136,38 +116,25 @@ function PersonAudioButton({
       return;
     }
     stopActiveAudio();
-    if (!audiob64) return;
-
-    const url = pcmToWavBase64(audiob64, audiomime);
-    const audio = new Audio(url);
+    setFailed(false);
+    const audio = new Audio(audioUrl);
     audioRef.current = audio;
     _activeAudio = audio;
     audio.onended = () => {
       stopLocal();
       setHasPlayed(true);
     };
-    audio.onerror = () => stopLocal();
+    audio.onerror = () => { stopLocal(); setFailed(true); };
     setPlaying(true);
     try {
       await audio.play();
     } catch {
       stopLocal();
+      setFailed(true);
     }
   };
 
-  if (loading) {
-    return (
-      <span
-        className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 text-white opacity-60"
-        style={{ background: ACCENT }}
-        aria-label={`Loading audio for ${name}`}
-      >
-        <Spinner />
-      </span>
-    );
-  }
-
-  if (!audiob64) {
+  if (!audioUrl) {
     return (
       <span className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 bg-gray-100 text-gray-300">
         <PlayIcon />
@@ -190,7 +157,7 @@ function PersonAudioButton({
       <button
         type="button"
         onClick={handlePlay}
-        aria-label={`Listen to ${name}`}
+        aria-label={failed ? 'Try again' : `Listen to ${name}`}
         className={[
           'relative w-10 h-10 rounded-full flex items-center justify-center text-white transition-transform active:scale-95',
           hasPlayed && !playing ? 'opacity-80' : '',
@@ -223,7 +190,7 @@ function ProgressDots({
   reduceMotion,
   onJump,
 }: {
-  people: PersonWithAudio[];
+  people: Person[];
   answers: Record<number, CharKey | null>;
   activePerson: number | null;
   reduceMotion: boolean;
@@ -274,14 +241,12 @@ function ActivePersonCard({
   person,
   matchedKey,
   matchedText,
-  audioLoading,
   reduceMotion,
   onClearSlot,
 }: {
-  person: PersonWithAudio;
+  person: Person;
   matchedKey: CharKey | null;
   matchedText: string | null;
-  audioLoading: boolean;
   reduceMotion: boolean;
   onClearSlot: () => void;
 }) {
@@ -304,12 +269,7 @@ function ActivePersonCard({
           {person.number}
         </span>
         <span className="text-base font-bold text-gray-800 flex-1 min-w-0 truncate">{person.name}</span>
-        <PersonAudioButton
-          audiob64={person.audio_b64}
-          audiomime={person.audio_mime}
-          name={person.name}
-          loading={audioLoading}
-        />
+        <PersonAudioButton audioUrl={person.audio_url} name={person.name} />
       </div>
 
       <div className="px-4 pb-4">
@@ -507,8 +467,7 @@ export function KETShortTalksPractice({
   const [personResults, setPersonResults] = useState<PersonResult[]>([]);
   const [correctCount, setCorrectCount] = useState(0);
   const [characteristics, setCharacteristics] = useState<Characteristic[]>([]);
-  const [audioLoading, setAudioLoading] = useState<Set<number>>(new Set());
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<{ code?: string; message?: string } | null>(null);
   const [isNewSession, setIsNewSession] = useState(false);
   const [draggingKey, setDraggingKey] = useState<CharKey | null>(null);
   const initStartedRef = useRef(false);
@@ -518,37 +477,6 @@ export function KETShortTalksPractice({
     useSensor(TouchSensor, { activationConstraint: { delay: 120, tolerance: 8 } }),
     useSensor(KeyboardSensor)
   );
-
-  /**
-   * Phase 2 of two-phase loading: fetches each person's TTS audio in parallel
-   * and patches it into the exercise as each one resolves, so players activate
-   * progressively instead of blocking the whole screen.
-   */
-  async function loadAudiosInBackground(people: Person[]) {
-    setAudioLoading(new Set(people.map((p) => p.number)));
-    await Promise.all(
-      people.map(async (p) => {
-        const audio = await generateKETPersonAudioAction(p.monologue).catch(() => ({
-          audio_b64: '',
-          audio_mime: 'audio/L16;codec=pcm;rate=24000',
-        }));
-        setExercise((prev) => {
-          if (!prev) return prev;
-          return {
-            ...prev,
-            people: prev.people.map((pp) =>
-              pp.number === p.number ? { ...pp, audio_b64: audio.audio_b64, audio_mime: audio.audio_mime } : pp
-            ),
-          };
-        });
-        setAudioLoading((prev) => {
-          const next = new Set(prev);
-          next.delete(p.number);
-          return next;
-        });
-      })
-    );
-  }
 
   useEffect(() => {
     if (initStartedRef.current) return;
@@ -567,31 +495,29 @@ export function KETShortTalksPractice({
           setPhase('finished');
         } else {
           setPhase('ready');
-          void loadAudiosInBackground(restored.exercise.people);
         }
         return;
       }
 
-      if (boot.kind === 'restore-failed') { setErrorMsg('Could not restore session. Please start a new one.'); return; }
+      if (boot.kind === 'restore-failed') { setLoadError({ message: 'Could not restore session. Please start a new one.' }); return; }
 
       setIsNewSession(true);
       setPhase('generating');
 
       const plan = await generateKETShortTalksPlanAction();
 
-      if ('error' in plan) {
-        setErrorMsg(plan.error);
+      if (!plan.ok) {
+        setLoadError({ code: plan.code });
         return;
       }
       setExercise({
-        people: plan.people.map((p) => ({ ...p, audio_b64: '', audio_mime: 'audio/L16;codec=pcm;rate=24000' })),
-        characteristics: plan.characteristics,
+        people: plan.data.people,
+        characteristics: plan.data.characteristics,
+        bank_group_id: plan.data.bank_group_id,
       });
-      setFramingText(plan.framing_text);
-      setCharacteristics(plan.characteristics);
+      setFramingText(plan.data.framing_text);
+      setCharacteristics(plan.data.characteristics);
       setPhase('ready');
-
-      void loadAudiosInBackground(plan.people);
     }
 
     void init();
@@ -680,14 +606,11 @@ export function KETShortTalksPractice({
       sessionId,
       framing_text: framingText,
       answers,
-      exercise: {
-        people: exercise.people,
-        characteristics: exercise.characteristics,
-      },
+      exercise,
     });
 
     if ('error' in result) {
-      setErrorMsg(result.error);
+      setLoadError({ message: result.error });
       setPhase('ready');
       return;
     }
@@ -711,20 +634,7 @@ export function KETShortTalksPractice({
   const allMatched = exercise ? matchedCount === total : false;
   const progressPct = total > 0 ? (matchedCount / total) * 100 : 0;
 
-  if (errorMsg) {
-    return (
-      <div className="flex flex-col items-center justify-center gap-4 p-8 text-center min-h-[40vh]">
-        <p className="text-red-500 font-semibold">{errorMsg}</p>
-        <button
-          type="button"
-          onClick={onBack}
-          className="px-5 py-2 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition-colors text-sm"
-        >
-          Back
-        </button>
-      </div>
-    );
-  }
+  if (loadError) return <ActivityLoadError {...loadError} onBack={onBack} />;
 
   const charByKey = new Map(characteristics.map((c) => [c.key, c]));
 
@@ -818,7 +728,6 @@ export function KETShortTalksPractice({
                 person={activeData.person}
                 matchedKey={activeData.matchedKey}
                 matchedText={activeData.matchedText}
-                audioLoading={audioLoading.has(activeData.person.number)}
                 reduceMotion={!!reduceMotion}
                 onClearSlot={handleClearActiveSlot}
               />

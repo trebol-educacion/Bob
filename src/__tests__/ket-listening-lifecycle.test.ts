@@ -12,6 +12,10 @@ vi.mock('@/lib/prompts/db-prompts', () => ({ getPrompt: vi.fn(async () => 'promp
 vi.mock('@/lib/gemini-client', () => ({ callGemini: vi.fn(async () => ({ ok: false })), isOk: () => false }));
 vi.mock('@/actions/modes/yl', () => ({ generateYLImagesParallelAction: vi.fn() }));
 vi.mock('@/actions/gemini', () => ({ generateSpeechAction: vi.fn(async () => ({ data: '', mimeType: 'audio/wav' })) }));
+vi.mock('@/lib/item-bank/plan-bank', async (original) => ({
+  ...(await original<typeof import('@/lib/item-bank/plan-bank')>()),
+  pickPlan: async () => ({ ok: false, code: 'no_content', retryable: false }),
+}));
 
 import { generateKETListenAndChooseAction, submitKETListenAnswersAction } from '@/actions/modes/ket-listening-part1';
 import { generateKETListenCompleteAction, submitKETListenCompleteAction } from '@/actions/modes/ket-listening-part2';
@@ -40,8 +44,8 @@ const CASES = [
             question: 'q',
             options: [{ id: 'A', description: 'd', image_prompt: 'p', image_url: 'u' }],
             correct_option: 'A',
-            ...EMPTY_AUDIO,
-            audio_b64: 'AUDIO',
+            audio_url: 'https://cdn/a.mp3',
+            bank_group_id: 'g1',
           },
         ] as never,
       }),
@@ -54,7 +58,7 @@ const CASES = [
       submitKETListenCompleteAction({
         framing_text: 'f',
         answers: { 1: 'cat' },
-        exercise: { context: 'c', form_title: 't', transcript: 'x', gaps: [{ number: 1, label: 'l', answer: 'cat' }] } as never,
+        exercise: { context: 'c', form_title: 't', transcript: 'x', gaps: [{ number: 1, label: 'l', answer: 'cat' }], audio_url: 'https://cdn/a.mp3', bank_group_id: 'g1' } as never,
       }),
   },
   {
@@ -65,7 +69,7 @@ const CASES = [
       submitKETListenDecideAction({
         framing_text: 'f',
         answers: { 1: 'A' },
-        exercise: { context: 'c', conversation: [], items: [{ number: 1, question: 'q', options, answer: 'A' }] } as never,
+        exercise: { context: 'c', conversation: [], items: [{ number: 1, question: 'q', options, answer: 'A' }], audio_url: 'https://cdn/a.mp3', bank_group_id: 'g1' } as never,
       }),
   },
   {
@@ -77,8 +81,9 @@ const CASES = [
         framing_text: 'f',
         answers: { 1: 'A' },
         exercise: {
-          people: [{ number: 1, name: 'n', monologue: 'm', correct_key: 'A', audio_b64: 'AUDIO' }],
+          people: [{ number: 1, name: 'n', monologue: 'm', correct_key: 'A', audio_url: 'https://cdn/a.mp3' }],
           characteristics: [],
+          bank_group_id: 'g1',
         } as never,
       }),
   },
@@ -90,7 +95,7 @@ const CASES = [
       submitKETTFDSAction({
         framing_text: 'f',
         answers: { 1: 'T' },
-        exercise: { context: 'c', audio: [], statements: [{ number: 1, text: 's', verdict: 'T' }], audio_b64: 'AUDIO' } as never,
+        exercise: { context: 'c', audio: [], statements: [{ number: 1, text: 's', verdict: 'T' }], audio_url: 'https://cdn/a.mp3', bank_group_id: 'g1' } as never,
       }),
   },
 ];
@@ -107,14 +112,16 @@ describe.each(CASES)('$mode', ({ mode, planKind, generate, submit }) => {
     expect(completeMock).not.toHaveBeenCalled();
   });
 
-  it('submit cierra con completeActivity una vez, sin audio en el plan', async () => {
+  it('submit cierra con completeActivity una vez, con la URL del audio y el sello del banco', async () => {
     const result = await submit();
     expect(completeMock).toHaveBeenCalledTimes(1);
     const call = completeMock.mock.calls[0][0];
     expect(call.mode).toBe(mode);
     expect(call.plan.kind).toBe(planKind);
     expect(call.plan.framing_text).toBe('f');
-    expect(JSON.stringify(call.plan)).not.toContain('AUDIO');
+    expect(JSON.stringify(call.plan)).toContain('https://cdn/a.mp3');
+    expect(JSON.stringify(call.plan)).not.toContain('audio_b64');
+    expect(call.bank).toEqual({ exam_part: mode.replace('cambridge_ket_', 'ket_'), bank_group_id: 'g1' });
     expect(call.evaluation.score_max).toBe(1);
     expect(call.answers).toHaveLength(1);
     expect(result).toMatchObject({ sessionId: 'new-session' });
@@ -143,5 +150,13 @@ describe('restore y audio', () => {
     expect(restored?.exercise[0]).toMatchObject({ number: 1, audio_b64: '' });
     expect(restored?.results).toEqual([{ n: 1 }]);
     expect(restored?.correctCount).toBe(1);
+  });
+
+  it('restoreExercise conserva la URL del audio del plan persistido', () => {
+    const messages = [
+      { role: 'bob', msg_type: 'text', content_json: { kind: 'listen_decide_plan', framing_text: 'f', exercise: { audio_url: 'https://cdn/a.mp3', bank_group_id: 'g1' } } },
+    ];
+    const restored = restoreExercise<{ audio_url: string }, unknown>(messages as never, 'listen_decide_plan', 'item_results');
+    expect(restored?.exercise.audio_url).toBe('https://cdn/a.mp3');
   });
 });

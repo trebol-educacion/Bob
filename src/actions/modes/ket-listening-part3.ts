@@ -1,46 +1,18 @@
 'use server';
 
-import { z } from 'zod';
 import { getPrompt } from '@/lib/prompts/db-prompts';
 import { stripDashes } from '@/lib/text';
-import { callGemini, isOk } from '@/lib/gemini-client';
+import { pickPlan, bankStamp } from '@/lib/item-bank/plan-bank';
+import { fail, ok, type ActionResult } from '@/lib/result';
+import { KetListenDecidePlanSchema, type KetListenDecidePlan } from '@/lib/bank-plans/ket-listening-part3';
 import { currentUserId } from '@/lib/session/lifecycle';
 import { completeActivity } from '@/lib/session/complete';
-import { withoutAudio } from '@/lib/ket/plan';
-import { generateSpeechAction } from '@/actions/gemini';
-import { MODELS } from '@/lib/models';
 
-const ConversationTurnSchema = z.object({
-  speaker: z.enum(['M', 'W']),
-  line: z.string(),
-});
+export type ConversationTurn = KetListenDecidePlan['conversation'][number];
+export type ListenDecideItem = KetListenDecidePlan['items'][number];
 
-const ItemSchema = z.object({
-  number: z.number().int().min(1).max(5),
-  question: z.string(),
-  options: z.object({
-    A: z.string(),
-    B: z.string(),
-    C: z.string(),
-  }),
-  answer: z.enum(['A', 'B', 'C']),
-});
-
-const GenerationSchema = z.object({
-  context: z.string(),
-  conversation: z.array(ConversationTurnSchema).min(4),
-  items: z.array(ItemSchema).length(5),
-});
-
-export type ConversationTurn = z.infer<typeof ConversationTurnSchema>;
-export type ListenDecideItem = z.infer<typeof ItemSchema>;
-
-export interface ListenDecideExercise {
-  context: string;
-  conversation: ConversationTurn[];
-  items: ListenDecideItem[];
-  audio_b64: string;
-  audio_mime: string;
+export interface ListenDecideExercise extends KetListenDecidePlan {
+  bank_group_id?: string;
 }
 
 export interface ListenDecideResult {
@@ -63,87 +35,35 @@ export interface ListenDecideSubmitResult {
   conversation: ConversationTurn[];
 }
 
-function buildConversationText(turns: ConversationTurn[]): string {
-  return turns
-    .map((t) => `${t.speaker === 'M' ? 'Man' : 'Woman'}: ${t.line}`)
-    .join('\n');
-}
+const FRAMING_FALLBACK =
+  'You will hear a conversation between two people. Listen carefully and choose the best answer, A, B or C, for each question.';
 
-function safeParse<T>(schema: z.ZodType<T>, raw: string): T | null {
-  try {
-    return schema.parse(JSON.parse(raw));
-  } catch {
-    return null;
-  }
-}
+export async function generateKETListenDecideAction(): Promise<ActionResult<ListenDecideResult>> {
+  const userId = await currentUserId();
+  if (!userId) return fail('unauthenticated');
 
-export async function generateKETListenDecideAction(): Promise<ListenDecideResult | { error: string }> {
-  const userId = (await currentUserId()) ?? undefined;
-  if (!userId) return { error: 'Not authenticated' };
+  const picked = await pickPlan({
+    exam: 'ket',
+    cefr: 'a2',
+    examPart: 'ket_listening_part3',
+    skill: 'listening',
+    schema: KetListenDecidePlanSchema,
+    userId,
+  });
+  if (!picked.ok) return picked;
 
-  const [generationPrompt, framingText] = await Promise.all([
-    getPrompt('cambridge_ket_listening_part3_a2_generation').catch(() => null),
-    getPrompt('cambridge_ket_listening_part3_a2_framing').catch(
-      () => 'You will hear a conversation between two people. Listen carefully and choose the best answer, A, B or C, for each question.'
-    ),
-  ]);
-
-  const cleanFramingText = stripDashes(framingText);
-
-  if (!generationPrompt) return { error: 'Could not load generation prompt' };
-
-  const geminiResult = await callGemini(
-    { promptKey: 'cambridge_ket_listening_part3_a2_generation', model: MODELS.FLASH_LITE, userId },
-    (ai) =>
-      ai.models.generateContent({
-        model: MODELS.FLASH_LITE,
-        contents: [{ role: 'user', parts: [{ text: generationPrompt }] }],
-        config: { responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
-      })
-  );
-
-  if (!isOk(geminiResult)) return { error: 'Could not generate exercise' };
-
-  const rawText = geminiResult.data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
-  const parsed = safeParse(GenerationSchema, rawText);
-  if (!parsed) return { error: 'Unexpected model response' };
-
-  const cleanItems: ListenDecideItem[] = parsed.items.map((item) => ({
-    ...item,
-    question: stripDashes(item.question),
-    options: {
-      A: stripDashes(item.options.A),
-      B: stripDashes(item.options.B),
-      C: stripDashes(item.options.C),
-    },
-  }));
-
-  const exercise: ListenDecideExercise = {
-    context: stripDashes(parsed.context),
-    conversation: parsed.conversation,
-    items: cleanItems,
-    audio_b64: '',
-    audio_mime: 'audio/L16;codec=pcm;rate=24000',
-  };
-
-  return {
-    framing_text: cleanFramingText,
-    exercise,
-  };
-}
-
-/** Generates the TTS audio for a Listen and Decide conversation, off the critical path. */
-export async function generateKETListenDecideAudioAction(input: {
-  conversation: ConversationTurn[];
-}): Promise<{ data: string; mimeType: string }> {
-  return generateSpeechAction(buildConversationText(input.conversation));
+  const framingText = await getPrompt('cambridge_ket_listening_part3_a2_framing').catch(() => FRAMING_FALLBACK);
+  return ok({
+    framing_text: stripDashes(framingText),
+    exercise: { ...picked.data.plan, bank_group_id: picked.data.groupId },
+  });
 }
 
 export async function submitKETListenDecideAction(input: {
   sessionId?: string;
   framing_text: string;
   answers: Record<number, 'A' | 'B' | 'C'>;
-  exercise: Omit<ListenDecideExercise, 'audio_b64' | 'audio_mime'>;
+  exercise: ListenDecideExercise;
 }): Promise<ListenDecideSubmitResult | { error: string }> {
   const item_results: ItemResult[] = input.exercise.items.map((item) => {
     const chosen = input.answers[item.number] ?? 'A';
@@ -160,7 +80,8 @@ export async function submitKETListenDecideAction(input: {
   const completed = await completeActivity({
     mode: 'cambridge_ket_listening_part3',
     sessionId: input.sessionId,
-    plan: { kind: 'listen_decide_plan', framing_text: input.framing_text, exercise: withoutAudio(input.exercise) },
+    bank: bankStamp('ket_listening_part3', input.exercise.bank_group_id),
+    plan: { kind: 'listen_decide_plan', framing_text: input.framing_text, exercise: input.exercise },
     answers: item_results.map((r) => ({
         kind: 'listen_decide_answer',
         item_number: r.number,

@@ -9,7 +9,7 @@ import { KETListeningIcon } from '@/components/icons/KETIcons';
 import { CelebrationCard } from '@/components/practice/yl/CelebrationCard';
 import { BobMascotLoader } from '@/components/chat/BobMascotLoader';
 import { BobAvatar } from '@/components/practice/yl/_shared';
-import { pcmToWavBase64 } from '@/lib/audio';
+import { ActivityLoadError } from '@/components/practice/ActivityLoadError';
 import {
   generateKETListenAndChooseAction,
   submitKETListenAnswersAction,
@@ -84,8 +84,10 @@ function ReplayIcon() {
   );
 }
 
-function AudioPlayer({ audiob64, audiomime, itemNumber }: { audiob64: string; audiomime: string; itemNumber: number }) {
+function AudioPlayer({ audioUrl, itemNumber }: { audioUrl: string; itemNumber: number }) {
   const t = useTranslations('cambridge');
+  const tErrors = useTranslations('errors');
+  const [failed, setFailed] = useState(false);
   const reduceMotion = useReducedMotion();
   const [playing, setPlaying] = useState(false);
   const [hasPlayed, setHasPlayed] = useState(false);
@@ -117,8 +119,8 @@ function AudioPlayer({ audiob64, audiomime, itemNumber }: { audiob64: string; au
 
     stopActiveAudio();
 
-    const url = pcmToWavBase64(audiob64, audiomime);
-    const audio = new Audio(url);
+    setFailed(false);
+    const audio = new Audio(audioUrl);
     audioRef.current = audio;
     _activeAudio = audio;
 
@@ -128,7 +130,7 @@ function AudioPlayer({ audiob64, audiomime, itemNumber }: { audiob64: string; au
       setProgress(1);
       setTimeout(() => setProgress(0), 600);
     };
-    audio.onerror = () => stopLocal();
+    audio.onerror = () => { stopLocal(); setFailed(true); };
 
     setPlaying(true);
     intervalRef.current = setInterval(() => {
@@ -139,10 +141,13 @@ function AudioPlayer({ audiob64, audiomime, itemNumber }: { audiob64: string; au
       await audio.play();
     } catch {
       stopLocal();
+      setFailed(true);
     }
   };
 
-  const label = playing
+  const label = failed
+    ? tErrors('retry')
+    : playing
     ? t('ket.listenAndChoose.playing')
     : hasPlayed
     ? t('ket.listenAndChoose.listenAgain')
@@ -300,8 +305,7 @@ function ListenCard({
         </div>
 
         <AudioPlayer
-          audiob64={item.audio_b64}
-          audiomime={item.audio_mime}
+          audioUrl={item.audio_url}
           itemNumber={item.number}
         />
 
@@ -538,7 +542,7 @@ export function KETListenAndChoosePractice({
   const [answers, setAnswers] = useState<Record<number, 'A' | 'B' | 'C'>>({});
   const [results, setResults] = useState<ListenAnswerResult[]>([]);
   const [correctCount, setCorrectCount] = useState(0);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<{ code?: string; message?: string } | null>(null);
   const [isNewSession, setIsNewSession] = useState(false);
   const initStartedRef = useRef(false);
 
@@ -572,12 +576,12 @@ export function KETListenAndChoosePractice({
 
       const result = await generateKETListenAndChooseAction();
 
-      if ('error' in result) {
-        setErrorMsg(result.error);
+      if (!result.ok) {
+        setLoadError({ code: result.code });
         return;
       }
-      setItems(result.items);
-      setFramingText(result.framingText);
+      setItems(result.data.items);
+      setFramingText(result.data.framingText);
       setPhase('ready');
     }
 
@@ -600,7 +604,7 @@ export function KETListenAndChoosePractice({
     });
 
     if ('error' in result) {
-      setErrorMsg(result.error);
+      setLoadError({ message: result.error });
       setPhase('ready');
       return;
     }
@@ -617,20 +621,7 @@ export function KETListenAndChoosePractice({
   const allAnswered = answeredCount === items.length && items.length > 0;
   const progressPct = items.length > 0 ? (answeredCount / items.length) * 100 : 0;
 
-  if (errorMsg) {
-    return (
-      <div className="flex flex-col items-center justify-center gap-4 p-8 text-center min-h-[40vh]">
-        <p className="text-red-500 font-semibold">{errorMsg}</p>
-        <button
-          type="button"
-          onClick={onBack}
-          className="px-5 py-2 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition-colors text-sm"
-        >
-          {t('ket.listenAndChoose.back')}
-        </button>
-      </div>
-    );
-  }
+  if (loadError) return <ActivityLoadError {...loadError} onBack={onBack} />;
 
   return (
     <div className="flex flex-col h-full relative">

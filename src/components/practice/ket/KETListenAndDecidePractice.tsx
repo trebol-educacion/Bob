@@ -6,10 +6,9 @@ import { Check } from 'lucide-react';
 import { KETListeningIcon } from '@/components/icons/KETIcons';
 import { CelebrationCard } from '@/components/practice/yl/CelebrationCard';
 import { BobMascotLoader } from '@/components/chat/BobMascotLoader';
-import { pcmToWavBase64 } from '@/lib/audio';
+import { ActivityLoadError } from '@/components/practice/ActivityLoadError';
 import {
   generateKETListenDecideAction,
-  generateKETListenDecideAudioAction,
   submitKETListenDecideAction,
   type ListenDecideExercise,
   type ListenDecideItem,
@@ -37,7 +36,7 @@ export interface KETListenAndDecidePracticeProps {
 }
 
 type Phase = 'loading' | 'generating' | 'ready' | 'submitting' | 'finished';
-type AudioStatus = 'loading' | 'ready' | 'error';
+type AudioStatus = 'ready' | 'error';
 
 interface RestoredState {
   exercise: ListenDecideExercise;
@@ -88,27 +87,17 @@ function ReplayIcon() {
   );
 }
 
-function Spinner() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4 animate-spin" aria-hidden>
-      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeOpacity="0.25" strokeWidth="3" />
-      <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-    </svg>
-  );
-}
-
 function AudioPlayer({
-  audiob64,
-  audiomime,
+  audioUrl,
   status,
 }: {
-  audiob64: string;
-  audiomime: string;
+  audioUrl: string;
   status: AudioStatus;
 }) {
   const reduceMotion = useReducedMotion();
   const [playing, setPlaying] = useState(false);
   const [hasPlayed, setHasPlayed] = useState(false);
+  const [failed, setFailed] = useState(false);
   const [progress, setProgress] = useState(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -137,8 +126,8 @@ function AudioPlayer({
 
     stopActiveAudio();
 
-    const url = pcmToWavBase64(audiob64, audiomime);
-    const audio = new Audio(url);
+    setFailed(false);
+    const audio = new Audio(audioUrl);
     audioRef.current = audio;
     _activeAudio = audio;
 
@@ -148,7 +137,7 @@ function AudioPlayer({
       setProgress(1);
       setTimeout(() => setProgress(0), 600);
     };
-    audio.onerror = () => stopLocal();
+    audio.onerror = () => { stopLocal(); setFailed(true); };
 
     setPlaying(true);
     intervalRef.current = setInterval(() => {
@@ -159,34 +148,22 @@ function AudioPlayer({
       await audio.play();
     } catch {
       stopLocal();
+      setFailed(true);
     }
   };
 
-  if (status === 'error') {
+  if (status === 'error' || failed) {
     return (
       <div className="sticky top-0 z-10 bg-white/95 backdrop-blur-sm pb-2 pt-4">
         <div className="rounded-full ring-1 ring-gray-100 bg-gray-50 px-3 py-2 flex items-center gap-3 h-12">
           <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 bg-gray-200 text-gray-400">
             <PlayIcon />
           </div>
-          <p className="flex-1 text-sm font-semibold text-gray-400">Audio unavailable</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (status === 'loading') {
-    return (
-      <div className="sticky top-0 z-10 bg-white/95 backdrop-blur-sm pb-2 pt-4">
-        <div className="rounded-full ring-1 ring-sky-100 bg-sky-50 px-3 py-2 flex items-center gap-3 h-12">
-          <div
-            className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 text-white opacity-60"
-            style={{ background: ACCENT }}
-            aria-hidden
-          >
-            <Spinner />
-          </div>
-          <p className="flex-1 text-xs font-semibold" style={{ color: ACCENT_TEXT }}>Preparing audio…</p>
+          {failed ? (
+            <button type="button" onClick={() => setFailed(false)} className="flex-1 text-left text-sm font-semibold text-gray-600">Try again</button>
+          ) : (
+            <p className="flex-1 text-sm font-semibold text-gray-400">Audio unavailable</p>
+          )}
         </div>
       </div>
     );
@@ -514,13 +491,9 @@ export function KETListenAndDecidePractice({
   const [itemResults, setItemResults] = useState<ItemResult[]>([]);
   const [correctCount, setCorrectCount] = useState(0);
   const [conversation, setConversation] = useState<ConversationTurn[]>([]);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<{ code?: string; message?: string } | null>(null);
   const [isNewSession, setIsNewSession] = useState(false);
-  const [audioStatus, setAudioStatus] = useState<AudioStatus>('loading');
-  const [audioB64, setAudioB64] = useState('');
-  const [audioMime, setAudioMime] = useState('audio/L16;codec=pcm;rate=24000');
   const initStartedRef = useRef(false);
-  const audioStartedRef = useRef(false);
 
   useEffect(() => {
     if (initStartedRef.current) return;
@@ -543,53 +516,25 @@ export function KETListenAndDecidePractice({
         return;
       }
 
-      if (boot.kind === 'restore-failed') { setErrorMsg('Could not restore session. Please start a new one.'); return; }
+      if (boot.kind === 'restore-failed') { setLoadError({ message: 'Could not restore session. Please start a new one.' }); return; }
 
       setIsNewSession(true);
       setPhase('generating');
 
       const result = await generateKETListenDecideAction();
 
-      if ('error' in result) {
-        setErrorMsg(result.error);
+      if (!result.ok) {
+        setLoadError({ code: result.code });
         return;
       }
-      setExercise(result.exercise);
-      setFramingText(result.framing_text);
-      setConversation(result.exercise.conversation);
+      setExercise(result.data.exercise);
+      setFramingText(result.data.framing_text);
+      setConversation(result.data.exercise.conversation);
       setPhase('ready');
     }
 
     void init();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
-    if (audioStartedRef.current) return;
-    if (phase !== 'ready') return;
-    if (!conversation.length) return;
-    audioStartedRef.current = true;
-
-    let cancelled = false;
-    (async () => {
-      try {
-        const audio = await generateKETListenDecideAudioAction({ conversation });
-        if (cancelled) return;
-        if (audio.data) {
-          setAudioB64(audio.data);
-          setAudioMime(audio.mimeType);
-          setAudioStatus('ready');
-        } else {
-          setAudioStatus('error');
-        }
-      } catch {
-        if (!cancelled) setAudioStatus('error');
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [phase, conversation]);
 
   async function handleSubmit() {
     if (!exercise) return;
@@ -604,7 +549,7 @@ export function KETListenAndDecidePractice({
     });
 
     if ('error' in result) {
-      setErrorMsg(result.error);
+      setLoadError({ message: result.error });
       setPhase('ready');
       return;
     }
@@ -622,20 +567,7 @@ export function KETListenAndDecidePractice({
   const allAnswered = exercise ? answeredCount === exercise.items.length : false;
   const progressPct = exercise && exercise.items.length > 0 ? (answeredCount / exercise.items.length) * 100 : 0;
 
-  if (errorMsg) {
-    return (
-      <div className="flex flex-col items-center justify-center gap-4 p-8 text-center min-h-[40vh]">
-        <p className="text-red-500 font-semibold">{errorMsg}</p>
-        <button
-          type="button"
-          onClick={onBack}
-          className="px-5 py-2 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition-colors text-sm"
-        >
-          Back
-        </button>
-      </div>
-    );
-  }
+  if (loadError) return <ActivityLoadError {...loadError} onBack={onBack} />;
 
   return (
     <div className="flex flex-col h-full relative">
@@ -694,7 +626,7 @@ export function KETListenAndDecidePractice({
         <>
           <div className="flex-1 overflow-y-auto px-4 pb-4">
             <div className="mx-auto w-full max-w-lg space-y-4">
-              <AudioPlayer audiob64={audioB64} audiomime={audioMime} status={audioStatus} />
+              <AudioPlayer audioUrl={exercise?.audio_url ?? ''} status={exercise?.audio_url ? 'ready' : 'error'} />
 
               <div className="flex items-start gap-3 rounded-3xl border border-gray-100 shadow-sm px-4 py-3" style={{ background: CARD_SURFACE }}>
                 <span

@@ -1,46 +1,22 @@
 'use server';
 
-import { z } from 'zod';
 import { getPrompt } from '@/lib/prompts/db-prompts';
-import { callGemini, isOk } from '@/lib/gemini-client';
+import { pickPlan, bankStamp } from '@/lib/item-bank/plan-bank';
+import { fail, ok, type ActionResult } from '@/lib/result';
+import { KetShortTalksPlanSchema, KET_CHAR_KEYS, type KetShortTalksPlan } from '@/lib/bank-plans/ket-listening-part4';
 import { currentUserId } from '@/lib/session/lifecycle';
 import { completeActivity } from '@/lib/session/complete';
-import { withoutAudio } from '@/lib/ket/plan';
-import { generateSpeechAction } from '@/actions/gemini';
-import { MODELS } from '@/lib/models';
 import { stripDashes } from '@/lib/text';
 
-export type CharKey = 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G' | 'H';
-const CHAR_KEYS: CharKey[] = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+export type CharKey = (typeof KET_CHAR_KEYS)[number];
 
-const PersonSchema = z.object({
-  number: z.number().int().min(1).max(5),
-  name: z.string(),
-  monologue: z.string(),
-  correct_key: z.enum(CHAR_KEYS),
-});
-
-const CharacteristicSchema = z.object({
-  key: z.enum(CHAR_KEYS),
-  text: z.string(),
-});
-
-const GenerationSchema = z.object({
-  people: z.array(PersonSchema).length(5),
-  characteristics: z.array(CharacteristicSchema).length(8),
-});
-
-export type Person = z.infer<typeof PersonSchema>;
-export type Characteristic = z.infer<typeof CharacteristicSchema>;
-
-export interface PersonWithAudio extends Person {
-  audio_b64: string;
-  audio_mime: string;
-}
+export type Person = KetShortTalksPlan['people'][number];
+export type Characteristic = KetShortTalksPlan['characteristics'][number];
 
 export interface ShortTalksExercise {
-  people: PersonWithAudio[];
+  people: Person[];
   characteristics: Characteristic[];
+  bank_group_id?: string;
 }
 
 export interface ShortTalksResult {
@@ -48,11 +24,11 @@ export interface ShortTalksResult {
   exercise: ShortTalksExercise;
 }
 
-/** Plan without audio, returned by the fast first-phase action. */
 export interface ShortTalksPlan {
   framing_text: string;
   people: Person[];
   characteristics: Characteristic[];
+  bank_group_id: string;
 }
 
 export interface PersonResult {
@@ -71,92 +47,32 @@ export interface ShortTalksSubmitResult {
   characteristics: Characteristic[];
 }
 
-function safeParse<T>(schema: z.ZodType<T>, raw: string): T | null {
-  try {
-    return schema.parse(JSON.parse(raw));
-  } catch {
-    return null;
-  }
-}
+const FRAMING_FALLBACK =
+  'You will hear five people talking about themselves. Match each person to the correct description, A to H. There are three descriptions you do not need.';
 
-/**
- * Phase 1, fast (~3s): generates text only, no TTS.
- * The component calls this first, renders the exercise immediately,
- * then loads audio per person in the background via generateKETPersonAudioAction.
- */
-export async function generateKETShortTalksPlanAction(): Promise<ShortTalksPlan | { error: string }> {
-  const t0 = Date.now();
-  const userId = (await currentUserId()) ?? undefined;
-  if (!userId) return { error: 'Not authenticated' };
+export async function generateKETShortTalksPlanAction(): Promise<ActionResult<ShortTalksPlan>> {
+  const userId = await currentUserId();
+  if (!userId) return fail('unauthenticated');
 
-  const tSession = Date.now();
+  const picked = await pickPlan({
+    exam: 'ket',
+    cefr: 'a2',
+    examPart: 'ket_listening_part4',
+    skill: 'listening',
+    schema: KetShortTalksPlanSchema,
+    userId,
+  });
+  if (!picked.ok) return picked;
 
-  const [generationPrompt, framingTextRaw] = await Promise.all([
-    getPrompt('cambridge_ket_listening_part4_a2_generation').catch(() => null),
-    getPrompt('cambridge_ket_listening_part4_a2_framing').catch(
-      () => 'You will hear five people talking about themselves. Match each person to the correct description, A to H. There are three descriptions you do not need.'
-    ),
-  ]);
-
-  const tPrompts = Date.now();
-
-  if (!generationPrompt) return { error: 'Could not load generation prompt' };
-
-  const geminiResult = await callGemini(
-    { promptKey: 'cambridge_ket_listening_part4_a2_generation', model: MODELS.FLASH_LITE, userId },
-    (ai) =>
-      ai.models.generateContent({
-        model: MODELS.FLASH_LITE,
-        contents: [{ role: 'user', parts: [{ text: generationPrompt }] }],
-        config: { responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
-      })
-  );
-
-  if (!isOk(geminiResult)) return { error: 'Could not generate exercise' };
-
-  const rawText = geminiResult.data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
-  const parsed = safeParse(GenerationSchema, rawText);
-  if (!parsed) return { error: 'Unexpected model response' };
-
-  const tGemini = Date.now();
-  console.info(
-    `[ket-listening-part4] session=${tSession - t0}ms prompts=${tPrompts - tSession}ms gemini=${tGemini - tPrompts}ms total=${tGemini - t0}ms`
-  );
-
-  const framingText = stripDashes(framingTextRaw);
-  const people: Person[] = parsed.people.map((p) => ({
-    ...p,
-    name: stripDashes(p.name),
-    monologue: stripDashes(p.monologue),
-  }));
-  const characteristics: Characteristic[] = parsed.characteristics.map((c) => ({
-    ...c,
-    text: stripDashes(c.text),
-  }));
-
-  return {
-    framing_text: framingText,
-    people,
-    characteristics,
-  };
-}
-
-/** Phase 2, generates TTS for a single person monologue (~7-9s, cached). */
-export async function generateKETPersonAudioAction(
-  monologue: string
-): Promise<{ audio_b64: string; audio_mime: string }> {
-  const result = await generateSpeechAction(monologue).catch(() => ({
-    data: '',
-    mimeType: 'audio/L16;codec=pcm;rate=24000',
-  }));
-  return { audio_b64: result.data, audio_mime: result.mimeType };
+  const framingText = await getPrompt('cambridge_ket_listening_part4_a2_framing').catch(() => FRAMING_FALLBACK);
+  return ok({ framing_text: stripDashes(framingText), ...picked.data.plan, bank_group_id: picked.data.groupId });
 }
 
 export async function submitKETShortTalksAction(input: {
   sessionId?: string;
   framing_text: string;
   answers: Record<number, CharKey | null>;
-  exercise: { people: Person[]; characteristics: Characteristic[] };
+  exercise: ShortTalksExercise;
 }): Promise<ShortTalksSubmitResult | { error: string }> {
   const person_results: PersonResult[] = input.exercise.people.map((p) => {
     const chosen = input.answers[p.number] ?? null;
@@ -174,7 +90,8 @@ export async function submitKETShortTalksAction(input: {
   const completed = await completeActivity({
     mode: 'cambridge_ket_listening_part4',
     sessionId: input.sessionId,
-    plan: { kind: 'short_talks_plan', framing_text: input.framing_text, exercise: withoutAudio(input.exercise) },
+    bank: bankStamp('ket_listening_part4', input.exercise.bank_group_id),
+    plan: { kind: 'short_talks_plan', framing_text: input.framing_text, exercise: input.exercise },
     answers: person_results.map((r) => ({
         kind: 'short_talks_answer',
         person_number: r.number,

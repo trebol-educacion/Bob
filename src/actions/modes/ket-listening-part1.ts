@@ -1,42 +1,15 @@
 'use server';
 
-import { z } from 'zod';
-import { getPrompt } from '@/lib/prompts/db-prompts';
 import { stripDashes } from '@/lib/text';
-import { callGemini, isOk } from '@/lib/gemini-client';
+import { getPrompt } from '@/lib/prompts/db-prompts';
+import { pickPlan, bankStamp } from '@/lib/item-bank/plan-bank';
+import { fail, ok, type ActionResult } from '@/lib/result';
 import { currentUserId } from '@/lib/session/lifecycle';
 import { completeActivity } from '@/lib/session/complete';
-import { withoutAudio } from '@/lib/ket/plan';
-import { generateSpeechAction } from '@/actions/gemini';
-import { generateYLImagesParallelAction } from '@/actions/modes/yl';
-import { MODELS } from '@/lib/models';
+import { KetListenChoosePlanSchema, type KetListenChoosePlan } from '@/lib/bank-plans/ket-listening-part1';
 
-const DialogueTurnSchema = z.object({
-  speaker: z.enum(['M', 'W']),
-  line: z.string(),
-});
-
-const ListenOptionSchema = z.object({
-  id: z.enum(['A', 'B', 'C']),
-  description: z.string(),
-  image_prompt: z.string(),
-});
-
-const ListenItemSchema = z.object({
-  number: z.number().int().min(1).max(5),
-  context: z.string(),
-  dialogue: z.array(DialogueTurnSchema).min(2).max(4),
-  question: z.string(),
-  options: z.array(ListenOptionSchema).length(3),
-  correct_option: z.enum(['A', 'B', 'C']),
-});
-
-const GenerationSchema = z.object({
-  items: z.array(ListenItemSchema).length(5),
-});
-
-export type ListenDialogueTurn = z.infer<typeof DialogueTurnSchema>;
-export type ListenOption = z.infer<typeof ListenOptionSchema>;
+export type ListenDialogueTurn = KetListenChoosePlan['items'][number]['dialogue'][number];
+export type ListenOption = KetListenChoosePlan['items'][number]['options'][number];
 
 /** A single Listen and Choose item with resolved image URLs and audio. */
 export interface ListenItem {
@@ -44,11 +17,10 @@ export interface ListenItem {
   context: string;
   dialogue: ListenDialogueTurn[];
   question: string;
-  options: Array<ListenOption & { image_url: string }>;
+  options: ListenOption[];
   correct_option: 'A' | 'B' | 'C';
-  /** Base64 TTS audio of the full dialogue. */
-  audio_b64: string;
-  audio_mime: string;
+  audio_url: string;
+  bank_group_id?: string;
 }
 
 /** Full result returned from generateKETListenAndChooseAction. */
@@ -74,104 +46,26 @@ export interface KETListenSubmitResult {
   results: ListenAnswerResult[];
 }
 
-function buildDialogueText(dialogue: ListenDialogueTurn[]): string {
-  return dialogue
-    .map((turn) => `${turn.speaker === 'M' ? 'Man' : 'Woman'}: ${turn.line}`)
-    .join('\n');
-}
+const FRAMING_FALLBACK =
+  'You will hear 5 short conversations. After each one, choose the picture that matches what you heard, A, B or C.';
 
-function safeParse<T>(schema: z.ZodType<T>, raw: string): T | null {
-  try {
-    return schema.parse(JSON.parse(raw));
-  } catch {
-    return null;
-  }
-}
+export async function generateKETListenAndChooseAction(): Promise<ActionResult<KETListeningResult>> {
+  const userId = await currentUserId();
+  if (!userId) return fail('unauthenticated');
 
-/**
- * Generates 5 KET A2 Listen and Choose items.
- * Pre-generates all TTS audio and scene images in parallel before returning.
- * Persists nothing until the first submit.
- */
-export async function generateKETListenAndChooseAction(): Promise<KETListeningResult | { error: string }> {
-  const userId = (await currentUserId()) ?? undefined;
-  if (!userId) return { error: 'Not authenticated' };
-
-  const [generationPrompt, framingText] = await Promise.all([
-    getPrompt('cambridge_ket_listening_part1_a2_generation').catch(() => null),
-    getPrompt('cambridge_ket_listening_part1_a2_framing').catch(
-      () =>
-        'You will hear 5 short conversations. After each one, choose the picture that matches what you heard, A, B or C.'
-    ),
-  ]);
-
-  if (!generationPrompt) {
-    return { error: 'Could not load generation prompt' };
-  }
-
-  const cleanFramingText = stripDashes(framingText);
-
-  const geminiResult = await callGemini(
-    { promptKey: 'cambridge_ket_listening_part1_a2_generation', model: MODELS.FLASH_LITE_PREVIEW, userId },
-    (ai) =>
-      ai.models.generateContent({
-        model: MODELS.FLASH_LITE_PREVIEW,
-        contents: [{ role: 'user', parts: [{ text: generationPrompt }] }],
-        config: { responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
-      })
-  );
-
-  if (!isOk(geminiResult)) {
-    return { error: 'Could not generate items' };
-  }
-
-  const rawText = geminiResult.data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
-  const parsed = safeParse(GenerationSchema, rawText);
-
-  if (!parsed) {
-    return { error: 'Unexpected model response' };
-  }
-
-  const allImagePrompts = parsed.items.flatMap((item) => item.options.map((opt) => opt.image_prompt));
-  const audioPromises = parsed.items.map((item) =>
-    generateSpeechAction(buildDialogueText(item.dialogue)).catch(() => ({
-      data: '',
-      mimeType: 'audio/L16;codec=pcm;rate=24000',
-    }))
-  );
-
-  const [allImageUrls, audios] = await Promise.all([
-    generateYLImagesParallelAction('starters', 1, allImagePrompts, userId, undefined, 'scene').catch(
-      () => allImagePrompts.map(() => '')
-    ),
-    Promise.all(audioPromises),
-  ]);
-
-  const resolvedItems: ListenItem[] = parsed.items.map((item, itemIdx) => {
-    const sliceStart = itemIdx * 3;
-    const imageUrls = allImageUrls.slice(sliceStart, sliceStart + 3);
-    const optionsWithImages = item.options.map((opt, optIdx) => ({
-      ...opt,
-      description: stripDashes(opt.description),
-      image_url: imageUrls[optIdx] ?? '',
-    }));
-    const audio = audios[itemIdx] ?? { data: '', mimeType: 'audio/L16;codec=pcm;rate=24000' };
-    return {
-      number: item.number,
-      context: stripDashes(item.context),
-      dialogue: item.dialogue,
-      question: stripDashes(item.question),
-      options: optionsWithImages,
-      correct_option: item.correct_option,
-      audio_b64: audio.data,
-      audio_mime: audio.mimeType,
-    } satisfies ListenItem;
+  const picked = await pickPlan({
+    exam: 'ket',
+    cefr: 'a2',
+    examPart: 'ket_listening_part1',
+    skill: 'listening',
+    schema: KetListenChoosePlanSchema,
+    userId,
   });
+  if (!picked.ok) return picked;
 
-  return {
-    framingText: cleanFramingText,
-    items: resolvedItems,
-  };
+  const framingText = await getPrompt('cambridge_ket_listening_part1_a2_framing').catch(() => FRAMING_FALLBACK);
+  const items = picked.data.plan.items.map((item) => ({ ...item, bank_group_id: picked.data.groupId }));
+  return ok({ framingText: stripDashes(framingText), items });
 }
 
 /**
@@ -201,16 +95,18 @@ export async function submitKETListenAnswersAction(input: {
   const completed = await completeActivity({
     mode: 'cambridge_ket_listening_part1',
     sessionId: input.sessionId,
+    bank: bankStamp('ket_listening_part1', input.items[0]?.bank_group_id),
     plan: {
       kind: 'listening_plan',
       framing_text: input.framingText,
-      items: withoutAudio(input.items).map((item) => ({
+      items: input.items.map((item) => ({
         number: item.number,
         context: item.context,
         dialogue: item.dialogue,
         question: item.question,
         options: item.options,
         correct_option: item.correct_option,
+        audio_url: item.audio_url,
       })),
     },
     answers: results.map((r) => ({ kind: 'listening_answer', item_number: r.number, chosen: r.chosen, isCorrect: r.isCorrect })),
