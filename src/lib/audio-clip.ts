@@ -8,11 +8,16 @@ export interface AudioClipHandlers {
   onError?: () => void;
   onProgress?: (fraction: number) => void;
   onStopped?: () => void;
+  onPaused?: () => void;
+  onDuration?: (seconds: number) => void;
 }
 
 export interface AudioClip {
   play: () => void;
   stop: () => void;
+  pause: () => void;
+  resume: () => void;
+  isPaused: () => boolean;
 }
 
 let activeClip: { interrupt: () => void } | null = null;
@@ -81,6 +86,9 @@ export function createAudioClip(
     handlers.onProgress?.(1);
     handlers.onEnded?.();
   };
+  audio.onloadedmetadata = () => {
+    if (!disposed && Number.isFinite(audio.duration)) handlers.onDuration?.(audio.duration);
+  };
   audio.ontimeupdate = () => {
     if (disposed || !(audio.duration > 0)) return;
     handlers.onProgress?.(audio.currentTime / audio.duration);
@@ -104,6 +112,7 @@ export function createAudioClip(
     audio.onplaying = null;
     audio.onended = null;
     audio.ontimeupdate = null;
+    audio.onloadedmetadata = null;
     audio.pause();
   }
 
@@ -126,12 +135,30 @@ export function createAudioClip(
     stop() {
       dispose();
     },
+    pause() {
+      if (disposed || audio.paused) return;
+      audio.pause();
+      handlers.onPaused?.();
+    },
+    resume() {
+      if (disposed || !audio.paused) return;
+      claimActive(owner);
+      handlers.onPlaying?.();
+      const resumed: Promise<void> | undefined = audio.play();
+      resumed?.catch?.(() => fail());
+    },
+    isPaused() {
+      return !disposed && audio.paused;
+    },
   };
 }
 
 export interface ClipPlayback {
   finished: Promise<'ended' | 'error' | 'stopped'>;
   stop: () => void;
+  pause: () => void;
+  resume: () => void;
+  isPaused: () => boolean;
 }
 
 /**
@@ -139,7 +166,10 @@ export interface ClipPlayback {
  * @param hooks - onStart just before playback is requested, onError on failure
  * @returns promise resolving when playback ends, fails or is stopped; never rejects
  */
-export function playClip(src: string, hooks: { onStart?: () => void; onError?: () => void } = {}): ClipPlayback {
+export function playClip(
+  src: string,
+  hooks: { onStart?: () => void; onError?: () => void; onPaused?: () => void; onResumed?: () => void } = {},
+): ClipPlayback {
   let settle: (outcome: 'ended' | 'error' | 'stopped') => void = () => {};
   const finished = new Promise<'ended' | 'error' | 'stopped'>((resolve) => {
     settle = resolve;
@@ -147,6 +177,8 @@ export function playClip(src: string, hooks: { onStart?: () => void; onError?: (
   const clip = createAudioClip(src, {
     onEnded: () => settle('ended'),
     onStopped: () => settle('stopped'),
+    onPaused: () => hooks.onPaused?.(),
+    onPlaying: () => hooks.onResumed?.(),
     onError: () => {
       hooks.onError?.();
       settle('error');
@@ -160,5 +192,8 @@ export function playClip(src: string, hooks: { onStart?: () => void; onError?: (
       clip.stop();
       settle('stopped');
     },
+    pause: () => clip.pause(),
+    resume: () => clip.resume(),
+    isPaused: () => clip.isPaused(),
   };
 }

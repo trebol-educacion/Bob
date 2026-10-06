@@ -13,6 +13,8 @@ import { useTranslations } from 'next-intl';
 import { resolveCueAudioUrl } from '@/lib/yl/bank-audio';
 import type { EvalResponse } from '@/lib/types/practice';
 import { BobMascotLoader } from '@/components/chat/BobMascotLoader';
+import { playClip, type ClipPlayback } from '@/lib/audio-clip';
+import { useAudioClip } from '@/hooks/useAudioClip';
 import { setBobSpeaking, useBobSpeaking } from '@/lib/bob-speaking';
 
 export const RECORDING_MAX_SECONDS = 45;
@@ -45,52 +47,45 @@ export function BobAvatar({ audioKey }: { audioKey?: string }) {
   );
 }
 
-let _currentAudio: HTMLAudioElement | null = null;
+let _current: ClipPlayback | null = null;
 let _currentText: string | null = null;
 let _cachedUrl: string | null = null;
 
 export function stopCurrentAudio(): void {
-  if (_currentAudio) {
-    _currentAudio.pause();
-    _currentAudio = null;
-  }
+  _current?.stop();
+  _current = null;
   _currentText = null;
   _cachedUrl = null;
   setBobSpeaking(null);
 }
 
 export function pauseCurrentAudio(): void {
-  if (_currentAudio && !_currentAudio.paused) {
-    _currentAudio.pause();
-    setBobSpeaking(null);
-  }
+  _current?.pause();
 }
 
 export function isAudioPaused(): boolean {
-  return !!_currentAudio && _currentAudio.paused;
+  return _current?.isPaused() ?? false;
 }
 
 export async function resumeCurrentAudio(): Promise<void> {
-  if (_currentAudio && _currentAudio.paused) {
-    try {
-      await _currentAudio.play();
-      setBobSpeaking(_currentText);
-    } catch { /* ignore */ }
-  }
+  _current?.resume();
+}
+
+async function playUrl(url: string, text: string): Promise<void> {
+  const playback = playClip(url, {
+    onStart: () => setBobSpeaking(text),
+    onPaused: () => setBobSpeaking(null),
+    onResumed: () => setBobSpeaking(text),
+  });
+  _current = playback;
+  await playback.finished;
+  if (_current === playback) setBobSpeaking(null);
 }
 
 export async function playTTS(text: string): Promise<void> {
   if (_currentText === text && _cachedUrl) {
-    if (_currentAudio) _currentAudio.pause();
-    const audio = new Audio(_cachedUrl);
-    _currentAudio = audio;
-    setBobSpeaking(text);
-    await new Promise<void>((resolve) => {
-      audio.onended = () => { setBobSpeaking(null); resolve(); };
-      audio.onerror = () => { setBobSpeaking(null); resolve(); };
-      audio.onpause = () => setBobSpeaking(null);
-      audio.play().catch(() => { setBobSpeaking(null); resolve(); });
-    });
+    _current?.stop();
+    await playUrl(_cachedUrl, text);
     return;
   }
 
@@ -99,15 +94,7 @@ export async function playTTS(text: string): Promise<void> {
     const url = await resolveCueAudioUrl(text);
     _currentText = text;
     _cachedUrl = url;
-    const audio = new Audio(url);
-    _currentAudio = audio;
-    setBobSpeaking(text);
-    await new Promise<void>((resolve) => {
-      audio.onended = () => { setBobSpeaking(null); resolve(); };
-      audio.onerror = () => { setBobSpeaking(null); resolve(); };
-      audio.onpause = () => setBobSpeaking(null);
-      audio.play().catch(() => { setBobSpeaking(null); resolve(); });
-    });
+    await playUrl(url, text);
   } catch {
     setBobSpeaking(null);
   }
@@ -325,60 +312,41 @@ export function YLVoiceNote({
   /** Auto-play once on mount. After playback, the button switches to a replay icon. */
   autoPlay?: boolean;
 }) {
-  const [playing, setPlaying] = React.useState(false);
-  const [hasPlayed, setHasPlayed] = React.useState(false);
-  const [duration, setDuration] = React.useState<number | null>(durationHint ?? null);
-  const [progress, setProgress] = React.useState(0); // 0..1
-  const audioRef = React.useRef<HTMLAudioElement | null>(null);
-  const intervalRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
+  const [src, setSrc] = React.useState<string | null>(null);
+  const pendingPlayRef = React.useRef(false);
   const autoPlayedRef = React.useRef(false);
+  const clip = useAudioClip({ src });
+  const playing = clip.isPlaying;
+  const hasPlayed = clip.hasPlayed;
+  const progress = clip.progress;
+  const duration = clip.duration ?? durationHint ?? null;
+  const play = clip.play;
 
-  const stop = React.useCallback(() => {
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current = null;
-    }
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
-    }
-    setPlaying(false);
-    setBobSpeaking(null);
-  }, []);
+  React.useEffect(() => {
+    if (!src || !pendingPlayRef.current) return;
+    pendingPlayRef.current = false;
+    play();
+  }, [src, play]);
 
-  React.useEffect(() => () => stop(), [stop]);
+  React.useEffect(() => {
+    if (side !== 'bob') return;
+    setBobSpeaking(playing ? text : null);
+  }, [playing, side, text]);
 
   const handlePlay = React.useCallback(async () => {
-    if (playing) {
-      stop();
-      setProgress(0);
+    if (playing || src) {
+      if (!playing) stopCurrentAudio();
+      clip.toggle();
       return;
     }
+    stopCurrentAudio();
     try {
-      stopCurrentAudio();
-      const url = await resolveCueAudioUrl(text);
-      const audio = new Audio(url);
-      audioRef.current = audio;
-      audio.onloadedmetadata = () => {
-        if (Number.isFinite(audio.duration)) setDuration(audio.duration);
-      };
-      audio.onended = () => {
-        stop();
-        setHasPlayed(true);
-        setProgress(1);
-        setTimeout(() => setProgress(0), 600);
-      };
-      audio.onerror = () => stop();
-      setPlaying(true);
-      if (side === 'bob') setBobSpeaking(text);
-      intervalRef.current = setInterval(() => {
-        if (audio.duration > 0) setProgress(audio.currentTime / audio.duration);
-      }, 100);
-      await audio.play();
+      pendingPlayRef.current = true;
+      setSrc(await resolveCueAudioUrl(text));
     } catch {
-      stop();
+      pendingPlayRef.current = false;
     }
-  }, [playing, stop, text, side]);
+  }, [playing, src, clip, text]);
 
   React.useEffect(() => {
     if (!autoPlay || autoPlayedRef.current) return;

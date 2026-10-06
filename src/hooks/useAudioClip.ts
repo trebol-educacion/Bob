@@ -15,6 +15,7 @@ export interface UseAudioClip {
   state: AudioClipState;
   playsUsed: number;
   progress: number;
+  duration: number | null;
   remaining: number | null;
   canPlay: boolean;
   isPlaying: boolean;
@@ -32,6 +33,7 @@ export function useAudioClip({ src, maxPlays, loadTimeoutMs }: UseAudioClipOptio
   const state: AudioClipState = src ? rawState : 'error';
   const [playsUsed, setPlaysUsed] = useState(0);
   const [progress, setProgress] = useState(0);
+  const [duration, setDuration] = useState<number | null>(null);
   const clipRef = useRef<AudioClip | null>(null);
 
   const dispose = useCallback(() => {
@@ -75,6 +77,7 @@ export function useAudioClip({ src, maxPlays, loadTimeoutMs }: UseAudioClipOptio
           setProgress(0);
         },
         onProgress: setProgress,
+        onDuration: setDuration,
         onStopped: () => {
           setState('ready');
           setProgress(0);
@@ -115,6 +118,7 @@ export function useAudioClip({ src, maxPlays, loadTimeoutMs }: UseAudioClipOptio
     state,
     playsUsed,
     progress,
+    duration,
     remaining: maxPlays === undefined ? null : Math.max(0, maxPlays - playsUsed),
     canPlay: Boolean(src) && !exhausted,
     isPlaying,
