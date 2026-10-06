@@ -2,7 +2,7 @@ import React from 'react';
 import { motion } from 'motion/react';
 import { CheckCircle, XCircle } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import type { ClozeGap, ClozeGapResult } from '@/actions/modes/fce-reading-part1';
+import type { ClozeGap, ClozeGapResult } from '@/lib/reading/fce-cloze-bank';
 
 export function GapRow({
   gap,

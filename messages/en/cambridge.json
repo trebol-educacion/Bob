@@ -141,6 +141,9 @@
       "footerCollaborativeLabel": "COLLABORATIVE TASK"
     },
     "restoreFailed": "We could not reopen this session. Go back and start a new one.",
+    "noContent": "There are no exercises available for this part yet. Go back and try another activity.",
+    "loadFailed": "We could not load this exercise. Go back and try again.",
+    "submitFailed": "We could not save your answers. Please try again.",
     "cloze": {
       "back": "Back",
       "headerTitle": "Multiple-Choice Cloze",

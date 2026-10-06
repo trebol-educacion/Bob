@@ -7,12 +7,8 @@ import { BobMascotLoader } from '@/components/chat/BobMascotLoader';
 import { BobAvatar } from '@/components/practice/yl/_shared';
 import { GapText, type GapReview } from '@/components/practice/gap-text';
 import { GapRow, GapResultRow } from './FCEClozeGapCards';
-import {
-  generateFCEClozeAction,
-  submitFCEClozeAnswersAction,
-  type ClozeGap,
-  type ClozeGapResult,
-} from '@/actions/modes/fce-reading-part1';
+import { generateFCEClozeAction, submitFCEClozeAnswersAction } from '@/actions/modes/fce-reading-part1';
+import type { ClozeGap, ClozeGapResult, ClozeOptionId } from '@/lib/reading/fce-cloze-bank';
 import type { StoredMessage } from '@/actions/messages';
 import { resolveActivityBoot } from '@/lib/activity/boot';
 import { useTranslations } from 'next-intl';
@@ -29,6 +25,7 @@ export interface FCEMultipleChoiceClozePracticeProps {
 type Phase = 'loading' | 'ready' | 'submitting' | 'finished';
 
 interface RestoredState {
+  groupId: string;
   title: string;
   text_with_gaps: string;
   gaps: ClozeGap[];
@@ -38,6 +35,7 @@ interface RestoredState {
 }
 
 function tryRestore(messages: StoredMessage[]): RestoredState | null {
+  let groupId = '';
   let title = '';
   let text_with_gaps = '';
   let gaps: ClozeGap[] | null = null;
@@ -50,6 +48,7 @@ function tryRestore(messages: StoredMessage[]): RestoredState | null {
     if (!cj) continue;
 
     if (msg.role === 'bob' && cj.kind === 'cloze_plan') {
+      groupId = String(cj.bank_group_id ?? '');
       title = String(cj.title ?? '');
       text_with_gaps = String(cj.text_with_gaps ?? '');
       gaps = cj.gaps as ClozeGap[];
@@ -61,7 +60,7 @@ function tryRestore(messages: StoredMessage[]): RestoredState | null {
     }
   }
 
-  if (gaps) return { title, text_with_gaps, gaps, framingText, results, correctCount };
+  if (gaps) return { groupId, title, text_with_gaps, gaps, framingText, results, correctCount };
   return null;
 }
 
@@ -94,11 +93,12 @@ export function FCEMultipleChoiceClozePractice({
 
   const [phase, setPhase] = useState<Phase>('loading');
   const [sessionId, setSessionId] = useState<string | undefined>(initialSessionId);
+  const [groupId, setGroupId] = useState('');
   const [title, setTitle] = useState('');
   const [textWithGaps, setTextWithGaps] = useState('');
   const [gaps, setGaps] = useState<ClozeGap[]>([]);
   const [framingText, setFramingText] = useState('');
-  const [answers, setAnswers] = useState<Record<number, 'A' | 'B' | 'C' | 'D'>>({});
+  const [answers, setAnswers] = useState<Record<number, ClozeOptionId>>({});
   const [results, setResults] = useState<ClozeGapResult[]>([]);
   const [correctCount, setCorrectCount] = useState(0);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -113,6 +113,7 @@ export function FCEMultipleChoiceClozePractice({
       const boot = resolveActivityBoot({ initialMessages, sessionId: initialSessionId, tryRestore });
       if (boot.kind === 'restore') {
         const restored = boot.data;
+        setGroupId(restored.groupId);
         setTitle(restored.title);
         setTextWithGaps(restored.text_with_gaps);
         setGaps(restored.gaps);
@@ -134,15 +135,16 @@ export function FCEMultipleChoiceClozePractice({
       setIsNewSession(true);
       const result = await generateFCEClozeAction();
 
-      if ('error' in result) {
-        setErrorMsg(result.error);
+      if (!result.ok) {
+        setErrorMsg(result.code === 'no_content' ? t('fce.noContent') : t('fce.loadFailed'));
         return;
       }
 
-      setTitle(result.title);
-      setTextWithGaps(result.text_with_gaps);
-      setGaps(result.gaps);
-      setFramingText(result.framingText);
+      setGroupId(result.data.groupId);
+      setTitle(result.data.title);
+      setTextWithGaps(result.data.text_with_gaps);
+      setGaps(result.data.gaps);
+      setFramingText(result.data.framingText);
       setPhase('ready');
     }
 
@@ -156,25 +158,18 @@ export function FCEMultipleChoiceClozePractice({
   async function handleSubmit() {
     setPhase('submitting');
 
-    const result = await submitFCEClozeAnswersAction({
-      sessionId,
-      title,
-      text_with_gaps: textWithGaps,
-      framingText,
-      answers,
-      gaps,
-    });
+    const result = await submitFCEClozeAnswersAction({ sessionId, groupId, answers });
 
-    if ('error' in result) {
-      setErrorMsg(result.error);
+    if (!result.ok) {
+      setErrorMsg(t('fce.submitFailed'));
       setPhase('ready');
       return;
     }
 
-    if (!sessionId) onSessionCreated?.(result.sessionId);
-    setSessionId(result.sessionId);
-    setResults(result.results);
-    setCorrectCount(result.correctCount);
+    if (!sessionId) onSessionCreated?.(result.data.sessionId);
+    setSessionId(result.data.sessionId);
+    setResults(result.data.results);
+    setCorrectCount(result.data.correctCount);
     setPhase('finished');
     onSessionFinished?.();
   }

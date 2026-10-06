@@ -17,10 +17,6 @@ export const B2_PICTURE_TOPICS = [
   'Food',
 ] as const;
 
-export function pickRandomTopic(): string {
-  return B2_PICTURE_TOPICS[Math.floor(Math.random() * B2_PICTURE_TOPICS.length)];
-}
-
 export function safeParse<T>(schema: z.ZodType<T>, raw: string): T | null {
   try {
     return schema.parse(JSON.parse(raw));

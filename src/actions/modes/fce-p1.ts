@@ -1,12 +1,13 @@
 'use server';
 
-import type { ActionResult } from '@/lib/result';
+import { pickContent } from '@/lib/item-bank/content-source';
+import { fail, ok, type ActionResult } from '@/lib/result';
 import { currentUserId } from '@/lib/session/lifecycle';
+import { toInterviewPlan } from '@/lib/speaking/fce-bank';
 import { FCE_INTERVIEW_CONFIG } from '@/lib/speaking/fce-configs';
-import type { FCEInterviewPlan } from '@/lib/speaking/fce-content';
+import { FCE_INTERVIEW_PART, type FCEInterviewPlan } from '@/lib/speaking/fce-content';
 import {
   evaluateQuestionRound,
-  generateQuestionRoundPlan,
   processQuestionRoundAnswer,
 } from '@/lib/speaking/question-round';
 import type {
@@ -16,10 +17,21 @@ import type {
   SpeakingQA,
 } from '@/lib/speaking/types';
 
-export async function generateFCEInterviewAction(): Promise<FCEInterviewPlan> {
+export async function generateFCEInterviewAction(): Promise<ActionResult<FCEInterviewPlan>> {
   const userId = await currentUserId();
-  if (!userId) return FCE_INTERVIEW_CONFIG.planFallback;
-  return generateQuestionRoundPlan(FCE_INTERVIEW_CONFIG, userId);
+  if (!userId) return fail('unauthenticated');
+  const picked = await pickContent({
+    framework: 'fce',
+    cefr: 'b2',
+    examPart: FCE_INTERVIEW_PART,
+    purpose: 'practice',
+    groupsOnly: true,
+    skill: 'speaking',
+    userId,
+  });
+  if (!picked.ok) return picked;
+  const plan = toInterviewPlan(picked.data);
+  return plan ? ok(plan) : fail('no_content');
 }
 
 export async function processFCEInterviewAnswerAction(

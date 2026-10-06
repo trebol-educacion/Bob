@@ -13,8 +13,8 @@ import {
   evaluateFCEEssayAction,
   type FCEEssayPrompt,
   type FCEEssayFeedback,
-  type EssayNote,
 } from '@/actions/modes/fce-writing-part1';
+import type { EssayNote } from '@/lib/writing/fce-essay-bank';
 import type { StoredMessage } from '@/actions/messages';
 import { EssayBriefCard } from '@/components/practice/fce/essay/EssayBriefCard';
 import { tryRestoreFromMessages } from '@/components/practice/fce/essay/restore';
@@ -259,12 +259,12 @@ export function FCEEssayWritingPractice({
       setIsNewSession(true);
       const result = await generateFCEEssayAction();
 
-      if ('error' in result) {
-        setErrorMsg(result.error);
+      if (!result.ok) {
+        setErrorMsg(result.code === 'no_content' ? t('fce.noContent') : t('fce.loadFailed'));
         return;
       }
 
-      setPrompt(result);
+      setPrompt(result.data);
       setPhase('ready');
     }
 

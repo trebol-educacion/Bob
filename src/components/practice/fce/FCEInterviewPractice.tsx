@@ -7,6 +7,7 @@ import {
   processFCEInterviewAnswerAction,
 } from '@/actions/modes/fce-p1';
 import { InterviewPlanSchema, type FCEInterviewPlan } from '@/lib/speaking/fce-content';
+import { unwrapContent } from '@/lib/content/unwrap-content';
 import type { ActivityRenderProps } from '@/lib/routing';
 import { QuestionRoundPractice, type QuestionRoundConfig } from '@/components/practice/speaking';
 
@@ -25,7 +26,7 @@ const FCE_INTERVIEW_UI_CONFIG: QuestionRoundConfig<FCEInterviewPlan> = {
   completeSubtitle: 'Cambridge B2 · Part 1',
   toQuestions: (plan) => plan.questions,
   actions: {
-    generate: generateFCEInterviewAction,
+    generate: async () => unwrapContent(await generateFCEInterviewAction()),
     processAnswer: processFCEInterviewAnswerAction,
     evaluate: evaluateFCEInterviewAction,
   },

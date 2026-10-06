@@ -50,6 +50,7 @@ export interface FCELongTurnResult {
   languageBank: FCELongTurnLanguageBank;
   imageUrlA: string;
   imageUrlB: string;
+  bankGroupId: string;
 }
 
 const RubricSchema = z

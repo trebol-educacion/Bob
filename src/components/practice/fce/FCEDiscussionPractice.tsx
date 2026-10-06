@@ -7,6 +7,7 @@ import {
   processFCEDiscussionAnswerAction,
 } from '@/actions/modes/fce-p4';
 import { DiscussionPlanSchema, type FCEDiscussionPlan } from '@/lib/speaking/fce-content';
+import { unwrapContent } from '@/lib/content/unwrap-content';
 import type { ActivityRenderProps } from '@/lib/routing';
 import { QuestionRoundPractice, type QuestionRoundConfig } from '@/components/practice/speaking';
 
@@ -25,7 +26,7 @@ const FCE_DISCUSSION_UI_CONFIG: QuestionRoundConfig<FCEDiscussionPlan> = {
   completeSubtitle: 'Cambridge B2 · Part 4',
   toQuestions: (plan) => plan.discussion_questions,
   actions: {
-    generate: generateFCEDiscussionAction,
+    generate: async () => unwrapContent(await generateFCEDiscussionAction()),
     processAnswer: processFCEDiscussionAnswerAction,
     evaluate: evaluateFCEDiscussionAction,
   },

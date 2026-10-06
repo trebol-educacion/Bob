@@ -1,63 +1,20 @@
 'use server';
 
-import { z } from 'zod';
 import { getPrompt } from '@/lib/prompts/db-prompts';
-import { callGemini, isOk } from '@/lib/gemini-client';
+import { fetchGroupItems, fetchGroups } from '@/actions/item-bank/repository';
+import { pickContent } from '@/lib/item-bank/content-source';
+import { gradeCloze, toClozePlan, type ClozeGapResult, type ClozeOptionId, type ClozePlan } from '@/lib/reading/fce-cloze-bank';
 import { ensureSession, finishSession, recordTurn } from '@/lib/session/lifecycle';
-import { MODELS } from '@/lib/models';
+import { fail, ok, type ActionResult } from '@/lib/result';
 
 const FCE_CLOZE_MODE = 'cambridge_fce_reading_part1';
+const FCE_CLOZE_PART = 'fce_reading_part1';
+const FRAMING_FALLBACK =
+  'You will read a short text with 8 missing words. For each gap, choose the best option from A, B, C, or D. Read the WHOLE sentence, sometimes the answer depends on the words around the gap.';
 
-const ClozeOptionSchema = z.object({
-  id: z.enum(['A', 'B', 'C', 'D']),
-  text: z.string().min(1),
-});
-
-const ClozeGapSchema = z.object({
-  number: z.number().int().min(1).max(8),
-  options: z.array(ClozeOptionSchema).length(4),
-  correct_option: z.enum(['A', 'B', 'C', 'D']),
-  explanation: z.string().min(1),
-});
-
-const GenerationSchema = z.object({
-  title: z.string().min(1),
-  text_with_gaps: z.string().min(1),
-  gaps: z.array(ClozeGapSchema).length(8),
-});
-
-export type ClozeOption = z.infer<typeof ClozeOptionSchema>;
-
-/** A single gap in the cloze text. */
-export interface ClozeGap {
-  number: number;
-  options: ClozeOption[];
-  correct_option: 'A' | 'B' | 'C' | 'D';
-  explanation: string;
-}
-
-/** The full cloze text with its gaps. */
-export interface ClozeText {
-  title: string;
-  text_with_gaps: string;
-  gaps: ClozeGap[];
-}
-
-/** Full result of a successful generation call. */
-export interface FCEClozeResult {
-  title: string;
-  text_with_gaps: string;
-  gaps: ClozeGap[];
+/** Full result of a successful bank read. */
+export interface FCEClozeResult extends ClozePlan {
   framingText: string;
-}
-
-/** Per-gap answer result returned after submit. */
-export interface ClozeGapResult {
-  number: number;
-  chosen: 'A' | 'B' | 'C' | 'D';
-  correct_option: 'A' | 'B' | 'C' | 'D';
-  isCorrect: boolean;
-  explanation: string;
 }
 
 /** Full submit result. */
@@ -68,84 +25,40 @@ export interface FCEClozeSubmitResult {
   results: ClozeGapResult[];
 }
 
-function safeParse<T>(schema: z.ZodType<T>, raw: string): T | null {
-  try {
-    return schema.parse(JSON.parse(raw));
-  } catch (error) {
-    console.error(JSON.stringify({ event: 'fce_cloze_parse_issue', issue: String(error).slice(0, 600) }));
-    return null;
-  }
+async function framing(): Promise<string> {
+  return getPrompt('cambridge_fce_reading_part1_b2_framing').catch(() => FRAMING_FALLBACK);
 }
 
-/** Generates 1 FCE B2 multiple-choice cloze text with 8 gaps; persists nothing until the first submit. */
-export async function generateFCEClozeAction(): Promise<FCEClozeResult | { error: string }> {
-  const [generationPrompt, framingText] = await Promise.all([
-    getPrompt('cambridge_fce_reading_part1_b2_generation').catch(() => null),
-    getPrompt('cambridge_fce_reading_part1_b2_framing').catch(
-      () =>
-        'You will read a short text with 8 missing words. For each gap, choose the best option from A, B, C, or D. Read the WHOLE sentence, sometimes the answer depends on the words around the gap.'
-    ),
-  ]);
-
-  if (!generationPrompt) {
-    return { error: 'Could not load generation prompt' };
-  }
-
-  const geminiResult = await callGemini(
-    { promptKey: 'cambridge_fce_reading_part1_b2_generation', model: MODELS.FLASH_LITE_PREVIEW },
-    (ai) =>
-      ai.models.generateContent({
-        model: MODELS.FLASH_LITE_PREVIEW,
-        contents: [{ role: 'user', parts: [{ text: generationPrompt }] }],
-        config: { responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
-      })
-  );
-
-  if (!isOk(geminiResult)) {
-    return { error: 'Could not generate cloze text' };
-  }
-
-  const rawText = geminiResult.data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
-  const parsed = safeParse(GenerationSchema, rawText);
-
-  if (!parsed) {
-    console.error(JSON.stringify({ event: 'fce_cloze_parse_error', raw: rawText.slice(0, 200) }));
-    return { error: 'Unexpected model response' };
-  }
-
-  return {
-    title: parsed.title,
-    text_with_gaps: parsed.text_with_gaps,
-    gaps: parsed.gaps,
-    framingText,
-  };
+/** Reads one pregenerated cloze from the bank; no model call and no session row. */
+export async function generateFCEClozeAction(): Promise<ActionResult<FCEClozeResult>> {
+  const picked = await pickContent({
+    framework: 'fce',
+    cefr: 'b2',
+    examPart: FCE_CLOZE_PART,
+    purpose: 'practice',
+    skill: 'reading',
+    groupsOnly: true,
+  });
+  if (!picked.ok) return picked;
+  if (picked.data.kind !== 'group') return fail('no_content');
+  return ok({ ...toClozePlan(picked.data.group, picked.data.items), framingText: await framing() });
 }
 
-/** Evaluates student answers deterministically (no LLM); creates the session on this first turn and closes it. */
+/** Grades from the stored keys; creates the session on this first turn and closes it. */
 export async function submitFCEClozeAnswersAction(input: {
   sessionId?: string;
-  title: string;
-  text_with_gaps: string;
-  framingText: string;
-  answers: Record<number, 'A' | 'B' | 'C' | 'D'>;
-  gaps: ClozeGap[];
-}): Promise<FCEClozeSubmitResult | { error: string }> {
-  const results: ClozeGapResult[] = input.gaps.map((gap) => {
-    const chosen = input.answers[gap.number] ?? 'A';
-    return {
-      number: gap.number,
-      chosen,
-      correct_option: gap.correct_option,
-      isCorrect: chosen === gap.correct_option,
-      explanation: gap.explanation,
-    };
-  });
+  groupId: string;
+  answers: Record<number, ClozeOptionId>;
+}): Promise<ActionResult<FCEClozeSubmitResult>> {
+  const [groups, items] = await Promise.all([fetchGroups({ id: input.groupId }), fetchGroupItems([input.groupId])]);
+  if (!groups.ok || !items.ok || groups.data.length === 0 || items.data.length === 0) return fail('no_content');
 
+  const results = gradeCloze(items.data, input.answers);
   const correctCount = results.filter((r) => r.isCorrect).length;
-  const total = input.gaps.length;
+  const total = results.length;
 
   const session = await ensureSession({ mode: FCE_CLOZE_MODE, sessionId: input.sessionId });
-  if (!session.ok) return { error: session.code };
+  if (!session.ok) return session;
 
   const planMessages = session.data.created
     ? [
@@ -155,10 +68,10 @@ export async function submitFCEClozeAnswersAction(input: {
           contentText: null,
           contentJson: {
             kind: 'cloze_plan',
-            title: input.title,
-            text_with_gaps: input.text_with_gaps,
-            gaps: input.gaps,
-            framing_text: input.framingText,
+            exam_part: FCE_CLOZE_PART,
+            bank_group_id: input.groupId,
+            ...toClozePlan(groups.data[0], items.data),
+            framing_text: await framing(),
           },
         },
       ]
@@ -177,14 +90,14 @@ export async function submitFCEClozeAnswersAction(input: {
       })),
     ],
   });
-  if (!turn.ok) return { error: turn.code };
+  if (!turn.ok) return turn;
 
   const finished = await finishSession({
     sessionId: session.data.sessionId,
     userId: session.data.userId,
     evaluation: { kind: 'cloze_evaluation', score: correctCount, score_max: total, results },
   });
-  if (!finished.ok) return { error: finished.code };
+  if (!finished.ok) return finished;
 
-  return { sessionId: session.data.sessionId, correctCount, total, results };
+  return ok({ sessionId: session.data.sessionId, correctCount, total, results });
 }

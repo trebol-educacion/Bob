@@ -64,6 +64,7 @@ const gaps = [1, 2].map((number) => ({
 
 const plan = {
   kind: 'cloze_plan',
+  bank_group_id: 'group-1',
   title: 'Cloze title',
   text_with_gaps: 'Start ___1___ middle ___2___ end.',
   gaps,
@@ -118,10 +119,13 @@ describe('FCEMultipleChoiceClozePractice characterization', () => {
 
   it('submit sends the chosen answers and renders the finished review', async () => {
     submitMock.mockResolvedValue({
-      sessionId: 's1',
-      correctCount: 1,
-      total: 2,
-      results: (finalEvaluation.content_json as { results: unknown[] }).results,
+      ok: true,
+      data: {
+        sessionId: 's1',
+        correctCount: 1,
+        total: 2,
+        results: (finalEvaluation.content_json as { results: unknown[] }).results,
+      },
     });
     const { container } = render(
       <FCEMultipleChoiceClozePractice {...baseProps} sessionId="s1" initialMessages={[planMessage]} />,
@@ -133,11 +137,8 @@ describe('FCEMultipleChoiceClozePractice characterization', () => {
     await waitFor(() => expect(screen.getByTestId('celebration')).toBeInTheDocument());
     expect(submitMock).toHaveBeenCalledWith({
       sessionId: 's1',
-      title: 'Cloze title',
-      text_with_gaps: 'Start ___1___ middle ___2___ end.',
-      framingText: 'Framing text',
+      groupId: 'group-1',
       answers: { 1: 'B', 2: 'C' },
-      gaps,
     });
     expect(baseProps.onSessionFinished).toHaveBeenCalled();
     expect(container.innerHTML).toMatchSnapshot();

@@ -1,5 +1,6 @@
 import type { StoredMessage } from '@/actions/messages';
-import type { FCEEssayPrompt, FCEEssayFeedback, EssayNote } from '@/actions/modes/fce-writing-part1';
+import type { FCEEssayPrompt, FCEEssayFeedback } from '@/actions/modes/fce-writing-part1';
+import type { EssayNote } from '@/lib/writing/fce-essay-bank';
 import { parseFceRubric } from '@/lib/writing/fce-rubric';
 
 export function tryRestoreFromMessages(messages: StoredMessage[]): {
@@ -26,6 +27,7 @@ export function tryRestoreFromMessages(messages: StoredMessage[]): {
           wordTargetMin: 140,
           wordTargetMax: 190,
           framingText: String(cj.framing_text ?? ''),
+          bankGroupId: String(cj.bank_group_id ?? ''),
         };
       }
     }

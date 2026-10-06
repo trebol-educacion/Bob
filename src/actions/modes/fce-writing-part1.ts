@@ -2,28 +2,20 @@
 
 import { z } from 'zod';
 import { getPrompt } from '@/lib/prompts/db-prompts';
-import { callGemini, isOk } from '@/lib/gemini-client';
+import { pickContent } from '@/lib/item-bank/content-source';
+import { fail, ok, type ActionResult } from '@/lib/result';
+import { toEssayTask, type EssayTask } from '@/lib/writing/fce-essay-bank';
 import { ensureSession, finishSession, recordTurn } from '@/lib/session/lifecycle';
-import { MODELS } from '@/lib/models';
 import { requestFceEvaluation } from '@/lib/writing/fce-evaluation';
 import { countWords } from '@/lib/writing/word-count';
 import { buildFceScorePayload, parseFceRubric, type FceRubric } from '@/lib/writing/fce-rubric';
 
 const FCE_ESSAY_MODE = 'cambridge_fce_writing_part1';
+const FCE_ESSAY_PART = 'fce_writing_part1';
+const FRAMING_FALLBACK =
+  'You will write a balanced essay in English (140-190 words). Bob will give you a title with two notes and one space for your own idea. Discuss both sides if relevant and finish with a conclusion. Use semi-formal language: firstly, moreover, however, in conclusion.';
 
-export interface EssayNote {
-  id: number;
-  label: string;
-  description: string;
-}
-
-export interface FCEEssayPrompt {
-  title: string;
-  essayQuestion: string;
-  context: string;
-  notes: [EssayNote, EssayNote, EssayNote];
-  wordTargetMin: 140;
-  wordTargetMax: 190;
+export interface FCEEssayPrompt extends EssayTask {
   framingText: string;
 }
 
@@ -44,23 +36,6 @@ export interface FCEEssayFeedback {
   score10: number | null;
   fceRubric: FceRubric | null;
 }
-
-const GenerationSchema = z.object({
-  title: z.string(),
-  essay_question: z.string(),
-  context: z.string(),
-  notes: z
-    .array(
-      z.object({
-        id: z.number(),
-        label: z.string(),
-        description: z.string(),
-      })
-    )
-    .length(3),
-  word_target_min: z.number().default(140),
-  word_target_max: z.number().default(190),
-});
 
 const RubricSchema = z
   .object({
@@ -83,21 +58,6 @@ const EvaluationSchema = z.object({
   fce_rubric:    z.unknown().optional(),
 });
 
-function safeParse<T>(schema: z.ZodType<T>, raw: string): T | null {
-  try {
-    return schema.parse(JSON.parse(raw));
-  } catch (err) {
-    console.warn(
-      JSON.stringify({
-        event: 'fce_writing_part1_safeparse_error',
-        error: err instanceof Error ? err.message : String(err),
-        rawPreview: raw.slice(0, 300),
-      })
-    );
-    return null;
-  }
-}
-
 function buildFallbackFeedback(): FCEEssayFeedback {
   return {
     understood: false,
@@ -112,62 +72,21 @@ function buildFallbackFeedback(): FCEEssayFeedback {
   };
 }
 
-/** Generates an FCE Writing Part 1 essay task; persists nothing until the first submission. */
-export async function generateFCEEssayAction(): Promise<FCEEssayPrompt | { error: string }> {
-  const [generationPrompt, framingText] = await Promise.all([
-    getPrompt('cambridge_fce_writing_part1_b2_generation').catch(() => null),
-    getPrompt('cambridge_fce_writing_part1_b2_framing').catch(
-      () =>
-        'You will write a balanced essay in English (140-190 words). Bob will give you a title with two notes and one space for your own idea. Discuss both sides if relevant and finish with a conclusion. Use semi-formal language: firstly, moreover, however, in conclusion.'
-    ),
-  ]);
-
-  if (!generationPrompt) {
-    return { error: 'Could not load generation prompt' };
-  }
-
-  const result = await callGemini(
-    {
-      promptKey: 'cambridge_fce_writing_part1_b2_generation',
-      model: MODELS.FLASH_LITE_PREVIEW,
-    },
-    (ai) =>
-      ai.models.generateContent({
-        model: MODELS.FLASH_LITE_PREVIEW,
-        contents: [{ role: 'user', parts: [{ text: generationPrompt }] }],
-        config: { responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
-      })
-  );
-
-  if (!isOk(result)) {
-    return { error: 'Could not generate the exercise' };
-  }
-
-  const rawText =
-    result.data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
-  const parsed = safeParse(GenerationSchema, rawText);
-
-  if (!parsed) {
-    console.error(
-      JSON.stringify({
-        event: 'fce_writing_part1_generate_parse_failed',
-        rawPreview: rawText.slice(0, 500),
-      })
-    );
-    return { error: 'Unexpected response from the model' };
-  }
-
-  const notes = parsed.notes as [EssayNote, EssayNote, EssayNote];
-
-  return {
-    title: parsed.title,
-    essayQuestion: parsed.essay_question,
-    context: parsed.context,
-    notes,
-    wordTargetMin: 140,
-    wordTargetMax: 190,
-    framingText,
-  };
+/** Reads one pregenerated essay task from the bank; no model call and no session row. */
+export async function generateFCEEssayAction(): Promise<ActionResult<FCEEssayPrompt>> {
+  const picked = await pickContent({
+    framework: 'fce',
+    cefr: 'b2',
+    examPart: FCE_ESSAY_PART,
+    purpose: 'practice',
+    groupsOnly: true,
+    skill: 'writing',
+  });
+  if (!picked.ok) return picked;
+  const prompt = toEssayTask(picked.data);
+  if (!prompt) return fail('no_content');
+  const framingText = await getPrompt('cambridge_fce_writing_part1_b2_framing').catch(() => FRAMING_FALLBACK);
+  return ok({ ...prompt, framingText });
 }
 
 export async function evaluateFCEEssayAction(input: {
@@ -193,6 +112,8 @@ export async function evaluateFCEEssayAction(input: {
           contentText: null,
           contentJson: {
             kind: 'essay_prompt',
+            exam_part: FCE_ESSAY_PART,
+            bank_group_id: prompt.bankGroupId,
             title: prompt.title,
             essay_question: prompt.essayQuestion,
             context: prompt.context,

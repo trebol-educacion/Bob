@@ -140,6 +140,8 @@ export async function evaluateFCEPictureDescriptionAction(input: {
         contentText: null,
         contentJson: {
           kind: 'fce_long_turn_plan',
+          exam_part: 'fce_speaking_part2',
+          bank_group_id: plan.bankGroupId,
           topic: plan.topic,
           framing_text: plan.framingText,
           comparison_question: plan.comparisonQuestion,

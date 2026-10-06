@@ -8,12 +8,19 @@ export const FCE_DISCUSSION_MODE = 'cambridge_fce_p4';
 export const FCE_OWN_DISCUSSION_TOPIC =
   'a general topic of your choice (for example work, technology, the environment, education or travel); choose one yourself and keep every question linked to it';
 
+export const FCE_INTERVIEW_PART = 'fce_speaking_part1';
+export const FCE_DISCUSSION_PART = 'fce_speaking_part4';
+
 export const InterviewPlanSchema = z.object({
   questions: z.array(z.string().min(1)).min(1).max(6),
+  exam_part: z.string().optional(),
+  bank_group_id: z.string().optional(),
 });
 
 export const DiscussionPlanSchema = z.object({
   discussion_questions: z.array(z.string().min(1)).min(1).max(6),
+  exam_part: z.string().optional(),
+  bank_group_id: z.string().optional(),
 });
 
 export type FCEInterviewPlan = z.infer<typeof InterviewPlanSchema>;
