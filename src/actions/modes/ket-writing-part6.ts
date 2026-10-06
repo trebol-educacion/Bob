@@ -7,6 +7,11 @@ import { currentUserId } from '@/lib/session/lifecycle';
 import { completeActivity } from '@/lib/session/complete';
 import { MODELS } from '@/lib/models';
 import { stripDashes } from '@/lib/text';
+import { bankStamp, pickPlan } from '@/lib/item-bank/plan-bank';
+import { fail, ok, type ActionResult } from '@/lib/result';
+import { KetShortMessagePlanSchema } from '@/lib/bank-plans/ket-writing-part6';
+
+const KET_SHORT_MESSAGE_PART = 'ket_writing_part6';
 
 export interface KETShortMessagePrompt {
   scenario: string;
@@ -14,6 +19,7 @@ export interface KETShortMessagePrompt {
   contentPoints: string[];
   wordTarget: number;
   framingText: string;
+  bankGroupId?: string;
 }
 
 export interface KETShortMessageEvaluation {
@@ -28,13 +34,6 @@ export interface KETShortMessageFeedback {
   modelAnswer: string | null;
   rubric?: z.infer<typeof RubricSchema>;
 }
-
-const GenerationSchema = z.object({
-  scenario: z.string(),
-  recipient: z.string(),
-  content_points: z.array(z.string()).min(2).max(3),
-  word_target: z.number().default(25),
-});
 
 const RubricSchema = z
   .object({
@@ -61,54 +60,33 @@ function safeParse<T>(schema: z.ZodType<T>, raw: string): T | null {
   }
 }
 
-/** Generates a KET Writing Part 6 scenario and framing text; persists nothing until the evaluation succeeds. */
-export async function generateKETShortMessageAction(): Promise<KETShortMessagePrompt | { error: string }> {
-  const userId = (await currentUserId()) ?? undefined;
-  if (!userId) return { error: 'userId requerido' };
+const FRAMING_FALLBACK = 'Vas a escribir un mensaje corto a un amigo en inglés. Escribe unas 25 palabras.';
 
-  const [generationPrompt, framingText] = await Promise.all([
-    getPrompt('cambridge_ket_writing_part6_a2_generation').catch(() => null),
-    getPrompt('cambridge_ket_writing_part6_a2_framing').catch(
-      () => 'Vas a escribir un mensaje corto a un amigo en inglés. Escribe unas 25 palabras.'
-    ),
-  ]);
+/** Reads one pregenerated Part 6 scenario from the bank; no model call and no session row. */
+export async function generateKETShortMessageAction(): Promise<ActionResult<KETShortMessagePrompt>> {
+  const userId = await currentUserId();
+  if (!userId) return fail('unauthenticated');
 
-  if (!generationPrompt) {
-    return { error: 'No se pudo cargar el prompt de generación' };
-  }
+  const picked = await pickPlan({
+    exam: 'ket',
+    cefr: 'a2',
+    examPart: KET_SHORT_MESSAGE_PART,
+    skill: 'writing',
+    schema: KetShortMessagePlanSchema,
+    userId,
+  });
+  if (!picked.ok) return picked;
 
-  let parsed: z.infer<typeof GenerationSchema> | null = null;
-  for (let attempt = 0; attempt < 3 && !parsed; attempt++) {
-    const result = await callGemini(
-      { promptKey: 'cambridge_ket_writing_part6_a2_generation', model: MODELS.FLASH_LITE_PREVIEW, userId },
-      (ai) =>
-        ai.models.generateContent({
-          model: MODELS.FLASH_LITE_PREVIEW,
-          contents: [{ role: 'user', parts: [{ text: generationPrompt }] }],
-          config: { responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
-        })
-    );
-    if (!isOk(result)) continue;
-    const rawText = result.data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
-    parsed = safeParse(GenerationSchema, rawText);
-  }
-
-  if (!parsed) {
-    return { error: 'No se pudo generar la consigna' };
-  }
-
-  const cleanScenario = stripDashes(parsed.scenario);
-  const cleanRecipient = stripDashes(parsed.recipient);
-  const cleanContentPoints = parsed.content_points.map((p) => stripDashes(p));
-  const cleanFramingText = stripDashes(framingText);
-
-  return {
-    scenario: cleanScenario,
-    recipient: cleanRecipient,
-    contentPoints: cleanContentPoints,
-    wordTarget: parsed.word_target,
-    framingText: cleanFramingText,
-  };
+  const plan = picked.data.plan;
+  const framingText = await getPrompt('cambridge_ket_writing_part6_a2_framing').catch(() => FRAMING_FALLBACK);
+  return ok({
+    scenario: plan.scenario,
+    recipient: plan.recipient,
+    contentPoints: plan.content_points,
+    wordTarget: plan.word_target,
+    framingText,
+    bankGroupId: picked.data.groupId,
+  });
 }
 
 /** Evaluates the short message first; the session is created and closed only when the evaluation succeeds. */
@@ -164,6 +142,7 @@ export async function evaluateKETShortMessageAction(input: {
   const completed = await completeActivity({
     mode: 'cambridge_ket_writing_part6',
     sessionId: input.sessionId,
+    bank: bankStamp(KET_SHORT_MESSAGE_PART, input.prompt.bankGroupId),
     plan: {
       kind: 'writing_prompt',
       scenario: input.prompt.scenario,

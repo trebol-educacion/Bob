@@ -1,31 +1,18 @@
 'use server';
 
-import { z } from 'zod';
 import { getPrompt } from '@/lib/prompts/db-prompts';
-import { callGemini, isOk } from '@/lib/gemini-client';
+import { bankStamp, pickPlan } from '@/lib/item-bank/plan-bank';
+import { fail, ok, type ActionResult } from '@/lib/result';
 import { currentUserId } from '@/lib/session/lifecycle';
 import { completeActivity } from '@/lib/session/complete';
-import { MODELS } from '@/lib/models';
-import { stripDashes } from '@/lib/text';
+import { KetVocabGapPlanSchema, type KetVocabGapItem, type KetVocabGapPlan } from '@/lib/bank-plans/ket-reading-part4';
 
-const GapItemSchema = z.object({
-  number: z.number().int().min(1).max(6),
-  options: z.object({ A: z.string(), B: z.string(), C: z.string() }),
-  answer: z.enum(['A', 'B', 'C']),
-});
+const KET_VOCAB_GAP_PART = 'ket_reading_part4';
 
-const GenerationSchema = z.object({
-  title: z.string(),
-  text: z.string(),
-  items: z.array(GapItemSchema).length(6),
-});
+export type VocabGapItem = KetVocabGapItem;
 
-export type VocabGapItem = z.infer<typeof GapItemSchema>;
-
-export interface VocabGapExercise {
-  title: string;
-  text: string;
-  items: VocabGapItem[];
+export interface VocabGapExercise extends KetVocabGapPlan {
+  bank_group_id?: string;
 }
 
 export interface VocabGapResult {
@@ -47,50 +34,24 @@ export interface VocabGapSubmitResult {
   item_results: VocabGapItemResult[];
 }
 
-function safeParse<T>(schema: z.ZodType<T>, raw: string): T | null {
-  try { return schema.parse(JSON.parse(raw)); } catch { return null; }
-}
+const FRAMING_FALLBACK = 'Read the text and choose the best word, A, B or C, for each gap.';
 
-export async function generateKETVocabGapAction(): Promise<VocabGapResult | { error: string }> {
-  const userId = (await currentUserId()) ?? undefined;
-  if (!userId) return { error: 'Not authenticated' };
+export async function generateKETVocabGapAction(): Promise<ActionResult<VocabGapResult>> {
+  const userId = await currentUserId();
+  if (!userId) return fail('unauthenticated');
 
-  const [generationPrompt, rawFramingText] = await Promise.all([
-    getPrompt('cambridge_ket_reading_part4_a2_generation').catch(() => null),
-    getPrompt('cambridge_ket_reading_part4_a2_framing').catch(() => 'Read the text and choose the best word, A, B or C, for each gap.'),
-  ]);
+  const picked = await pickPlan({
+    exam: 'ket',
+    cefr: 'a2',
+    examPart: KET_VOCAB_GAP_PART,
+    skill: 'reading',
+    schema: KetVocabGapPlanSchema,
+    userId,
+  });
+  if (!picked.ok) return picked;
 
-  if (!generationPrompt) return { error: 'Could not load generation prompt' };
-
-  const framingText = stripDashes(rawFramingText);
-
-  let parsed: z.infer<typeof GenerationSchema> | null = null;
-  for (let attempt = 0; attempt < 3 && !parsed; attempt++) {
-    const geminiResult = await callGemini(
-      { promptKey: 'cambridge_ket_reading_part4_a2_generation', model: MODELS.FLASH_LITE, userId },
-      (ai) => ai.models.generateContent({
-        model: MODELS.FLASH_LITE,
-        contents: [{ role: 'user', parts: [{ text: generationPrompt }] }],
-        config: { responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
-      })
-    );
-    if (!isOk(geminiResult)) continue;
-    const rawText = geminiResult.data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
-    parsed = safeParse(GenerationSchema, rawText);
-  }
-
-  if (!parsed) return { error: 'Could not generate exercise' };
-
-  const exercise: VocabGapExercise = {
-    title: stripDashes(parsed.title),
-    text: parsed.text,
-    items: parsed.items.map((it) => ({
-      ...it,
-      options: { A: stripDashes(it.options.A), B: stripDashes(it.options.B), C: stripDashes(it.options.C) },
-    })),
-  };
-
-  return { framing_text: framingText, exercise };
+  const framingText = await getPrompt('cambridge_ket_reading_part4_a2_framing').catch(() => FRAMING_FALLBACK);
+  return ok({ framing_text: framingText, exercise: { ...picked.data.plan, bank_group_id: picked.data.groupId } });
 }
 
 export async function submitKETVocabGapAction(input: {
@@ -109,6 +70,7 @@ export async function submitKETVocabGapAction(input: {
   const completed = await completeActivity({
     mode: 'cambridge_ket_reading_part4',
     sessionId: input.sessionId,
+    bank: bankStamp(KET_VOCAB_GAP_PART, input.exercise.bank_group_id),
     plan: { kind: 'reading_vocab_gap_plan', framing_text: input.framing_text, exercise: input.exercise },
     answers: item_results.map((r) => ({ kind: 'reading_vocab_gap_answer', item_number: r.number, chosen: r.chosen, is_correct: r.is_correct })),
     evaluation: { kind: 'reading_vocab_gap_evaluation', score: correct_count, score_max: input.exercise.items.length, item_results, is_final: true },

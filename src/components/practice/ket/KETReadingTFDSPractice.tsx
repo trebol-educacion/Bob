@@ -15,6 +15,7 @@ import {
 } from '@/actions/modes/ket-reading-part5';
 import type { StoredMessage } from '@/actions/messages';
 import { resolveActivityBoot } from '@/lib/activity/boot';
+import { ActivityLoadError } from '@/components/practice/ActivityLoadError';
 import { restoreExercise } from '@/lib/ket/restore-plan';
 
 const ACCENT = '#469E7B';
@@ -275,6 +276,7 @@ export function KETReadingTFDSPractice({
   const [results, setResults] = useState<ReadingStatementResult[]>([]);
   const [correctCount, setCorrectCount] = useState(0);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [loadErrorCode, setLoadErrorCode] = useState<string | null>(null);
   const [isNewSession, setIsNewSession] = useState(false);
   const [current, setCurrent] = useState(0);
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -296,8 +298,8 @@ export function KETReadingTFDSPractice({
       if (boot.kind === 'restore-failed') { setErrorMsg('Could not restore session. Please start a new one.'); return; }
       setIsNewSession(true); setPhase('generating');
       const result = await generateKETReadingTFDSAction();
-      if ('error' in result) { setErrorMsg(result.error); return; }
-      setExercise(result.exercise); setFramingText(result.framing_text); setPhase('ready');
+      if (!result.ok) { setLoadErrorCode(result.code); return; }
+      setExercise(result.data.exercise); setFramingText(result.data.framing_text); setPhase('ready');
     }
     void init();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -324,12 +326,7 @@ export function KETReadingTFDSPractice({
   const answeredCount = exercise ? Object.values(answers).filter((v) => v != null).length : 0;
   const allAnswered = exercise ? answeredCount === exercise.statements.length : false;
 
-  if (errorMsg) return (
-    <div className="flex flex-col items-center justify-center gap-4 p-8 text-center min-h-[40vh]">
-      <p className="text-red-500 font-semibold">{errorMsg}</p>
-      <button type="button" onClick={onBack} className="px-5 py-2 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 text-sm">Back</button>
-    </div>
-  );
+  if (loadErrorCode || errorMsg) return <ActivityLoadError code={loadErrorCode} message={errorMsg} onBack={onBack} />;
 
   const currentStatement = exercise?.statements[current];
 

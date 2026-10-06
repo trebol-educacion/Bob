@@ -15,6 +15,7 @@ import {
 } from '@/actions/modes/ket-reading-part4';
 import type { StoredMessage } from '@/actions/messages';
 import { resolveActivityBoot } from '@/lib/activity/boot';
+import { ActivityLoadError } from '@/components/practice/ActivityLoadError';
 import { restoreExercise } from '@/lib/ket/restore-plan';
 
 const ACCENT = '#469E7B';
@@ -243,6 +244,7 @@ export function KETVocabGapPractice({
   const [results, setResults] = useState<VocabGapItemResult[]>([]);
   const [correctCount, setCorrectCount] = useState(0);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [loadErrorCode, setLoadErrorCode] = useState<string | null>(null);
   const [isNewSession, setIsNewSession] = useState(false);
   const initRef = useRef(false);
 
@@ -266,12 +268,9 @@ export function KETVocabGapPractice({
       setIsNewSession(true);
       setPhase('generating');
       const result = await generateKETVocabGapAction();
-      if ('error' in result) {
-        setErrorMsg(result.error);
-        return;
-      }
-      setExercise(result.exercise);
-      setFramingText(result.framing_text);
+      if (!result.ok) { setLoadErrorCode(result.code); return; }
+      setExercise(result.data.exercise);
+      setFramingText(result.data.framing_text);
       setPhase('ready');
     }
     void init();
@@ -314,20 +313,7 @@ export function KETVocabGapPractice({
   const progressPct = exercise && exercise.items.length > 0 ? (answeredCount / exercise.items.length) * 100 : 0;
   const activeItem = exercise?.items[activeIndex];
 
-  if (errorMsg) {
-    return (
-      <div className="flex flex-col items-center justify-center gap-4 p-8 text-center min-h-[40vh]">
-        <p className="text-red-500 font-semibold">{errorMsg}</p>
-        <button
-          type="button"
-          onClick={onBack}
-          className="px-5 py-2 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition-colors text-sm"
-        >
-          Back
-        </button>
-      </div>
-    );
-  }
+  if (loadErrorCode || errorMsg) return <ActivityLoadError code={loadErrorCode} message={errorMsg} onBack={onBack} />;
 
   return (
     <div className="flex flex-col h-full relative">

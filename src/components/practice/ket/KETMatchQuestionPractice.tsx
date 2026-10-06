@@ -462,14 +462,7 @@ export function KETMatchQuestionPractice({
   const allAnswered = exercise ? answeredCount === total : false;
   const progressPct = total > 0 ? (answeredCount / total) * 100 : 0;
 
-  if (loadErrorCode) return <ActivityLoadError code={loadErrorCode} onBack={onBack} />;
-
-  if (errorMsg) return (
-    <div className="flex flex-col items-center justify-center gap-4 p-8 text-center min-h-[40vh]">
-      <p className="text-red-500 font-semibold">{errorMsg}</p>
-      <button type="button" onClick={onBack} className="px-5 py-2 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition-colors text-sm">Back</button>
-    </div>
-  );
+  if (loadErrorCode || errorMsg) return <ActivityLoadError code={loadErrorCode} message={errorMsg} onBack={onBack} />;
 
   const textByLabel = new Map((exercise?.texts ?? []).map((t) => [t.label, t]));
   const activeQuestionObj =

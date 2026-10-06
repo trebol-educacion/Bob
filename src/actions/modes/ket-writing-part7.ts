@@ -5,19 +5,12 @@ import { getPrompt } from '@/lib/prompts/db-prompts';
 import { callGemini, isOk } from '@/lib/gemini-client';
 import { currentUserId } from '@/lib/session/lifecycle';
 import { completeActivity } from '@/lib/session/complete';
-import { generateYLImagesParallelAction } from '@/actions/modes/yl';
 import { MODELS } from '@/lib/models';
+import { bankStamp, pickPlan } from '@/lib/item-bank/plan-bank';
+import { fail, ok, type ActionResult } from '@/lib/result';
+import { KetPictureStoryPlanSchema, type KetStoryScene } from '@/lib/bank-plans/ket-writing-part7';
 
-const SceneSchema = z.object({
-  number: z.number().int().min(1).max(3),
-  description: z.string(),
-  image_prompt: z.string(),
-});
-
-const GenerationSchema = z.object({
-  story_premise: z.string(),
-  scenes: z.array(SceneSchema).length(3),
-});
+const KET_PICTURE_STORY_PART = 'ket_writing_part7';
 
 const RubricSchema = z
   .object({
@@ -36,17 +29,17 @@ const EvaluationSchema = z.object({
   rubric:       RubricSchema,
 });
 
-export type StoryScene = z.infer<typeof SceneSchema>;
+export type StoryScene = Omit<KetStoryScene, 'image_url'>;
 
 export interface StorySceneWithImage extends StoryScene {
   image_url: string;
 }
 
-/** Plan without images, returned by the fast first-phase action. */
 export interface PictureStoryPlan {
   story_premise: string;
-  scenes: StoryScene[];
+  scenes: StorySceneWithImage[];
   framing_text: string;
+  bank_group_id: string;
 }
 
 export interface PictureStoryFeedback {
@@ -61,56 +54,30 @@ function safeParse<T>(schema: z.ZodType<T>, raw: string): T | null {
   try { return schema.parse(JSON.parse(raw)); } catch { return null; }
 }
 
-/**
- * Phase 1, fast (~2s): generates the story premise + scene descriptions only.
- * The component renders the exercise immediately, then loads the 3 scene
- * images in the background via generateKETSceneImageAction.
- */
-export async function generateKETPictureStoryPlanAction(): Promise<PictureStoryPlan | { error: string }> {
-  const userId = (await currentUserId()) ?? undefined;
-  if (!userId) return { error: 'Not authenticated' };
+const FRAMING_FALLBACK = 'Look at the three pictures. They tell a story. Write the story in about 35 words or more.';
 
-  const [generationPrompt, framingText] = await Promise.all([
-    getPrompt('cambridge_ket_writing_part7_a2_generation').catch(() => null),
-    getPrompt('cambridge_ket_writing_part7_a2_framing').catch(
-      () => 'Look at the three pictures. They tell a story. Write the story in about 35 words or more.'
-    ),
-  ]);
-
-  if (!generationPrompt) return { error: 'Could not load generation prompt' };
-
-  const geminiResult = await callGemini(
-    { promptKey: 'cambridge_ket_writing_part7_a2_generation', model: MODELS.FLASH_LITE_PREVIEW, userId },
-    (ai) => ai.models.generateContent({
-      model: MODELS.FLASH_LITE_PREVIEW,
-      contents: [{ role: 'user', parts: [{ text: generationPrompt }] }],
-      config: { responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
-    })
-  );
-
-  if (!isOk(geminiResult)) return { error: 'Could not generate story prompt' };
-
-  const rawText = geminiResult.data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
-  const parsed = safeParse(GenerationSchema, rawText);
-  if (!parsed) return { error: 'Unexpected model response' };
-
-  return {
-    story_premise: parsed.story_premise,
-    scenes: parsed.scenes,
-    framing_text: framingText,
-  };
-}
-
-/** Phase 2, generates a single scene image (~6-9s, cached). */
-export async function generateKETSceneImageAction(input: {
-  imagePrompt: string;
-}): Promise<{ image_url: string }> {
+/** Reads one pregenerated picture story with its three scene images from the bank; no model call and no session row. */
+export async function generateKETPictureStoryPlanAction(): Promise<ActionResult<PictureStoryPlan>> {
   const userId = await currentUserId();
-  if (!userId) return { image_url: '' };
-  const urls = await generateYLImagesParallelAction('movers', 7, [input.imagePrompt], userId, undefined, 'scene').catch(
-    () => ['']
-  );
-  return { image_url: urls[0] ?? '' };
+  if (!userId) return fail('unauthenticated');
+
+  const picked = await pickPlan({
+    exam: 'ket',
+    cefr: 'a2',
+    examPart: KET_PICTURE_STORY_PART,
+    skill: 'writing',
+    schema: KetPictureStoryPlanSchema,
+    userId,
+  });
+  if (!picked.ok) return picked;
+
+  const framingText = await getPrompt('cambridge_ket_writing_part7_a2_framing').catch(() => FRAMING_FALLBACK);
+  return ok({
+    story_premise: picked.data.plan.story_premise,
+    scenes: picked.data.plan.scenes.map((scene) => ({ ...scene, image_url: scene.image_url ?? '' })),
+    framing_text: framingText,
+    bank_group_id: picked.data.groupId,
+  });
 }
 
 export interface PictureStoryEvaluation {
@@ -126,6 +93,7 @@ export async function evaluateKETPictureStoryAction(input: {
   framing_text: string;
   scenes: StoryScene[];
   image_urls: string[];
+  bank_group_id?: string;
 }): Promise<PictureStoryEvaluation | { error: string }> {
   const userId = await currentUserId();
   if (!userId) return { error: 'unauthenticated' };
@@ -165,6 +133,7 @@ export async function evaluateKETPictureStoryAction(input: {
   const completed = await completeActivity({
     mode: 'cambridge_ket_writing_part7',
     sessionId: input.sessionId,
+    bank: bankStamp(KET_PICTURE_STORY_PART, input.bank_group_id),
     plan: {
       kind: 'picture_story_prompt',
       framing_text: input.framing_text,

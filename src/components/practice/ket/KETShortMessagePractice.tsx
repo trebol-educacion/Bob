@@ -14,6 +14,7 @@ import {
   type KETShortMessageFeedback,
 } from '@/actions/modes/ket-writing-part6';
 import type { StoredMessage } from '@/actions/messages';
+import { ActivityLoadError } from '@/components/practice/ActivityLoadError';
 import { restoreShortMessage } from '@/lib/ket/writing-restore';
 import { useTranslations } from 'next-intl';
 
@@ -182,7 +183,7 @@ export function KETShortMessagePractice({
   const [text, setText] = useState('');
   const [feedback, setFeedback] = useState<KETShortMessageFeedback | null>(null);
   const [restoredUserText, setRestoredUserText] = useState<string | null>(null);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [loadErrorCode, setLoadErrorCode] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | undefined>(initialSessionId);
   const [isNewSession, setIsNewSession] = useState(false);
@@ -215,12 +216,12 @@ export function KETShortMessagePractice({
       setIsNewSession(true);
       const result = await generateKETShortMessageAction();
 
-      if ('error' in result) {
-        setErrorMsg(result.error);
+      if (!result.ok) {
+        setLoadErrorCode(result.code);
         return;
       }
 
-      setPrompt(result);
+      setPrompt(result.data);
       setPhase('ready');
     }
 
@@ -250,20 +251,7 @@ export function KETShortMessagePractice({
   const wordCount = countWords(text);
   const MIN_WORDS = 15;
 
-  if (errorMsg) {
-    return (
-      <div className="flex flex-col items-center justify-center gap-4 p-8 text-center min-h-[40vh]">
-        <p className="text-red-500 font-semibold">{errorMsg}</p>
-        <button
-          type="button"
-          onClick={onBack}
-          className="px-5 py-2 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition-colors text-sm cursor-pointer"
-        >
-          {t('ket.shortMessage.back')}
-        </button>
-      </div>
-    );
-  }
+  if (loadErrorCode) return <ActivityLoadError code={loadErrorCode} onBack={onBack} />;
 
   return (
     <div className="flex flex-col h-full relative">

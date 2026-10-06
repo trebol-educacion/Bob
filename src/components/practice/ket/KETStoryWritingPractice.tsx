@@ -10,15 +10,16 @@ import { BobMascotLoader } from '@/components/chat/BobMascotLoader';
 import { BobAvatar } from '@/components/practice/yl/_shared';
 import {
   generateKETPictureStoryPlanAction,
-  generateKETSceneImageAction,
   evaluateKETPictureStoryAction,
   type StorySceneWithImage,
-  type StoryScene,
   type PictureStoryFeedback,
 } from '@/actions/modes/ket-writing-part7';
 import type { StoredMessage } from '@/actions/messages';
 import { restorePictureStory } from '@/lib/ket/writing-restore';
 import { resolveActivityBoot } from '@/lib/activity/boot';
+import { ActivityLoadError } from '@/components/practice/ActivityLoadError';
+
+const NO_LOADING: Set<number> = new Set();
 
 export interface KETStoryWritingPracticeProps {
   onBack: () => void;
@@ -186,35 +187,12 @@ export function KETStoryWritingPractice({
   const [framingText, setFramingText] = useState('');
   const [text, setText] = useState('');
   const [feedback, setFeedback] = useState<PictureStoryFeedback | null>(null);
-  const [imageLoading, setImageLoading] = useState<Set<number>>(new Set());
+  const [bankGroupId, setBankGroupId] = useState<string | undefined>(undefined);
+  const [loadErrorCode, setLoadErrorCode] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isNewSession, setIsNewSession] = useState(false);
   const initRef = useRef(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-
-  /**
-   * Phase 2 of two-phase loading: fetches each scene image in parallel and
-   * patches it in as it resolves, so the strip fills progressively instead of
-   * blocking the screen on a ~9s "Creating your story pictures…".
-   */
-  async function loadSceneImagesInBackground(planScenes: StoryScene[]) {
-    setImageLoading(new Set(planScenes.map((s) => s.number)));
-    await Promise.all(
-      planScenes.map(async (scene) => {
-        const { image_url } = await generateKETSceneImageAction({ imagePrompt: scene.image_prompt }).catch(
-          () => ({ image_url: '' })
-        );
-        setScenes((prev) =>
-          prev.map((s) => (s.number === scene.number ? { ...s, image_url } : s))
-        );
-        setImageLoading((prev) => {
-          const next = new Set(prev);
-          next.delete(scene.number);
-          return next;
-        });
-      })
-    );
-  }
 
   useEffect(() => {
     if (initRef.current) return;
@@ -229,24 +207,18 @@ export function KETStoryWritingPractice({
         setFramingText(r.framingText);
         setText(r.userText);
         if (r.feedback) { setFeedback(r.feedback); setPhase('finished'); }
-        else {
-          setPhase('ready');
-          const missing = r.scenes.filter((s) => !s.image_url);
-          if (missing.length > 0 && initialSessionId) {
-            void loadSceneImagesInBackground(missing.map(({ image_url: _i, ...s }) => s));
-          }
-        }
+        else setPhase('ready');
         return;
       }
       if (boot.kind === 'restore-failed') { setErrorMsg('Could not restore session. Please start a new one.'); return; }
       setIsNewSession(true); setPhase('generating');
       const plan = await generateKETPictureStoryPlanAction();
-      if ('error' in plan) { setErrorMsg(plan.error); return; }
-      setStoryPremise(plan.story_premise);
-      setScenes(plan.scenes.map((s) => ({ ...s, image_url: '' })));
-      setFramingText(plan.framing_text);
+      if (!plan.ok) { setLoadErrorCode(plan.code); return; }
+      setStoryPremise(plan.data.story_premise);
+      setScenes(plan.data.scenes);
+      setFramingText(plan.data.framing_text);
+      setBankGroupId(plan.data.bank_group_id);
       setPhase('ready');
-      void loadSceneImagesInBackground(plan.scenes);
     }
     void init();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -260,6 +232,7 @@ export function KETStoryWritingPractice({
       framing_text: framingText,
       scenes: scenes.map(({ image_url: _, ...s }) => s),
       image_urls: scenes.map((s) => s.image_url),
+      bank_group_id: bankGroupId,
     });
     if ('error' in result) { setSubmitError('We could not check your story. Please try again.'); setPhase('ready'); return; }
     setFeedback(result.feedback); setPhase('finished');
@@ -271,12 +244,7 @@ export function KETStoryWritingPractice({
   const wordCount = countWords(text);
   const hasEnoughWords = wordCount >= MIN_WORDS;
 
-  if (errorMsg) return (
-    <div className="flex flex-col items-center justify-center gap-4 p-8 text-center min-h-[40vh]">
-      <p className="text-red-500 font-semibold">{errorMsg}</p>
-      <button type="button" onClick={onBack} className="px-5 py-2 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 text-sm">Back</button>
-    </div>
-  );
+  if (loadErrorCode || errorMsg) return <ActivityLoadError code={loadErrorCode} message={errorMsg} onBack={onBack} />;
 
   return (
     <div className="flex flex-col h-full relative">
@@ -313,7 +281,7 @@ export function KETStoryWritingPractice({
             </div>
 
             <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}>
-              <SceneStrip scenes={scenes} loadingNumbers={imageLoading} />
+              <SceneStrip scenes={scenes} loadingNumbers={NO_LOADING} />
             </motion.div>
 
             <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden">
