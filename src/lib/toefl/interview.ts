@@ -8,6 +8,7 @@ export const ToeflQuestionSchema = z.object({
   text: z.string(),
   difficulty: z.number().min(1).max(4),
   suggested_time: z.number(),
+  audio_url: z.string().optional(),
 });
 
 export const ToeflInterviewPlanSchema = z.object({
@@ -15,6 +16,8 @@ export const ToeflInterviewPlanSchema = z.object({
   topic_name: z.string(),
   topic_context: z.string(),
   questions: z.array(ToeflQuestionSchema).length(4),
+  intro_audio_url: z.string().optional(),
+  bank_group_id: z.string().optional(),
 });
 
 export type ToeflInterviewPlan = z.infer<typeof ToeflInterviewPlanSchema>;

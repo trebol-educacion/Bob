@@ -1,153 +1,44 @@
 'use server';
 
-import { Type, Part } from '@google/genai';
 import { MODELS } from '@/lib/models';
 import { RepetitionObjectiveFeedbackSchema, type RepetitionObjectiveFeedback } from '@/lib/types/practice';
-import { ToeflRepeatSessionSchema, REPEAT_ANSWER_KIND, buildRepeatEvaluation, restoreRepeat, type ToeflRepeatItem } from '@/lib/toefl/repeat';
+import { REPEAT_ANSWER_KIND, buildRepeatEvaluation, restoreRepeat, type ToeflRepeatItem } from '@/lib/toefl/repeat';
 import { currentUserId, finishSession, openSession, recordTurn } from '@/lib/session/lifecycle';
-import { getPrompt } from '@/lib/prompts/db-prompts';
+import { pickPlan, bankStamp } from '@/lib/item-bank/plan-bank';
+import { ToeflRepeatPlanSchema } from '@/lib/bank-plans/toefl-repeat';
 import { readSessionMessages } from '@/lib/persist-activity';
-import { getOrCreateCachedContent } from '@/lib/cache';
-import { fail, ok } from '@/lib/result';
-import { parseJsonResult } from '@/lib/llm/parse-json-result';
+import { fail, ok, type ActionResult } from '@/lib/result';
 import { callGemini } from '@/lib/gemini-client';
 
-export type ToeflAudioChunk = {
-  data: string;
-  mimeType: string;
-};
+const REPEAT_LEVEL = 'b1';
+const REPEAT_PART = 'toefl_listen_repeat';
 
-const SessionFallback: ToeflRepeatItem[] = Array.from({ length: 10 }, (_, i) => ({
-  text: `Please repeat this sentence clearly and naturally. Number ${i + 1}.`,
-  difficulty: Math.min(5, Math.floor(i / 2) + 1),
-}));
-
-/** Generates 10 progressive TOEFL Listen & Repeat items; persists nothing until the first graded repetition. */
-export async function generateToeflRepeatSessionAction(): Promise<ToeflRepeatItem[]> {
-  const userId = (await currentUserId()) ?? undefined;
-  const cached = await getOrCreateCachedContent<ToeflRepeatItem[]>(
-    { kind: 'plan', promptKey: 'toefl-listen-repeat-b1-plan', inputs: {} },
-    async () => {
-      const prompt = await getPrompt('toefl_listen_repeat_b1_generation');
-
-      const result = await callGemini(
-        { promptKey: 'toefl_listen_repeat_b1_generation', model: MODELS.FLASH_LITE_PREVIEW, userId },
-        (ai) => ai.models.generateContent({
-          model: MODELS.FLASH_LITE_PREVIEW,
-          contents: [{ role: 'user', parts: [{ text: prompt }] }],
-          config: {
-            responseMimeType: 'application/json',
-            responseSchema: {
-              type: Type.OBJECT,
-              properties: {
-                items: {
-                  type: Type.ARRAY,
-                  items: {
-                    type: Type.OBJECT,
-                    properties: {
-                      text: { type: Type.STRING },
-                      difficulty: { type: Type.NUMBER },
-                    },
-                    required: ['text', 'difficulty'],
-                  },
-                },
-              },
-              required: ['items'],
-            },
-          },
-        })
-      );
-
-      const parsed = parseJsonResult(result, ToeflRepeatSessionSchema, 'generateToeflRepeatSessionAction');
-      return parsed.ok ? ok(parsed.data.items) : parsed;
-    },
-    { storeAs: 'json', validate: (items) => ToeflRepeatSessionSchema.safeParse({ items }).success }
-  );
-
-  if ('error' in cached) {
-    console.error(JSON.stringify({ event: 'generateToeflRepeatSessionAction_cache', error: cached.error }));
-    return SessionFallback;
-  }
-
-  return cached;
+export interface ToeflRepeatSession {
+  items: ToeflRepeatItem[];
+  bankGroupId: string;
 }
 
-/**
- * Pre-generates TTS audio for all phrases in parallel (max concurrency 3).
- * Returns raw PCM base64 + mimeType for each phrase, client converts to WAV.
- */
-export async function generateToeflRepeatAudiosAction(
-  phrases: string[]
-): Promise<ToeflAudioChunk[]> {
-  const audioFallback: ToeflAudioChunk = { data: '', mimeType: 'audio/L16;codec=pcm;rate=24000' };
-  const CONCURRENCY = 3;
-  const results: ToeflAudioChunk[] = [];
-
-  const generateOne = async (phrase: string): Promise<ToeflAudioChunk> => {
-    const cached = await getOrCreateCachedContent<ToeflAudioChunk>(
-      { kind: 'tts', promptKey: 'toefl-listen-repeat-phrase-tts', inputs: { text: phrase, voice: 'Sadaltager' } },
-      async () => {
-        const result = await callGemini(
-          { promptKey: 'toefl-listen-repeat-phrase-tts', model: MODELS.TTS },
-          (ai) => ai.models.generateContent({
-            model: MODELS.TTS,
-            contents: [
-              {
-                role: 'user',
-                parts: [{ text: `Read this sentence aloud with clear, natural pronunciation: "${phrase}"` }],
-              },
-            ],
-            config: {
-              responseModalities: ['audio'],
-              speechConfig: {
-                voiceConfig: {
-                  prebuiltVoiceConfig: { voiceName: 'Sadaltager' },
-                },
-              },
-            },
-          })
-        );
-
-        if (!result.ok) {
-          console.error(JSON.stringify({ event: 'generateToeflRepeatAudiosAction', phrase: phrase.slice(0, 40), error: result.error }));
-          return fail(result.code, result.retryable);
-        }
-
-        const audioPart = result.data.candidates?.[0]?.content?.parts?.find((p: Part) => p.inlineData);
-
-        if (!audioPart?.inlineData?.data) {
-          console.error(JSON.stringify({ event: 'generateToeflRepeatAudiosAction', phrase: phrase.slice(0, 40), error: 'no audio data' }));
-          return fail('empty_audio', true);
-        }
-
-        return ok({
-          data: audioPart.inlineData.data,
-          mimeType: audioPart.inlineData.mimeType ?? 'audio/L16;codec=pcm;rate=24000',
-        });
-      },
-      { storeAs: 'json', validate: (chunk) => chunk.data.length > 0 }
-    );
-
-    if ('error' in cached) {
-      console.error(JSON.stringify({ event: 'generateToeflRepeatAudiosAction_cache', error: cached.error }));
-      return audioFallback;
-    }
-    return cached;
-  };
-
-  for (let i = 0; i < phrases.length; i += CONCURRENCY) {
-    const batch = phrases.slice(i, i + CONCURRENCY);
-    const batchResults = await Promise.all(batch.map(generateOne));
-    results.push(...batchResults);
-  }
-
-  return results;
+/** Reads one pregenerated Listen & Repeat set with its audio URLs from the bank; no model call and no session row. */
+export async function generateToeflRepeatSessionAction(): Promise<ActionResult<ToeflRepeatSession>> {
+  const userId = await currentUserId();
+  if (!userId) return fail('unauthenticated');
+  const picked = await pickPlan({
+    exam: 'toefl',
+    cefr: REPEAT_LEVEL,
+    examPart: REPEAT_PART,
+    skill: 'speaking',
+    schema: ToeflRepeatPlanSchema,
+    userId,
+  });
+  if (!picked.ok) return picked;
+  return ok({ items: picked.data.plan.items, bankGroupId: picked.data.groupId });
 }
 
 const MODE = 'toefl_listen_repeat';
 
 export interface RepetitionInput {
   items: ToeflRepeatItem[];
+  bankGroupId?: string;
   phraseIndex: number;
   audioBase64: string;
   mimeType: string;
@@ -207,7 +98,7 @@ export async function submitRepetitionAction(input: RepetitionInput): Promise<Re
   const opened = await openSession({
     mode: MODE,
     sessionId: input.sessionId,
-    opening: [{ role: 'bob', msgType: 'phrase', contentJson: { phrases: input.items } }],
+    opening: [{ role: 'bob', msgType: 'phrase', contentJson: { phrases: input.items, ...bankStamp(REPEAT_PART, input.bankGroupId) } }],
   });
   if (!opened.ok) return { error: opened.code };
 

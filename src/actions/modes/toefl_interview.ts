@@ -1,77 +1,33 @@
 'use server';
 
-import { Type } from '@google/genai';
 import { MODELS } from '@/lib/models';
 import { FormativeFeedbackSchema, type FormativeFeedback } from '@/lib/types/practice';
-import { getPrompt } from '@/lib/prompts/db-prompts';
+import { pickPlan, bankStamp } from '@/lib/item-bank/plan-bank';
+import { ToeflInterviewBankSchema } from '@/lib/bank-plans/toefl-interview';
+import { toInterviewPlan } from '@/lib/toefl/interview-bank';
+import { fail, ok, type ActionResult } from '@/lib/result';
 import { readSessionMessages } from '@/lib/persist-activity';
 import { currentUserId, finishSession, openSession, recordTurn } from '@/lib/session/lifecycle';
-import { ToeflInterviewPlanSchema, buildInterviewEvaluation, restoreInterview, INTERVIEW_ANSWER_KIND, type ToeflInterviewPlan } from '@/lib/toefl/interview';
-import { getOrCreateCachedContent } from '@/lib/cache';
-import { parseJsonResult } from '@/lib/llm/parse-json-result';
+import { buildInterviewEvaluation, restoreInterview, INTERVIEW_ANSWER_KIND, type ToeflInterviewPlan } from '@/lib/toefl/interview';
 import { callGemini } from '@/lib/gemini-client';
 
-const PlanFallback: ToeflInterviewPlan = {
-  topic_id: 'daily_life',
-  topic_name: 'Daily Life',
-  topic_context: 'Talk about your everyday routines and activities.',
-  questions: [
-    { text: 'Can you describe a typical day in your life?', difficulty: 1, suggested_time: 45 },
-    { text: 'What do you usually do in your free time?', difficulty: 2, suggested_time: 45 },
-    { text: 'How has technology changed the way you spend your time?', difficulty: 3, suggested_time: 60 },
-    { text: 'What would your ideal daily routine look like and why?', difficulty: 4, suggested_time: 60 },
-  ],
-};
+const INTERVIEW_LEVEL = 'b2';
+const INTERVIEW_PART = 'toefl_interview';
 
-/** Generates a TOEFL Interview session plan with 4 progressive questions. */
-export async function generateToeflInterviewAction(): Promise<ToeflInterviewPlan> {
-  const cached = await getOrCreateCachedContent<ToeflInterviewPlan>(
-    { kind: 'plan', promptKey: 'toefl-interview-b2-plan', inputs: {} },
-    async () => {
-      const prompt = await getPrompt('toefl_interview_b2_generation');
-
-      const result = await callGemini(
-        { promptKey: 'toefl_interview_b2_generation', model: MODELS.FLASH_LITE_PREVIEW },
-        (ai) => ai.models.generateContent({
-          model: MODELS.FLASH_LITE_PREVIEW,
-          contents: [{ role: 'user', parts: [{ text: prompt }] }],
-          config: {
-            responseMimeType: 'application/json',
-            responseSchema: {
-              type: Type.OBJECT,
-              properties: {
-                topic_id: { type: Type.STRING },
-                topic_name: { type: Type.STRING },
-                topic_context: { type: Type.STRING },
-                questions: {
-                  type: Type.ARRAY,
-                  items: {
-                    type: Type.OBJECT,
-                    properties: {
-                      text: { type: Type.STRING },
-                      difficulty: { type: Type.NUMBER },
-                      suggested_time: { type: Type.NUMBER },
-                    },
-                    required: ['text', 'difficulty', 'suggested_time'],
-                  },
-                },
-              },
-              required: ['topic_id', 'topic_name', 'topic_context', 'questions'],
-            },
-          },
-        })
-      );
-
-      return parseJsonResult<ToeflInterviewPlan>(result, ToeflInterviewPlanSchema, 'generateToeflInterviewAction');
-    },
-    { storeAs: 'json', validate: (plan) => ToeflInterviewPlanSchema.safeParse(plan).success }
-  );
-
-  if ('error' in cached) {
-    console.error(JSON.stringify({ event: 'generateToeflInterviewAction_cache', error: cached.error }));
-    return PlanFallback;
-  }
-  return cached;
+/** Reads one pregenerated interview set with its audio URLs from the bank; no model call and no session row. */
+export async function generateToeflInterviewAction(): Promise<ActionResult<ToeflInterviewPlan>> {
+  const userId = await currentUserId();
+  if (!userId) return fail('unauthenticated');
+  const picked = await pickPlan({
+    exam: 'toefl',
+    cefr: INTERVIEW_LEVEL,
+    examPart: INTERVIEW_PART,
+    skill: 'speaking',
+    schema: ToeflInterviewBankSchema,
+    userId,
+  });
+  if (!picked.ok) return picked;
+  return ok(toInterviewPlan(picked.data.plan, picked.data.groupId));
 }
 
 const MODE = 'toefl_interview';
@@ -138,7 +94,7 @@ export async function submitToeflAnswerAction(input: ToeflAnswerInput): Promise<
     mode: MODE,
     sessionId: input.sessionId,
     topic: input.plan.topic_id,
-    opening: [{ role: 'bob', msgType: 'phrase', contentJson: { ...input.plan } }],
+    opening: [{ role: 'bob', msgType: 'phrase', contentJson: { ...input.plan, ...bankStamp(INTERVIEW_PART, input.plan.bank_group_id) } }],
   });
   if (!opened.ok) return { error: opened.code };
 

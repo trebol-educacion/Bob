@@ -7,10 +7,11 @@ export const REPEAT_ANSWER_KIND = 'speaking_answer';
 export const ToeflRepeatItemSchema = z.object({
   text: z.string(),
   difficulty: z.number().min(1).max(5),
+  audio_url: z.string().optional(),
 });
 
 export const ToeflRepeatSessionSchema = z.object({
-  items: z.array(ToeflRepeatItemSchema).length(10),
+  items: z.array(ToeflRepeatItemSchema).min(5).max(10),
 });
 
 export type ToeflRepeatItem = z.infer<typeof ToeflRepeatItemSchema>;

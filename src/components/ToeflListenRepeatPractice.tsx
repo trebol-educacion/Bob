@@ -6,15 +6,14 @@ import { ArrowLeft, Headphones, Mic, RotateCcw, ChevronRight, CheckCircle2, Aler
 import { CountdownTimer } from './CountdownTimer';
 import { useCountdown } from '@/hooks/useCountdown';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
-import { pcmToWavBase64, blobToBase64 } from '@/lib/audio';
+import { blobToBase64 } from '@/lib/audio';
 import { useTTS } from '@/hooks/useTTS';
 import {
   generateToeflRepeatSessionAction,
-  generateToeflRepeatAudiosAction,
   submitRepetitionAction,
   finishToeflRepeatAction,
-  type ToeflAudioChunk,
 } from '@/actions/modes/toefl_repeat';
+import { ActivityLoadError } from '@/components/practice/ActivityLoadError';
 import { RepeatSummary } from '@/components/toefl/RepeatSummary';
 import { restoreRepeat, type ToeflRepeatItem } from '@/lib/toefl/repeat';
 import { resolveActivityBoot } from '@/lib/activity/boot';
@@ -65,8 +64,8 @@ export function ToeflListenRepeatPractice({
   const restored = boot.kind === 'restore' ? boot.data : null;
   const [phase, setPhase] = useState<Phase>(restored?.finished ? 'finished' : 'loading');
   const [items, setItems] = useState<ToeflRepeatItem[]>(restored?.items ?? []);
-  const [audioChunks, setAudioChunks] = useState<ToeflAudioChunk[]>([]);
-  const [loadingProgress, setLoadingProgress] = useState(0);
+  const [loadErrorCode, setLoadErrorCode] = useState<string | null>(null);
+  const bankGroupIdRef = useRef<string | undefined>(undefined);
   const [currentIndex, setCurrentIndex] = useState(() => {
     if (!restored || restored.finished) return 0;
     const firstOpen = restored.evaluations.findIndex((evaluation) => evaluation === null);
@@ -114,29 +113,19 @@ export function ToeflListenRepeatPractice({
 
     async function load() {
       try {
-        const sessionItems = resumed ? resumed.items : await generateToeflRepeatSessionAction();
-        if (cancelled) return;
-        setItems(sessionItems);
-        setLoadingProgress(1);
-
-        const phrases = sessionItems.map((it) => it.text);
-        const BATCH_SIZE = 3;
-        const allChunks: ToeflAudioChunk[] = new Array(phrases.length);
-        let loaded = 0;
-
-        for (let i = 0; i < phrases.length; i += BATCH_SIZE) {
-          const batch = phrases.slice(i, i + BATCH_SIZE);
-          const batchChunks = await generateToeflRepeatAudiosAction(batch);
-          if (cancelled) return;
-          batchChunks.forEach((chunk, j) => {
-            allChunks[i + j] = chunk;
-          });
-          loaded += batch.length;
-          setLoadingProgress(1 + loaded);
+        if (resumed) {
+          setItems(resumed.items);
+          setPhase('play');
+          return;
         }
-
+        const session = await generateToeflRepeatSessionAction();
         if (cancelled) return;
-        setAudioChunks(allChunks);
+        if (!session.ok) {
+          setLoadErrorCode(session.code);
+          return;
+        }
+        bankGroupIdRef.current = session.data.bankGroupId;
+        setItems(session.data.items);
         setPhase('play');
       } catch (err) {
         if (!cancelled) {
@@ -152,14 +141,16 @@ export function ToeflListenRepeatPractice({
 
   useEffect(() => {
     if (phase !== 'play') return;
-    const chunk = audioChunks[currentIndex];
-    if (!chunk) return;
+    const audioUrl = items[currentIndex]?.audio_url;
+    if (!audioUrl) {
+      const skip = setTimeout(() => setPhase('ready'), 0);
+      return () => clearTimeout(skip);
+    }
 
     let cancelled = false;
     let errored = false;
-    const wavUrl = pcmToWavBase64(chunk.data, chunk.mimeType);
 
-    playAudioUrl(wavUrl, {
+    playAudioUrl(audioUrl, {
       onError: () => {
         errored = true;
       },
@@ -182,7 +173,7 @@ export function ToeflListenRepeatPractice({
         readyTimerRef.current = null;
       }
     };
-  }, [phase, currentIndex, audioChunks, playAudioUrl, stopAudio]);
+  }, [phase, currentIndex, items, playAudioUrl, stopAudio]);
 
   useEffect(() => {
     if (phase !== 'record') {
@@ -212,6 +203,7 @@ export function ToeflListenRepeatPractice({
         const item = items[currentIndex];
         const outcome = await submitRepetitionAction({
           items,
+          bankGroupId: bankGroupIdRef.current,
           phraseIndex: currentIndex,
           audioBase64: base64,
           mimeType,
@@ -263,8 +255,7 @@ export function ToeflListenRepeatPractice({
     sessionIdRef.current = null;
     restoredRef.current = null;
     setLoadKey((key) => key + 1);
-    setAudioChunks([]);
-    setLoadingProgress(0);
+    setLoadErrorCode(null);
     setCurrentIndex(0);
     setResults([]);
     setCurrentEvaluation(null);
@@ -288,21 +279,7 @@ export function ToeflListenRepeatPractice({
     </span>
   ) : null;
 
-  const loadingBar = (
-    <div className="w-full space-y-2">
-      <p className="text-xs text-gray-500 text-center">
-        {loadingProgress === 0
-          ? t('listenRepeat.loadingGenerating')
-          : t('listenRepeat.loadingAudio', { current: loadingProgress, total: items.length || 10 })}
-      </p>
-      <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
-        <div
-          className="h-full rounded-full transition-all duration-500"
-          style={{ background: 'var(--color-bob-brand)', width: `${(loadingProgress / (items.length || 10)) * 100}%` }}
-        />
-      </div>
-    </div>
-  );
+  if (loadErrorCode) return <ActivityLoadError code={loadErrorCode} onBack={onBack} />;
 
   return (
     <ChatShell
@@ -334,7 +311,6 @@ export function ToeflListenRepeatPractice({
           </div>
           <MessageBubble variant="assistant" accentColor="blue">
             <p className="font-semibold">{t('listenRepeat.preparingSession')}</p>
-            <div className="mt-3">{loadingBar}</div>
           </MessageBubble>
         </div>
       )}

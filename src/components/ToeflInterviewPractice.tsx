@@ -21,7 +21,9 @@ import { difficultyKey } from '@/components/toefl/difficulty-key';
 import type { ActivityRenderProps } from '@/lib/routing';
 import type { FormativeFeedback } from '@/lib/types/practice';
 import { BobMascotLoader } from '@/components/chat/BobMascotLoader';
+import { InterviewProgressDots } from '@/components/toefl/InterviewProgressDots';
 import { ChatShell } from '@/components/ChatShell';
+import { ActivityLoadError } from '@/components/practice/ActivityLoadError';
 import { MessageBubble, InfoCard } from '@/components/chat';
 import { ACTIVE_MODEL_LABEL } from '@/lib/models';
 
@@ -62,9 +64,10 @@ export function ToeflInterviewPractice({
   const [currentEval, setCurrentEval] = useState<FormativeFeedback | null>(null);
   const [error, setError] = useState<string | null>(boot.kind === 'restore-failed' ? t('interview.loadError') : null);
   const [loadKey, setLoadKey] = useState(0);
+  const [loadErrorCode, setLoadErrorCode] = useState<string | null>(null);
 
   const recordedBlobRef = useRef<Blob | null>(null);
-  const { play: playTTS, stop: stopTTS } = useTTS();
+  const { playUrl: playQuestionUrl, stop: stopTTS } = useTTS();
   const autoStartedRef = useRef(false);
   const sessionIdRef = useRef<string | null>(initialSessionId ?? null);
 
@@ -101,7 +104,11 @@ export function ToeflInterviewPractice({
       try {
         const interviewPlan = await generateToeflInterviewAction();
         if (cancelled) return;
-        setPlan(interviewPlan);
+        if (!interviewPlan.ok) {
+          setLoadErrorCode(interviewPlan.code);
+          return;
+        }
+        setPlan(interviewPlan.data);
         setPhase('intro');
       } catch (err) {
         if (!cancelled) {
@@ -129,11 +136,13 @@ export function ToeflInterviewPractice({
     const question = plan.questions[currentIndex];
 
     async function playQuestion() {
-      await playTTS(question.text, {
-        onStart: () => {
-          if (!cancelled) setSubPhase('listening');
-        },
-      });
+      if (question.audio_url) {
+        await playQuestionUrl(question.audio_url, {
+          onStart: () => {
+            if (!cancelled) setSubPhase('listening');
+          },
+        });
+      }
       if (!cancelled) setSubPhase('prep');
     }
 
@@ -243,33 +252,17 @@ export function ToeflInterviewPractice({
     setEvaluations([]);
     setCurrentEval(null);
     setError(null);
+    setLoadErrorCode(null);
     autoStartedRef.current = false;
     sessionIdRef.current = null;
     setLoadKey((key) => key + 1);
   }, []);
 
-  const progressDots = plan ? (
-    <div className="flex gap-1.5">
-      {plan.questions.map((_, i) => (
-        <div
-          key={i}
-          className="w-2 h-2 rounded-full transition-colors"
-          style={{
-            background:
-              i < currentIndex
-                ? 'var(--color-bob-brand)'
-                : i === currentIndex
-                  ? 'color-mix(in oklab, var(--color-bob-brand) 60%, white)'
-                  : '#e5e7eb',
-          }}
-        />
-      ))}
-    </div>
-  ) : null;
+  if (loadErrorCode) return <ActivityLoadError code={loadErrorCode} onBack={onBack} />;
 
   const headerRightSlot = phase === 'question' && plan ? (
     <div className="flex items-center gap-3">
-      {progressDots}
+      <InterviewProgressDots total={plan.questions.length} current={currentIndex} />
       <span className="text-xs font-bold text-gray-400">
         {currentIndex + 1}/{plan.questions.length}
       </span>
