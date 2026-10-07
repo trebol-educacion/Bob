@@ -8,7 +8,7 @@ export type GroupedApi = GroupExerciseApi<FCEGroupedExercise, number, FCEGrouped
 function createGroupedApi(part: FCEGroupedPart): GroupedApi {
   return {
     start: () => startFCEReadingExerciseAction({ part }),
-    submit: (sessionId, answers) => submitFCEReadingExerciseAction({ sessionId, part, answers }),
+    submit: (input) => submitFCEReadingExerciseAction({ ...input, part }),
     restore: (messages) => restoreGroupSession(messages, part),
     answersOf: (result) => Object.fromEntries(result.results.map((entry) => [entry.number, entry.given])),
   };

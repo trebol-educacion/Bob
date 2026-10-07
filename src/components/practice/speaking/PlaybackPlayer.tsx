@@ -1,36 +1,22 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React from 'react';
 import { motion, useReducedMotion } from 'motion/react';
+import { useTranslations } from 'next-intl';
+import { useAudioClip } from '@/hooks/useAudioClip';
 import { ACCENT, ACCENT_DARK, ACCENT_TINT } from './speaking-theme';
 
 export function PlaybackPlayer({ url }: { url: string }) {
   const reduceMotion = useReducedMotion();
-  const [playing, setPlaying] = useState(false);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-
-  useEffect(() => () => {
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current = null;
-    }
-  }, []);
+  const t = useTranslations('errors');
+  const clip = useAudioClip({ src: url });
+  const failed = clip.state === 'error';
+  const playing = clip.state === 'playing' || clip.state === 'loading';
 
   function toggle() {
-    if (playing) {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current = null;
-      }
-      setPlaying(false);
-      return;
-    }
-    const audio = new Audio(url);
-    audioRef.current = audio;
-    audio.onended = () => { audioRef.current = null; setPlaying(false); };
-    audio.onerror = () => { audioRef.current = null; setPlaying(false); };
-    setPlaying(true);
-    audio.play().catch(() => { audioRef.current = null; setPlaying(false); });
+    if (playing) clip.stop();
+    else if (failed) clip.retry();
+    else clip.play();
   }
 
   return (
@@ -38,7 +24,7 @@ export function PlaybackPlayer({ url }: { url: string }) {
       <button
         type="button"
         onClick={toggle}
-        aria-label={playing ? 'Pause' : 'Listen back'}
+        aria-label={playing ? 'Pause' : failed ? t('retry') : 'Listen back'}
         className="relative shrink-0 w-9 h-9 rounded-full flex items-center justify-center text-white transition-transform active:scale-95"
         style={{ background: ACCENT }}
       >
@@ -64,7 +50,7 @@ export function PlaybackPlayer({ url }: { url: string }) {
         )}
       </button>
       <p className="flex-1 text-xs font-bold truncate" style={{ color: ACCENT_DARK }}>
-        {playing ? 'Playing your answer…' : 'Listen back to your answer'}
+        {failed ? t('audioUnavailable') : playing ? 'Playing your answer…' : 'Listen back to your answer'}
       </p>
     </div>
   );

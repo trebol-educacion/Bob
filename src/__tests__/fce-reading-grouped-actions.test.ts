@@ -3,10 +3,11 @@ import * as fx from './fce-grouped-fixtures';
 
 vi.mock('server-only', () => ({}));
 
-const persistMock = vi.fn();
+const recordTurnMock = vi.fn();
+const finishMock = vi.fn();
+const ensureMock = vi.fn();
 const fetchGroupsMock = vi.fn();
 const fetchGroupItemsMock = vi.fn();
-const createSessionMock = vi.fn();
 const readMessagesMock = vi.fn();
 
 function messagesQuery() {
@@ -28,9 +29,12 @@ vi.mock('@/actions/item-bank/repository', () => ({
   fetchGroups: (...a: unknown[]) => fetchGroupsMock(...a),
   fetchGroupItems: (...a: unknown[]) => fetchGroupItemsMock(...a),
 }));
-vi.mock('@/actions/sessions', () => ({ createSessionAction: (...a: unknown[]) => createSessionMock(...a) }));
+vi.mock('@/lib/session/lifecycle', () => ({
+  ensureSession: (...a: unknown[]) => ensureMock(...a),
+  recordTurn: (...a: unknown[]) => recordTurnMock(...a),
+  finishSession: (...a: unknown[]) => finishMock(...a),
+}));
 vi.mock('@/lib/persist-activity', () => ({
-  persistMessage: (...a: unknown[]) => persistMock(...a),
   readSessionMessagesForCurrentOrUser: (...a: unknown[]) => readMessagesMock(...a),
 }));
 
@@ -40,21 +44,22 @@ import {
 } from '@/actions/modes/fce-reading-grouped';
 
 beforeEach(() => {
-  persistMock.mockReset().mockResolvedValue({ id: 'msg' });
+  recordTurnMock.mockReset().mockResolvedValue({ ok: true, data: { ids: [] } });
+  finishMock.mockReset().mockResolvedValue({ ok: true, data: { score10: 5, messageId: 'm' } });
+  ensureMock.mockReset().mockResolvedValue({ ok: true, data: { sessionId: 's1', userId: 'user-1', created: true } });
   fetchGroupsMock.mockReset().mockResolvedValue({ ok: true, data: [fx.KEY_WORD_GROUP] });
   fetchGroupItemsMock.mockReset().mockResolvedValue({ ok: true, data: fx.KEY_WORD_ITEMS });
-  createSessionMock.mockReset().mockResolvedValue({ data: { id: 's1', user_id: 'user-1' }, error: null });
   readMessagesMock.mockReset().mockResolvedValue([]);
 });
 
 describe('startFCEReadingExerciseAction', () => {
-  it('returns and persists the exercise without keys or accepted answers', async () => {
+  it('returns the exercise without keys or accepted answers and creates no session', async () => {
     const result = await startFCEReadingExerciseAction({ part: 'fce_reading_part4' });
     expect('error' in result).toBe(false);
-    const serialized = JSON.stringify([result, persistMock.mock.calls]);
+    const serialized = JSON.stringify(result);
     expect(serialized).not.toContain('is said to be');
     expect(serialized).not.toContain('accepted');
-    expect(createSessionMock).toHaveBeenCalledWith(expect.objectContaining({ mode: 'cambridge_fce_reading_part4' }));
+    expect(ensureMock).not.toHaveBeenCalled();
   });
 
   it('queries only published B2 groups of the requested part', async () => {
@@ -77,6 +82,7 @@ describe('startFCEReadingExerciseAction', () => {
 describe('submitFCEReadingExerciseAction', () => {
   const input = {
     sessionId: 's1',
+    groupId: 'group-fce_reading_part4',
     part: 'fce_reading_part4',
     answers: { 25: 'is said to be', 26: 'have difficulty' },
   };
@@ -89,17 +95,17 @@ describe('submitFCEReadingExerciseAction', () => {
     },
   };
 
-  it('grades server-side and persists a final 0-10 evaluation', async () => {
+  it('grades server-side and finishes the session with the final 0-10 evaluation', async () => {
     readMessagesMock.mockResolvedValue([plan]);
+    ensureMock.mockResolvedValue({ ok: true, data: { sessionId: 's1', userId: 'user-1', created: false } });
     const result = await submitFCEReadingExerciseAction(input);
-    expect(result).toMatchObject({ correct: 1, total: 2, score10: 5 });
-    const evaluation = persistMock.mock.calls.map((c) => c[0]).find((m) => m.msgType === 'evaluation');
-    expect(evaluation.contentJson).toMatchObject({ is_final: true, score: 1, score_max: 2, score_10: 5 });
+    expect(result).toMatchObject({ sessionId: 's1', result: { correct: 1, total: 2, score10: 5 } });
+    expect(finishMock.mock.calls[0][0].evaluation).toMatchObject({ score: 1, score_max: 2, score_10: 5 });
   });
 
   it('rejects a session without a plan of this part for the user', async () => {
     expect(await submitFCEReadingExerciseAction(input)).toEqual({ error: 'Could not load exercise' });
-    expect(persistMock).not.toHaveBeenCalled();
+    expect(finishMock).not.toHaveBeenCalled();
   });
 
   it('does not grade twice and returns the stored result', async () => {
@@ -108,7 +114,7 @@ describe('submitFCEReadingExerciseAction', () => {
       plan,
       { role: 'bob', content_json: { kind: 'fce_group_evaluation', exam_part: 'fce_reading_part4', is_final: true, result: stored } },
     ]);
-    expect(await submitFCEReadingExerciseAction(input)).toEqual(stored);
-    expect(persistMock).not.toHaveBeenCalled();
+    expect(await submitFCEReadingExerciseAction(input)).toEqual({ sessionId: 's1', result: stored });
+    expect(finishMock).not.toHaveBeenCalled();
   });
 });

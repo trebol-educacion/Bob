@@ -6,7 +6,7 @@ import { CheckCircle, XCircle, ChevronDown, ChevronUp, Check, ArrowRight } from 
 import { KETWritingIcon } from '@/components/icons/KETIcons';
 import { CelebrationCard } from '@/components/practice/yl/CelebrationCard';
 import { BobMascotLoader } from '@/components/chat/BobMascotLoader';
-import { ChatInputBar } from '@/components/chat/ChatInputBar';
+import { WritingComposer } from '@/components/practice/writing/WritingComposer';
 import {
   generateKETShortMessageAction,
   evaluateKETShortMessageAction,
@@ -14,7 +14,11 @@ import {
   type KETShortMessageFeedback,
 } from '@/actions/modes/ket-writing-part6';
 import type { StoredMessage } from '@/actions/messages';
+import { ActivityLoadError } from '@/components/practice/ActivityLoadError';
+import { restoreShortMessage } from '@/lib/ket/writing-restore';
 import { useTranslations } from 'next-intl';
+import { toScore10 } from '@/lib/session/score';
+import { isPassingScore } from '@/lib/score/headline';
 
 const ACCENT = '#469E7B';
 const ACCENT_TEXT = '#2F6B52';
@@ -70,7 +74,8 @@ function FeedbackPanel({ feedback, userText, onOpenDashboard, animate }: {
 }) {
   const t = useTranslations('cambridge');
   const [modelOpen, setModelOpen] = useState(false);
-  const score = feedback.understood ? 1 : 0;
+  const score10 = toScore10(feedback) ?? 0;
+  const passed = isPassingScore(score10);
 
   return (
     <motion.div
@@ -86,11 +91,11 @@ function FeedbackPanel({ feedback, userText, onOpenDashboard, animate }: {
 
       <div className="rounded-3xl border border-gray-100 shadow-sm px-4 py-3 space-y-3" style={{ background: CARD_SURFACE }}>
         <div className="flex items-center gap-2">
-          {feedback.understood
+          {passed
             ? <CheckCircle size={18} className="text-green-500 shrink-0" />
             : <XCircle size={18} className="text-amber-500 shrink-0" />}
           <span className="text-sm font-semibold text-gray-700">
-            {feedback.understood ? t('ket.shortMessage.youDidIt') : t('ket.shortMessage.reviewYourMessage')}
+            {passed ? t('ket.shortMessage.youDidIt') : t('ket.shortMessage.reviewYourMessage')}
           </span>
         </div>
 
@@ -152,57 +157,14 @@ function FeedbackPanel({ feedback, userText, onOpenDashboard, animate }: {
       </div>
 
       <CelebrationCard
-        score={score}
-        scoreMax={1}
-        hideGrade
-        feedback={feedback.understood
-          ? 'You wrote your message! Keep practicing to make it even better.'
-          : 'Try again, every attempt makes you stronger.'}
+        score={score10}
+        scoreMax={10}
+        showPoints={false}
         onAction={onOpenDashboard}
         animate={animate}
       />
     </motion.div>
   );
-}
-
-function tryRestoreFromMessages(messages: StoredMessage[]): {
-  prompt: KETShortMessagePrompt | null;
-  userText: string | null;
-  feedback: KETShortMessageFeedback | null;
-} {
-  let prompt: KETShortMessagePrompt | null = null;
-  let userText: string | null = null;
-  let feedback: KETShortMessageFeedback | null = null;
-
-  for (const msg of messages) {
-    const cj = msg.content_json as Record<string, unknown> | null;
-    if (!cj) continue;
-
-    if (msg.role === 'bob' && cj.kind === 'writing_prompt') {
-      prompt = {
-        sessionId: msg.session_id ?? '',
-        userId: msg.user_id ?? '',
-        scenario: String(cj.scenario ?? ''),
-        recipient: String(cj.recipient ?? 'your friend'),
-        contentPoints: (cj.content_points as string[]) ?? [],
-        wordTarget: Number(cj.word_target ?? 25),
-        framingText: String(cj.framing_text ?? ''),
-      };
-    }
-    if (msg.role === 'user' && cj.kind === 'writing_submission') {
-      userText = String(cj.text ?? '');
-    }
-    if (msg.role === 'bob' && msg.msg_type === 'evaluation' && cj.is_final === true) {
-      feedback = {
-        understood: Boolean(cj.understood),
-        highlights: (cj.highlights as string[]) ?? [],
-        suggestions: (cj.suggestions as string[]) ?? [],
-        modelAnswer: (cj.modelAnswer as string | null) ?? null,
-      };
-    }
-  }
-
-  return { prompt, userText, feedback };
 }
 
 /** KET Writing Part 6, Short Message focus-mode practice component. */
@@ -221,7 +183,9 @@ export function KETShortMessagePractice({
   const [text, setText] = useState('');
   const [feedback, setFeedback] = useState<KETShortMessageFeedback | null>(null);
   const [restoredUserText, setRestoredUserText] = useState<string | null>(null);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [loadErrorCode, setLoadErrorCode] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [sessionId, setSessionId] = useState<string | undefined>(initialSessionId);
   const [isNewSession, setIsNewSession] = useState(false);
   const initStartedRef = useRef(false);
 
@@ -230,7 +194,7 @@ export function KETShortMessagePractice({
     initStartedRef.current = true;
     async function init() {
       if (initialMessages && initialMessages.length > 0) {
-        const restored = tryRestoreFromMessages(initialMessages);
+        const restored = restoreShortMessage(initialMessages);
         if (restored.prompt && restored.feedback) {
           setPrompt(restored.prompt);
           setRestoredUserText(restored.userText);
@@ -250,21 +214,14 @@ export function KETShortMessagePractice({
       }
 
       setIsNewSession(true);
-      const result = await generateKETShortMessageAction({
-        sessionId: initialSessionId,
-        userId: undefined,
-      });
+      const result = await generateKETShortMessageAction();
 
-      if ('error' in result) {
-        setErrorMsg(result.error);
+      if (!result.ok) {
+        setLoadErrorCode(result.code);
         return;
       }
 
-      if (!initialSessionId) {
-        onSessionCreated?.(result.sessionId);
-      }
-
-      setPrompt(result);
+      setPrompt(result.data);
       setPhase('ready');
     }
 
@@ -275,42 +232,26 @@ export function KETShortMessagePractice({
     if (!prompt || !text.trim() || wordCount < MIN_WORDS) return;
     setPhase('evaluating');
 
-    const result = await evaluateKETShortMessageAction({
-      sessionId: prompt.sessionId,
-      userId: prompt.userId,
-      scenario: prompt.scenario,
-      contentPoints: prompt.contentPoints,
-      userText: text,
-    });
+    setSubmitError(null);
+    const result = await evaluateKETShortMessageAction({ sessionId, prompt, userText: text });
 
     if ('error' in result) {
-      setErrorMsg(result.error);
+      setSubmitError(t('ket.shortMessage.evaluationFailed'));
       setPhase('ready');
       return;
     }
 
-    setFeedback(result);
+    setFeedback(result.feedback);
     setPhase('finished');
+    if (!sessionId) onSessionCreated?.(result.sessionId);
+    setSessionId(result.sessionId);
     onSessionFinished?.();
   }
 
   const wordCount = countWords(text);
   const MIN_WORDS = 15;
 
-  if (errorMsg) {
-    return (
-      <div className="flex flex-col items-center justify-center gap-4 p-8 text-center min-h-[40vh]">
-        <p className="text-red-500 font-semibold">{errorMsg}</p>
-        <button
-          type="button"
-          onClick={onBack}
-          className="px-5 py-2 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition-colors text-sm cursor-pointer"
-        >
-          {t('ket.shortMessage.back')}
-        </button>
-      </div>
-    );
-  }
+  if (loadErrorCode) return <ActivityLoadError code={loadErrorCode} onBack={onBack} />;
 
   return (
     <div className="flex flex-col h-full relative">
@@ -381,38 +322,18 @@ export function KETShortMessagePractice({
             </div>
           </div>
 
-          <div className="mx-auto w-full max-w-lg">
-            <ChatInputBar
-              variant="text"
-              value={text}
-              placeholder="Write your message here…"
-              disabled={phase !== 'ready'}
-              onChange={setText}
-              onSend={handleSubmit}
-            />
-            <div className="shrink-0 px-4 pb-3 -mt-1 flex items-center justify-between text-xs text-gray-400 bg-white">
-              <span>
-                Words:{' '}
-                <strong
-                  className={
-                    wordCount < MIN_WORDS
-                      ? 'text-amber-500'
-                      : wordCount > 40
-                      ? 'text-red-400'
-                      : 'text-green-600'
-                  }
-                >
-                  {wordCount}
-                </strong>{' '}
-                / target ~25
-              </span>
-              {wordCount < MIN_WORDS && (
-                <span className="text-amber-500">
-                  {MIN_WORDS - wordCount} more to send
-                </span>
-              )}
-            </div>
-          </div>
+          <WritingComposer
+            value={text}
+            placeholder="Write your message here…"
+            wordCount={wordCount}
+            minWords={MIN_WORDS}
+            maxWords={40}
+            target="/ target ~25"
+            disabled={phase !== 'ready'}
+            error={submitError}
+            onChange={setText}
+            onSubmit={handleSubmit}
+          />
         </>
       )}
 

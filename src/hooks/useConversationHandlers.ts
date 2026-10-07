@@ -10,7 +10,8 @@ import {
   checkTopicIsAppropriateAction,
 } from '@/actions/gemini';
 import { pcmToWavBase64, blobToBase64 } from '@/lib/audio';
-import { saveMessageAction } from '@/actions/messages';
+import { playClip } from '@/lib/audio-clip';
+import { finishGenericSessionAction, recordGenericTurnAction } from '@/actions/generic-session';
 import type { CefrLevel } from '@/lib/types/practice';
 import type { UseConversationStateReturn } from './useConversationState';
 import type { UseQuestionsFlowReturn } from './useQuestionsFlow';
@@ -21,13 +22,14 @@ export interface UseConversationHandlersArgs {
   maxTurns: number;
   level: CefrLevel;
   sessionId?: string;
-  onSessionStart?: (topic: string) => void;
+  onSessionStart?: (topic: string) => Promise<string | undefined>;
+  onSessionFinished?: () => void;
   onError: (message: string) => void;
 }
 
 export interface UseConversationHandlersReturn {
   onRecordedRef: React.RefObject<(blob: Blob) => void>;
-  persistTurn: (role: 'user' | 'model', text: string) => void;
+  persistTurns: (turns: ChatMessage[]) => Promise<boolean>;
   handleListen: (text: string, index: number) => Promise<void>;
   handleSendMessage: (audioBlob: Blob) => Promise<void>;
   handleSendTextMessage: () => Promise<void>;
@@ -44,18 +46,30 @@ export function useConversationHandlers({
   level,
   sessionId,
   onSessionStart,
+  onSessionFinished,
   onError,
 }: UseConversationHandlersArgs): UseConversationHandlersReturn {
   const onRecordedRef = useRef<(blob: Blob) => void>(() => {});
 
-  const persistTurn = (role: 'user' | 'model', text: string) => {
-    if (!sessionId || !text) return;
-    void saveMessageAction({
-      session_id: sessionId,
-      role: role === 'model' ? 'bob' : 'user',
-      msg_type: 'text',
-      content_text: text,
-    }).catch((error) => console.error('[useConversationHandlers] persistTurn failed:', error));
+  const sessionIdRef = useRef<string | undefined>(sessionId);
+
+  useEffect(() => {
+    if (sessionId) sessionIdRef.current = sessionId;
+  }, [sessionId]);
+
+  const persistTurns = async (turns: ChatMessage[]): Promise<boolean> => {
+    const sid = sessionIdRef.current;
+    const messages = turns
+      .filter((turn) => turn.text)
+      .map((turn) => ({
+        role: turn.role === 'model' ? ('bob' as const) : ('user' as const),
+        msgType: 'text' as const,
+        contentText: turn.text,
+      }));
+    if (!sid || messages.length === 0) return true;
+    const result = await recordGenericTurnAction({ sessionId: sid, messages });
+    if (!result.ok) onError('saveError');
+    return result.ok;
   };
 
   const handleListen = async (text: string, index: number) => {
@@ -65,11 +79,9 @@ export function useConversationHandlers({
     try {
       const { data, mimeType } = await generateSpeechAction(text);
       const audioUrl = pcmToWavBase64(data, mimeType);
-      const audio = new Audio(audioUrl);
-
       conv.incrementPlayCount(index);
 
-      await audio.play();
+      await playClip(audioUrl).finished;
     } catch (error) {
       console.error('Error playing audio:', error);
     } finally {
@@ -92,8 +104,7 @@ export function useConversationHandlers({
       conv.setMessages(newMessages);
       conv.setCurrentEvaluation(result.evaluation);
       conv.setShowEvaluation(true);
-      persistTurn('user', userMsg.text);
-      persistTurn('model', modelMsg.text);
+      await persistTurns([userMsg, modelMsg]);
 
       const modelMsgIndex = newMessages.length - 1;
       setTimeout(() => handleListen(modelMsg.text, modelMsgIndex), 500);
@@ -122,8 +133,7 @@ export function useConversationHandlers({
       conv.setMessages(newMessages);
       conv.setCurrentEvaluation(result.evaluation);
       conv.setShowEvaluation(true);
-      persistTurn('user', userMsg.text);
-      persistTurn('model', modelMsg.text);
+      await persistTurns([userMsg, modelMsg]);
 
       const modelMsgIndex = newMessages.length - 1;
       setTimeout(() => handleListen(modelMsg.text, modelMsgIndex), 500);
@@ -150,8 +160,7 @@ export function useConversationHandlers({
       conv.setMessages(newMessages);
       conv.setCurrentEvaluation(result.evaluation);
       conv.setShowEvaluation(true);
-      persistTurn('user', userMsg.text);
-      persistTurn('model', modelMsg.text);
+      await persistTurns([userMsg, modelMsg]);
 
       const modelMsgIndex = newMessages.length - 1;
       setTimeout(() => handleListen(modelMsg.text, modelMsgIndex), 500);
@@ -201,6 +210,13 @@ export function useConversationHandlers({
 
       const hasMore = qf.advanceQuestion();
       if (!hasMore) {
+        const scores = [...Object.values(qf.questionAnswers).map((answer) => answer.score), result.evaluation.score];
+        const sid = sessionIdRef.current;
+        if (sid) {
+          const finished = await finishGenericSessionAction({ sessionId: sid, scores });
+          if (finished.ok) onSessionFinished?.();
+          else onError('saveError');
+        }
         conv.setPhase('finished');
       }
     } catch (error) {
@@ -237,14 +253,16 @@ export function useConversationHandlers({
       conv.setIsProcessing(false);
     }
 
+    const startedId = await onSessionStart?.(topic);
+    if (startedId) sessionIdRef.current = startedId;
+    else onError('saveError');
     conv.setInternalTopic(topic);
-    onSessionStart?.(topic);
     conv.setPhase('conversation');
   };
 
   return {
     onRecordedRef: onRecordedRef as React.RefObject<(blob: Blob) => void>,
-    persistTurn,
+    persistTurns,
     handleListen,
     handleSendMessage,
     handleSendTextMessage,

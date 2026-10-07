@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { ChevronRight, RotateCcw, Volume2 } from 'lucide-react';
+import React, { useState, useCallback } from 'react';
+import { ChevronRight, RotateCcw } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { BobMascotLoader } from '@/components/chat/BobMascotLoader';
+import { GroupAudioPlayer } from '@/components/practice/group-exercise/GroupAudioPlayer';
 import { PlacementProgress } from './PlacementProgress';
 import type { ClosedAnswer } from '@/lib/item-bank/scoring';
 import type { PublicBankItem, PublicItemGroup } from '@/lib/item-bank/types';
@@ -17,8 +18,6 @@ export interface PlacementStepRunnerProps {
   onSubmitStep: (answers: ClosedAnswer[]) => void;
   onCancel: () => void;
 }
-
-const MAX_PLAYS = 2;
 
 /** @param props PlacementStepRunnerProps */
 export function PlacementStepRunner({
@@ -34,36 +33,11 @@ export function PlacementStepRunner({
   const [currentIdx, setCurrentIdx] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
-  const [playsUsed, setPlaysUsed] = useState(0);
-
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current = null;
-      }
-    };
-  }, []);
 
   const currentItem = items[currentIdx];
   const isLastItem = currentIdx === items.length - 1;
   const audioUrl = currentItem?.stimulus_audio_url ?? group.stimulus_audio_url;
   const stimulusText = currentItem?.stimulus_text ?? group.stimulus_text;
-  const canPlay = Boolean(audioUrl) && playsUsed < MAX_PLAYS;
-
-  const handlePlay = useCallback(() => {
-    if (!audioUrl || playsUsed >= MAX_PLAYS) return;
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.currentTime = 0;
-    }
-    const audio = new Audio(audioUrl);
-    audioRef.current = audio;
-    audio.play().catch(() => {});
-    setPlaysUsed((n) => n + 1);
-  }, [audioUrl, playsUsed]);
 
   const handleSelectOption = useCallback((key: string) => {
     setSelectedKey(key);
@@ -86,11 +60,6 @@ export function PlacementStepRunner({
 
     setCurrentIdx((prev) => prev + 1);
     setSelectedKey(null);
-    setPlaysUsed(0);
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current = null;
-    }
   }, [selectedKey, currentItem, answers, isLastItem, onSubmitStep]);
 
   const handleRetry = useCallback(() => {
@@ -133,20 +102,7 @@ export function PlacementStepRunner({
       </p>
 
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 w-full flex flex-col gap-4">
-        {audioUrl && (
-          <div className="flex flex-col items-center gap-3">
-            <button
-              onClick={handlePlay}
-              disabled={!canPlay}
-              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm transition ${
-                canPlay ? 'bg-trebol-primary text-white hover:opacity-90' : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-              }`}
-            >
-              <Volume2 size={16} />
-              {playsUsed === 0 ? 'Play audio' : playsUsed >= MAX_PLAYS ? 'Audio played' : 'Play again'}
-            </button>
-          </div>
-        )}
+        {audioUrl && <GroupAudioPlayer key={currentItem?.id} audioPath={audioUrl} label={tPlacement('audioPlay')} />}
 
         {stimulusText && (
           <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">

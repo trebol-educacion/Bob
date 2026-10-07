@@ -10,6 +10,7 @@ import {
   L3_GROUP, L3_ITEMS, R7_GROUP, R7_ITEMS,
 } from './fce-group-fixtures';
 
+vi.mock('next-intl', async () => (await import('./stubs/intl')).intlMock());
 vi.mock('@/components/chat/BobMascotLoader', () => ({
   BobMascotLoader: ({ message }: { message: string }) => <div>{message}</div>,
 }));
@@ -68,8 +69,10 @@ const props = { onBack: vi.fn() };
 describe('FCEReadingMatchingPractice (Reading P7)', () => {
   it('muestra cuatro secciones y 10 preguntas, admite repetir letra, corrige y muestra nota', async () => {
     startMocks.r7.mockResolvedValue({ sessionId: 's1', exercise: r7 });
-    submitMocks.r7.mockImplementation(async (_s: string, answers: Record<string, string>) =>
-      gradeGroupAnswers(R7_ITEMS, answers, matchesLetterKey),
+    submitMocks.r7.mockImplementation(async (input: { answers: Record<string, string> }) => ({
+      sessionId: 'sx',
+      result: gradeGroupAnswers(R7_ITEMS, input.answers, matchesLetterKey),
+      }),
     );
     render(<FCEReadingMatchingPractice {...props} />);
 
@@ -83,9 +86,9 @@ describe('FCEReadingMatchingPractice (Reading P7)', () => {
     expect(screen.getByLabelText('Question 43: A')).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByLabelText('Question 50: A')).toHaveAttribute('aria-pressed', 'true');
 
-    fireEvent.click(screen.getByRole('button', { name: /Check answers \(3\/10\)/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Submit answers \(3\/10\)/ }));
     await waitFor(() => expect(screen.getByTestId('score-10')).toHaveTextContent('Score: 3 / 10'));
-    expect(submitMocks.r7).toHaveBeenCalledWith('s1', { 'r7-item-1': 'A', 'r7-item-8': 'A', 'r7-item-10': 'A' });
+    expect(submitMocks.r7).toHaveBeenCalledWith({ sessionId: undefined, groupId: r7.groupId, answers: { 'r7-item-1': 'A', 'r7-item-8': 'A', 'r7-item-10': 'A' } });
     expect(screen.getByLabelText('Question 44: D')).toBeDisabled();
   });
 
@@ -124,8 +127,10 @@ describe('FCEReadingMatchingPractice (Reading P7)', () => {
 describe('FCEListeningMatchingPractice (Listening P3)', () => {
   it('cinco clips con audio individual, ocho opciones A-H y tres sobrantes', async () => {
     startMocks.l3.mockResolvedValue({ sessionId: 's3', exercise: l3 });
-    submitMocks.l3.mockImplementation(async (_s: string, answers: Record<string, string>) =>
-      gradeGroupAnswers(L3_ITEMS, answers, matchesLetterKey),
+    submitMocks.l3.mockImplementation(async (input: { answers: Record<string, string> }) => ({
+      sessionId: 'sx',
+      result: gradeGroupAnswers(L3_ITEMS, input.answers, matchesLetterKey),
+      }),
     );
     render(<FCEListeningMatchingPractice {...props} />);
 
@@ -140,7 +145,7 @@ describe('FCEListeningMatchingPractice (Listening P3)', () => {
     for (const [n, key] of [[19, 'E'], [20, 'B'], [21, 'A'], [22, 'G'], [23, 'D']] as const) {
       fireEvent.click(screen.getByLabelText(`Question ${n}: ${key}`));
     }
-    fireEvent.click(screen.getByRole('button', { name: /Check answers \(5\/5\)/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Submit answers \(5\/5\)/ }));
     await waitFor(() => expect(screen.getByTestId('score-10')).toHaveTextContent('Score: 10 / 10'));
   });
 
@@ -153,6 +158,7 @@ describe('FCEListeningMatchingPractice (Listening P3)', () => {
     createdAudio[0].onerror?.();
     await screen.findByText('The audio is not available right now.');
     fireEvent.click(screen.getAllByRole('button', { name: /Try again/ })[0]);
-    expect(screen.getAllByRole('button', { name: /^Play Speaker/ }).length).toBeGreaterThan(0);
+    expect(createdAudio.length).toBe(2);
+    expect(playMock).toHaveBeenCalledTimes(2);
   });
 });

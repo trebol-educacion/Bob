@@ -68,7 +68,6 @@
       "incorrectBadge": "Incorrect",
       "correctAnswerLabel": "Correct answer:",
       "explanationLabel": "Why:",
-      "celebrationFeedback": "Great work reading those signs! Keep practising to get even faster.",
       "celebrationAction": "See my activities"
     },
     "listenAndChoose": {
@@ -87,7 +86,6 @@
       "listenAgain": "Listen again",
       "showTranscript": "See conversation transcript",
       "hideTranscript": "Hide transcript",
-      "celebrationFeedback": "Great listening! Keep practising to catch every word.",
       "celebrationAction": "See my activities",
       "framingFallback": "You will hear 5 short conversations. After each one, choose the picture that matches what you heard, A, B or C."
     },
@@ -100,17 +98,14 @@
       "wordGoal": "Goal: ~25 words in English",
       "preparingExercise": "Preparing your writing exercise…",
       "reviewingMessage": "Reviewing your message…",
+      "evaluationFailed": "We could not check your message. Please try again.",
       "yourMessage": "Your message",
       "youDidIt": "You did it!",
       "reviewYourMessage": "Review your message",
       "whatYouDidWell": "What you did well",
       "toImprove": "To improve",
       "viewModelAnswer": "View model answer",
-      "back": "Back",
-      "words": "Words:",
-      "wordGoalTarget": "/ goal ~25",
-      "moreToSend": "{remaining} more to send",
-      "sendMessage": "Send message"
+      "back": "Back"
     }
   },
   "fce": {
@@ -121,7 +116,7 @@
       "feedbackTitle": "Your Feedback",
       "evaluatingPerformance": "Evaluating your performance…",
       "howItWorks": "How it works",
-      "howItWorksLine1": "You discuss 5 ideas with an AI examiner: about 2 minutes on each option, then 1 minute to decide (up to {maxTurns} turns)",
+      "howItWorksLine1": "You discuss 5 ideas with an AI examiner: about 2 minutes discussing the options together, then 1 minute to decide which is best (up to {maxTurns} turns)",
       "howItWorksLine2": "Give reasons, compare the ideas and react to your partner",
       "howItWorksLine3": "After finishing, you get your grade out of 10 and detailed feedback",
       "startDiscussion": "Start Task",
@@ -139,6 +134,10 @@
       "footerFeedbackLabel": "FEEDBACK",
       "footerCollaborativeLabel": "COLLABORATIVE TASK"
     },
+    "restoreFailed": "We could not reopen this session. Go back and start a new one.",
+    "noContent": "There are no exercises available for this part yet. Go back and try another activity.",
+    "loadFailed": "We could not load this exercise. Go back and try again.",
+    "submitFailed": "We could not save your answers. Please try again.",
     "cloze": {
       "back": "Back",
       "headerTitle": "Multiple-Choice Cloze",
@@ -153,7 +152,6 @@
       "incorrectBadge": "Incorrect",
       "correctAnswerLabel": "Correct answer:",
       "explanationLabel": "Why:",
-      "celebrationFeedback": "Well done! Keep practising collocations and phrasal verbs to master B2 vocabulary.",
       "celebrationAction": "See my activities"
     },
     "grouped": {
@@ -171,8 +169,7 @@
       "keywordLabel": "Keyword",
       "keywordHint": "Use the keyword unchanged. Write between 2 and 5 words.",
       "sentenceBankTitle": "Missing sentences",
-      "markLabel": "Mark: {score} / 10",
-      "celebrationFeedback": "Review the corrections above and try another exercise to keep improving.",
+      "markLabel": "Score: {score} / 10",
       "celebrationAction": "See my activities",
       "parts": {
         "fce_reading_part2": {
@@ -216,7 +213,6 @@
       "reviewingMessage": "Reviewing your essay…",
       "words": "Words:",
       "target": "/ target 140-190",
-      "moreToSend": "{remaining} more to send",
       "contextLabel": "Context",
       "titleLabel": "Essay title",
       "notesLabel": "Notes",
@@ -237,7 +233,6 @@
       "viewModelAnswer": "View model answer",
       "hideModelAnswer": "Hide model answer",
       "modelAnswerTitle": "Model answer (B2 level)",
-      "celebrationFeedback": "Well done writing your essay! Keep practising to cover all 3 notes with a strong, balanced argument.",
       "celebrationAction": "See my activities"
     },
     "pictureDescription": {
@@ -295,7 +290,6 @@
       "showModelAnswer": "See a model answer",
       "hideModelAnswer": "Hide model answer",
       "modelAnswerTitle": "Model answer (B2 level)",
-      "celebrationFeedback": "Nice work comparing the pictures! Keep practising to cover all 6 points fluently.",
       "celebrationAction": "See my progress",
       "finishedTitle": "Long Turn complete"
     },
@@ -351,7 +345,6 @@
       "incorrectBadge": "Incorrect",
       "correctAnswerLabel": "Correct answer:",
       "explanationLabel": "Why:",
-      "celebrationFeedback": "Well done reading those texts! Keep practising your comprehension skills.",
       "celebrationAction": "See my activities"
     },
     "pictureDescription": {
@@ -404,7 +397,6 @@
       "showModelAnswer": "See a model answer",
       "hideModelAnswer": "Hide model answer",
       "modelAnswerTitle": "Model answer (B1 level)",
-      "celebrationFeedback": "Nice work describing the picture! Keep practising to cover all 8 points fluently.",
       "celebrationAction": "See my progress",
       "finishedTitle": "Description complete"
     },
@@ -418,9 +410,7 @@
       "scenarioTitle": "Email received",
       "replyPointsTitle": "What to include in your reply:",
       "placeholder": "Write your email here…",
-      "words": "Words:",
       "target": "/ target ~100",
-      "moreToSend": "{remaining} more to send",
       "yourMessage": "Your message",
       "youDidIt": "Great email!",
       "reviewYourMessage": "Review your email",
@@ -428,7 +418,6 @@
       "toImprove": "To improve",
       "viewModelAnswer": "View model answer",
       "hideModelAnswer": "Hide model answer",
-      "celebrationFeedback": "Well done writing your email! Keep practising to cover all 4 points perfectly.",
       "celebrationAction": "See my activities"
     }
   }

@@ -14,8 +14,10 @@ import {
   type PETReadingQuestionResult,
   type PETReadingAnswer,
 } from '@/actions/modes/pet-reading-comprehension';
+import { ActivityLoadError } from '@/components/practice/ActivityLoadError';
 import type { StoredMessage } from '@/actions/messages';
 import { resolveActivityBoot } from '@/lib/activity/boot';
+import { ActivityHeader } from '@/components/activity/ActivityHeader';
 
 const ACCENT_RING = 'border-emerald-200';
 
@@ -60,7 +62,7 @@ function toClientQuestion(raw: Record<string, unknown>): PETReadingClientQuestio
   return { number, section, type: 'mcq', question: String(raw.question ?? ''), options };
 }
 
-function tryRestore(messages: StoredMessage[]): RestoredState | null {
+export function tryRestore(messages: StoredMessage[]): RestoredState | null {
   let title = '';
   let topics: string[] = [];
   let text = '';
@@ -252,7 +254,7 @@ export function PETReadingComprehensionPractice({
 }: PETReadingComprehensionPracticeProps) {
   const [phase, setPhase] = useState<Phase>('loading');
   const [sessionId, setSessionId] = useState<string | undefined>(initialSessionId);
-  const [userId, setUserId] = useState<string | undefined>();
+  const [planToken, setPlanToken] = useState<string | null>(null);
   const [title, setTitle] = useState('');
   const [topics, setTopics] = useState<string[]>([]);
   const [text, setText] = useState('');
@@ -262,6 +264,7 @@ export function PETReadingComprehensionPractice({
   const [results, setResults] = useState<PETReadingQuestionResult[]>([]);
   const [correctCount, setCorrectCount] = useState(0);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [loadErrorCode, setLoadErrorCode] = useState<string | null>(null);
   const [isNewSession, setIsNewSession] = useState(false);
   const initStartedRef = useRef(false);
 
@@ -283,11 +286,7 @@ export function PETReadingComprehensionPractice({
           setCorrectCount(restored.correctCount);
           setPhase('finished');
         } else {
-          const { createSupabaseBrowser } = await import('@/lib/supabase/browser-client');
-          const supabase = createSupabaseBrowser();
-          const { data: { user } } = await supabase.auth.getUser();
-          if (user) setUserId(user.id);
-          setPhase('ready');
+          setErrorMsg('Could not restore session. Please start a new one.');
         }
         return;
       }
@@ -295,21 +294,19 @@ export function PETReadingComprehensionPractice({
       if (boot.kind === 'restore-failed') { setErrorMsg('Could not restore session. Please start a new one.'); return; }
 
       setIsNewSession(true);
-      const result = await generatePETReadingComprehensionAction({ sessionId: initialSessionId });
+      const result = await generatePETReadingComprehensionAction();
 
-      if ('error' in result) {
-        setErrorMsg(result.error);
+      if (!result.ok) {
+        setLoadErrorCode(result.code);
         return;
       }
 
-      onSessionCreated?.(result.sessionId);
-      setSessionId(result.sessionId);
-      setUserId(result.userId);
-      setTitle(result.title);
-      setTopics(result.topics);
-      setText(result.text);
-      setQuestions(result.questions);
-      setFramingText(result.framingText);
+      setPlanToken(result.data.planToken);
+      setTitle(result.data.title);
+      setTopics(result.data.topics);
+      setText(result.data.text);
+      setQuestions(result.data.questions);
+      setFramingText(result.data.framingText);
       setPhase('ready');
     }
 
@@ -325,10 +322,10 @@ export function PETReadingComprehensionPractice({
   }
 
   async function handleSubmit() {
-    if (!sessionId || !userId) return;
+    if (!planToken) return;
     setPhase('submitting');
 
-    const result = await submitPETReadingComprehensionAction({ sessionId, userId, answers });
+    const result = await submitPETReadingComprehensionAction({ sessionId, planToken, answers });
 
     if ('error' in result) {
       setErrorMsg(result.error);
@@ -336,6 +333,8 @@ export function PETReadingComprehensionPractice({
       return;
     }
 
+    if (!sessionId) onSessionCreated?.(result.sessionId);
+    setSessionId(result.sessionId);
     setResults(result.question_results);
     setCorrectCount(result.correct_count);
     setPhase('finished');
@@ -351,6 +350,8 @@ export function PETReadingComprehensionPractice({
 
   const answeredCount = questions.filter(isAnswered).length;
   const allAnswered = answeredCount === questions.length && questions.length > 0;
+
+  if (loadErrorCode) return <ActivityLoadError code={loadErrorCode} onBack={onBack} />;
 
   if (errorMsg) {
     return (
@@ -369,26 +370,12 @@ export function PETReadingComprehensionPractice({
 
   return (
     <div className="flex flex-col h-full relative">
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-100 bg-white shrink-0">
-        <button
-          type="button"
-          onClick={onBack}
-          className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-600"
-          aria-label="Back"
-        >
-          ←
-        </button>
-        <div className="w-8 h-8 rounded-xl bg-emerald-100 flex items-center justify-center shrink-0">
-          <PETReadingIcon size={18} className="text-emerald-700" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-bold text-gray-800 truncate">Reading, Comprehensive Text</p>
-          <p className="text-xs text-gray-400">Reading · B1</p>
-        </div>
-        <span className="shrink-0 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-bold uppercase tracking-widest">
-          B1
-        </span>
-      </div>
+      <ActivityHeader
+        title="Comprehensive Text"
+        subtitle="Reading"
+        icon={<PETReadingIcon size={18} className="text-emerald-700" />}
+        onBack={onBack}
+      />
 
       {phase === 'loading' && (
         <div className="flex-1 flex flex-col min-h-0">
@@ -461,7 +448,7 @@ export function PETReadingComprehensionPractice({
               disabled={!allAnswered}
               className="px-5 py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-bold shadow-sm hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
             >
-              Check answers
+              Submit answers
             </button>
           </div>
         </>
@@ -491,7 +478,6 @@ export function PETReadingComprehensionPractice({
             <CelebrationCard
               score={correctCount}
               scoreMax={10}
-              feedback="Great reading practice!"
               onAction={onOpenDashboard}
               actionLabel="See my progress"
               animate={isNewSession}

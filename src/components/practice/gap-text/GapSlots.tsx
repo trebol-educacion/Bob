@@ -75,9 +75,10 @@ interface SentenceSlotProps {
   onChange: (value: string) => void;
   label: string;
   sentences: GapSentence[];
+  takenIds?: ReadonlySet<string>;
 }
 
-export function SentenceSlot({ number, value, onChange, label, sentences }: SentenceSlotProps) {
+export function SentenceSlot({ number, value, onChange, label, sentences, takenIds }: SentenceSlotProps) {
   return (
     <span className="inline-flex items-center align-middle mx-0.5">
       <span
@@ -94,7 +95,7 @@ export function SentenceSlot({ number, value, onChange, label, sentences }: Sent
       >
         <option value="">—</option>
         {sentences.map((sentence) => (
-          <option key={sentence.id} value={sentence.id}>
+          <option key={sentence.id} value={sentence.id} disabled={takenIds?.has(sentence.id) ?? false}>
             {sentence.id}
           </option>
         ))}

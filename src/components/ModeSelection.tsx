@@ -1,90 +1,13 @@
 import React, { forwardRef } from 'react';
 import { motion } from 'motion/react';
 import { useTranslations } from 'next-intl';
-import {
-  MessageSquare,
-  Image as ImageIcon,
-  Sparkles,
-  Mic2,
-  Headphones,
-  ClipboardList,
-  Hand,
-  HelpCircle,
-  BookOpen,
-  User,
-  GitCompare,
-  MessageCircle,
-  BookImage,
-} from 'lucide-react';
+import { CatalogEmptyState } from '@/components/catalog/CatalogEmptyState';
 import type { ModeKey, PracticeMode, CefrLevel, DynamicCard, CardVisibility } from '@/lib/types/practice';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import type { AvailableMode } from '@/contexts/OrganizationContext';
 import type { PracticeTrack } from '@/lib/modes';
 import { getModeIcon, getModeBadge, getModeSection, getModeTitle, getModeDescription, getModeSortWeight, getModeOfficialName, isGenericGroupedWithCambridge } from '@/lib/mode-ui';
-import { ListenAndPointIcon } from '@/components/icons/ModeIcons';
-import { LookAndAnswerIcon, TellTheStoryIcon, WhatsThisIcon, PersonalQuestionsIcon } from '@/components/icons/StartersIcons';
-import { FindTheDifferencesIcon, InformationExchangeIcon, PictureStoryMoversIcon, PersonalQuestionsMoversIcon, MoreAboutYouIcon } from '@/components/icons/MoversIcons';
-import { FlyersFindDifferencesIcon } from '@/components/icons/FlyersIcons';
-import { KETListeningIcon, KETReadingIcon, KETWritingIcon, KETSpeakingIcon } from '@/components/icons/KETIcons';
-import { PETListeningIcon, PETReadingIcon, PETWritingIcon, PETSpeakingIcon } from '@/components/icons/PETIcons';
-import { FCEListeningIcon, FCEReadingIcon, FCEWritingIcon, FCESpeakingIcon } from '@/components/icons/FCEIcons';
-import { CAEInterviewIcon, CAELongTurnIcon, CAECollaborativeIcon, CAEDiscussionIcon } from '@/components/icons/CAEIcons';
-import { CPEInterviewIcon, CPECollaborativeIcon, CPEMonologueIcon, CPEExtendedDiscussionIcon, CPEFinalDiscussionIcon } from '@/components/icons/CPEIcons';
-
-const ICON_MAP: Record<string, React.FC<{ size?: number; className?: string }>> = {
-  MessageSquare,
-  Image: ImageIcon,
-  Sparkles,
-  Mic2,
-  Headphones,
-  ClipboardList,
-  Hand,
-  HelpCircle,
-  BookOpen,
-  User,
-  GitCompare,
-  MessageCircle,
-  BookImage,
-  ImageIcon,
-  ListenAndPoint: ListenAndPointIcon,
-  LookAndAnswer: LookAndAnswerIcon,
-  TellTheStory: TellTheStoryIcon,
-  WhatsThis: WhatsThisIcon,
-  PersonalQuestions: PersonalQuestionsIcon,
-  FindTheDifferences: FindTheDifferencesIcon,
-  InformationExchange: InformationExchangeIcon,
-  PictureStoryMovers: PictureStoryMoversIcon,
-  PersonalQuestionsMovers: PersonalQuestionsMoversIcon,
-  MoreAboutYou: MoreAboutYouIcon,
-  FlyersFindDifferences: FlyersFindDifferencesIcon,
-  KETListening: KETListeningIcon,
-  KETReading: KETReadingIcon,
-  KETWriting: KETWritingIcon,
-  KETSpeaking: KETSpeakingIcon,
-  PETListening: PETListeningIcon,
-  PETReading: PETReadingIcon,
-  PETWriting: PETWritingIcon,
-  PETSpeaking: PETSpeakingIcon,
-  FCEListening: FCEListeningIcon,
-  FCEReading: FCEReadingIcon,
-  FCEWriting: FCEWritingIcon,
-  FCESpeaking: FCESpeakingIcon,
-  CAEInterview: CAEInterviewIcon,
-  CAELongTurn: CAELongTurnIcon,
-  CAECollaborative: CAECollaborativeIcon,
-  CAEDiscussion: CAEDiscussionIcon,
-  CPEInterview: CPEInterviewIcon,
-  CPECollaborative: CPECollaborativeIcon,
-  CPEMonologue: CPEMonologueIcon,
-  CPEExtendedDiscussion: CPEExtendedDiscussionIcon,
-  CPEFinalDiscussion: CPEFinalDiscussionIcon,
-};
-
-function resolveIcon(name: string, size = 28, className?: string): React.ReactNode {
-  const Icon = ICON_MAP[name];
-  if (Icon) return <Icon size={size} className={className} />;
-  return <Sparkles size={size} className={className} />;
-}
+import { resolveIcon } from '@/components/catalog/mode-icons';
 
 interface ModeCardProps {
   mode: ModeKey;
@@ -156,7 +79,7 @@ export const ModeSelection = forwardRef<HTMLDivElement, ModeSelectionProps>(func
   { onSelect, cefrActiveLevel = null, track = 'official' },
   selectorRef
 ) {
-  const { allDynamicCards, resolvedCards } = useOrganization();
+  const { allDynamicCards, resolvedCards, loading } = useOrganization();
   const t = useTranslations('home.modeSelection');
   const tTrack = useTranslations('mode_ui.track');
 
@@ -202,6 +125,8 @@ export const ModeSelection = forwardRef<HTMLDivElement, ModeSelectionProps>(func
     }
     return undefined;
   }
+
+  const isEmpty = !loading && Boolean(cefrActiveLevel) && (track === 'free' ? genericCards.length === 0 : sectionMap.size === 0);
 
   function renderCard(card: DynamicCard) {
     const resolved = resolvedCardMap.get(card.mode_key);
@@ -260,6 +185,8 @@ export const ModeSelection = forwardRef<HTMLDivElement, ModeSelectionProps>(func
             </div>
           </motion.div>
         )}
+
+        {isEmpty && <CatalogEmptyState title={t('emptyTitle')} body={t('emptyBody')} />}
 
         {cefrActiveLevel && track === 'official' && Array.from(sectionMap.entries()).map(([sectionName, cards], i) => (
           <motion.div

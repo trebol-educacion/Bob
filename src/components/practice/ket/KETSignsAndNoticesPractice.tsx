@@ -10,11 +10,11 @@ import { BobMascotLoader } from '@/components/chat/BobMascotLoader';
 import {
   generateKETSignsAndNoticesAction,
   submitKETSignsAnswersAction,
-  generateKETSignImagesAction,
   type SignItem,
   type SignAnswerResult,
 } from '@/actions/modes/ket-reading-part1';
 import type { StoredMessage } from '@/actions/messages';
+import { ActivityLoadError } from '@/components/practice/ActivityLoadError';
 import { useTranslations } from 'next-intl';
 
 const ACCENT = '#469E7B';
@@ -330,7 +330,6 @@ export function KETSignsAndNoticesPractice({
 
   const [phase, setPhase] = useState<Phase>('loading');
   const [sessionId, setSessionId] = useState<string | undefined>(initialSessionId);
-  const [userId, setUserId] = useState<string | undefined>();
   const [items, setItems] = useState<SignItem[]>([]);
   const [framingText, setFramingText] = useState('');
   const [answers, setAnswers] = useState<Record<number, 'A' | 'B' | 'C'>>({});
@@ -339,9 +338,9 @@ export function KETSignsAndNoticesPractice({
   const [correctCount, setCorrectCount] = useState(0);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isNewSession, setIsNewSession] = useState(false);
-  const [signImages, setSignImages] = useState<Record<number, string>>({});
+  const [bankGroupId, setBankGroupId] = useState<string | undefined>(undefined);
+  const [loadErrorCode, setLoadErrorCode] = useState<string | null>(null);
   const initStartedRef = useRef(false);
-  const imagesStartedRef = useRef(false);
   const advanceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -358,10 +357,6 @@ export function KETSignsAndNoticesPractice({
             setCorrectCount(restored.correctCount);
             setPhase('finished');
           } else {
-            const { createSupabaseBrowser } = await import('@/lib/supabase/browser-client');
-            const supabase = createSupabaseBrowser();
-            const { data: { user } } = await supabase.auth.getUser();
-            if (user) setUserId(user.id);
             setPhase('ready');
           }
           return;
@@ -373,21 +368,16 @@ export function KETSignsAndNoticesPractice({
       }
 
       setIsNewSession(true);
-      const result = await generateKETSignsAndNoticesAction({ sessionId: initialSessionId });
+      const result = await generateKETSignsAndNoticesAction();
 
-      if ('error' in result) {
-        setErrorMsg(result.error);
+      if (!result.ok) {
+        setLoadErrorCode(result.code);
         return;
       }
 
-      if (!initialSessionId) {
-        onSessionCreated?.(result.sessionId);
-      }
-
-      setSessionId(result.sessionId);
-      setUserId(result.userId);
-      setItems(result.items);
-      setFramingText(result.framingText);
+      setItems(result.data.items);
+      setFramingText(result.data.framingText);
+      setBankGroupId(result.data.bankGroupId);
       setPhase('ready');
     }
 
@@ -397,27 +387,6 @@ export function KETSignsAndNoticesPractice({
   useEffect(() => () => {
     if (advanceRef.current) clearTimeout(advanceRef.current);
   }, []);
-
-  useEffect(() => {
-    if (imagesStartedRef.current) return;
-    if (items.length === 0) return;
-    imagesStartedRef.current = true;
-
-    async function loadImages() {
-      await Promise.all(
-        items.map(async (it) => {
-          const result = await generateKETSignImagesAction({
-            items: [{ number: it.number, sign_context: it.sign_context, sign_style: it.sign_style ?? 'default' }],
-            sessionId,
-          }).catch(() => []);
-          const url = result[0]?.image_url;
-          if (url) setSignImages((prev) => ({ ...prev, [it.number]: url }));
-        })
-      );
-    }
-
-    void loadImages();
-  }, [items, sessionId]);
 
   function handleSelect(itemNumber: number, optionId: 'A' | 'B' | 'C') {
     setAnswers((prev) => ({ ...prev, [itemNumber]: optionId }));
@@ -430,13 +399,13 @@ export function KETSignsAndNoticesPractice({
   }
 
   async function handleSubmit() {
-    if (!sessionId || !userId) return;
     if (advanceRef.current) clearTimeout(advanceRef.current);
     setPhase('submitting');
 
     const result = await submitKETSignsAnswersAction({
       sessionId,
-      userId,
+      framingText,
+      bankGroupId,
       answers,
       items,
     });
@@ -450,6 +419,8 @@ export function KETSignsAndNoticesPractice({
     setResults(result.results);
     setCorrectCount(result.correctCount);
     setPhase('finished');
+    if (!sessionId) onSessionCreated?.(result.sessionId);
+    setSessionId(result.sessionId);
     onSessionFinished?.();
   }
 
@@ -457,20 +428,7 @@ export function KETSignsAndNoticesPractice({
   const allAnswered = answeredCount === items.length && items.length > 0;
   const currentItem = items[current];
 
-  if (errorMsg) {
-    return (
-      <div className="flex flex-col items-center justify-center gap-4 p-8 text-center min-h-[40vh]">
-        <p className="text-red-500 font-semibold">{errorMsg}</p>
-        <button
-          type="button"
-          onClick={onBack}
-          className="px-5 py-2 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition-colors text-sm"
-        >
-          {t('ket.signsAndNotices.back')}
-        </button>
-      </div>
-    );
-  }
+  if (loadErrorCode || errorMsg) return <ActivityLoadError code={loadErrorCode} message={errorMsg} onBack={onBack} />;
 
   return (
     <div className="flex flex-col h-full relative">
@@ -556,7 +514,7 @@ export function KETSignsAndNoticesPractice({
                   transition={{ type: 'spring', stiffness: 300, damping: 28 }}
                   className="space-y-4"
                 >
-                  <SignBoard item={currentItem} imageUrl={signImages[currentItem.number]} />
+                  <SignBoard item={currentItem} imageUrl={currentItem.image_url} />
 
                   <p className="text-sm font-semibold text-gray-700 text-center">{currentItem.question}</p>
 
@@ -615,7 +573,7 @@ export function KETSignsAndNoticesPractice({
                       animate={isNewSession}
                       reduceMotion={!!reduceMotion}
                       explanationLabel={t('ket.signsAndNotices.explanationLabel')}
-                      imageUrl={signImages[item.number]}
+                      imageUrl={item.image_url}
                     />
                   );
                 })
@@ -625,7 +583,6 @@ export function KETSignsAndNoticesPractice({
               <CelebrationCard
                 score={correctCount}
                 scoreMax={items.length || 6}
-                feedback={t('ket.signsAndNotices.celebrationFeedback')}
                 onAction={onOpenDashboard}
                 actionLabel={t('ket.signsAndNotices.celebrationAction')}
                 animate={isNewSession}

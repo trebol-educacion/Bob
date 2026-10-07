@@ -10,6 +10,7 @@ import { useAssessmentFlow } from '@/hooks/useAssessmentFlow';
 import { useUsageHeartbeat } from '@/hooks/useUsageHeartbeat';
 import { isBrandNewStudent } from '@/lib/placement/first-entry-gate';
 import { isConversationMode, isExamMode, type AppState } from '@/lib/routing';
+import { parsePracticeSessionMode } from '@/lib/practice/mode-prompt-key';
 import type { PracticeMode } from '@/lib/types/practice';
 import type { PracticeActivityMode } from '@/lib/practice/types';
 
@@ -93,18 +94,11 @@ export default function App() {
   }, [setSelectedSkill]);
 
   const onSelectExam = useCallback(() => setAppState('skill-selection'), []);
-  const onSelectPractice = useCallback(() => setAppState('practice-mode-select'), []);
-  const onSelectPracticeMode = useCallback((selected: PracticeActivityMode) => {
-    setPracticeMode(selected);
-    setAppState('practice-session');
-  }, []);
-
   const {
     sessions,
     activeSessionId,
     sessionsLoading,
     selectedMessages,
-    setSessions,
     setActiveSessionId,
     clearActiveSession,
     handleNewSession,
@@ -113,6 +107,17 @@ export default function App() {
     handleConversationSessionStart,
     refreshSessions,
   } = useSessionState(userEmail);
+
+  const onSelectPractice = useCallback(() => {
+    clearActiveSession();
+    setAppState('practice-mode-select');
+  }, [clearActiveSession]);
+
+  const onSelectPracticeMode = useCallback((selected: PracticeActivityMode) => {
+    clearActiveSession();
+    setPracticeMode(selected);
+    setAppState('practice-session');
+  }, [clearActiveSession]);
 
   const leavePractice = useCallback((target: AppState) => {
     clearActiveSession();
@@ -126,7 +131,11 @@ export default function App() {
   const onSelectSession = useCallback(async (id: string) => {
     await handleSelectSession(id, (sessionMode, sessionTopic) => {
       setMode(sessionMode as PracticeMode);
-      if (isConversationMode(sessionMode)) {
+      const reopenedPractice = parsePracticeSessionMode(sessionMode);
+      if (reopenedPractice) {
+        setPracticeMode(reopenedPractice);
+        setAppState('practice-session');
+      } else if (isConversationMode(sessionMode)) {
         setTopic(sessionTopic);
         setAppState('conversation-practicing');
       } else if (isExamMode(sessionMode)) {
@@ -154,7 +163,7 @@ export default function App() {
 
   const onConversationSessionStart = useCallback((topicStr: string) => {
     setTopic(topicStr);
-    handleConversationSessionStart(topicStr);
+    return handleConversationSessionStart(topicStr);
   }, [handleConversationSessionStart]);
 
   const onFinish = useCallback(() => {
@@ -218,16 +227,11 @@ export default function App() {
       refreshSkillLevels={refreshSkillLevels}
       refreshPendingAssessments={refreshPendingAssessments}
       setActiveSessionId={setActiveSessionId}
-      setSessions={setSessions}
       cefrSelectorRef={cefrSelectorRef}
       assessmentId={assessment.assessmentId}
       assessmentPrompts={assessment.assessmentPrompts}
       assessmentIsYl={assessment.assessmentIsYl}
-      assessmentListeningItems={assessment.assessmentListeningItems}
-      assessmentReadingItems={assessment.assessmentReadingItems}
       assessmentWritingTask={assessment.assessmentWritingTask}
-      assessmentResult={assessment.assessmentResult}
-      setAssessmentResult={assessment.setAssessmentResult}
     />
   );
 }

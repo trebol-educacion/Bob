@@ -59,6 +59,8 @@
     "conversationError": "Something went wrong with that turn.",
     "sendMessageError": "Bob couldn't answer just now.",
     "startError": "Bob couldn't start practice just now.",
+    "persistError": "We couldn't save that turn. Try again.",
+    "finishError": "We couldn't save your result. Try again.",
     "retry": "Try again",
     "dismiss": "Dismiss"
   },

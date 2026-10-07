@@ -6,18 +6,19 @@ import {
   chatPart3Action,
   chatPart3TextAction,
   evaluatePart3Action,
-  getB1SessionMessagesAction,
 } from '@/actions/modes/part3';
+import { unwrapContent } from '@/lib/content/unwrap-content';
+import type { ActivityRenderProps } from '@/lib/routing';
 import type { Part3Scenario } from '@/lib/speaking/types';
 import {
   CollaborativePractice,
   type CollaborativePracticeConfig,
 } from '@/components/practice/speaking/collaborative';
 
-interface B1CollaborativePracticeProps {
-  onBack: () => void;
-  sessionId?: string;
-}
+type B1CollaborativePracticeProps = Pick<
+  ActivityRenderProps,
+  'onBack' | 'sessionId' | 'initialMessages' | 'onSessionCreated' | 'onSessionFinished'
+>;
 
 const PRESET_SCENARIOS: Part3Scenario[] = [
   {
@@ -61,20 +62,17 @@ const PRESET_SCENARIOS: Part3Scenario[] = [
 ];
 
 const B1_COLLABORATIVE_CONFIG: CollaborativePracticeConfig = {
-  mode: 'cambridge_pet_p3',
-  sessionTitlePrefix: 'B1 Collaborative',
   presets: PRESET_SCENARIOS,
   maxTurns: 8,
   finishEarlyAfterTurns: 4,
   actions: {
-    generateScenario: generatePart3ScenarioAction,
+    generateScenario: async () => unwrapContent(await generatePart3ScenarioAction()),
     chatAudio: chatPart3Action,
     chatText: chatPart3TextAction,
     evaluate: evaluatePart3Action,
-    restore: getB1SessionMessagesAction,
   },
 };
 
-export function B1CollaborativePractice({ onBack, sessionId }: B1CollaborativePracticeProps) {
-  return <CollaborativePractice config={B1_COLLABORATIVE_CONFIG} onBack={onBack} sessionId={sessionId} />;
+export function B1CollaborativePractice(props: B1CollaborativePracticeProps) {
+  return <CollaborativePractice config={B1_COLLABORATIVE_CONFIG} {...props} />;
 }

@@ -15,6 +15,14 @@ vi.mock('@/actions/modes/yl', () => ({
   pregenerateYLCueAudiosAction: vi.fn(),
 }));
 
+vi.mock('@/actions/messages', () => ({
+  saveMessageAction: vi.fn().mockResolvedValue({ data: null, error: null }),
+}));
+
+vi.mock('@/actions/generic-session', () => ({
+  finishGenericSessionAction: vi.fn().mockResolvedValue({ ok: true, data: { score10: null } }),
+}));
+
 import { generateTopicPhrasesAction } from '@/actions/gemini';
 
 describe('usePracticeChat · lista de frases vacía', () => {

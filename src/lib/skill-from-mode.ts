@@ -3,12 +3,16 @@ import type { Skill } from '@/lib/types/skills';
 const MODE_SKILL_OVERRIDES: Record<string, Skill> = {
   cambridge_starters_part1: 'listening',
   toefl_listen_repeat: 'speaking',
+  toefl_listen_choose_response: 'listening',
 };
+
+const SPEAKING_MODE_PATTERN = /^cambridge_(?:ket_part|pet_p|fce_p|starters_part|movers_part)\d+$/;
 
 /** Derives the skill bucket from a session mode string. Returns null for unrecognised modes. */
 export function inferSkillFromMode(mode: string): Skill | null {
   const override = MODE_SKILL_OVERRIDES[mode];
   if (override) return override;
+  if (SPEAKING_MODE_PATTERN.test(mode)) return 'speaking';
   if (mode.includes('listening') || mode.includes('assessment_listening')) return 'listening';
   if (mode.includes('reading')) return 'reading';
   if (mode.includes('writing')) return 'writing';

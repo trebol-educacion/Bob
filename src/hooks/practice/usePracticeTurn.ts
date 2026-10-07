@@ -9,7 +9,7 @@ import {
 } from '@/actions/gemini';
 import type { ChatMessage } from '@/actions/gemini';
 import { pcmToWavBase64, blobToBase64 } from '@/lib/audio';
-import { addPracticeTurnAction } from '@/actions/practice/repository';
+import { recordPracticeTurnAction } from '@/actions/practice/turn';
 import { generatePracticeImageAction } from '@/actions/practice/image';
 import { isHintAvailable, markAssistedTurn } from '@/lib/practice/scaffolding';
 import { AUDIO_GENERATION_TIMEOUT_MS, playAudioSafely, withTimeout } from './audioPlayback';
@@ -25,6 +25,9 @@ type FailedAction = { kind: 'audio'; blob: Blob } | { kind: 'text'; text: string
 
 export interface UsePracticeTurnArgs {
   sessionId: string | null;
+  organizationId: string | null;
+  initialImageUrl?: string | null;
+  onSessionCreated?: (sessionId: string) => void;
   mode: PracticeActivityMode;
   seed: PracticeSeed;
   level: CefrLevel;
@@ -34,6 +37,7 @@ export interface UsePracticeTurnArgs {
 }
 
 export interface UsePracticeTurnReturn {
+  sessionId: string | null;
   mode: PracticeActivityMode;
   framing: string;
   messages: ChatMessage[];
@@ -67,7 +71,21 @@ const AUTOPLAY_DELAY_MS = 500;
 const SLOW_TURN_MS = 6000;
 
 export function usePracticeTurn(args: UsePracticeTurnArgs): UsePracticeTurnReturn {
-  const { sessionId, mode, seed, initialFraming, initialMessages, initialTurnSignals, level } = args;
+  const {
+    sessionId: initialSessionId,
+    organizationId,
+    initialImageUrl,
+    onSessionCreated,
+    mode,
+    seed,
+    initialFraming,
+    initialMessages,
+    initialTurnSignals,
+    level,
+  } = args;
+
+  const [sessionId, setSessionId] = useState<string | null>(initialSessionId);
+  const [imagePrompt, setImagePrompt] = useState<string | null>(null);
 
   const framing = initialFraming;
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
@@ -81,8 +99,8 @@ export function usePracticeTurn(args: UsePracticeTurnArgs): UsePracticeTurnRetur
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [lastFailedAction, setLastFailedAction] = useState<FailedAction | null>(null);
   const [pendingModelAnswer, setPendingModelAnswer] = useState<string | null>(null);
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
-  const [imageLoading, setImageLoading] = useState(mode === 'picture');
+  const [imageUrl, setImageUrl] = useState<string | null>(initialImageUrl ?? null);
+  const [imageLoading, setImageLoading] = useState(mode === 'picture' && initialSessionId === null);
   const [inputText, setInputText] = useState('');
 
   const audioCacheRef = useRef<Map<number, string>>(new Map());
@@ -92,28 +110,20 @@ export function usePracticeTurn(args: UsePracticeTurnArgs): UsePracticeTurnRetur
 
   const revealText = (index: number) => setVisibleTexts((prev) => ({ ...prev, [index]: true }));
 
-  const persistTurn = (role: 'bob' | 'student', content: string, hintUsed = false, modelAnswerUsed = false) => {
-    if (!sessionId) return;
-    void addPracticeTurnAction({ sessionId, role, content, hintUsed, modelAnswerUsed }).catch((error) =>
-      console.error('[usePracticeTurn] persistTurn failed:', error)
-    );
-  };
-
   useEffect(() => {
-    if (mode !== 'picture' || imageUrl) return;
+    if (mode !== 'picture' || initialSessionId !== null) return;
     let cancelled = false;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setImageLoading(true);
     (async () => {
-      const result = await generatePracticeImageAction(sessionId, seed.topic);
+      const result = await generatePracticeImageAction(seed.topic);
       if (cancelled) return;
       setImageUrl(result.imageUrl);
+      setImagePrompt(result.prompt);
       setImageLoading(false);
     })();
     return () => {
       cancelled = true;
     };
-  }, [mode, sessionId, seed.topic, imageUrl]);
+  }, [mode, initialSessionId, seed.topic]);
 
   useEffect(() => {
     const lastIndex = messages.length - 1;
@@ -188,21 +198,37 @@ export function usePracticeTurn(args: UsePracticeTurnArgs): UsePracticeTurnRetur
     setVisibleTexts((prev) => ({ ...prev, [index]: !prev[index] }));
   };
 
-  const recordExchange = (userText: string, botText: string, turnScore: number | null, hasAudio: boolean) => {
+  const recordExchange = async (userText: string, botText: string, turnScore: number | null, hasAudio: boolean): Promise<boolean> => {
     const usage = markAssistedTurn({
       hintUsed: pendingHintRef.current,
       modelAnswerUsed: pendingModelAnswerUsedRef.current,
     });
+    const signal: PracticeTurnSignal = { hasAudio, hintUsed: usage.hintUsed, modelAnswerUsed: usage.modelAnswerUsed, turnScore };
+
+    const recorded = await recordPracticeTurnAction({
+      sessionId,
+      mode,
+      level,
+      seed,
+      organizationId,
+      opening: { framing, message: initialMessages[0]?.text ?? '', imageUrl, imagePrompt },
+      student: { text: userText, signal },
+      botText,
+    });
+    if (!recorded.ok) return false;
+
+    if (recorded.data.sessionId !== sessionId) {
+      setSessionId(recorded.data.sessionId);
+      onSessionCreated?.(recorded.data.sessionId);
+    }
 
     setMessages((prev) => [...prev, { role: 'user', text: userText }, { role: 'model', text: botText }]);
-    setTurnSignals((prev) => [...prev, { hasAudio, hintUsed: usage.hintUsed, modelAnswerUsed: usage.modelAnswerUsed, turnScore }]);
-
-    persistTurn('student', userText, usage.hintUsed, usage.modelAnswerUsed);
-    persistTurn('bob', botText);
+    setTurnSignals((prev) => [...prev, signal]);
 
     pendingHintRef.current = false;
     pendingModelAnswerUsedRef.current = false;
     setPendingModelAnswer(null);
+    return true;
   };
 
   const sendText = async (text: string) => {
@@ -213,7 +239,12 @@ export function usePracticeTurn(args: UsePracticeTurnArgs): UsePracticeTurnRetur
     const slowTimer = setTimeout(() => setIsSlow(true), SLOW_TURN_MS);
     try {
       const result = await chatTextConversationAction(text, messages, seed.topic, level);
-      recordExchange(text, result.ai_response, result.evaluation.score, false);
+      const persisted = await recordExchange(text, result.ai_response, result.evaluation.score, false);
+      if (!persisted) {
+        setErrorMessage('persistError');
+        setLastFailedAction({ kind: 'text', text });
+        return;
+      }
       setLastFailedAction(null);
     } catch (error) {
       console.error('[usePracticeTurn] sendText failed:', error);
@@ -237,7 +268,12 @@ export function usePracticeTurn(args: UsePracticeTurnArgs): UsePracticeTurnRetur
       const base64Audio = await blobToBase64(blob);
       const mimeType = (blob.type || 'audio/webm').split(';')[0];
       const result = await chatConversationAction(base64Audio, mimeType, messages, seed.topic, level);
-      recordExchange(result.evaluation.transcribed_text, result.ai_response, result.evaluation.score, true);
+      const persisted = await recordExchange(result.evaluation.transcribed_text, result.ai_response, result.evaluation.score, true);
+      if (!persisted) {
+        setErrorMessage('persistError');
+        setLastFailedAction({ kind: 'audio', blob });
+        return;
+      }
       setLastFailedAction(null);
     } catch (error) {
       console.error('[usePracticeTurn] sendAudio failed:', error);
@@ -296,6 +332,7 @@ export function usePracticeTurn(args: UsePracticeTurnArgs): UsePracticeTurnRetur
   };
 
   return {
+    sessionId,
     mode,
     framing,
     messages,

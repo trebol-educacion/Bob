@@ -6,7 +6,7 @@ import { CheckCircle, XCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { PETWritingIcon } from '@/components/icons/PETIcons';
 import { CelebrationCard } from '@/components/practice/yl/CelebrationCard';
 import { BobMascotLoader } from '@/components/chat/BobMascotLoader';
-import { ChatInputBar } from '@/components/chat/ChatInputBar';
+import { WritingComposer } from '@/components/practice/writing/WritingComposer';
 import { BobAvatar } from '@/components/practice/yl/_shared';
 import {
   generatePETEmailAction,
@@ -14,8 +14,11 @@ import {
   type PETEmailPrompt,
   type PETEmailFeedback,
 } from '@/actions/modes/pet-writing-part1';
+import { ActivityLoadError } from '@/components/practice/ActivityLoadError';
 import type { StoredMessage } from '@/actions/messages';
 import { useTranslations } from 'next-intl';
+import { toScore10 } from '@/lib/session/score';
+import { isPassingScore } from '@/lib/score/headline';
 
 export interface PETEmailWritingPracticeProps {
   onBack: () => void;
@@ -100,7 +103,8 @@ function FeedbackPanel({
 }) {
   const t = useTranslations('cambridge');
   const [modelOpen, setModelOpen] = useState(false);
-  const coveredCount = feedback.contentPointsCovered.filter(Boolean).length;
+  const score10 = toScore10(feedback) ?? 0;
+  const passed = isPassingScore(score10);
 
   return (
     <motion.div
@@ -116,11 +120,11 @@ function FeedbackPanel({
 
       <div className="rounded-2xl bg-white border border-gray-100 shadow-sm px-4 py-3 space-y-3">
         <div className="flex items-center gap-2">
-          {feedback.understood
+          {passed
             ? <CheckCircle size={18} className="text-green-500 shrink-0" />
             : <XCircle size={18} className="text-amber-500 shrink-0" />}
           <span className="text-sm font-semibold text-gray-700">
-            {feedback.understood ? t('pet.emailWriting.youDidIt') : t('pet.emailWriting.reviewYourMessage')}
+            {passed ? t('pet.emailWriting.youDidIt') : t('pet.emailWriting.reviewYourMessage')}
           </span>
         </div>
 
@@ -198,10 +202,9 @@ function FeedbackPanel({
       </div>
 
       <CelebrationCard
-        score={coveredCount}
-        scoreMax={4}
-        hideGrade
-        feedback={t('pet.emailWriting.celebrationFeedback')}
+        score={score10}
+        scoreMax={10}
+        showPoints={false}
         onAction={onOpenDashboard}
         actionLabel={t('pet.emailWriting.celebrationAction')}
         animate={animate}
@@ -210,7 +213,7 @@ function FeedbackPanel({
   );
 }
 
-function tryRestoreFromMessages(messages: StoredMessage[]): {
+export function tryRestoreFromMessages(messages: StoredMessage[]): {
   prompt: PETEmailPrompt | null;
   userText: string | null;
   feedback: PETEmailFeedback | null;
@@ -227,8 +230,6 @@ function tryRestoreFromMessages(messages: StoredMessage[]): {
       const er = cj.email_received as { from: string; subject: string; body: string } | null;
       if (er) {
         prompt = {
-          sessionId: msg.session_id ?? '',
-          userId: msg.user_id ?? '',
           emailReceived: er,
           contentPoints: (cj.content_points as [string, string, string, string]) ?? ['', '', '', ''],
           wordTarget: Number(cj.word_target ?? 100),
@@ -247,6 +248,7 @@ function tryRestoreFromMessages(messages: StoredMessage[]): {
         suggestions: (cj.suggestions as string[]) ?? [],
         contentPointsCovered: (cj.contentPointsCovered as [boolean, boolean, boolean, boolean]) ?? [false, false, false, false],
         modelAnswer: (cj.modelAnswer as string | null) ?? null,
+        rubric: (cj.rubric as PETEmailFeedback['rubric']) ?? undefined,
       };
     }
   }
@@ -265,11 +267,13 @@ export function PETEmailWritingPractice({
 }: PETEmailWritingPracticeProps) {
   const t = useTranslations('cambridge');
   const [phase, setPhase] = useState<Phase>('loading');
+  const [sessionId, setSessionId] = useState<string | undefined>(initialSessionId);
   const [prompt, setPrompt] = useState<PETEmailPrompt | null>(null);
   const [text, setText] = useState('');
   const [feedback, setFeedback] = useState<PETEmailFeedback | null>(null);
   const [restoredUserText, setRestoredUserText] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [loadErrorCode, setLoadErrorCode] = useState<string | null>(null);
   const [isNewSession, setIsNewSession] = useState(false);
   const initStartedRef = useRef(false);
 
@@ -299,18 +303,14 @@ export function PETEmailWritingPractice({
       }
 
       setIsNewSession(true);
-      const result = await generatePETEmailAction({ sessionId: initialSessionId, userId: undefined });
+      const result = await generatePETEmailAction();
 
-      if ('error' in result) {
-        setErrorMsg(result.error);
+      if (!result.ok) {
+        setLoadErrorCode(result.code);
         return;
       }
 
-      if (!initialSessionId) {
-        onSessionCreated?.(result.sessionId);
-      }
-
-      setPrompt(result);
+      setPrompt(result.data);
       setPhase('ready');
     }
 
@@ -322,10 +322,13 @@ export function PETEmailWritingPractice({
     setPhase('evaluating');
 
     const result = await evaluatePETEmailAction({
-      sessionId: prompt.sessionId,
-      userId: prompt.userId,
+      sessionId,
       emailReceived: prompt.emailReceived,
       contentPoints: prompt.contentPoints,
+      wordTarget: prompt.wordTarget,
+      context: prompt.context,
+      framingText: prompt.framingText,
+      bankGroupId: prompt.bankGroupId,
       userText: text,
     });
 
@@ -335,6 +338,8 @@ export function PETEmailWritingPractice({
       return;
     }
 
+    if (!sessionId && result.sessionId) onSessionCreated?.(result.sessionId);
+    setSessionId(result.sessionId ?? sessionId);
     setFeedback(result);
     setPhase('finished');
     onSessionFinished?.();
@@ -343,6 +348,8 @@ export function PETEmailWritingPractice({
   const wordCount = countWords(text);
   const MIN_WORDS = 60;
   const WARN_WORDS = 130;
+
+  if (loadErrorCode) return <ActivityLoadError code={loadErrorCode} onBack={onBack} />;
 
   if (errorMsg) {
     return (
@@ -422,36 +429,17 @@ export function PETEmailWritingPractice({
             </motion.div>
           </div>
 
-          <ChatInputBar
-            variant="text"
+          <WritingComposer
             value={text}
             placeholder={t('pet.emailWriting.placeholder')}
-            disabled={phase !== 'ready'} sendDisabled={wordCount < MIN_WORDS}
+            wordCount={wordCount}
+            minWords={MIN_WORDS}
+            maxWords={WARN_WORDS}
+            target={t('pet.emailWriting.target')}
+            disabled={phase !== 'ready'}
             onChange={setText}
-            onSend={handleSubmit}
+            onSubmit={handleSubmit}
           />
-          <div className="shrink-0 px-4 pb-3 -mt-1 flex items-center justify-between text-xs text-gray-400 bg-white">
-            <span>
-              {t('pet.emailWriting.words')}{' '}
-              <strong
-                className={
-                  wordCount < MIN_WORDS
-                    ? 'text-amber-500'
-                    : wordCount > WARN_WORDS
-                    ? 'text-red-400'
-                    : 'text-green-600'
-                }
-              >
-                {wordCount}
-              </strong>{' '}
-              {t('pet.emailWriting.target')}
-            </span>
-            {wordCount < MIN_WORDS && (
-              <span className="text-amber-500">
-                {t('pet.emailWriting.moreToSend', { remaining: MIN_WORDS - wordCount })}
-              </span>
-            )}
-          </div>
         </>
       )}
 

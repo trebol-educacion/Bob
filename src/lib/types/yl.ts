@@ -67,6 +67,9 @@ export const YLPlanSchema = z.object({
   pointing_cues: z.array(PointingCueSchema).optional(),
   object_cards: z.array(WhatsThisCardSchema).optional(),
   differences: z.array(FindDifferenceSchema).optional(),
+  image_urls: z.array(z.string()).optional(),
+  audio_urls: z.record(z.string(), z.string()).optional(),
+  bank_group_id: z.string().optional(),
 });
 
 export type YLPlan = z.infer<typeof YLPlanSchema>;

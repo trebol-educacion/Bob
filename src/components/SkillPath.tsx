@@ -28,7 +28,7 @@ export interface SkillPathSkill {
   key: SkillKey;
   label: string;
   level: string;
-  goalLevel: string;
+  goalLevel: string | null;
   cefrValue: string | null;
   done: number;
   total: number;
@@ -206,7 +206,7 @@ export function SkillPath({
   const colHeight = lastPt.y + PAD * 2;
   const showDecor = width >= 680;
   const reachedGoal = skill.done >= skill.total;
-  const atMax = skill.level === skill.goalLevel;
+  const atMax = skill.goalLevel === null;
   const canLevelUp = reachedGoal && skill.pct / 10 > 7 && !atMax && !!onLevelUp;
   const select = (i: number) => {
     setActive(i);
@@ -337,7 +337,7 @@ export function SkillPath({
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between gap-2">
               <span className="text-sm font-black whitespace-nowrap" style={{ color: p.c }}>
-                {skill.level} ▸ {skill.goalLevel}
+                {skill.goalLevel ? `${skill.level} ▸ ${skill.goalLevel}` : `${skill.level} · Top level`}
               </span>
               <span className="text-[11px] font-black tabular-nums text-trebol-text/55">{skill.done}/{skill.total}</span>
             </div>
@@ -474,7 +474,7 @@ export function SkillPath({
               <>
                 <Trophy size={23} color={reachedGoal ? '#fff' : '#8d85a8'} fill={reachedGoal ? '#fff' : 'none'} strokeWidth={2} />
                 <span className="text-[15px] font-black leading-none mt-0.5" style={{ color: reachedGoal ? '#fff' : '#8d85a8' }}>
-                  {skill.goalLevel}
+                  {skill.goalLevel ?? 'Top'}
                 </span>
               </>
             );
@@ -491,7 +491,7 @@ export function SkillPath({
                 >
                   <span className="absolute rounded-full animate-ping" style={{ inset: -10, border: '3px solid #ffc73a', opacity: 0.6 }} />
                   <span className="absolute -top-8 px-2.5 py-0.5 rounded-full bg-white text-[11px] font-black whitespace-nowrap shadow-md" style={{ color: '#c97f12' }}>
-                    ¡Sube a {skill.goalLevel}!
+                    Level up to {skill.goalLevel ?? skill.level}!
                   </span>
                   {content}
                 </button>
@@ -625,9 +625,9 @@ export function SkillPath({
               >
                 <Trophy size={36} color="#fff" fill="#fff" strokeWidth={2} />
               </div>
-              <span className="text-xl font-black text-trebol-text">¡Lo lograste!</span>
+              <span className="text-xl font-black text-trebol-text">You did it!</span>
               <span className="text-sm font-bold text-trebol-text/60 mt-1">
-                Ahora estás en <span style={{ color: p.c }}>{skill.goalLevel}</span> 🎉
+                You are now at <span style={{ color: p.c }}>{skill.goalLevel ?? skill.level}</span> 🎉
               </span>
             </motion.div>
           </motion.div>

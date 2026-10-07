@@ -1,33 +1,13 @@
 'use server';
 
-import { z } from 'zod';
 import { getPrompt } from '@/lib/prompts/db-prompts';
-import { callGemini, isOk } from '@/lib/gemini-client';
-import { persistMessage, persistMessages } from '@/lib/persist-activity';
-import { createSessionAction } from '@/actions/sessions';
-import { createSupabaseServer } from '@/lib/supabase/server';
-import { MODELS } from '@/lib/models';
+import { bankStamp, pickPlan } from '@/lib/item-bank/plan-bank';
+import { PetShortTextsPlanSchema, type PetShortTextsPlan } from '@/lib/bank-plans/pet-reading-part1';
+import { fail, ok, type ActionResult } from '@/lib/result';
+import { completeActivity } from '@/lib/session/complete';
+import { currentUserId } from '@/lib/session/lifecycle';
 
-const OptionSchema = z.object({
-  id: z.enum(['A', 'B', 'C']),
-  text: z.string(),
-});
-
-const ShortTextItemSchema = z.object({
-  number: z.number().int().min(1).max(5),
-  text_body: z.string(),
-  text_context: z.string(),
-  question: z.string(),
-  options: z.array(OptionSchema).length(3),
-  correct_option: z.enum(['A', 'B', 'C']),
-  explanation: z.string(),
-});
-
-const GenerationSchema = z.object({
-  items: z.array(ShortTextItemSchema).min(5).max(5),
-});
-
-export type ShortTextOption = z.infer<typeof OptionSchema>;
+export type ShortTextOption = PetShortTextsPlan['items'][number]['options'][number];
 
 /** A single short-text item as returned to the client. */
 export interface ShortTextItem {
@@ -38,12 +18,11 @@ export interface ShortTextItem {
   options: ShortTextOption[];
   correct_option: 'A' | 'B' | 'C';
   explanation: string;
+  bank_group_id?: string;
 }
 
 /** Full result of a successful generation call. */
 export interface PETShortTextsResult {
-  sessionId: string;
-  userId: string;
   items: ShortTextItem[];
   framingText: string;
 }
@@ -59,100 +38,37 @@ export interface ShortTextAnswerResult {
 
 /** Full submit result. */
 export interface PETShortTextsSubmitResult {
+  sessionId: string;
   correctCount: number;
   total: number;
   results: ShortTextAnswerResult[];
 }
 
-function safeParse<T>(schema: z.ZodType<T>, raw: string): T | null {
-  try {
-    return schema.parse(JSON.parse(raw));
-  } catch {
-    return null;
-  }
+const FRAMING_FALLBACK =
+  'You will read 5 short texts (notices, emails, messages, postcards). For each one, choose the meaning that fits best, A, B or C.';
+
+/** Reads one pregenerated set of 5 short-text items from the bank; no model call and no session row. */
+export async function generatePETShortTextsAction(): Promise<ActionResult<PETShortTextsResult>> {
+  const userId = await currentUserId();
+  if (!userId) return fail('unauthenticated');
+  const picked = await pickPlan({
+    exam: 'pet',
+    cefr: 'b1',
+    examPart: 'pet_reading_part1',
+    skill: 'reading',
+    schema: PetShortTextsPlanSchema,
+    userId,
+  });
+  if (!picked.ok) return picked;
+  const framingText = await getPrompt('cambridge_pet_reading_part1_b1_framing').catch(() => FRAMING_FALLBACK);
+  const items = picked.data.plan.items.map((item) => ({ ...item, bank_group_id: picked.data.groupId }));
+  return ok({ items, framingText });
 }
 
-/** Generates 5 PET B1 short-text items and a framing text; creates a session when none is provided. */
-export async function generatePETShortTextsAction(input: {
-  sessionId?: string;
-}): Promise<PETShortTextsResult | { error: string }> {
-  let sessionId = input.sessionId;
-  let userId: string | undefined;
-
-  if (!sessionId) {
-    const result = await createSessionAction({
-      mode: 'cambridge_pet_reading_part1',
-      title: 'Reading Part 1, Short Texts',
-    });
-    if (!result.data) {
-      return { error: result.error ?? 'Could not create session' };
-    }
-    sessionId = result.data.id;
-    userId = result.data.user_id;
-  } else {
-    const supabase = await createSupabaseServer();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return { error: 'Not authenticated' };
-    userId = user.id;
-  }
-
-  const [generationPrompt, framingText] = await Promise.all([
-    getPrompt('cambridge_pet_reading_part1_b1_generation').catch(() => null),
-    getPrompt('cambridge_pet_reading_part1_b1_framing').catch(
-      () => 'You will read 5 short texts (notices, emails, messages, postcards). For each one, choose the meaning that fits best, A, B or C.'
-    ),
-  ]);
-
-  if (!generationPrompt) {
-    return { error: 'Could not load generation prompt' };
-  }
-
-  const geminiResult = await callGemini(
-    { promptKey: 'cambridge_pet_reading_part1_b1_generation', model: MODELS.FLASH_LITE_PREVIEW, userId },
-    (ai) =>
-      ai.models.generateContent({
-        model: MODELS.FLASH_LITE_PREVIEW,
-        contents: [{ role: 'user', parts: [{ text: generationPrompt }] }],
-        config: { responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
-      })
-  );
-
-  if (!isOk(geminiResult)) {
-    return { error: 'Could not generate items' };
-  }
-
-  const rawText = geminiResult.data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
-  const parsed = safeParse(GenerationSchema, rawText);
-
-  if (!parsed) {
-    return { error: 'Unexpected model response' };
-  }
-
-  persistMessage({
-    sessionId,
-    userId,
-    role: 'bob',
-    msgType: 'text',
-    contentText: null,
-    contentJson: {
-      kind: 'reading_prompt',
-      items: parsed.items,
-      framing_text: framingText,
-    },
-  }).catch(() => undefined);
-
-  return {
-    sessionId,
-    userId,
-    items: parsed.items,
-    framingText,
-  };
-}
-
-/** Evaluates student answers deterministically (no LLM) and persists results. */
+/** Evaluates student answers deterministically (no LLM); creates the session on this first turn and closes it. */
 export async function submitPETShortTextsAnswersAction(input: {
-  sessionId: string;
-  userId: string;
+  sessionId?: string;
+  framingText: string;
   answers: Record<number, 'A' | 'B' | 'C'>;
   items: ShortTextItem[];
 }): Promise<PETShortTextsSubmitResult | { error: string }> {
@@ -170,36 +86,20 @@ export async function submitPETShortTextsAnswersAction(input: {
   const correctCount = results.filter((r) => r.isCorrect).length;
   const total = input.items.length;
 
-  const answerMessages = results.map((r) => ({
+  const completed = await completeActivity({
+    mode: 'cambridge_pet_reading_part1',
     sessionId: input.sessionId,
-    userId: input.userId,
-    role: 'user' as const,
-    msgType: 'text' as const,
-    contentText: null,
-    contentJson: {
+    bank: bankStamp('pet_reading_part1', input.items[0]?.bank_group_id),
+    plan: { kind: 'reading_prompt', items: input.items, framing_text: input.framingText },
+    answers: results.map((r) => ({
       kind: 'reading_answer',
       item_number: r.number,
       chosen: r.chosen,
       isCorrect: r.isCorrect,
-    },
-  }));
+    })),
+    evaluation: { kind: 'reading_evaluation', score: correctCount, score_max: total, results },
+  });
+  if (!completed.ok) return { error: completed.code };
 
-  persistMessages(answerMessages).catch(() => undefined);
-
-  persistMessage({
-    sessionId: input.sessionId,
-    userId: input.userId,
-    role: 'bob',
-    msgType: 'evaluation',
-    contentText: null,
-    contentJson: {
-      kind: 'reading_evaluation',
-      score: correctCount,
-      score_max: total,
-      results,
-      is_final: true,
-    },
-  }).catch(() => undefined);
-
-  return { correctCount, total, results };
+  return { sessionId: completed.data.sessionId, correctCount, total, results };
 }

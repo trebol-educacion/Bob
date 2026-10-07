@@ -1,17 +1,20 @@
 'use server';
 
+import { fail, type ActionResult } from '@/lib/result';
+import { currentUserId } from '@/lib/session/lifecycle';
+import { PetCollaborativePlanSchema } from '@/lib/bank-plans/pet-p3';
+import { pickPetPlan } from '@/lib/speaking/pet-bank';
 import type { FormativeFeedback } from '@/lib/types/practice';
 import {
   chatCollaborativeAudio,
   chatCollaborativeText,
   evaluateCollaborative,
-  generateCollaborativeScenario,
-  readCollaborativeMessages,
   type CollaborativeConfig,
 } from '@/lib/speaking/collaborative';
 import type { Part3ChatMessage, Part3Scenario } from '@/lib/speaking/types';
 
 const PET_P3_CONFIG: CollaborativeConfig = {
+  mode: 'cambridge_pet_p3',
   promptPrefix: 'cambridge_pet_p3_b1',
   scenarioCacheKey: 'cambridge-pet-p3-b1-scenario',
   scenarioFallback: {
@@ -24,8 +27,10 @@ const PET_P3_CONFIG: CollaborativeConfig = {
   logTag: 'B1',
 };
 
-export async function generatePart3ScenarioAction(sessionId?: string): Promise<Part3Scenario> {
-  return generateCollaborativeScenario(PET_P3_CONFIG, sessionId);
+export async function generatePart3ScenarioAction(): Promise<ActionResult<Part3Scenario>> {
+  const userId = await currentUserId();
+  if (!userId) return fail('unauthenticated');
+  return pickPetPlan({ schema: PetCollaborativePlanSchema, examPart: 'pet_p3', userId });
 }
 
 export async function chatPart3Action(
@@ -34,7 +39,7 @@ export async function chatPart3Action(
   history: Part3ChatMessage[],
   scenario: Part3Scenario,
   sessionId?: string
-): Promise<{ transcribed: string; examinerResponse: string }> {
+): Promise<ActionResult<{ transcribed: string; examinerResponse: string; sessionId: string }>> {
   return chatCollaborativeAudio(PET_P3_CONFIG, audioBase64, mimeType, history, scenario, sessionId);
 }
 
@@ -43,7 +48,7 @@ export async function chatPart3TextAction(
   history: Part3ChatMessage[],
   scenario: Part3Scenario,
   sessionId?: string
-): Promise<{ examinerResponse: string }> {
+): Promise<ActionResult<{ examinerResponse: string; sessionId: string }>> {
   return chatCollaborativeText(PET_P3_CONFIG, text, history, scenario, sessionId);
 }
 
@@ -51,12 +56,6 @@ export async function evaluatePart3Action(
   history: Part3ChatMessage[],
   scenario: Part3Scenario,
   sessionId?: string
-): Promise<FormativeFeedback> {
+): Promise<ActionResult<{ feedback: FormativeFeedback; sessionId?: string }>> {
   return evaluateCollaborative(PET_P3_CONFIG, history, scenario, sessionId);
-}
-
-export async function getB1SessionMessagesAction(
-  sessionId: string
-): Promise<{ history: Part3ChatMessage[]; feedback: FormativeFeedback | null }> {
-  return readCollaborativeMessages(sessionId);
 }

@@ -1,90 +1,77 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { getClosedItemsAction } from '@/actions/modes/listen-choose-response';
 import { ClosedComprehension } from '@/components/practice/ClosedComprehension';
+import { ActivityLoadError } from '@/components/practice/ActivityLoadError';
 import { BobMascotLoader } from '@/components/chat/BobMascotLoader';
-import { createSessionAction } from '@/actions/sessions';
+import { useClosedSetSubmit } from '@/hooks/useClosedSetSubmit';
+import { resolveActivityBoot } from '@/lib/activity/boot';
+import { restoreClosedSet } from '@/lib/toefl/closed-set';
 import { useTranslations } from 'next-intl';
-import type { ClosedItem } from '@/lib/types/practice';
+import type { ActivityRenderProps } from '@/lib/routing';
+import type { ClosedEvaluation, ClosedItem } from '@/lib/types/practice';
 
-interface ListenChooseResponsePracticeProps {
-  onBack: () => void;
-}
+const MODE = 'toefl_listen_choose_response';
 
-/** Wrapper that loads TOEFL Listen-Choose-a-Response items and renders ClosedComprehension. */
-export function ListenChooseResponsePractice({ onBack }: ListenChooseResponsePracticeProps) {
-  const tErrors = useTranslations('errors');
+/** Wrapper that loads TOEFL Listen-Choose-a-Response items, opens the session on the final submit and restores finished sessions. */
+export function ListenChooseResponsePractice({
+  onBack,
+  sessionId,
+  initialMessages,
+  onSessionCreated,
+  onSessionFinished,
+}: ActivityRenderProps) {
   const tLoading = useTranslations('loading');
+  const [boot] = useState(() =>
+    resolveActivityBoot({ initialMessages, sessionId, tryRestore: (messages) => restoreClosedSet(messages) }),
+  );
   const [items, setItems] = useState<ClosedItem[] | null>(null);
-  const [sessionId, setSessionId] = useState('');
-  const [userId, setUserId] = useState('');
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
-
-  const msgFailedSession = tErrors('failedCreateSession');
-  const msgNoItems = tErrors('noItemsAvailable');
+  const [loadErrorCode, setLoadErrorCode] = useState<string | null>(boot.kind === 'restore-failed' ? 'restore_failed' : null);
+  const [bankGroupId, setBankGroupId] = useState<string | undefined>(undefined);
+  const callbacks = useMemo(() => ({ sessionId, onSessionCreated, onSessionFinished }), [sessionId, onSessionCreated, onSessionFinished]);
+  const { submit, error: submitError } = useClosedSetSubmit(callbacks);
 
   useEffect(() => {
+    if (boot.kind !== 'generate') return;
     async function init() {
-      const sessionResult = await createSessionAction({
-        mode: 'toefl_listen_choose_response',
-        title: 'TOEFL Listening, Choose a Response',
-      });
-
-      if (!sessionResult.data) {
-        setErrorMsg(sessionResult.error ?? msgFailedSession);
+      const result = await getClosedItemsAction();
+      if (!result.ok) {
+        setLoadErrorCode(result.code);
         return;
       }
-
-      setSessionId(sessionResult.data.id);
-      setUserId(sessionResult.data.user_id);
-
-      const result = await getClosedItemsAction({
-        framework: 'toefl',
-        exam_part: 'listen_choose_response',
-        cefr_level: 'b1',
-      });
-
-      if ('error' in result) {
-        setErrorMsg(result.error);
-        return;
-      }
-
-      if (result.items.length === 0) {
-        setErrorMsg(msgNoItems);
-        return;
-      }
-
-      setItems(result.items);
+      setBankGroupId(result.data.bankGroupId);
+      setItems(result.data.items);
     }
-
     void init();
-  }, [msgFailedSession, msgNoItems]);
+  }, [boot.kind]);
 
-  if (errorMsg) {
-    return (
-      <div className="flex flex-col items-center justify-center gap-4 p-8 text-center">
-        <p className="text-red-500 font-semibold">{errorMsg}</p>
-        <button
-          onClick={onBack}
-          className="px-5 py-2 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition-colors"
-        >
-          Back
-        </button>
-      </div>
-    );
+  function handleFinish(results: ClosedEvaluation[]) {
+    if (!items) return;
+    void submit({
+      mode: MODE,
+      bankGroupId,
+      items,
+      entries: items.map((item, index) => ({
+        id: item.variant_id,
+        selected: results[index]?.selected ?? '',
+        expected: item.correct_key,
+        explanation: item.explanation,
+        match: 'key' as const,
+      })),
+    });
   }
+
+  if (boot.kind === 'restore') {
+    const restored: ClosedEvaluation[] = boot.data.map((entry) => ({ kind: 'closed', ...entry }));
+    return <ClosedComprehension items={[]} initialResults={restored} onDone={onBack} />;
+  }
+
+  if (loadErrorCode) return <ActivityLoadError code={loadErrorCode} onBack={onBack} />;
 
   if (!items) {
     return <BobMascotLoader message={tLoading('loadingListening')} />;
   }
 
-  return (
-    <ClosedComprehension
-      items={items}
-      sessionId={sessionId}
-      userId={userId}
-      onComplete={onBack}
-    />
-  );
+  return <ClosedComprehension items={items} submitError={submitError} onFinish={handleFinish} onDone={onBack} />;
 }

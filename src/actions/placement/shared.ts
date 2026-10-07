@@ -1,9 +1,10 @@
 import 'server-only';
 
 import { createSupabaseServer } from '@/lib/supabase/server';
-import { fetchGroups, fetchGroupItems } from '@/actions/item-bank/repository';
+import { pickContent } from '@/lib/item-bank/content-source';
+import { fail, ok, type ActionResult } from '@/lib/result';
 import { toPublicGroup, toPublicItem } from '@/lib/item-bank/public';
-import { parsePlacementConfig, parsePlacementCooldownDays } from '@/lib/placement/config';
+import { parsePlacementConfig } from '@/lib/placement/config';
 import type { PlacementConfig, PlacementLevel } from '@/lib/placement/types';
 import type { PublicBankItem, PublicItemGroup } from '@/lib/item-bank/types';
 
@@ -52,38 +53,29 @@ export async function resolvePlacementConfig(supabase: PlacementSupabase): Promi
 }
 
 /**
- * @param supabase PlacementSupabase
- * @returns Promise<number>
- */
-export async function resolvePlacementCooldownDays(supabase: PlacementSupabase): Promise<number> {
-  const { data } = await supabase
-    .from('test_configs')
-    .select('config')
-    .eq('code', 'placement_sequential_v1')
-    .maybeSingle();
-
-  return parsePlacementCooldownDays((data?.config as Record<string, unknown> | undefined) ?? null);
-}
-
-/**
  * @param skill PlacementSkill
  * @param level PlacementLevel
  * @param excludeGroupIds string[]
- * @returns Promise<PlacementStepContent>
+ * @returns Promise<ActionResult<PlacementStepContent>>
  */
 export async function fetchStepContent(
   skill: PlacementSkill,
   level: PlacementLevel,
   excludeGroupIds: string[]
-): Promise<PlacementStepContent | null> {
-  const groupsResult = await fetchGroups({ skill, cefr_level: level, purpose: 'placement' });
-  if (!groupsResult.ok) return null;
-
-  const candidate = groupsResult.data.find((group) => !excludeGroupIds.includes(group.id));
-  if (!candidate) return null;
-
-  const itemsResult = await fetchGroupItems([candidate.id]);
-  if (!itemsResult.ok || itemsResult.data.length === 0) return null;
-
-  return { group: toPublicGroup(candidate), items: itemsResult.data.map(toPublicItem) };
+): Promise<ActionResult<PlacementStepContent>> {
+  const picked = await pickContent({
+    framework: 'cefr',
+    cefr: level,
+    examPart: `placement_${skill}`,
+    purpose: 'placement',
+    skill,
+    groupsOnly: true,
+    excludeGroupIds,
+  });
+  if (!picked.ok) {
+    console.error(`[placement] no content skill=${skill} level=${level} code=${picked.code}`);
+    return picked;
+  }
+  if (picked.data.kind !== 'group') return fail('no_content');
+  return ok({ group: toPublicGroup(picked.data.group), items: picked.data.items.map(toPublicItem) });
 }

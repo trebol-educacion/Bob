@@ -10,11 +10,11 @@ import Image from 'next/image';
 import { motion } from 'motion/react';
 import { ArrowLeft, Mic, MicOff, CheckCircle } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { generateSpeechAction } from '@/actions/gemini';
-import { getOrCreateCueAudioAction } from '@/actions/modes/yl';
-import { pcmToWavBase64 } from '@/lib/audio';
+import { resolveCueAudioUrl } from '@/lib/yl/bank-audio';
 import type { EvalResponse } from '@/lib/types/practice';
 import { BobMascotLoader } from '@/components/chat/BobMascotLoader';
+import { playClip, type ClipPlayback } from '@/lib/audio-clip';
+import { useAudioClip } from '@/hooks/useAudioClip';
 import { setBobSpeaking, useBobSpeaking } from '@/lib/bob-speaking';
 
 export const RECORDING_MAX_SECONDS = 45;
@@ -47,70 +47,54 @@ export function BobAvatar({ audioKey }: { audioKey?: string }) {
   );
 }
 
-let _currentAudio: HTMLAudioElement | null = null;
+let _current: ClipPlayback | null = null;
 let _currentText: string | null = null;
 let _cachedUrl: string | null = null;
 
 export function stopCurrentAudio(): void {
-  if (_currentAudio) {
-    _currentAudio.pause();
-    _currentAudio = null;
-  }
+  _current?.stop();
+  _current = null;
   _currentText = null;
   _cachedUrl = null;
   setBobSpeaking(null);
 }
 
 export function pauseCurrentAudio(): void {
-  if (_currentAudio && !_currentAudio.paused) {
-    _currentAudio.pause();
-    setBobSpeaking(null);
-  }
+  _current?.pause();
 }
 
 export function isAudioPaused(): boolean {
-  return !!_currentAudio && _currentAudio.paused;
+  return _current?.isPaused() ?? false;
 }
 
 export async function resumeCurrentAudio(): Promise<void> {
-  if (_currentAudio && _currentAudio.paused) {
-    try {
-      await _currentAudio.play();
-      setBobSpeaking(_currentText);
-    } catch { /* ignore */ }
-  }
+  _current?.resume();
+}
+
+async function playUrl(url: string, text: string): Promise<void> {
+  const playback = playClip(url, {
+    onStart: () => setBobSpeaking(text),
+    onPaused: () => setBobSpeaking(null),
+    onResumed: () => setBobSpeaking(text),
+  });
+  _current = playback;
+  await playback.finished;
+  if (_current === playback) setBobSpeaking(null);
 }
 
 export async function playTTS(text: string): Promise<void> {
   if (_currentText === text && _cachedUrl) {
-    if (_currentAudio) _currentAudio.pause();
-    const audio = new Audio(_cachedUrl);
-    _currentAudio = audio;
-    setBobSpeaking(text);
-    await new Promise<void>((resolve) => {
-      audio.onended = () => { setBobSpeaking(null); resolve(); };
-      audio.onerror = () => { setBobSpeaking(null); resolve(); };
-      audio.onpause = () => setBobSpeaking(null);
-      audio.play().catch(() => { setBobSpeaking(null); resolve(); });
-    });
+    _current?.stop();
+    await playUrl(_cachedUrl, text);
     return;
   }
 
   stopCurrentAudio();
   try {
-    const { data, mimeType } = await generateSpeechAction(text);
-    const url = pcmToWavBase64(data, mimeType);
+    const url = await resolveCueAudioUrl(text);
     _currentText = text;
     _cachedUrl = url;
-    const audio = new Audio(url);
-    _currentAudio = audio;
-    setBobSpeaking(text);
-    await new Promise<void>((resolve) => {
-      audio.onended = () => { setBobSpeaking(null); resolve(); };
-      audio.onerror = () => { setBobSpeaking(null); resolve(); };
-      audio.onpause = () => setBobSpeaking(null);
-      audio.play().catch(() => { setBobSpeaking(null); resolve(); });
-    });
+    await playUrl(url, text);
   } catch {
     setBobSpeaking(null);
   }
@@ -306,88 +290,63 @@ function VoiceNoteLabel({ playing, hasPlayed }: { playing: boolean; hasPlayed: b
   return <span>{t('shared.voiceNote')}</span>;
 }
 
+export function isYLUserTurn(message: {
+  role: string;
+  msg_type: string;
+  content_json?: Record<string, unknown> | null;
+}): boolean {
+  if (message.role !== 'user') return false;
+  if (message.msg_type === 'user_audio') return true;
+  return message.msg_type === 'text' && message.content_json?.kind === 'yl_turn';
+}
+
 export function YLVoiceNote({
   text,
   side = 'bob',
   durationHint,
-  sessionId,
   autoPlay,
 }: {
   text: string;
   side?: 'bob' | 'user';
   durationHint?: number; // seconds, optional
-  /** When provided, audio is cached per (sessionId, text) in the DB. */
-  sessionId?: string;
   /** Auto-play once on mount. After playback, the button switches to a replay icon. */
   autoPlay?: boolean;
 }) {
-  const [playing, setPlaying] = React.useState(false);
-  const [hasPlayed, setHasPlayed] = React.useState(false);
-  const [duration, setDuration] = React.useState<number | null>(durationHint ?? null);
-  const [progress, setProgress] = React.useState(0); // 0..1
-  const audioRef = React.useRef<HTMLAudioElement | null>(null);
-  const intervalRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
+  const [src, setSrc] = React.useState<string | null>(null);
+  const pendingPlayRef = React.useRef(false);
   const autoPlayedRef = React.useRef(false);
+  const clip = useAudioClip({ src });
+  const playing = clip.isPlaying;
+  const hasPlayed = clip.hasPlayed;
+  const progress = clip.progress;
+  const duration = clip.duration ?? durationHint ?? null;
+  const play = clip.play;
 
-  const stop = React.useCallback(() => {
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current = null;
-    }
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
-    }
-    setPlaying(false);
-    setBobSpeaking(null);
-  }, []);
+  React.useEffect(() => {
+    if (!src || !pendingPlayRef.current) return;
+    pendingPlayRef.current = false;
+    play();
+  }, [src, play]);
 
-  React.useEffect(() => () => stop(), [stop]);
+  React.useEffect(() => {
+    if (side !== 'bob') return;
+    setBobSpeaking(playing ? text : null);
+  }, [playing, side, text]);
 
   const handlePlay = React.useCallback(async () => {
-    if (playing) {
-      stop();
-      setProgress(0);
+    if (playing || src) {
+      if (!playing) stopCurrentAudio();
+      clip.toggle();
       return;
     }
+    stopCurrentAudio();
     try {
-      stopCurrentAudio();
-      // Prefer the cached-on-DB action when we have a sessionId so we don't
-      // hit Gemini twice for the same cue.
-      let data: string;
-      let mimeType: string;
-      if (sessionId) {
-        const cached = await getOrCreateCueAudioAction(sessionId, text);
-        data = cached.data;
-        mimeType = cached.mimeType;
-      } else {
-        const fresh = await generateSpeechAction(text);
-        data = fresh.data;
-        mimeType = fresh.mimeType;
-      }
-      const url = pcmToWavBase64(data, mimeType);
-      const audio = new Audio(url);
-      audioRef.current = audio;
-      audio.onloadedmetadata = () => {
-        if (Number.isFinite(audio.duration)) setDuration(audio.duration);
-      };
-      audio.onended = () => {
-        stop();
-        setHasPlayed(true);
-        setProgress(1);
-        setTimeout(() => setProgress(0), 600);
-      };
-      audio.onerror = () => stop();
-      setPlaying(true);
-      if (side === 'bob') setBobSpeaking(text);
-      intervalRef.current = setInterval(() => {
-        if (audio.duration > 0) setProgress(audio.currentTime / audio.duration);
-      }, 100);
-      await audio.play();
+      pendingPlayRef.current = true;
+      setSrc(await resolveCueAudioUrl(text));
     } catch {
-      stop();
+      pendingPlayRef.current = false;
     }
-  }, [playing, stop, text, sessionId, side]);
+  }, [playing, src, clip, text]);
 
   React.useEffect(() => {
     if (!autoPlay || autoPlayedRef.current) return;
@@ -675,6 +634,8 @@ export function YLReadOnlyMessage({
       </div>
     );
   }
+
+  if (msgType === 'yl_tts') return null;
 
   if (msgType === 'image_scene') {
     const src =

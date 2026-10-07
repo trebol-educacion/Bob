@@ -6,22 +6,20 @@ import {
   chatFCECollaborativeTextAction,
   evaluateFCECollaborativeAction,
   generateFCECollaborativeScenarioAction,
-  getFCECollaborativeMessagesAction,
 } from '@/actions/modes/fce-p3';
-import { FCE_COLLABORATIVE_MODE, FCE_COLLABORATIVE_PRESETS } from '@/lib/speaking/fce-content';
+import { FCE_COLLABORATIVE_PRESETS } from '@/lib/speaking/fce-content';
+import type { ActivityRenderProps } from '@/lib/routing';
 import {
   CollaborativePractice,
   type CollaborativePracticeConfig,
 } from '@/components/practice/speaking/collaborative';
 
-export interface FCECollaborativePracticeProps {
-  onBack: () => void;
-  sessionId?: string;
-}
+export type FCECollaborativePracticeProps = Pick<
+  ActivityRenderProps,
+  'onBack' | 'sessionId' | 'initialMessages' | 'onSessionCreated' | 'onSessionFinished'
+>;
 
 const FCE_COLLABORATIVE_UI_CONFIG: CollaborativePracticeConfig = {
-  mode: FCE_COLLABORATIVE_MODE,
-  sessionTitlePrefix: 'B2 Collaborative',
   presets: FCE_COLLABORATIVE_PRESETS,
   maxTurns: 6,
   finishEarlyAfterTurns: 5,
@@ -31,10 +29,9 @@ const FCE_COLLABORATIVE_UI_CONFIG: CollaborativePracticeConfig = {
     chatAudio: chatFCECollaborativeAction,
     chatText: chatFCECollaborativeTextAction,
     evaluate: evaluateFCECollaborativeAction,
-    restore: getFCECollaborativeMessagesAction,
   },
 };
 
-export function FCECollaborativePractice({ onBack, sessionId }: FCECollaborativePracticeProps) {
-  return <CollaborativePractice config={FCE_COLLABORATIVE_UI_CONFIG} onBack={onBack} sessionId={sessionId} />;
+export function FCECollaborativePractice(props: FCECollaborativePracticeProps) {
+  return <CollaborativePractice config={FCE_COLLABORATIVE_UI_CONFIG} {...props} />;
 }

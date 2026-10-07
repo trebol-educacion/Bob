@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { OPEN_CHECKS } from './schemas-open';
 import { countWords, gapNumbers } from './text';
 
 const OptionSchema = z.object({ key: z.string().min(1), label: z.string().min(1) });
@@ -262,6 +263,7 @@ const CHECKS: Record<string, Check> = {
   fce_listening_part2: listeningPart2,
   fce_listening_part3: listeningPart3,
   fce_listening_part4: listeningPart4,
+  ...OPEN_CHECKS,
 };
 
 export const GROUP_PARTS = Object.keys(CHECKS).filter((part) => part !== 'fce_listening_part1');

@@ -41,8 +41,6 @@ export type FCELongTurnLanguageBank = {
 
 /** Full result returned after a successful generate call. */
 export interface FCELongTurnResult {
-  sessionId: string;
-  userId: string;
   topic: string;
   framingText: string;
   comparisonQuestion: string;
@@ -52,6 +50,7 @@ export interface FCELongTurnResult {
   languageBank: FCELongTurnLanguageBank;
   imageUrlA: string;
   imageUrlB: string;
+  bankGroupId: string;
 }
 
 const RubricSchema = z
@@ -81,6 +80,12 @@ export const EvaluationSchema = z.object({
   transcript_used: z.string(),
   rubric:          RubricSchema,
 });
+
+/** Evaluation outcome with the session the attempt was recorded in. */
+export interface FCELongTurnSubmission {
+  sessionId: string;
+  feedback: FCELongTurnFeedback;
+}
 
 /** Qualitative feedback for a FCE Long Turn attempt. */
 export interface FCELongTurnFeedback {

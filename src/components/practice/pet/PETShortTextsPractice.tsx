@@ -14,6 +14,7 @@ import {
   type ShortTextAnswerResult,
 } from '@/actions/modes/pet-reading-part1';
 import type { StoredMessage } from '@/actions/messages';
+import { ActivityLoadError } from '@/components/practice/ActivityLoadError';
 import { useTranslations } from 'next-intl';
 
 export interface PETShortTextsPracticeProps {
@@ -34,7 +35,7 @@ interface RestoredState {
   correctCount: number;
 }
 
-function tryRestore(messages: StoredMessage[]): RestoredState | null {
+export function tryRestore(messages: StoredMessage[]): RestoredState | null {
   let items: ShortTextItem[] | null = null;
   let framingText = '';
   let results: ShortTextAnswerResult[] | null = null;
@@ -249,13 +250,13 @@ export function PETShortTextsPractice({
 
   const [phase, setPhase] = useState<Phase>('loading');
   const [sessionId, setSessionId] = useState<string | undefined>(initialSessionId);
-  const [userId, setUserId] = useState<string | undefined>();
   const [items, setItems] = useState<ShortTextItem[]>([]);
   const [framingText, setFramingText] = useState('');
   const [answers, setAnswers] = useState<Record<number, 'A' | 'B' | 'C'>>({});
   const [results, setResults] = useState<ShortTextAnswerResult[]>([]);
   const [correctCount, setCorrectCount] = useState(0);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [loadErrorCode, setLoadErrorCode] = useState<string | null>(null);
   const [isNewSession, setIsNewSession] = useState(false);
   const initStartedRef = useRef(false);
 
@@ -274,10 +275,6 @@ export function PETShortTextsPractice({
             setCorrectCount(restored.correctCount);
             setPhase('finished');
           } else {
-            const { createSupabaseBrowser } = await import('@/lib/supabase/browser-client');
-            const supabase = createSupabaseBrowser();
-            const { data: { user } } = await supabase.auth.getUser();
-            if (user) setUserId(user.id);
             setPhase('ready');
           }
           return;
@@ -289,21 +286,15 @@ export function PETShortTextsPractice({
       }
 
       setIsNewSession(true);
-      const result = await generatePETShortTextsAction({ sessionId: initialSessionId });
+      const result = await generatePETShortTextsAction();
 
-      if ('error' in result) {
-        setErrorMsg(result.error);
+      if (!result.ok) {
+        setLoadErrorCode(result.code);
         return;
       }
 
-      if (!initialSessionId) {
-        onSessionCreated?.(result.sessionId);
-      }
-
-      setSessionId(result.sessionId);
-      setUserId(result.userId);
-      setItems(result.items);
-      setFramingText(result.framingText);
+      setItems(result.data.items);
+      setFramingText(result.data.framingText);
       setPhase('ready');
     }
 
@@ -315,12 +306,11 @@ export function PETShortTextsPractice({
   }
 
   async function handleSubmit() {
-    if (!sessionId || !userId) return;
     setPhase('submitting');
 
     const result = await submitPETShortTextsAnswersAction({
       sessionId,
-      userId,
+      framingText,
       answers,
       items,
     });
@@ -331,6 +321,8 @@ export function PETShortTextsPractice({
       return;
     }
 
+    if (!sessionId) onSessionCreated?.(result.sessionId);
+    setSessionId(result.sessionId);
     setResults(result.results);
     setCorrectCount(result.correctCount);
     setPhase('finished');
@@ -339,6 +331,8 @@ export function PETShortTextsPractice({
 
   const answeredCount = Object.keys(answers).length;
   const allAnswered = answeredCount === items.length && items.length > 0;
+
+  if (loadErrorCode) return <ActivityLoadError code={loadErrorCode} onBack={onBack} />;
 
   if (errorMsg) {
     return (
@@ -450,7 +444,6 @@ export function PETShortTextsPractice({
             <CelebrationCard
               score={correctCount}
               scoreMax={5}
-              feedback={t('pet.shortTexts.celebrationFeedback')}
               onAction={onOpenDashboard}
               actionLabel={t('pet.shortTexts.celebrationAction')}
               animate={isNewSession}

@@ -7,6 +7,7 @@ import { mapSkillLevelRows, type RawSkillLevelRow } from './skill-levels';
 import { computeEnabledModes } from './enabled-modes';
 import { dedupeAvailableModes, dedupeDynamicCards, type RawAvailableModeRow, type RawDynamicCardRow } from './catalog';
 import { extractOrgFrameworks, type OrgFrameworkQueryRow } from './frameworks';
+import { attachPresentation, type RawPresentationRow } from './presentation';
 import { loadStudentFrameworks } from './student-frameworks';
 import type { AvailableMode, BobAccessDenialReason } from './types';
 
@@ -29,7 +30,7 @@ export async function loadOrganizationData(
   userId: string,
   org: Organization | null,
 ): Promise<OrganizationDataBundle> {
-  const [profileResult, studentFwResult, orgFwResult, availableModesResult, allCardsResult, skillLevelsResult, cooldownResult, licenseResult] = await Promise.all([
+  const [profileResult, studentFwResult, orgFwResult, availableModesResult, allCardsResult, skillLevelsResult, cooldownResult, licenseResult, presentationResult] = await Promise.all([
     supabase
       .schema('public').from('profiles')
       .select('role, cefr_active_level, cefr_level_locked')
@@ -70,6 +71,9 @@ export async function loadOrganizationData(
           .maybeSingle()
       : Promise.resolve({ data: null, error: null }),
     supabase.schema('public').rpc('has_product_access', { p_user_id: userId, p_product_code: 'bob' }),
+    supabase
+      .from('activity_presentation')
+      .select('framework, exam_part, cefr_level, student_title, student_description, minutes, icon_key, rules'),
   ]);
 
   if (profileResult.error) {
@@ -94,6 +98,9 @@ export async function loadOrganizationData(
   }
   if (skillLevelsResult.error) {
     console.error('[OrganizationContext] bob_skill_levels query failed:', skillLevelsResult.error);
+  }
+  if (presentationResult.error) {
+    console.error('[OrganizationContext] activity_presentation query failed:', presentationResult.error);
   }
   if (cooldownResult.error) {
     console.error('[OrganizationContext] organizations cooldown query failed:', cooldownResult.error);
@@ -124,7 +131,10 @@ export async function loadOrganizationData(
   const studentFrameworks = studentFwResult.frameworks;
   const orgFrameworks = extractOrgFrameworks((orgFwResult.data ?? []) as OrgFrameworkQueryRow[]);
 
-  const allDynamicCards = dedupeDynamicCards((allCardsResult.data ?? []) as RawDynamicCardRow[]);
+  const allDynamicCards = attachPresentation(
+    dedupeDynamicCards((allCardsResult.data ?? []) as RawDynamicCardRow[]),
+    (presentationResult.data ?? []) as RawPresentationRow[],
+  );
 
   const effectiveFrameworks = studentFrameworks.filter(f => orgFrameworks.includes(f));
   const enabledModes = computeEnabledModes({

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { trackUsageAction } from '@/actions/usage';
+import { sendUsage } from '@/lib/usage/send-usage';
 import { HEARTBEAT_INTERVAL_MS, INACTIVITY_LIMIT_MS, isActiveTick, clampSeconds } from '@/lib/usage/heartbeat';
 
 const INTERACTION_EVENTS: Array<keyof WindowEventMap> = ['pointerdown', 'keydown', 'scroll'];
@@ -37,7 +37,7 @@ export function useUsageHeartbeat(mode: string | null): void {
       });
       if (!active) return;
 
-      void trackUsageAction(mode, clampSeconds(elapsedSeconds)).catch(() => undefined);
+      sendUsage(mode, clampSeconds(elapsedSeconds));
     };
 
     for (const event of INTERACTION_EVENTS) {

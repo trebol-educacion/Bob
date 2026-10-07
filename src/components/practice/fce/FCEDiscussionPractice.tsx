@@ -6,16 +6,18 @@ import {
   generateFCEDiscussionAction,
   processFCEDiscussionAnswerAction,
 } from '@/actions/modes/fce-p4';
-import { FCE_DISCUSSION_MODE, type FCEDiscussionPlan } from '@/lib/speaking/fce-content';
+import { DiscussionPlanSchema, type FCEDiscussionPlan } from '@/lib/speaking/fce-content';
+import { unwrapContent } from '@/lib/content/unwrap-content';
+import type { ActivityRenderProps } from '@/lib/routing';
 import { QuestionRoundPractice, type QuestionRoundConfig } from '@/components/practice/speaking';
 
-export interface FCEDiscussionPracticeProps {
-  onBack: () => void;
-}
+export type FCEDiscussionPracticeProps = Pick<
+  ActivityRenderProps,
+  'onBack' | 'sessionId' | 'initialMessages' | 'onSessionCreated' | 'onSessionFinished'
+>;
 
 const FCE_DISCUSSION_UI_CONFIG: QuestionRoundConfig<FCEDiscussionPlan> = {
-  mode: FCE_DISCUSSION_MODE,
-  sessionTitle: 'B2 Speaking, Part 4',
+  planSchema: DiscussionPlanSchema,
   headerTitle: 'Speaking · Part 4: Discussion',
   headerSubtitle: 'Cambridge B2 First',
   levelBadge: 'B2',
@@ -24,12 +26,12 @@ const FCE_DISCUSSION_UI_CONFIG: QuestionRoundConfig<FCEDiscussionPlan> = {
   completeSubtitle: 'Cambridge B2 · Part 4',
   toQuestions: (plan) => plan.discussion_questions,
   actions: {
-    generate: generateFCEDiscussionAction,
+    generate: async () => unwrapContent(await generateFCEDiscussionAction()),
     processAnswer: processFCEDiscussionAnswerAction,
     evaluate: evaluateFCEDiscussionAction,
   },
 };
 
-export function FCEDiscussionPractice({ onBack }: FCEDiscussionPracticeProps) {
-  return <QuestionRoundPractice config={FCE_DISCUSSION_UI_CONFIG} onBack={onBack} />;
+export function FCEDiscussionPractice(props: FCEDiscussionPracticeProps) {
+  return <QuestionRoundPractice config={FCE_DISCUSSION_UI_CONFIG} {...props} />;
 }

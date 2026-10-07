@@ -12,6 +12,15 @@ export interface GapTextProps {
   baseWords?: Record<number, string>;
   sentences?: GapSentence[];
   gapLabel?: (gapNumber: number) => string;
+  allowRepeatOptions?: boolean;
+}
+
+function takenByOtherGaps(values: Record<number, string>, gapNumber: number): ReadonlySet<string> {
+  return new Set(
+    Object.entries(values)
+      .filter(([key, value]) => Number(key) !== gapNumber && value)
+      .map(([, value]) => value),
+  );
 }
 
 const defaultGapLabel = (gapNumber: number) => `Gap ${gapNumber}`;
@@ -25,6 +34,7 @@ export function GapText({
   baseWords,
   sentences = [],
   gapLabel = defaultGapLabel,
+  allowRepeatOptions = true,
 }: GapTextProps) {
   return (
     <>
@@ -63,6 +73,7 @@ export function GapText({
               onChange={handleChange}
               label={gapLabel(number)}
               sentences={sentences}
+              takenIds={allowRepeatOptions ? undefined : takenByOtherGaps(values, number)}
             />
           );
         }

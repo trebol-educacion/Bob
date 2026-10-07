@@ -6,10 +6,11 @@ import { Check } from 'lucide-react';
 import { PETListeningIcon } from '@/components/icons/PETIcons';
 import { CelebrationCard } from '@/components/practice/yl/CelebrationCard';
 import { BobMascotLoader } from '@/components/chat/BobMascotLoader';
-import { pcmToWavBase64 } from '@/lib/audio';
+import { PETAudioPlayer } from './PETAudioPlayer';
+import { stopActiveClip } from '@/lib/audio-clip';
+import { ActivityLoadError } from '@/components/practice/ActivityLoadError';
 import {
   generatePETListeningTrueFalseJustifyAction,
-  generatePETListeningTrueFalseJustifyAudioAction,
   submitPETListeningTrueFalseJustifyAction,
   type PETJustifyAudioTurn,
   type PETJustifyClientStatement,
@@ -18,17 +19,16 @@ import {
 } from '@/actions/modes/pet-listening-part5';
 import type { StoredMessage } from '@/actions/messages';
 import { resolveActivityBoot } from '@/lib/activity/boot';
-import type { YLRenderProps } from '@/lib/routing';
+import type { ActivityRenderProps } from '@/lib/routing';
+import { ActivityHeader } from '@/components/activity/ActivityHeader';
 
 const ACCENT = '#10B981';
 const ACCENT_DARK = '#0E9F6E';
 const ACCENT_TEXT = '#047857';
 const ACCENT_TINT = 'color-mix(in oklab, #10B981 12%, white)';
 const CARD_SURFACE = '#FAFAF8';
-const AUDIO_MIME = 'audio/L16;codec=pcm;rate=24000';
 
 type Phase = 'loading' | 'generating' | 'ready' | 'submitting' | 'finished';
-type AudioStatus = 'loading' | 'ready' | 'error';
 type Verdict = 'T' | 'F';
 
 interface ClientAnswer {
@@ -45,7 +45,7 @@ interface RestoredState {
   scoreMax: number;
 }
 
-function tryRestore(messages: StoredMessage[]): RestoredState | null {
+export function tryRestore(messages: StoredMessage[]): RestoredState | null {
   let statements: PETJustifyClientStatement[] | null = null;
   let audio: PETJustifyAudioTurn[] = [];
   let framingText = '';
@@ -79,178 +79,6 @@ function tryRestore(messages: StoredMessage[]): RestoredState | null {
 
   if (statements) return { statements, audio, framingText, statementResults, score, scoreMax };
   return null;
-}
-
-let _activeAudio: HTMLAudioElement | null = null;
-
-function stopActiveAudio() {
-  if (_activeAudio) {
-    _activeAudio.pause();
-    _activeAudio.src = '';
-    _activeAudio = null;
-  }
-}
-
-function PlayIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
-      <path d="M8 5v14l11-7z" />
-    </svg>
-  );
-}
-
-function PauseIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
-      <rect x="6" y="5" width="4" height="14" rx="1" />
-      <rect x="14" y="5" width="4" height="14" rx="1" />
-    </svg>
-  );
-}
-
-function ReplayIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
-      <path d="M3 12a9 9 0 1 0 3-6.7" />
-      <polyline points="3 4 3 10 9 10" />
-    </svg>
-  );
-}
-
-function Spinner() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4 animate-spin" aria-hidden>
-      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeOpacity="0.25" strokeWidth="3" />
-      <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function AudioPlayer({
-  audiob64,
-  audiomime,
-  status,
-}: {
-  audiob64: string;
-  audiomime: string;
-  status: AudioStatus;
-}) {
-  const reduceMotion = useReducedMotion();
-  const [playing, setPlaying] = useState(false);
-  const [hasPlayed, setHasPlayed] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  const stopLocal = () => {
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current = null;
-    }
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
-    }
-    setPlaying(false);
-    if (_activeAudio === audioRef.current) _activeAudio = null;
-  };
-
-  useEffect(() => () => stopLocal(), []);
-
-  const handlePlay = async () => {
-    if (playing) {
-      stopLocal();
-      setProgress(0);
-      return;
-    }
-
-    stopActiveAudio();
-
-    const url = pcmToWavBase64(audiob64, audiomime);
-    const audio = new Audio(url);
-    audioRef.current = audio;
-    _activeAudio = audio;
-
-    audio.onended = () => {
-      stopLocal();
-      setHasPlayed(true);
-      setProgress(1);
-      setTimeout(() => setProgress(0), 600);
-    };
-    audio.onerror = () => stopLocal();
-
-    setPlaying(true);
-    intervalRef.current = setInterval(() => {
-      if (audio.duration > 0) setProgress(audio.currentTime / audio.duration);
-    }, 100);
-
-    try {
-      await audio.play();
-    } catch {
-      stopLocal();
-    }
-  };
-
-  if (status === 'error') {
-    return (
-      <div className="rounded-full ring-1 ring-gray-100 bg-gray-50 px-3 py-2 flex items-center gap-3 h-12">
-        <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 bg-gray-200 text-gray-400">
-          <PlayIcon />
-        </div>
-        <p className="flex-1 text-sm font-semibold text-gray-400">Audio unavailable</p>
-      </div>
-    );
-  }
-
-  if (status === 'loading') {
-    return (
-      <div className="rounded-full ring-1 ring-emerald-100 bg-emerald-50 px-3 py-2 flex items-center gap-3 h-12">
-        <div
-          className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 text-white opacity-60"
-          style={{ background: ACCENT }}
-          aria-hidden
-        >
-          <Spinner />
-        </div>
-        <p className="flex-1 text-xs font-semibold" style={{ color: ACCENT_TEXT }}>Preparing audio…</p>
-      </div>
-    );
-  }
-
-  const label = playing ? 'Playing…' : hasPlayed ? 'Listen again' : 'Listen to the interview';
-
-  return (
-    <div className="relative rounded-full ring-1 ring-emerald-100 bg-emerald-50 px-3 py-2 flex items-center gap-3 h-12 overflow-hidden">
-      <div className="relative shrink-0 w-10 h-10">
-        {playing && (
-          <motion.div
-            aria-hidden
-            className="absolute inset-0 rounded-full"
-            style={{ background: ACCENT }}
-            initial={{ scale: 1, opacity: 0.4 }}
-            animate={reduceMotion ? { scale: 1, opacity: 0.25 } : { scale: [1, 1.6], opacity: [0.4, 0] }}
-            transition={reduceMotion ? { duration: 0 } : { duration: 1.2, ease: 'easeOut', repeat: Infinity }}
-          />
-        )}
-        <button
-          type="button"
-          onClick={handlePlay}
-          aria-label={label}
-          className="relative w-10 h-10 rounded-full flex items-center justify-center transition-transform active:scale-95 text-white"
-          style={{ background: ACCENT }}
-        >
-          {playing ? <PauseIcon /> : hasPlayed ? <ReplayIcon /> : <PlayIcon />}
-        </button>
-      </div>
-      <p className="flex-1 text-xs font-semibold truncate" style={{ color: ACCENT_TEXT }}>{label}</p>
-      <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-[3px] bg-emerald-200/60">
-        <div
-          className="h-full transition-all"
-          style={{ width: `${Math.round(progress * 100)}%`, background: ACCENT }}
-        />
-      </div>
-    </div>
-  );
 }
 
 function VerdictButton({
@@ -522,23 +350,22 @@ export function PETListeningTrueFalseJustifyPractice({
   onSessionCreated,
   onSessionFinished,
   onOpenDashboard,
-}: YLRenderProps) {
+}: ActivityRenderProps) {
   const reduceMotion = useReducedMotion();
   const [phase, setPhase] = useState<Phase>('loading');
   const [sessionId, setSessionId] = useState<string | undefined>(initialSessionId);
-  const [userId, setUserId] = useState<string | undefined>();
+  const [planToken, setPlanToken] = useState<string | null>(null);
   const [statements, setStatements] = useState<PETJustifyClientStatement[]>([]);
-  const [audio, setAudio] = useState<PETJustifyAudioTurn[]>([]);
   const [framingText, setFramingText] = useState('');
   const [answers, setAnswers] = useState<Record<number, ClientAnswer>>({});
   const [statementResults, setStatementResults] = useState<PETJustifyStatementResult[]>([]);
   const [score, setScore] = useState(0);
   const [scoreMax, setScoreMax] = useState(0);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [loadErrorCode, setLoadErrorCode] = useState<string | null>(null);
   const [isNewSession, setIsNewSession] = useState(false);
-  const [audioState, setAudioState] = useState<{ b64: string; mime: string; status: AudioStatus }>({ b64: '', mime: AUDIO_MIME, status: 'loading' });
+  const [audioUrl, setAudioUrl] = useState('');
   const initStartedRef = useRef(false);
-  const audioStartedRef = useRef(false);
 
   useEffect(() => {
     if (initStartedRef.current) return;
@@ -549,7 +376,6 @@ export function PETListeningTrueFalseJustifyPractice({
       if (boot.kind === 'restore') {
         const restored = boot.data;
         setStatements(restored.statements);
-        setAudio(restored.audio);
         setFramingText(restored.framingText);
         if (restored.statementResults) {
           setStatementResults(restored.statementResults);
@@ -557,10 +383,7 @@ export function PETListeningTrueFalseJustifyPractice({
           setScoreMax(restored.scoreMax);
           setPhase('finished');
         } else {
-          const { createSupabaseBrowser } = await import('@/lib/supabase/browser-client');
-          const { data: { user } } = await createSupabaseBrowser().auth.getUser();
-          if (user) setUserId(user.id);
-          setPhase('ready');
+          setErrorMsg('Could not restore session. Please start a new one.');
         }
         return;
       }
@@ -570,51 +393,23 @@ export function PETListeningTrueFalseJustifyPractice({
       setIsNewSession(true);
       setPhase('generating');
 
-      const result = await generatePETListeningTrueFalseJustifyAction({ sessionId: initialSessionId });
+      const generated = await generatePETListeningTrueFalseJustifyAction();
 
-      if ('error' in result) {
-        setErrorMsg(result.error);
+      if (!generated.ok) {
+        setLoadErrorCode(generated.code);
         return;
       }
+      const result = generated.data;
+      setAudioUrl(result.audio_url);
 
-      onSessionCreated?.(result.sessionId);
-      setSessionId(result.sessionId);
-      setUserId(result.userId);
+      setPlanToken(result.planToken);
       setStatements(result.statements);
-      setAudio(result.audio);
       setFramingText(result.framingText);
       setPhase('ready');
     }
 
     void init();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
-    if (audioStartedRef.current) return;
-    if (phase !== 'ready' && phase !== 'finished') return;
-    if (!audio.length) return;
-    audioStartedRef.current = true;
-
-    let cancelled = false;
-    (async () => {
-      try {
-        const result = await generatePETListeningTrueFalseJustifyAudioAction({ audio });
-        if (cancelled) return;
-        setAudioState(
-          result.data
-            ? { b64: result.data, mime: result.mimeType, status: 'ready' }
-            : { b64: '', mime: result.mimeType, status: 'error' }
-        );
-      } catch {
-        if (cancelled) return;
-        setAudioState({ b64: '', mime: AUDIO_MIME, status: 'error' });
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [phase, audio]);
 
   function setVerdict(number: number, verdict: Verdict) {
     setAnswers((prev) => {
@@ -636,11 +431,11 @@ export function PETListeningTrueFalseJustifyPractice({
   }
 
   async function handleSubmit() {
-    if (!sessionId || !userId) return;
-    stopActiveAudio();
+    if (!planToken) return;
+    stopActiveClip();
     setPhase('submitting');
 
-    const result = await submitPETListeningTrueFalseJustifyAction({ sessionId, userId, answers });
+    const result = await submitPETListeningTrueFalseJustifyAction({ sessionId, planToken, answers });
 
     if ('error' in result) {
       setErrorMsg(result.error);
@@ -648,6 +443,8 @@ export function PETListeningTrueFalseJustifyPractice({
       return;
     }
 
+    if (!sessionId) onSessionCreated?.(result.sessionId);
+    setSessionId(result.sessionId);
     setStatementResults(result.statement_results);
     setScore(result.score);
     setScoreMax(result.score_max);
@@ -658,6 +455,8 @@ export function PETListeningTrueFalseJustifyPractice({
   const answeredCount = statements.filter(isAnswered).length;
   const allAnswered = statements.length > 0 && answeredCount === statements.length;
   const progressPct = statements.length > 0 ? (answeredCount / statements.length) * 100 : 0;
+
+  if (loadErrorCode) return <ActivityLoadError code={loadErrorCode} onBack={onBack} />;
 
   if (errorMsg) {
     return (
@@ -676,32 +475,14 @@ export function PETListeningTrueFalseJustifyPractice({
 
   return (
     <div className="flex flex-col h-full relative">
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-100 bg-white shrink-0">
-        <button
-          type="button"
-          onClick={onBack}
-          className="w-11 h-11 flex items-center justify-center rounded-xl hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-600 text-lg"
-          aria-label="Back"
-        >
-          ←
-        </button>
-        <div
-          className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0"
-          style={{ background: ACCENT_TINT, color: ACCENT }}
-        >
-          <PETListeningIcon size={18} />
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-bold text-gray-800 truncate">True or False with Justification</p>
-          <p className="text-xs text-gray-400">Listening · Part 5</p>
-        </div>
-        <span
-          className="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-widest"
-          style={{ background: ACCENT_TINT, color: ACCENT_TEXT }}
-        >
-          B1
-        </span>
-      </div>
+      <ActivityHeader
+        title="True or False"
+        subtitle="Listening · Part 5"
+        badge="Part 5"
+        icon={<PETListeningIcon size={18} />}
+        iconStyle={{ background: ACCENT_TINT, color: ACCENT }}
+        onBack={onBack}
+      />
 
       {phase === 'ready' && (
         <div className="h-1.5 w-full bg-gray-100 shrink-0 overflow-hidden">
@@ -742,7 +523,7 @@ export function PETListeningTrueFalseJustifyPractice({
               </div>
 
               <div className="rounded-3xl border border-gray-100 shadow-sm px-4 py-4" style={{ background: CARD_SURFACE }}>
-                <AudioPlayer audiob64={audioState.b64} audiomime={audioState.mime} status={audioState.status} />
+                <PETAudioPlayer url={audioUrl} idleLabel="Listen to the interview" />
               </div>
 
               {statements.map((s, i) => (
@@ -775,7 +556,7 @@ export function PETListeningTrueFalseJustifyPractice({
                 className="px-6 py-3 rounded-2xl text-white text-sm font-bold transition-transform duration-75 cursor-pointer active:translate-y-1 active:shadow-none disabled:opacity-40 disabled:cursor-not-allowed disabled:translate-y-0 disabled:shadow-none"
                 style={{ background: ACCENT, boxShadow: allAnswered ? `0 4px 0 ${ACCENT_DARK}` : 'none' }}
               >
-                Check answers
+                Submit answers
               </button>
             </div>
           </div>
@@ -799,7 +580,6 @@ export function PETListeningTrueFalseJustifyPractice({
               <CelebrationCard
                 score={score}
                 scoreMax={scoreMax}
-                feedback="Great listening practice!"
                 onAction={onOpenDashboard}
                 actionLabel="See my progress"
                 animate={isNewSession}

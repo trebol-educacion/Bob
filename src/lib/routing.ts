@@ -27,12 +27,12 @@ import {
   KETListenAndChoosePractice,
   KETListenAndCompletePractice,
   KETListenAndDecidePractice,
-  KETShortTalksPractice,
-  KETTrueFalseDoesntSayPractice,
+  KETShortConversationsPractice,
+  KETListenMatchPractice,
   KETMatchQuestionPractice,
   KETLongTextPractice,
   KETVocabGapPractice,
-  KETReadingTFDSPractice,
+  KETOpenClozePractice,
   KETStoryWritingPractice,
   KETHobbyTalkPractice,
   KETDescribePicturePractice,
@@ -58,7 +58,6 @@ export type AppState =
   | 'practice-session'
   | 'assessment-invite'
   | 'assessment-running'
-  | 'assessment-result'
   | 'mode-selection'
   | 'catalog-filtered'
   | 'practicing'
@@ -68,7 +67,7 @@ export type AppState =
   | 'challenge'
   | 'challenge-running';
 
-export interface YLRenderProps {
+export interface ActivityRenderProps {
   onBack: () => void;
   sessionId?: string;
   initialMessages?: StoredMessage[];
@@ -77,16 +76,9 @@ export interface YLRenderProps {
   onOpenDashboard?: () => void;
 }
 
-export interface ExamRenderProps {
-  onBack: () => void;
-}
-
-export type RouteKind = 'yl' | 'exam';
-
 export interface RouteEntry {
   appState: AppState;
-  kind: RouteKind;
-  render: (props: YLRenderProps | ExamRenderProps) => React.JSX.Element;
+  render: (props: ActivityRenderProps) => React.JSX.Element;
 }
 
 /**
@@ -98,218 +90,175 @@ export const EXAM_PART_COMPONENT_MAP: Record<ModeKey, RouteEntry> = {
   ...FCE_ROUTES,
   cambridge_starters_part1: {
     appState: 'exam-practicing',
-    kind: 'yl',
-    render: (p) => React.createElement(YLPointingPractice, { key: ylInstanceKey(p as YLRenderProps), exam: 'starters', part: 1, ...(p as YLRenderProps) }),
+    render: (p) => React.createElement(YLPointingPractice, { key: ylInstanceKey(p), exam: 'starters', part: 1, ...p }),
   },
   cambridge_starters_part2: {
     appState: 'exam-practicing',
-    kind: 'yl',
-    render: (p) => React.createElement(YLPart2Practice, { key: ylInstanceKey(p as YLRenderProps), exam: 'starters', part: 2, ...(p as YLRenderProps) }),
+    render: (p) => React.createElement(YLPart2Practice, { key: ylInstanceKey(p), exam: 'starters', part: 2, ...p }),
   },
   cambridge_starters_part3: {
     appState: 'exam-practicing',
-    kind: 'yl',
-    render: (p) => React.createElement(YLWhatsThisPractice, { key: ylInstanceKey(p as YLRenderProps), exam: 'starters', part: 3, ...(p as YLRenderProps) }),
+    render: (p) => React.createElement(YLWhatsThisPractice, { key: ylInstanceKey(p), exam: 'starters', part: 3, ...p }),
   },
   cambridge_starters_part4: {
     appState: 'exam-practicing',
-    kind: 'yl',
-    render: (p) => React.createElement(YLPart4Practice, { key: ylInstanceKey(p as YLRenderProps), exam: 'starters', part: 4, ...(p as YLRenderProps) }),
+    render: (p) => React.createElement(YLPart4Practice, { key: ylInstanceKey(p), exam: 'starters', part: 4, ...p }),
   },
   cambridge_movers_part1: {
     appState: 'exam-practicing',
-    kind: 'yl',
-    render: (p) => React.createElement(YLFindDifferencesPractice, { key: ylInstanceKey(p as YLRenderProps), exam: 'movers', part: 1, ...(p as YLRenderProps) }),
+    render: (p) => React.createElement(YLFindDifferencesPractice, { key: ylInstanceKey(p), exam: 'movers', part: 1, ...p }),
   },
   cambridge_movers_part2: {
     appState: 'exam-practicing',
-    kind: 'yl',
-    render: (p) => React.createElement(YLPart2Practice, { key: ylInstanceKey(p as YLRenderProps), exam: 'movers', part: 2, ...(p as YLRenderProps) }),
+    render: (p) => React.createElement(YLPart2Practice, { key: ylInstanceKey(p), exam: 'movers', part: 2, ...p }),
   },
   cambridge_movers_part3: {
     appState: 'exam-practicing',
-    kind: 'yl',
-    render: (p) => React.createElement(YLTellTheStoryPractice, { key: ylInstanceKey(p as YLRenderProps), exam: 'movers', part: 3, ...(p as YLRenderProps) }),
+    render: (p) => React.createElement(YLTellTheStoryPractice, { key: ylInstanceKey(p), exam: 'movers', part: 3, ...p }),
   },
   cambridge_movers_part4: {
     appState: 'exam-practicing',
-    kind: 'yl',
-    render: (p) => React.createElement(YLPart4Practice, { key: ylInstanceKey(p as YLRenderProps), exam: 'movers', part: 4, ...(p as YLRenderProps) }),
+    render: (p) => React.createElement(YLPart4Practice, { key: ylInstanceKey(p), exam: 'movers', part: 4, ...p }),
   },
   cambridge_movers_part5: {
     appState: 'exam-practicing',
-    kind: 'yl',
-    render: (p) => React.createElement(YLPart4Practice, { key: ylInstanceKey(p as YLRenderProps), exam: 'movers', part: 5, ...(p as YLRenderProps) }),
+    render: (p) => React.createElement(YLPart4Practice, { key: ylInstanceKey(p), exam: 'movers', part: 5, ...p }),
   },
   cambridge_pet_p2: {
     appState: 'exam-practicing',
-    kind: 'yl',
-    render: (p) => React.createElement(PETPictureDescriptionPractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
+    render: (p) => React.createElement(PETPictureDescriptionPractice, { key: ylInstanceKey(p), ...p }),
   },
   cambridge_pet_p1: {
     appState: 'exam-practicing',
-    kind: 'exam',
-    render: (p) => React.createElement(PETInterviewPractice, { onBack: (p as ExamRenderProps).onBack }),
+    render: (p) => React.createElement(PETInterviewPractice, { ...p }),
   },
   cambridge_pet_p3: {
     appState: 'exam-practicing',
-    kind: 'exam',
-    render: (p) => React.createElement(B1CollaborativePractice, { onBack: (p as ExamRenderProps).onBack }),
+    render: (p) => React.createElement(B1CollaborativePractice, { ...p }),
   },
   cambridge_pet_p4: {
     appState: 'exam-practicing',
-    kind: 'exam',
-    render: (p) => React.createElement(PETDiscussionPractice, { onBack: (p as ExamRenderProps).onBack }),
+    render: (p) => React.createElement(PETDiscussionPractice, { ...p }),
   },
   cambridge_ket_part1: {
     appState: 'exam-practicing',
-    kind: 'exam',
-    render: (p) => React.createElement(A2Part1Practice, { onBack: (p as ExamRenderProps).onBack }),
+    render: (p) => React.createElement(A2Part1Practice, { ...p }),
   },
   cambridge_ket_part2: {
     appState: 'exam-practicing',
-    kind: 'yl',
-    render: (p) => React.createElement(KETHobbyTalkPractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
+    render: (p) => React.createElement(KETHobbyTalkPractice, { key: ylInstanceKey(p), ...p }),
   },
   cambridge_ket_part3: {
     appState: 'exam-practicing',
-    kind: 'yl',
-    render: (p) => React.createElement(KETDescribePicturePractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
+    render: (p) => React.createElement(KETDescribePicturePractice, { key: ylInstanceKey(p), ...p }),
   },
   toefl_listen_repeat: {
     appState: 'exam-practicing',
-    kind: 'exam',
-    render: (p) => React.createElement(ToeflListenRepeatPractice, { onBack: (p as ExamRenderProps).onBack }),
+    render: (p) => React.createElement(ToeflListenRepeatPractice, { ...p }),
   },
   toefl_interview: {
     appState: 'exam-practicing',
-    kind: 'exam',
-    render: (p) => React.createElement(ToeflInterviewPractice, { onBack: (p as ExamRenderProps).onBack }),
+    render: (p) => React.createElement(ToeflInterviewPractice, { ...p }),
   },
   toefl_listen_choose_response: {
     appState: 'exam-practicing',
-    kind: 'exam',
-    render: (p) => React.createElement(ListenChooseResponsePractice, { onBack: (p as ExamRenderProps).onBack }),
+    render: (p) => React.createElement(ListenChooseResponsePractice, { ...p }),
   },
   toefl_writing_build_sentence: {
     appState: 'exam-practicing',
-    kind: 'exam',
-    render: (p) => React.createElement(BuildSentencePractice, { onBack: (p as ExamRenderProps).onBack }),
+    render: (p) => React.createElement(BuildSentencePractice, { ...p }),
   },
   toefl_writing_email: {
     appState: 'exam-practicing',
-    kind: 'exam',
-    render: (p) => React.createElement(EmailWritingPractice, { mode: 'toefl_writing_email', onBack: (p as ExamRenderProps).onBack }),
+    render: (p) => React.createElement(EmailWritingPractice, { mode: 'toefl_writing_email', ...p }),
   },
   cambridge_pet_writing_part1: {
     appState: 'exam-practicing',
-    kind: 'yl',
-    render: (p) => React.createElement(PETEmailWritingPractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
+    render: (p) => React.createElement(PETEmailWritingPractice, { key: ylInstanceKey(p), ...p }),
   },
   cambridge_pet_writing_challenge: {
     appState: 'exam-practicing',
-    kind: 'yl',
-    render: (p) => React.createElement(PETWritingChallengePractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
+    render: (p) => React.createElement(PETWritingChallengePractice, { key: ylInstanceKey(p), ...p }),
   },
   toefl_writing_academic_discussion: {
     appState: 'exam-practicing',
-    kind: 'exam',
-    render: (p) => React.createElement(AcademicWritingPractice, { mode: 'toefl_writing_academic_discussion', onBack: (p as ExamRenderProps).onBack }),
+    render: (p) => React.createElement(AcademicWritingPractice, { mode: 'toefl_writing_academic_discussion', ...p }),
   },
   cambridge_ket_writing_part6: {
     appState: 'exam-practicing',
-    kind: 'yl',
-    render: (p) => React.createElement(KETShortMessagePractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
+    render: (p) => React.createElement(KETShortMessagePractice, { key: ylInstanceKey(p), ...p }),
   },
   cambridge_ket_writing_part7: {
     appState: 'exam-practicing',
-    kind: 'yl',
-    render: (p) => React.createElement(KETStoryWritingPractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
+    render: (p) => React.createElement(KETStoryWritingPractice, { key: ylInstanceKey(p), ...p }),
   },
   cambridge_pet_reading_part1: {
     appState: 'exam-practicing',
-    kind: 'yl',
-    render: (p) => React.createElement(PETShortTextsPractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
+    render: (p) => React.createElement(PETShortTextsPractice, { key: ylInstanceKey(p), ...p }),
   },
   cambridge_pet_reading_comprehension: {
     appState: 'exam-practicing',
-    kind: 'yl',
-    render: (p) => React.createElement(PETReadingComprehensionPractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
+    render: (p) => React.createElement(PETReadingComprehensionPractice, { key: ylInstanceKey(p), ...p }),
   },
   cambridge_ket_reading_part1: {
     appState: 'exam-practicing',
-    kind: 'yl',
-    render: (p) => React.createElement(KETSignsAndNoticesPractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
+    render: (p) => React.createElement(KETSignsAndNoticesPractice, { key: ylInstanceKey(p), ...p }),
   },
   cambridge_ket_reading_part2: {
     appState: 'exam-practicing',
-    kind: 'yl',
-    render: (p) => React.createElement(KETMatchQuestionPractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
+    render: (p) => React.createElement(KETMatchQuestionPractice, { key: ylInstanceKey(p), ...p }),
   },
   cambridge_ket_reading_part3: {
     appState: 'exam-practicing',
-    kind: 'yl',
-    render: (p) => React.createElement(KETLongTextPractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
+    render: (p) => React.createElement(KETLongTextPractice, { key: ylInstanceKey(p), ...p }),
   },
   cambridge_ket_reading_part4: {
     appState: 'exam-practicing',
-    kind: 'yl',
-    render: (p) => React.createElement(KETVocabGapPractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
+    render: (p) => React.createElement(KETVocabGapPractice, { key: ylInstanceKey(p), ...p }),
   },
   cambridge_ket_reading_part5: {
     appState: 'exam-practicing',
-    kind: 'yl',
-    render: (p) => React.createElement(KETReadingTFDSPractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
+    render: (p) => React.createElement(KETOpenClozePractice, { key: ylInstanceKey(p), ...p }),
   },
   cambridge_ket_listening_part1: {
     appState: 'exam-practicing',
-    kind: 'yl',
-    render: (p) => React.createElement(KETListenAndChoosePractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
+    render: (p) => React.createElement(KETListenAndChoosePractice, { key: ylInstanceKey(p), ...p }),
   },
   cambridge_ket_listening_part2: {
     appState: 'exam-practicing',
-    kind: 'yl',
-    render: (p) => React.createElement(KETListenAndCompletePractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
+    render: (p) => React.createElement(KETListenAndCompletePractice, { key: ylInstanceKey(p), ...p }),
   },
   cambridge_ket_listening_part3: {
     appState: 'exam-practicing',
-    kind: 'yl',
-    render: (p) => React.createElement(KETListenAndDecidePractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
+    render: (p) => React.createElement(KETListenAndDecidePractice, { key: ylInstanceKey(p), ...p }),
   },
   cambridge_ket_listening_part4: {
     appState: 'exam-practicing',
-    kind: 'yl',
-    render: (p) => React.createElement(KETShortTalksPractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
+    render: (p) => React.createElement(KETShortConversationsPractice, { key: ylInstanceKey(p), ...p }),
   },
   cambridge_ket_listening_part5: {
     appState: 'exam-practicing',
-    kind: 'yl',
-    render: (p) => React.createElement(KETTrueFalseDoesntSayPractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
+    render: (p) => React.createElement(KETListenMatchPractice, { key: ylInstanceKey(p), ...p }),
   },
   cambridge_pet_listening_part1: {
     appState: 'exam-practicing',
-    kind: 'yl',
-    render: (p) => React.createElement(PETListeningSituationalPractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
+    render: (p) => React.createElement(PETListeningSituationalPractice, { key: ylInstanceKey(p), ...p }),
   },
   cambridge_pet_listening_part2: {
     appState: 'exam-practicing',
-    kind: 'yl',
-    render: (p) => React.createElement(PETMultipleChoicePractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
+    render: (p) => React.createElement(PETMultipleChoicePractice, { key: ylInstanceKey(p), ...p }),
   },
   cambridge_pet_listening_part3: {
     appState: 'exam-practicing',
-    kind: 'yl',
-    render: (p) => React.createElement(PETListeningGapFillPractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
+    render: (p) => React.createElement(PETListeningGapFillPractice, { key: ylInstanceKey(p), ...p }),
   },
   cambridge_pet_listening_part4: {
     appState: 'exam-practicing',
-    kind: 'yl',
-    render: (p) => React.createElement(PETListeningAttitudePractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
+    render: (p) => React.createElement(PETListeningAttitudePractice, { key: ylInstanceKey(p), ...p }),
   },
   cambridge_pet_listening_part5: {
     appState: 'exam-practicing',
-    kind: 'yl',
-    render: (p) => React.createElement(PETListeningTrueFalseJustifyPractice, { key: ylInstanceKey(p as YLRenderProps), ...(p as YLRenderProps) }),
+    render: (p) => React.createElement(PETListeningTrueFalseJustifyPractice, { key: ylInstanceKey(p), ...p }),
   },
 };
 
@@ -328,8 +277,3 @@ export function isConversationMode(mode: string): boolean {
   return mode === 'generic_conversation';
 }
 
-/** True when the mode belongs to the Cambridge Young Learners family. */
-export function isYLMode(mode: string): boolean {
-  const entry = EXAM_PART_COMPONENT_MAP[mode];
-  return entry?.kind === 'yl';
-}

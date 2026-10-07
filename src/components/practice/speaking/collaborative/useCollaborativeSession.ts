@@ -1,21 +1,31 @@
 'use client';
 
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { blobToBase64 } from '@/lib/audio';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
 import { useTTS } from '@/hooks/useTTS';
-import { createSessionAction } from '@/actions/sessions';
+import type { StoredMessage } from '@/actions/messages';
+import { restoreCollaborative } from '@/lib/speaking/collaborative-restore';
 import type { FormativeFeedback } from '@/lib/types/practice';
 import type { Part3ChatMessage, Part3Scenario } from '@/lib/speaking/types';
-import type { CollaborativePhase, CollaborativePracticeConfig } from './types';
+import type { CollaborativePhase, CollaborativePracticeConfig, CollaborativeSessionParams } from './types';
 
-export function useCollaborativeSession(config: CollaborativePracticeConfig, initialSessionId?: string) {
+export function useCollaborativeSession(config: CollaborativePracticeConfig, params: CollaborativeSessionParams = {}) {
+  const { sessionId: initialSessionId, initialMessages, onSessionCreated, onSessionFinished } = params;
   const { actions } = config;
-  const [phase, setPhase] = useState<CollaborativePhase>('intro');
-  const [scenario, setScenario] = useState<Part3Scenario | null>(null);
-  const [history, setHistory] = useState<Part3ChatMessage[]>([]);
+  const [restored] = useState(() =>
+    initialSessionId && initialMessages && initialMessages.length > 0
+      ? restoreCollaborative(initialMessages as StoredMessage[])
+      : null,
+  );
+  const [phase, setPhase] = useState<CollaborativePhase>(() => {
+    if (restored?.feedback) return 'result';
+    return restored && restored.history.length > 0 ? 'conversation' : 'intro';
+  });
+  const [scenario, setScenario] = useState<Part3Scenario | null>(restored?.scenario ?? null);
+  const [history, setHistory] = useState<Part3ChatMessage[]>(restored?.history ?? []);
   const [discussedOptions, setDiscussedOptions] = useState<Set<number>>(new Set());
-  const [evaluation, setEvaluation] = useState<FormativeFeedback | null>(null);
+  const [evaluation, setEvaluation] = useState<FormativeFeedback | null>(restored?.feedback ?? null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [loadingScenario, setLoadingScenario] = useState(false);
   const [textInput, setTextInput] = useState('');
@@ -23,24 +33,13 @@ export function useCollaborativeSession(config: CollaborativePracticeConfig, ini
   const [audioError, setAudioError] = useState<string | null>(null);
   const [ttsLoading, setTtsLoading] = useState(false);
 
-  const sessionCreatedRef = useRef(false);
   const sessionIdRef = useRef<string | null>(initialSessionId ?? null);
 
-  useEffect(() => {
-    if (!initialSessionId) return;
-    sessionIdRef.current = initialSessionId;
-    sessionCreatedRef.current = true;
-    actions.restore(initialSessionId).then(({ history: h, feedback: fb }) => {
-      if (h.length > 0) {
-        setHistory(h);
-        setPhase('conversation');
-      }
-      if (fb) {
-        setEvaluation(fb);
-        setPhase('result');
-      }
-    }).catch(() => undefined);
-  }, [initialSessionId, actions]);
+  const adoptSession = useCallback((sessionId: string | undefined) => {
+    if (!sessionId || sessionIdRef.current === sessionId) return;
+    sessionIdRef.current = sessionId;
+    onSessionCreated?.(sessionId);
+  }, [onSessionCreated]);
 
   const userTurns = history.filter((m) => m.role === 'user').length;
 
@@ -75,21 +74,10 @@ export function useCollaborativeSession(config: CollaborativePracticeConfig, ini
 
     setPhase('conversation');
 
-    if (!sessionCreatedRef.current) {
-      sessionCreatedRef.current = true;
-      createSessionAction({
-        mode: config.mode,
-        topic: scenario.topic,
-        title: `${config.sessionTitlePrefix}: ${scenario.topic}`,
-      }).then((result) => {
-        if (result.data) sessionIdRef.current = result.data.id;
-      }).catch(() => undefined);
-    }
-
     const openingLine = `Let's talk about "${scenario.topic}". ${scenario.situation} ${scenario.prompt_question}`;
     setHistory([{ role: 'examiner', text: openingLine }]);
     await playExaminerTts(openingLine);
-  }, [scenario, playExaminerTts, config.mode, config.sessionTitlePrefix]);
+  }, [scenario, playExaminerTts]);
 
   const processAudioBlob = useCallback(
     async (blob: Blob) => {
@@ -102,13 +90,10 @@ export function useCollaborativeSession(config: CollaborativePracticeConfig, ini
         const base64 = await blobToBase64(blob);
         const mimeType = 'audio/webm;codecs=opus';
 
-        const { transcribed, examinerResponse } = await actions.chatAudio(
-          base64,
-          mimeType,
-          history,
-          scenario,
-          sessionIdRef.current ?? undefined
-        );
+        const turn = await actions.chatAudio(base64, mimeType, history, scenario, sessionIdRef.current ?? undefined);
+        if (!turn.ok) throw new Error(turn.code);
+        const { transcribed, examinerResponse } = turn.data;
+        adoptSession(turn.data.sessionId);
 
         const userMsg: Part3ChatMessage = { role: 'user', text: transcribed };
         const examinerMsg: Part3ChatMessage = { role: 'examiner', text: examinerResponse };
@@ -131,7 +116,7 @@ export function useCollaborativeSession(config: CollaborativePracticeConfig, ini
         setIsProcessing(false);
       }
     },
-    [scenario, history, playExaminerTts, actions]
+    [scenario, history, playExaminerTts, actions, adoptSession]
   );
 
   const handleRecorderError = useCallback(() => {
@@ -154,7 +139,10 @@ export function useCollaborativeSession(config: CollaborativePracticeConfig, ini
 
     try {
       const userMsg: Part3ChatMessage = { role: 'user', text };
-      const { examinerResponse } = await actions.chatText(text, history, scenario, sessionIdRef.current ?? undefined);
+      const turn = await actions.chatText(text, history, scenario, sessionIdRef.current ?? undefined);
+      if (!turn.ok) throw new Error(turn.code);
+      const { examinerResponse } = turn.data;
+      adoptSession(turn.data.sessionId);
       const examinerMsg: Part3ChatMessage = { role: 'examiner', text: examinerResponse };
 
       setHistory((prev) => [...prev, userMsg, examinerMsg]);
@@ -164,7 +152,7 @@ export function useCollaborativeSession(config: CollaborativePracticeConfig, ini
     } finally {
       setIsProcessing(false);
     }
-  }, [scenario, textInput, history, playExaminerTts, actions]);
+  }, [scenario, textInput, history, playExaminerTts, actions, adoptSession]);
 
   const handleEvaluate = useCallback(async () => {
     if (!scenario) return;
@@ -173,8 +161,11 @@ export function useCollaborativeSession(config: CollaborativePracticeConfig, ini
 
     try {
       const result = await actions.evaluate(history, scenario, sessionIdRef.current ?? undefined);
-      setEvaluation(result);
+      if (!result.ok) throw new Error(result.code);
+      adoptSession(result.data.sessionId);
+      setEvaluation(result.data.feedback);
       setPhase('result');
+      onSessionFinished?.();
     } catch {
       setPhase('result');
       setEvaluation({
@@ -184,7 +175,7 @@ export function useCollaborativeSession(config: CollaborativePracticeConfig, ini
         suggestions: ['Could not generate feedback. Please try again.'],
       });
     }
-  }, [scenario, history, actions]);
+  }, [scenario, history, actions, adoptSession, onSessionFinished]);
 
   const handleTryAgain = useCallback(() => {
     setPhase('intro');
@@ -194,7 +185,6 @@ export function useCollaborativeSession(config: CollaborativePracticeConfig, ini
     setEvaluation(null);
     setIsProcessing(false);
     setAudioError(null);
-    sessionCreatedRef.current = false;
     sessionIdRef.current = null;
   }, []);
 

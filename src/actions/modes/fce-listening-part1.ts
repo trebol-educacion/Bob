@@ -1,10 +1,12 @@
 'use server';
 
 import { createSupabaseServer } from '@/lib/supabase/server';
-import { createSessionAction } from '@/actions/sessions';
-import { persistMessage, persistMessages } from '@/lib/persist-activity';
+import { pickContent } from '@/lib/item-bank/content-source';
+import { readSessionMessages } from '@/lib/persist-activity';
+import { ensureSession, finishSession, recordTurn } from '@/lib/session/lifecycle';
 
 const ITEMS_PER_SESSION = 8;
+const FCE_LISTENING_P1_MODE = 'cambridge_fce_listening_part1';
 
 /** A single FCE Listening Part 1 item exposed to the client (no correct_key). */
 export interface FCEShortExtractsItem {
@@ -17,6 +19,7 @@ export interface FCEShortExtractsItem {
 
 /** Result for a single answered turn. */
 export interface FCEListeningTurnResult {
+  sessionId: string;
   correct: boolean;
   correct_index: number;
 }
@@ -36,177 +39,156 @@ interface RawClosedItem {
   correct_key: string;
 }
 
-function shuffleInPlace<T>(arr: T[]): T[] {
-  for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [arr[i], arr[j]] = [arr[j], arr[i]];
-  }
-  return arr;
-}
-
 function keyToIndex(key: string): number {
   return key.charCodeAt(0) - 'A'.charCodeAt(0);
 }
 
-/**
- * Starts a new FCE Listening Part 1 session.
- * Picks 8 random items from the bank, creates a bob_sessions row,
- * and persists an initial plan message.
- */
+function toPlanItem(item: RawClosedItem) {
+  return {
+    id: item.id,
+    variant_id: item.variant_id,
+    stimulus_audio_url: item.stimulus_audio_url ?? '',
+    question: item.question,
+    options: item.options.map((o) => o.label),
+    correct_index: keyToIndex(item.correct_key),
+  };
+}
+
+/** Picks 8 random items from the bank without touching the session tables. */
 export async function startFCEListeningPart1Action(): Promise<
-  { session_id: string; items: FCEShortExtractsItem[] } | { error: string }
+  { items: FCEShortExtractsItem[] } | { error: string }
 > {
   const supabase = await createSupabaseServer();
 
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: 'Not authenticated' };
 
-  const { data: rows, error: fetchError } = await supabase
-    .from('closed_items')
-    .select('id, variant_id, stimulus_audio_url, question, options, correct_key')
-    .eq('framework', 'cambridge')
-    .eq('exam_part', 'fce_listening_part1')
-    .eq('cefr_level', 'b2')
-    .eq('skill', 'listening')
-    .eq('status', 'enabled');
-
-  if (fetchError || !rows || rows.length === 0) {
-    return { error: 'Could not load listening items' };
-  }
-
-  const pool = shuffleInPlace([...(rows as RawClosedItem[])]).slice(0, ITEMS_PER_SESSION);
-
-  const sessionResult = await createSessionAction({
-    mode: 'cambridge_fce_listening_part1',
-    title: 'Listening Part 1, Short Extracts',
+  const picked = await pickContent({
+    framework: 'fce',
+    cefr: 'b2',
+    examPart: 'fce_listening_part1',
+    purpose: 'practice',
+    skill: 'listening',
+    userId: user.id,
+    count: ITEMS_PER_SESSION,
   });
+  if (!picked.ok) return { error: 'Could not load listening items' };
 
-  if (!sessionResult.data) {
-    return { error: sessionResult.error ?? 'Could not create session' };
-  }
-
-  const sessionId = sessionResult.data.id;
-  const userId = sessionResult.data.user_id;
-
-  const planJson = {
-    kind: 'fce_listening_part1_plan',
-    items: pool.map((item) => ({
-      id: item.id,
-      variant_id: item.variant_id,
-      stimulus_audio_url: item.stimulus_audio_url ?? '',
-      question: item.question,
-      options: (item.options as Array<{ key: string; label: string }>).map((o) => o.label),
-      correct_index: keyToIndex(item.correct_key),
-    })),
-  };
-
-  persistMessage({
-    sessionId,
-    userId,
-    role: 'bob',
-    msgType: 'text',
-    contentText: null,
-    contentJson: planJson,
-  }).catch(() => undefined);
+  const pool = picked.data.items;
 
   const clientItems: FCEShortExtractsItem[] = pool.map((item) => ({
     id: item.id,
     variant_id: item.variant_id,
     stimulus_audio_url: item.stimulus_audio_url ?? '',
     question: item.question,
-    options: (item.options as Array<{ key: string; label: string }>).map((o) => o.label),
+    options: item.options.map((o) => o.label),
   }));
 
-  return { session_id: sessionId, items: clientItems };
+  return { items: clientItems };
+}
+
+async function loadPlanItems(itemIds: string[]): Promise<RawClosedItem[] | null> {
+  const supabase = await createSupabaseServer();
+  const { data, error } = await supabase
+    .from('closed_items')
+    .select('id, variant_id, stimulus_audio_url, question, options, correct_key')
+    .in('id', itemIds);
+  if (error || !data) return null;
+  const byId = new Map((data as RawClosedItem[]).map((row) => [row.id, row]));
+  const ordered = itemIds.map((id) => byId.get(id));
+  return ordered.every(Boolean) ? (ordered as RawClosedItem[]) : null;
 }
 
 /**
- * Validates a single answer server-side and persists both the user answer
- * and Bob's per-turn evaluation message.
- * The correct_index is derived server-side, never sent to the client upfront.
+ * Validates a single answer server-side. The first answer creates the session and
+ * persists the plan, so closing the activity before answering leaves no trace.
  */
-export async function submitFCEListeningAnswerAction(
-  session_id: string,
-  item_id: string,
-  selected_index: number
-): Promise<FCEListeningTurnResult | { error: string }> {
+export async function submitFCEListeningAnswerAction(input: {
+  sessionId?: string;
+  itemIds: string[];
+  itemId: string;
+  selectedIndex: number;
+}): Promise<FCEListeningTurnResult | { error: string }> {
   const supabase = await createSupabaseServer();
-
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: 'Not authenticated' };
 
   const { data: item, error: itemError } = await supabase
     .from('closed_items')
     .select('correct_key')
-    .eq('id', item_id)
+    .eq('id', input.itemId)
     .single();
 
   if (itemError || !item) return { error: 'Item not found' };
 
   const correct_index = keyToIndex((item as { correct_key: string }).correct_key);
-  const correct = selected_index === correct_index;
+  const correct = input.selectedIndex === correct_index;
 
-  persistMessages([
-    {
-      sessionId: session_id,
-      userId: user.id,
-      role: 'user',
-      msgType: 'text',
-      contentText: null,
-      contentJson: {
-        kind: 'fce_listening_answer',
-        item_id,
-        selected_index,
-      },
-    },
-    {
-      sessionId: session_id,
-      userId: user.id,
-      role: 'bob',
-      msgType: 'evaluation',
-      contentText: null,
-      contentJson: {
-        kind: 'fce_listening_turn_result',
-        item_id,
-        selected_index,
-        correct_index,
-        correct,
-        is_final: false,
-      },
-    },
-  ]).catch(() => undefined);
+  const session = await ensureSession({ mode: FCE_LISTENING_P1_MODE, sessionId: input.sessionId });
+  if (!session.ok) return { error: session.code };
 
-  return { correct, correct_index };
+  const planMessages = [];
+  if (session.data.created) {
+    const planItems = await loadPlanItems(input.itemIds);
+    if (!planItems) return { error: 'Could not load listening items' };
+    planMessages.push({
+      role: 'bob' as const,
+      msgType: 'text' as const,
+      contentText: null,
+      contentJson: { kind: 'fce_listening_part1_plan', items: planItems.map(toPlanItem) },
+    });
+  }
+
+  const turn = await recordTurn({
+    sessionId: session.data.sessionId,
+    userId: session.data.userId,
+    messages: [
+      ...planMessages,
+      {
+        role: 'user',
+        msgType: 'text',
+        contentText: null,
+        contentJson: { kind: 'fce_listening_answer', item_id: input.itemId, selected_index: input.selectedIndex },
+      },
+      {
+        role: 'bob',
+        msgType: 'evaluation',
+        contentText: null,
+        contentJson: {
+          kind: 'fce_listening_turn_result',
+          item_id: input.itemId,
+          selected_index: input.selectedIndex,
+          correct_index,
+          correct,
+          is_final: false,
+        },
+      },
+    ],
+  });
+  if (!turn.ok) return { error: turn.code };
+
+  return { sessionId: session.data.sessionId, correct, correct_index };
 }
 
-/**
- * Computes the final score and persists the session-closing evaluation message.
- * Called once after all 8 turns are completed.
- */
+/** Counts the persisted correct turns, writes the final evaluation and the activity result. */
 export async function finalizeFCEListeningSessionAction(
-  session_id: string,
-  correct_count: number
+  session_id: string
 ): Promise<FCEListeningFinalResult | { error: string }> {
   const supabase = await createSupabaseServer();
 
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: 'Not authenticated' };
 
-  const score_max = ITEMS_PER_SESSION;
+  const messages = await readSessionMessages(session_id, user.id);
+  const score = messages.filter((m) => {
+    const cj = m.content_json as Record<string, unknown> | null;
+    return m.msg_type === 'evaluation' && cj?.kind === 'fce_listening_turn_result' && cj.correct === true;
+  }).length;
 
-  persistMessage({
+  const finished = await finishSession({
     sessionId: session_id,
     userId: user.id,
-    role: 'bob',
-    msgType: 'evaluation',
-    contentText: null,
-    contentJson: {
-      kind: 'fce_listening_final',
-      score: correct_count,
-      score_max,
-      is_final: true,
-    },
-  }).catch(() => undefined);
+    evaluation: { kind: 'fce_listening_final', score, score_max: ITEMS_PER_SESSION },
+  });
+  if (!finished.ok) return { error: finished.code };
 
-  return { score: correct_count, score_max };
+  return { score, score_max: ITEMS_PER_SESSION };
 }

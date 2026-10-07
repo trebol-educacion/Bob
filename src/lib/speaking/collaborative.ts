@@ -2,10 +2,10 @@ import { z } from 'zod';
 import { MODELS } from '@/lib/models';
 import { FormativeFeedbackSchema, type FormativeFeedback } from '@/lib/types/practice';
 import { getPrompt } from '@/lib/prompts/db-prompts';
-import { createSupabaseServer } from '@/lib/supabase/server';
-import { persistMessage, readSessionMessagesForCurrentOrUser } from '@/lib/persist-activity';
-import type { PersistMessageInput } from '@/lib/persist-activity';
+import { finishSession, openSession, recordTurn, type TurnMessage } from '@/lib/session/lifecycle';
+import { fail, ok, type ActionResult } from '@/lib/result';
 import { getOrCreateCachedContent } from '@/lib/cache';
+import { parseJsonResult } from '@/lib/llm/parse-json-result';
 import { callGemini, safeParseFallback } from '@/lib/gemini-client';
 import { toExaminerFeedback } from './examiner-score';
 import type { Part3ChatMessage, Part3Scenario } from './types';
@@ -17,6 +17,7 @@ export interface CollaborativeTemplateContext {
 }
 
 export interface CollaborativeConfig {
+  mode: string;
   promptPrefix: string;
   scenarioCacheKey: string;
   scenarioFallback: Part3Scenario;
@@ -48,30 +49,34 @@ const FormativeFeedbackFallback: FormativeFeedback = {
   suggestions: ['Try again, we could not process your response.'],
 };
 
-async function resolveUserId(): Promise<string | null> {
-  const supabase = await createSupabaseServer();
-  const { data: { user } } = await supabase.auth.getUser();
-  return user?.id ?? null;
+function historyMessages(history: Part3ChatMessage[]): TurnMessage[] {
+  return history.map((entry) => ({
+    role: entry.role === 'user' ? 'user' : 'bob',
+    msgType: 'text',
+    contentText: entry.text,
+  }));
 }
 
-async function safePersist(config: CollaborativeConfig, input: PersistMessageInput): Promise<void> {
-  const result = await persistMessage(input);
-  if ('error' in result) {
-    console.error(`[${config.logTag} persist] persistMessage failed:`, result.error);
-  }
-}
-
-async function persistForCurrentUser(
+async function recordCollaborativeTurn(
   config: CollaborativeConfig,
+  scenario: Part3Scenario,
+  history: Part3ChatMessage[],
   sessionId: string | undefined,
-  messages: Array<Omit<PersistMessageInput, 'sessionId' | 'userId'>>,
-): Promise<void> {
-  if (!sessionId) return;
-  const userId = await resolveUserId();
-  if (!userId) return;
-  for (const message of messages) {
-    await safePersist(config, { ...message, sessionId, userId });
-  }
+  turn: Part3ChatMessage[],
+): Promise<ActionResult<{ sessionId: string }>> {
+  const session = await openSession({
+    mode: config.mode,
+    sessionId,
+    topic: scenario.topic,
+    opening: [
+      { role: 'bob', msgType: 'phrase', contentJson: scenario as unknown as Record<string, unknown> },
+      ...historyMessages(history),
+    ],
+  });
+  if (!session.ok) return session;
+  const recorded = await recordTurn({ ...session.data, messages: historyMessages(turn) });
+  if (!recorded.ok) return recorded;
+  return ok({ sessionId: session.data.sessionId });
 }
 
 export function formatHistory(history: Part3ChatMessage[]): string {
@@ -101,11 +106,9 @@ function partnerTurnPrompt(config: CollaborativeConfig, history: Part3ChatMessag
   });
 }
 
-export async function generateCollaborativeScenario(
-  config: CollaborativeConfig,
-  sessionId?: string,
-): Promise<Part3Scenario> {
+export async function generateCollaborativeScenario(config: CollaborativeConfig): Promise<Part3Scenario> {
   const generationKey = `${config.promptPrefix}_generation`;
+  const scenarioSchema = config.scenarioSchema ?? Part3ScenarioSchema;
   const cached = await getOrCreateCachedContent<Part3Scenario>(
     { kind: 'plan', promptKey: config.scenarioCacheKey, inputs: {} },
     async () => {
@@ -119,30 +122,15 @@ export async function generateCollaborativeScenario(
         })
       );
 
-      if (!result.ok || !result.data.text) {
-        console.error(JSON.stringify({ event: 'generatePart3ScenarioAction', error: result.ok ? 'empty response' : result.error }));
-        return config.scenarioFallback;
-      }
-
-      let parsed: unknown;
-      try {
-        parsed = JSON.parse(result.data.text);
-      } catch {
-        return config.scenarioFallback;
-      }
-      return safeParseFallback(config.scenarioSchema ?? Part3ScenarioSchema, parsed, config.scenarioFallback);
+      return parseJsonResult<Part3Scenario>(result, scenarioSchema, 'generatePart3ScenarioAction');
     },
-    { storeAs: 'json' }
+    { storeAs: 'json', validate: (scenario) => scenarioSchema.safeParse(scenario).success }
   );
 
   if ('error' in cached) {
     console.error(JSON.stringify({ event: 'generatePart3ScenarioAction_cache', error: cached.error }));
     return config.scenarioFallback;
   }
-
-  await persistForCurrentUser(config, sessionId, [
-    { role: 'bob', msgType: 'phrase', contentJson: cached as unknown as Record<string, unknown> },
-  ]);
 
   return cached;
 }
@@ -154,7 +142,7 @@ export async function chatCollaborativeAudio(
   history: Part3ChatMessage[],
   scenario: Part3Scenario,
   sessionId?: string,
-): Promise<{ transcribed: string; examinerResponse: string }> {
+): Promise<ActionResult<{ transcribed: string; examinerResponse: string; sessionId: string }>> {
   const systemInstruction = await partnerTurnPrompt(config, history, scenario);
   const audioVariables = config.templateVariables?.({
     scenario,
@@ -183,14 +171,14 @@ export async function chatCollaborativeAudio(
 
   if (!result.ok || !result.data.text) {
     console.error(JSON.stringify({ event: 'chatPart3Action', error: result.ok ? 'empty response' : result.error }));
-    return { transcribed: '', examinerResponse: FALLBACK_EXAMINER_LINE };
+    return fail('chat_failed', true);
   }
 
   let parsed: unknown;
   try {
     parsed = JSON.parse(result.data.text);
   } catch {
-    return { transcribed: '', examinerResponse: FALLBACK_EXAMINER_LINE };
+    return fail('chat_failed', true);
   }
 
   const validated = safeParseFallback(
@@ -199,15 +187,17 @@ export async function chatCollaborativeAudio(
     { transcribed: '', examiner_response: FALLBACK_EXAMINER_LINE }
   );
 
-  await persistForCurrentUser(config, sessionId, [
-    { role: 'user', msgType: 'text', contentText: validated.transcribed },
-    { role: 'bob', msgType: 'text', contentText: validated.examiner_response },
+  const recorded = await recordCollaborativeTurn(config, scenario, history, sessionId, [
+    { role: 'user', text: validated.transcribed },
+    { role: 'examiner', text: validated.examiner_response },
   ]);
+  if (!recorded.ok) return recorded;
 
-  return {
+  return ok({
     transcribed: validated.transcribed,
     examinerResponse: validated.examiner_response,
-  };
+    sessionId: recorded.data.sessionId,
+  });
 }
 
 export async function chatCollaborativeText(
@@ -216,7 +206,7 @@ export async function chatCollaborativeText(
   history: Part3ChatMessage[],
   scenario: Part3Scenario,
   sessionId?: string,
-): Promise<{ examinerResponse: string }> {
+): Promise<ActionResult<{ examinerResponse: string; sessionId: string }>> {
   const systemInstruction = await partnerTurnPrompt(config, history, scenario);
 
   const prompt = `${systemInstruction}
@@ -236,12 +226,13 @@ Respond with ONLY your next examiner line (no labels, no quotes, under 30 words)
   const extracted = result.ok ? extractExaminerLine(result.data.text ?? '') : '';
   const examinerResponse = extracted || FALLBACK_EXAMINER_LINE;
 
-  await persistForCurrentUser(config, sessionId, [
-    { role: 'user', msgType: 'text', contentText: text },
-    { role: 'bob', msgType: 'text', contentText: examinerResponse },
+  const recorded = await recordCollaborativeTurn(config, scenario, history, sessionId, [
+    { role: 'user', text },
+    { role: 'examiner', text: examinerResponse },
   ]);
+  if (!recorded.ok) return recorded;
 
-  return { examinerResponse };
+  return ok({ examinerResponse, sessionId: recorded.data.sessionId });
 }
 
 function inlineEvaluationPrompt(
@@ -284,7 +275,7 @@ export async function evaluateCollaborative(
   history: Part3ChatMessage[],
   scenario: Part3Scenario,
   sessionId?: string,
-): Promise<FormativeFeedback> {
+): Promise<ActionResult<{ feedback: FormativeFeedback; sessionId?: string }>> {
   const prompt = await buildEvaluationPrompt(config, history, scenario);
 
   const result = await callGemini(
@@ -298,50 +289,36 @@ export async function evaluateCollaborative(
 
   if (!result.ok || !result.data.text) {
     console.error(JSON.stringify({ event: 'evaluatePart3Action', error: result.ok ? 'empty response' : result.error }));
-    return FormativeFeedbackFallback;
+    return ok({ feedback: FormativeFeedbackFallback, sessionId });
   }
 
   let parsed: unknown;
   try {
     parsed = JSON.parse(result.data.text);
   } catch {
-    return FormativeFeedbackFallback;
+    return ok({ feedback: FormativeFeedbackFallback, sessionId });
   }
 
   const scored = config.scoredEvaluation ? toExaminerFeedback(parsed) : null;
-  if (config.scoredEvaluation && !scored) return FormativeFeedbackFallback;
+  if (config.scoredEvaluation && !scored) return ok({ feedback: FormativeFeedbackFallback, sessionId });
   const feedback = scored ?? safeParseFallback(FormativeFeedbackSchema, parsed, FormativeFeedbackFallback);
 
-  await persistForCurrentUser(config, sessionId, [
-    {
-      role: 'bob',
-      msgType: 'evaluation',
-      contentJson: { ...(feedback as unknown as Record<string, unknown>), is_final: true },
-    },
-  ]);
+  const session = await openSession({
+    mode: config.mode,
+    sessionId,
+    topic: scenario.topic,
+    opening: [
+      { role: 'bob', msgType: 'phrase', contentJson: scenario as unknown as Record<string, unknown> },
+      ...historyMessages(history),
+    ],
+  });
+  if (!session.ok) return session;
 
-  return feedback;
-}
+  const finished = await finishSession({
+    ...session.data,
+    evaluation: feedback as unknown as Record<string, unknown>,
+  });
+  if (!finished.ok) return finished;
 
-export async function readCollaborativeMessages(
-  sessionId: string,
-): Promise<{ history: Part3ChatMessage[]; feedback: FormativeFeedback | null }> {
-  const rows = await readSessionMessagesForCurrentOrUser(sessionId);
-
-  const history: Part3ChatMessage[] = [];
-  let feedback: FormativeFeedback | null = null;
-
-  for (const row of rows) {
-    if (row.msg_type === 'evaluation' && row.role === 'bob' && row.content_json) {
-      const parsed = FormativeFeedbackSchema.safeParse(row.content_json);
-      if (parsed.success) feedback = parsed.data;
-    } else if (row.msg_type === 'text') {
-      history.push({
-        role: row.role === 'user' ? 'user' : 'examiner',
-        text: row.content_text ?? '',
-      });
-    }
-  }
-
-  return { history, feedback };
+  return ok({ feedback, sessionId: session.data.sessionId });
 }

@@ -14,6 +14,10 @@ import {
 } from '@/actions/modes/pet-listening-part2';
 import type { StoredMessage } from '@/actions/messages';
 import { resolveActivityBoot } from '@/lib/activity/boot';
+import { AudioClipPlayer } from '@/components/activity/AudioClipPlayer';
+import { stopActiveClip } from '@/lib/audio-clip';
+import { loadErrorMessage } from '@/lib/item-bank/load-error-message';
+import { ActivityHeader } from '@/components/activity/ActivityHeader';
 
 const ITEMS_PER_SESSION = 6;
 const MAX_PLAYS = 2;
@@ -42,7 +46,7 @@ interface RestoredState {
   finalScore: number | null;
 }
 
-function tryRestore(messages: StoredMessage[]): RestoredState | null {
+export function tryRestore(messages: StoredMessage[]): RestoredState | null {
   let items: PETListeningItem[] | null = null;
   const turns: TurnRecord[] = [];
   let finalScore: number | null = null;
@@ -96,16 +100,6 @@ function tryRestore(messages: StoredMessage[]): RestoredState | null {
   return { items, turns, finalScore };
 }
 
-let _activeAudio: HTMLAudioElement | null = null;
-
-function stopActiveAudio(): void {
-  if (_activeAudio) {
-    _activeAudio.pause();
-    _activeAudio.src = '';
-    _activeAudio = null;
-  }
-}
-
 function ProgressDots({
   total,
   currentIdx,
@@ -144,42 +138,9 @@ function ProgressDots({
   );
 }
 
-function AudioButton({
-  audioUrl: _audioUrl,
-  playsUsed,
-  onPlay,
-}: {
-  audioUrl: string;
-  playsUsed: number;
-  onPlay: () => void;
-}) {
-  const canPlay = playsUsed < MAX_PLAYS;
-
-  return (
-    <div className="flex flex-col items-center gap-1.5">
-      <button
-        type="button"
-        onClick={onPlay}
-        disabled={!canPlay}
-        className={[
-          'flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm transition cursor-pointer',
-          canPlay
-            ? 'bg-bob-brand text-white hover:opacity-90'
-            : 'bg-gray-100 text-gray-400 cursor-not-allowed',
-        ].join(' ')}
-      >
-        <Volume2 size={16} />
-        {playsUsed === 0 ? 'Play audio' : playsUsed >= MAX_PLAYS ? 'Audio played' : 'Play again'}
-      </button>
-      <p className="text-xs text-gray-400">
-        {playsUsed === 0
-          ? `You can listen up to ${MAX_PLAYS} times`
-          : playsUsed >= MAX_PLAYS
-          ? 'Maximum plays reached'
-          : `${MAX_PLAYS - playsUsed} play${MAX_PLAYS - playsUsed !== 1 ? 's' : ''} remaining`}
-      </p>
-    </div>
-  );
+function listeningAudioUrl(path: string): string {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? '';
+  return path.startsWith('http') ? path : `${supabaseUrl}/storage/v1/object/public/bob-listening${path}`;
 }
 
 /** PET B1 Listening Part 2, short monologue + 4-option multiple choice. */
@@ -196,14 +157,11 @@ export function PETMultipleChoicePractice({
   const [items, setItems] = useState<PETListeningItem[]>([]);
   const [currentIdx, setCurrentIdx] = useState(0);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
-  const [playsUsed, setPlaysUsed] = useState(0);
   const [turns, setTurns] = useState<TurnRecord[]>([]);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isNewSession, setIsNewSession] = useState(false);
   const [finalScore, setFinalScore] = useState<number | null>(null);
   const initStartedRef = useRef(false);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-
   useEffect(() => {
     if (initStartedRef.current) return;
     initStartedRef.current = true;
@@ -234,50 +192,43 @@ export function PETMultipleChoicePractice({
       setIsNewSession(true);
       const result = await startPETListeningPart2Action();
 
-      if ('error' in result) {
-        setErrorMsg(result.error);
+      if (!result.ok) {
+        setErrorMsg(loadErrorMessage(result.code));
         setPhase('error');
         return;
       }
 
-      onSessionCreated?.(result.session_id);
-      setSessionId(result.session_id);
-      setItems(result.items);
+      setItems(result.data.items);
       setPhase('ready');
     }
 
     void init();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handlePlay = useCallback(() => {
-    const item = items[currentIdx];
-    if (!item || playsUsed >= MAX_PLAYS) return;
-
-    stopActiveAudio();
-
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? '';
-    const fullUrl = `${supabaseUrl}/storage/v1/object/public/bob-listening${item.stimulus_audio_url}`;
-    const audio = new Audio(fullUrl);
-    audioRef.current = audio;
-    _activeAudio = audio;
-    audio.play().catch(() => {});
-    setPlaysUsed((prev) => prev + 1);
-  }, [items, currentIdx, playsUsed]);
-
   const handleNext = useCallback(async () => {
-    if (!selectedKey || !sessionId) return;
+    if (!selectedKey) return;
     const item = items[currentIdx];
     if (!item) return;
 
     setPhase('submitting');
-    stopActiveAudio();
+    stopActiveClip();
 
-    const result = await submitPETListeningAnswerAction(sessionId, item.id, selectedKey);
+    const result = await submitPETListeningAnswerAction({
+      sessionId,
+      itemIds: items.map((candidate) => candidate.id),
+      itemId: item.id,
+      selectedKey,
+    });
 
     if ('error' in result) {
       setErrorMsg('Could not submit answer. Please try again.');
       setPhase('ready');
       return;
+    }
+
+    if (!sessionId) {
+      onSessionCreated?.(result.sessionId);
+      setSessionId(result.sessionId);
     }
 
     const newTurn: TurnRecord = {
@@ -293,8 +244,7 @@ export function PETMultipleChoicePractice({
     const isLastItem = currentIdx === items.length - 1;
 
     if (isLastItem) {
-      const correctCount = updatedTurns.filter((t) => t.correct).length;
-      const finalResult = await finalizePETListeningSessionAction(sessionId, correctCount);
+      const finalResult = await finalizePETListeningSessionAction({ sessionId: result.sessionId });
 
       if ('error' in finalResult) {
         setErrorMsg('Could not save final result. Please try again.');
@@ -308,11 +258,9 @@ export function PETMultipleChoicePractice({
     } else {
       setCurrentIdx((prev) => prev + 1);
       setSelectedKey(null);
-      setPlaysUsed(0);
-      audioRef.current = null;
       setPhase('ready');
     }
-  }, [selectedKey, sessionId, items, currentIdx, turns, onSessionFinished]);
+  }, [selectedKey, sessionId, items, currentIdx, turns, onSessionFinished, onSessionCreated]);
 
   const handleRetry = useCallback(() => {
     initStartedRef.current = false;
@@ -321,25 +269,21 @@ export function PETMultipleChoicePractice({
     setItems([]);
     setCurrentIdx(0);
     setSelectedKey(null);
-    setPlaysUsed(0);
     setTurns([]);
     setErrorMsg(null);
     setFinalScore(null);
-    audioRef.current = null;
 
     startPETListeningPart2Action().then((result) => {
-      if ('error' in result) {
-        setErrorMsg(result.error);
+      if (!result.ok) {
+        setErrorMsg(loadErrorMessage(result.code));
         setPhase('error');
         return;
       }
-      onSessionCreated?.(result.session_id);
-      setSessionId(result.session_id);
-      setItems(result.items);
+      setItems(result.data.items);
       setIsNewSession(true);
       setPhase('ready');
     });
-  }, [onSessionCreated]);
+  }, []);
 
   const currentItem = items[currentIdx];
 
@@ -481,7 +425,6 @@ export function PETMultipleChoicePractice({
             <CelebrationCard
               score={score}
               scoreMax={ITEMS_PER_SESSION}
-              feedback="Great work! Keep practising to improve your listening skills."
               onAction={onOpenDashboard}
               actionLabel="Go to dashboard"
               animate={isNewSession}
@@ -517,10 +460,10 @@ export function PETMultipleChoicePractice({
               <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 flex flex-col gap-4">
                 {currentItem && (
                   <>
-                    <AudioButton
-                      audioUrl={currentItem.stimulus_audio_url}
-                      playsUsed={playsUsed}
-                      onPlay={handlePlay}
+                    <AudioClipPlayer
+                      key={currentItem.id}
+                      src={listeningAudioUrl(currentItem.stimulus_audio_url)}
+                      maxPlays={MAX_PLAYS}
                     />
 
                     <p className="text-base font-bold text-gray-800 text-center">
@@ -587,39 +530,14 @@ function Header({
   phase: Phase;
 }) {
   return (
-    <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-100 bg-white shrink-0">
-      <button
-        type="button"
-        onClick={onBack}
-        className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-600 cursor-pointer"
-        aria-label="Go back"
-      >
-        ←
-      </button>
-      <div
-        className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0"
-        style={{ background: 'color-mix(in oklab, var(--color-bob-brand) 12%, white)' }}
-      >
-        <Volume2 size={18} className="text-bob-brand" />
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-bold text-gray-800 truncate">Listening Part 2</p>
-        <p className="text-xs text-gray-400">Multiple Choice</p>
-      </div>
-      <div className="shrink-0 flex items-center gap-2">
-        <ProgressDots
-          total={total}
-          currentIdx={currentIdx}
-          turns={turns}
-          phase={phase}
-        />
-        <span
-          className="shrink-0 px-2 py-0.5 rounded-full text-bob-brand text-[10px] font-bold uppercase tracking-widest"
-          style={{ background: 'color-mix(in oklab, var(--color-bob-brand) 12%, white)' }}
-        >
-          B1 · PET
-        </span>
-      </div>
-    </div>
+    <ActivityHeader
+      title="Short Talks"
+      subtitle="Listening · Part 2"
+      badge="Part 2"
+      icon={<Volume2 size={18} className="text-bob-brand" />}
+      iconStyle={{ background: 'color-mix(in oklab, var(--color-bob-brand) 12%, white)' }}
+      trailing={<ProgressDots total={total} currentIdx={currentIdx} turns={turns} phase={phase} />}
+      onBack={onBack}
+    />
   );
 }

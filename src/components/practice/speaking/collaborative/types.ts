@@ -1,8 +1,7 @@
+import type { StoredMessage } from '@/actions/messages';
 import type { CollaborativeActions, Part3Scenario } from '@/lib/speaking/types';
 
 export interface CollaborativePracticeConfig {
-  mode: string;
-  sessionTitlePrefix: string;
   presets: Part3Scenario[];
   maxTurns: number;
   finishEarlyAfterTurns: number;
@@ -10,10 +9,16 @@ export interface CollaborativePracticeConfig {
   actions: CollaborativeActions;
 }
 
-export interface CollaborativePracticeProps {
+export interface CollaborativeSessionParams {
+  sessionId?: string;
+  initialMessages?: StoredMessage[];
+  onSessionCreated?: (sessionId: string) => void;
+  onSessionFinished?: () => void;
+}
+
+export interface CollaborativePracticeProps extends CollaborativeSessionParams {
   config: CollaborativePracticeConfig;
   onBack: () => void;
-  sessionId?: string;
 }
 
 export type CollaborativePhase = 'intro' | 'conversation' | 'evaluating' | 'result';

@@ -3,6 +3,7 @@ import { Mic, Volume2 } from 'lucide-react';
 import type { ImageScene } from '@/actions/gemini';
 import type { StoredMessage } from '@/actions/messages';
 import { getScoreColor } from '@/lib/score';
+import { isPracticeSummary } from '@/lib/session/practice-summary';
 import type { ChatMsg } from './types';
 
 export function renderEvaluationContent(
@@ -37,7 +38,7 @@ export function renderEvaluationContent(
 
 export function restoreMessages(stored: StoredMessage[]): ChatMsg[] {
   return stored
-    .filter((m) => m.msg_type !== 'phrase_plan' && m.msg_type !== 'yl_tts')
+    .filter((m) => m.msg_type !== 'phrase_plan' && m.msg_type !== 'yl_tts' && !(m.msg_type === 'evaluation' && isPracticeSummary(m.content_json)))
     .map((m) => {
     let content: React.ReactNode;
 

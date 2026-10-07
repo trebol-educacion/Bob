@@ -2,6 +2,7 @@ import React from 'react';
 import { useTranslations } from 'next-intl';
 import { GapText, SentenceBank, type GapReview } from '@/components/practice/gap-text';
 import { FCE_GROUPED_ANSWER_KIND, type FCEGroupedItemResult } from '@/lib/reading/fce-grouped-types';
+import { useActivityRules } from '@/hooks/useActivityRules';
 import type { GroupedBodyProps } from './types';
 
 function buildReview(
@@ -23,6 +24,7 @@ function buildReview(
 export function GapTextBody({ exercise, answers, onAnswer, results }: GroupedBodyProps) {
   const t = useTranslations('cambridge');
   const isSentence = FCE_GROUPED_ANSWER_KIND[exercise.part] === 'sentence';
+  const rules = useActivityRules(exercise.part);
   const sentences = exercise.sentences.map((s) => ({ id: s.key, text: s.label }));
   const baseWords = Object.fromEntries(
     exercise.items.filter((item) => item.baseWord).map((item) => [item.number, item.baseWord as string])
@@ -45,6 +47,7 @@ export function GapTextBody({ exercise, answers, onAnswer, results }: GroupedBod
             baseWords={baseWords}
             sentences={sentences}
             gapLabel={(number) => t('fce.grouped.gapLabel', { number })}
+            allowRepeatOptions={rules.allowRepeatOptions ?? true}
           />
         </div>
       </div>

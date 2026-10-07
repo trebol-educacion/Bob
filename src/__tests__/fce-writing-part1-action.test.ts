@@ -2,12 +2,16 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('server-only', () => ({}));
 
-const persistMock = vi.fn();
+const ensureMock = vi.fn();
+const recordTurnMock = vi.fn();
+const finishMock = vi.fn();
 const evaluationMock = vi.fn();
 
-vi.mock('@/lib/persist-activity', () => ({ persistMessage: (...a: unknown[]) => persistMock(...a) }));
-vi.mock('@/actions/sessions', () => ({ createSessionAction: vi.fn() }));
-vi.mock('@/lib/supabase/server', () => ({ createSupabaseServer: vi.fn() }));
+vi.mock('@/lib/session/lifecycle', () => ({
+  ensureSession: (...a: unknown[]) => ensureMock(...a),
+  recordTurn: (...a: unknown[]) => recordTurnMock(...a),
+  finishSession: (...a: unknown[]) => finishMock(...a),
+}));
 vi.mock('@/lib/prompts/db-prompts', () => ({ getPrompt: vi.fn() }));
 vi.mock('@/lib/gemini-client', () => ({ callGemini: vi.fn(), isOk: () => false }));
 vi.mock('@/lib/writing/fce-evaluation', () => ({ requestFceEvaluation: (...a: unknown[]) => evaluationMock(...a) }));
@@ -32,48 +36,65 @@ const BASE = {
 };
 
 const input = {
-  sessionId: 's1',
-  userId: 'u1',
-  title: 'Essay',
-  notes: [...NOTES] as unknown as Parameters<typeof evaluateFCEEssayAction>[0]['notes'],
+  prompt: {
+    title: 'Essay',
+    essayQuestion: 'q',
+    context: 'c',
+    notes: [...NOTES] as unknown as Parameters<typeof evaluateFCEEssayAction>[0]['prompt']['notes'],
+    wordTargetMin: 140 as const,
+    wordTargetMax: 190 as const,
+    framingText: 'f',
+  },
   userText: 'some essay text',
 };
 
 beforeEach(() => {
-  persistMock.mockReset().mockResolvedValue({ id: 'm' });
+  ensureMock.mockReset().mockResolvedValue({ ok: true, data: { sessionId: 's1', userId: 'u1', created: true } });
+  recordTurnMock.mockReset().mockResolvedValue({ ok: true, data: { ids: [] } });
+  finishMock.mockReset().mockResolvedValue({ ok: true, data: { score10: 6.5, messageId: 'm' } });
   evaluationMock.mockReset();
 });
 
 describe('evaluateFCEEssayAction', () => {
-  it('adds the 0-10 mark from fce_rubric and keeps the formative fields', async () => {
+  it('adds the 0-10 mark from fce_rubric, creates the session on first submit and finishes it', async () => {
     evaluationMock.mockResolvedValue({
       ...BASE,
       fce_rubric: { content: 4, communicative_achievement: 3, organisation: 3, language: 3 },
     });
     const result = await evaluateFCEEssayAction(input);
     if ('error' in result) throw new Error(result.error);
-    expect(result.score10).toBe(6.5);
-    expect(result.notesCovered).toEqual([true, true, false]);
-    expect(result.modelAnswer).toBe('model');
-    const finalCall = persistMock.mock.calls.find(([arg]) => arg.msgType === 'evaluation');
-    expect(finalCall?.[0].contentJson).toMatchObject({ is_final: true, score: 13, score_max: 20, score_10: 6.5 });
+    expect(result.sessionId).toBe('s1');
+    expect(result.feedback.score10).toBe(6.5);
+    expect(result.feedback.notesCovered).toEqual([true, true, false]);
+    expect(result.feedback.modelAnswer).toBe('model');
+    const roles = recordTurnMock.mock.calls[0][0].messages.map((m: { role: string }) => m.role);
+    expect(roles).toEqual(['bob', 'user']);
+    expect(finishMock.mock.calls[0][0].evaluation).toMatchObject({ score: 13, score_max: 20, score_10: 6.5 });
   });
 
   it('shows the feedback without a mark when the rubric is incomplete', async () => {
     evaluationMock.mockResolvedValue({ ...BASE, fce_rubric: { content: 4 } });
     const result = await evaluateFCEEssayAction(input);
     if ('error' in result) throw new Error(result.error);
-    expect(result.score10).toBeNull();
-    expect(result.fceRubric).toBeNull();
-    expect(result.highlights).toEqual(['h']);
+    expect(result.feedback.score10).toBeNull();
+    expect(result.feedback.fceRubric).toBeNull();
+    expect(result.feedback.highlights).toEqual(['h']);
   });
 
-  it('returns the fallback feedback when the evaluation fails', async () => {
+  it('keeps the submission and does not finish the session when the evaluation fails', async () => {
     evaluationMock.mockResolvedValue(null);
     const result = await evaluateFCEEssayAction(input);
     if ('error' in result) throw new Error(result.error);
-    expect(result.understood).toBe(false);
-    expect(result.score10).toBeNull();
-    expect(persistMock.mock.calls[0][0].contentJson).toMatchObject({ is_final: true });
+    expect(result.feedback.understood).toBe(false);
+    expect(result.feedback.score10).toBeNull();
+    expect(recordTurnMock).toHaveBeenCalled();
+    expect(finishMock).not.toHaveBeenCalled();
+  });
+
+  it('does not repeat the prompt message on an existing session', async () => {
+    ensureMock.mockResolvedValue({ ok: true, data: { sessionId: 's1', userId: 'u1', created: false } });
+    evaluationMock.mockResolvedValue({ ...BASE, fce_rubric: null });
+    await evaluateFCEEssayAction({ ...input, sessionId: 's1' });
+    expect(recordTurnMock.mock.calls[0][0].messages).toHaveLength(1);
   });
 });

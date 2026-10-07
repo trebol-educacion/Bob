@@ -1,18 +1,18 @@
 'use server';
 
+import type { ActionResult } from '@/lib/result';
 import type { FormativeFeedback } from '@/lib/types/practice';
 import {
   chatCollaborativeAudio,
   chatCollaborativeText,
   evaluateCollaborative,
   generateCollaborativeScenario,
-  readCollaborativeMessages,
 } from '@/lib/speaking/collaborative';
 import { FCE_COLLABORATIVE_CONFIG } from '@/lib/speaking/fce-configs';
 import type { Part3ChatMessage, Part3Scenario } from '@/lib/speaking/types';
 
-export async function generateFCECollaborativeScenarioAction(sessionId?: string): Promise<Part3Scenario> {
-  return generateCollaborativeScenario(FCE_COLLABORATIVE_CONFIG, sessionId);
+export async function generateFCECollaborativeScenarioAction(): Promise<Part3Scenario> {
+  return generateCollaborativeScenario(FCE_COLLABORATIVE_CONFIG);
 }
 
 export async function chatFCECollaborativeAction(
@@ -21,7 +21,7 @@ export async function chatFCECollaborativeAction(
   history: Part3ChatMessage[],
   scenario: Part3Scenario,
   sessionId?: string,
-): Promise<{ transcribed: string; examinerResponse: string }> {
+): Promise<ActionResult<{ transcribed: string; examinerResponse: string; sessionId: string }>> {
   return chatCollaborativeAudio(FCE_COLLABORATIVE_CONFIG, audioBase64, mimeType, history, scenario, sessionId);
 }
 
@@ -30,7 +30,7 @@ export async function chatFCECollaborativeTextAction(
   history: Part3ChatMessage[],
   scenario: Part3Scenario,
   sessionId?: string,
-): Promise<{ examinerResponse: string }> {
+): Promise<ActionResult<{ examinerResponse: string; sessionId: string }>> {
   return chatCollaborativeText(FCE_COLLABORATIVE_CONFIG, text, history, scenario, sessionId);
 }
 
@@ -38,12 +38,6 @@ export async function evaluateFCECollaborativeAction(
   history: Part3ChatMessage[],
   scenario: Part3Scenario,
   sessionId?: string,
-): Promise<FormativeFeedback> {
+): Promise<ActionResult<{ feedback: FormativeFeedback; sessionId?: string }>> {
   return evaluateCollaborative(FCE_COLLABORATIVE_CONFIG, history, scenario, sessionId);
-}
-
-export async function getFCECollaborativeMessagesAction(
-  sessionId: string,
-): Promise<{ history: Part3ChatMessage[]; feedback: FormativeFeedback | null }> {
-  return readCollaborativeMessages(sessionId);
 }

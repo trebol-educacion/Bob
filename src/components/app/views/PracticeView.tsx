@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { BobPracticeChat } from '@/components/BobPracticeChat';
-import { createSessionAction, type BobSession } from '@/actions/sessions';
+import { openGenericSessionAction } from '@/actions/generic-session';
 import { resolveEffectiveLevel } from '@/lib/levels/effective-level';
 import type { StoredMessage } from '@/actions/messages';
 import type { CefrLevel } from '@/lib/types/practice';
@@ -17,7 +17,6 @@ export interface PracticeViewProps {
   activeSessionId: string | null;
   selectedMessages: StoredMessage[];
   setActiveSessionId: (id: string | null) => void;
-  setSessions: React.Dispatch<React.SetStateAction<BobSession[]>>;
   refreshSessions: () => void;
 }
 
@@ -30,7 +29,6 @@ export function PracticeView({
   activeSessionId,
   selectedMessages,
   setActiveSessionId,
-  setSessions,
   refreshSessions,
 }: PracticeViewProps) {
   const { level: effectiveLevel } = resolveEffectiveLevel(skillLevels, cefrActiveLevel, selectedSkill);
@@ -40,9 +38,11 @@ export function PracticeView({
       level={(effectiveLevel as 'a1' | 'a2' | 'b1' | 'b2' | undefined) ?? undefined}
       onBack={onFinish}
       onSessionStart={async (title) => {
-        const { data } = await createSessionAction({ mode, topic: title, title });
-        if (data) { setActiveSessionId(data.id); setSessions(prev => [data, ...prev]); }
-        return data?.id;
+        const opened = await openGenericSessionAction({ mode, topic: title, title });
+        if (!opened.ok) return undefined;
+        setActiveSessionId(opened.data.sessionId);
+        refreshSessions();
+        return opened.data.sessionId;
       }}
       onSessionFinished={refreshSessions}
       sessionId={activeSessionId}

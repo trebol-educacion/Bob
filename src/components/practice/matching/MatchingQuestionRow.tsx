@@ -9,6 +9,7 @@ export interface MatchingQuestionRowProps {
   onSelect?: (key: string) => void;
   review?: MatchingReview;
   extra?: React.ReactNode;
+  takenKeys?: ReadonlySet<string>;
 }
 
 function keyClasses(key: string, selected: string | undefined, review: MatchingReview | undefined): string {
@@ -22,7 +23,7 @@ function keyClasses(key: string, selected: string | undefined, review: MatchingR
     : 'border-gray-200 bg-white text-gray-600 hover:border-indigo-300 cursor-pointer';
 }
 
-export function MatchingQuestionRow({ question, choices, selected, onSelect, review, extra }: MatchingQuestionRowProps) {
+export function MatchingQuestionRow({ question, choices, selected, onSelect, review, extra, takenKeys }: MatchingQuestionRowProps) {
   return (
     <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm space-y-3" data-testid={`question-${question.number}`}>
       <div className="flex items-start gap-3">
@@ -38,11 +39,11 @@ export function MatchingQuestionRow({ question, choices, selected, onSelect, rev
           <button
             key={choice.key}
             type="button"
-            disabled={review !== undefined}
+            disabled={review !== undefined || (takenKeys?.has(choice.key) ?? false)}
             aria-pressed={selected === choice.key}
             aria-label={`Question ${question.number}: ${choice.key}`}
             onClick={() => onSelect?.(choice.key)}
-            className={`w-9 h-9 rounded-full border-2 text-sm font-black transition ${keyClasses(choice.key, selected, review)}`}
+            className={`w-9 h-9 rounded-full border-2 text-sm font-black transition disabled:cursor-not-allowed ${takenKeys?.has(choice.key) && !review ? 'opacity-30' : ''} ${keyClasses(choice.key, selected, review)}`}
           >
             {choice.key}
           </button>

@@ -3,7 +3,9 @@
 import React from 'react';
 import { useTranslations } from 'next-intl';
 import { FCE_CRITERIA, type FceRubric } from '@/lib/writing/fce-rubric';
-import { scoreHeadlineTier } from '@/lib/writing/score-headline';
+import { scoreTier, type ScoreTier } from '@/lib/score/headline';
+
+const WRITING_HEADLINE: Record<ScoreTier, string> = { perfect: 'excellent', great: 'excellent', good: 'good', fair: 'fair', keep: 'keepGoing' };
 
 export interface FceScoreCardProps {
   score10: number;
@@ -52,5 +54,5 @@ export interface ScoreHeadlineProps {
 export function ScoreHeadline({ score10, fallback }: ScoreHeadlineProps) {
   const t = useTranslations('cambridge');
   if (score10 === null || score10 === undefined) return <>{fallback}</>;
-  return <>{t(`fce.score.headline.${scoreHeadlineTier(score10)}`)}</>;
+  return <>{t(`fce.score.headline.${WRITING_HEADLINE[scoreTier(score10)]}`)}</>;
 }

@@ -15,6 +15,9 @@ import {
 } from '@/actions/modes/ket-reading-part4';
 import type { StoredMessage } from '@/actions/messages';
 import { resolveActivityBoot } from '@/lib/activity/boot';
+import { ActivityLoadError } from '@/components/practice/ActivityLoadError';
+import { restoreExercise } from '@/lib/ket/restore-plan';
+import { ActivityHeader } from '@/components/activity/ActivityHeader';
 
 const ACCENT = '#469E7B';
 const ACCENT_DARK = '#37795E';
@@ -34,31 +37,8 @@ export interface KETVocabGapPracticeProps {
 type Phase = 'loading' | 'generating' | 'ready' | 'submitting' | 'finished';
 type OptionKey = 'A' | 'B' | 'C';
 
-interface RestoredState {
-  exercise: VocabGapExercise;
-  framingText: string;
-  results: VocabGapItemResult[] | null;
-  correctCount: number;
-}
-
-function tryRestore(messages: StoredMessage[]): RestoredState | null {
-  let exercise: VocabGapExercise | null = null;
-  let framingText = '';
-  let results: VocabGapItemResult[] | null = null;
-  let correctCount = 0;
-  for (const msg of messages) {
-    const cj = msg.content_json as Record<string, unknown> | null;
-    if (!cj) continue;
-    if (msg.role === 'bob' && cj.kind === 'reading_vocab_gap_plan') {
-      exercise = cj.exercise as VocabGapExercise;
-      framingText = String(cj.framing_text ?? '');
-    }
-    if (msg.role === 'bob' && msg.msg_type === 'evaluation' && cj.is_final === true) {
-      results = cj.item_results as VocabGapItemResult[];
-      correctCount = Number(cj.score ?? 0);
-    }
-  }
-  return exercise ? { exercise, framingText, results, correctCount } : null;
+function tryRestore(messages: StoredMessage[]) {
+  return restoreExercise<VocabGapExercise, VocabGapItemResult>(messages, 'reading_vocab_gap_plan', 'item_results');
 }
 
 /**
@@ -258,7 +238,6 @@ export function KETVocabGapPractice({
   const reduceMotion = useReducedMotion();
   const [phase, setPhase] = useState<Phase>('loading');
   const [sessionId, setSessionId] = useState<string | undefined>(initialSessionId);
-  const [userId, setUserId] = useState<string | undefined>();
   const [exercise, setExercise] = useState<VocabGapExercise | null>(null);
   const [framingText, setFramingText] = useState('');
   const [answers, setAnswers] = useState<Record<number, OptionKey | null>>({});
@@ -266,6 +245,7 @@ export function KETVocabGapPractice({
   const [results, setResults] = useState<VocabGapItemResult[]>([]);
   const [correctCount, setCorrectCount] = useState(0);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [loadErrorCode, setLoadErrorCode] = useState<string | null>(null);
   const [isNewSession, setIsNewSession] = useState(false);
   const initRef = useRef(false);
 
@@ -282,27 +262,16 @@ export function KETVocabGapPractice({
           setResults(r.results);
           setCorrectCount(r.correctCount);
           setPhase('finished');
-        } else {
-          const { createSupabaseBrowser } = await import('@/lib/supabase/browser-client');
-          const { data: { user } } = await createSupabaseBrowser().auth.getUser();
-          if (user) setUserId(user.id);
-          setPhase('ready');
-        }
+        } else { setPhase('ready'); }
         return;
       }
       if (boot.kind === 'restore-failed') { setErrorMsg('Could not restore session. Please start a new one.'); return; }
       setIsNewSession(true);
       setPhase('generating');
-      const result = await generateKETVocabGapAction({ sessionId: initialSessionId });
-      if ('error' in result) {
-        setErrorMsg(result.error);
-        return;
-      }
-      onSessionCreated?.(result.sessionId);
-      setSessionId(result.sessionId);
-      setUserId(result.userId);
-      setExercise(result.exercise);
-      setFramingText(result.framing_text);
+      const result = await generateKETVocabGapAction();
+      if (!result.ok) { setLoadErrorCode(result.code); return; }
+      setExercise(result.data.exercise);
+      setFramingText(result.data.framing_text);
       setPhase('ready');
     }
     void init();
@@ -322,9 +291,9 @@ export function KETVocabGapPractice({
   }
 
   async function handleSubmit() {
-    if (!sessionId || !userId || !exercise) return;
+    if (!exercise) return;
     setPhase('submitting');
-    const result = await submitKETVocabGapAction({ sessionId, userId, answers, items: exercise.items });
+    const result = await submitKETVocabGapAction({ sessionId, framing_text: framingText, exercise, answers });
     if ('error' in result) {
       setErrorMsg(result.error);
       setPhase('ready');
@@ -333,6 +302,8 @@ export function KETVocabGapPractice({
     setResults(result.item_results);
     setCorrectCount(result.correct_count);
     setPhase('finished');
+    if (!sessionId) onSessionCreated?.(result.sessionId);
+    setSessionId(result.sessionId);
     onSessionFinished?.();
   }
 
@@ -343,43 +314,18 @@ export function KETVocabGapPractice({
   const progressPct = exercise && exercise.items.length > 0 ? (answeredCount / exercise.items.length) * 100 : 0;
   const activeItem = exercise?.items[activeIndex];
 
-  if (errorMsg) {
-    return (
-      <div className="flex flex-col items-center justify-center gap-4 p-8 text-center min-h-[40vh]">
-        <p className="text-red-500 font-semibold">{errorMsg}</p>
-        <button
-          type="button"
-          onClick={onBack}
-          className="px-5 py-2 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition-colors text-sm"
-        >
-          Back
-        </button>
-      </div>
-    );
-  }
+  if (loadErrorCode || errorMsg) return <ActivityLoadError code={loadErrorCode} message={errorMsg} onBack={onBack} />;
 
   return (
     <div className="flex flex-col h-full relative">
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-100 bg-white shrink-0">
-        <button
-          type="button"
-          onClick={onBack}
-          className="w-11 h-11 flex items-center justify-center rounded-xl hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-600 text-lg"
-          aria-label="Back"
-        >
-          ←
-        </button>
-        <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style={{ background: ACCENT_TINT, color: ACCENT }}>
-          <KETReadingIcon size={18} />
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-bold text-gray-800 truncate">Choose the Word</p>
-          <p className="text-xs text-gray-400">Reading · Part 4</p>
-        </div>
-        <span className="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-widest" style={{ background: ACCENT_TINT, color: ACCENT_TEXT }}>
-          A2
-        </span>
-      </div>
+      <ActivityHeader
+        title="Choose the Word"
+        subtitle="Reading · Part 4"
+        badge="Part 4"
+        icon={<KETReadingIcon size={18} />}
+        iconStyle={{ background: ACCENT_TINT, color: ACCENT }}
+        onBack={onBack}
+      />
 
       {phase === 'ready' && (
         <div className="h-1.5 w-full bg-gray-100 shrink-0 overflow-hidden">
@@ -462,7 +408,7 @@ export function KETVocabGapPractice({
                 className="px-6 py-3 rounded-2xl text-white text-sm font-bold transition-transform duration-75 cursor-pointer active:translate-y-1 active:shadow-none disabled:opacity-40 disabled:cursor-not-allowed disabled:translate-y-0 disabled:shadow-none"
                 style={{ background: ACCENT, boxShadow: allAnswered ? `0 4px 0 ${ACCENT_DARK}` : 'none' }}
               >
-                Check answers
+                Submit answers
               </button>
             </div>
           </div>
@@ -491,7 +437,6 @@ export function KETVocabGapPractice({
               <CelebrationCard
                 score={correctCount}
                 scoreMax={exercise.items.length}
-                feedback="Great reading practice!"
                 onAction={onOpenDashboard}
                 actionLabel="See my progress"
                 animate={isNewSession}

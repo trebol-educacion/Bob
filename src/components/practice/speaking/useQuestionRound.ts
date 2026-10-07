@@ -1,33 +1,55 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { createSessionAction } from '@/actions/sessions';
 import { blobToBase64 } from '@/lib/audio';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
 import { useTTS } from '@/hooks/useTTS';
 import type { FormativeFeedback } from '@/lib/types/practice';
+import { restoreQuestionRound } from '@/lib/speaking/question-round-restore';
 import type { SpeakingQA } from '@/lib/speaking/types';
 import { RECORDING_MAX_SECONDS, REACTION_PAUSE_MS } from './speaking-theme';
-import type { QuestionRoundConfig, QuestionRoundStep } from './types';
+import type { QuestionRoundConfig, QuestionRoundSessionParams, QuestionRoundStep } from './types';
 
-export function useQuestionRound<TPlan>(config: QuestionRoundConfig<TPlan>) {
-  const [ready, setReady] = useState(false);
-  const [plan, setPlan] = useState<TPlan | null>(null);
-  const [questions, setQuestions] = useState<string[]>([]);
-  const [questionIndex, setQuestionIndex] = useState(0);
+const PLACEMENT_MESSAGE = 'Complete your level test first to unlock this activity.';
+const RESTORE_FAILED_MESSAGE = 'We could not reopen this session. Go back and start a new one.';
+const SAVE_MESSAGE = 'We could not save your answer. Please try again.';
+
+function describeFailure(code: string): string {
+  return code === 'placement_required' ? PLACEMENT_MESSAGE : SAVE_MESSAGE;
+}
+
+export function useQuestionRound<TPlan>(config: QuestionRoundConfig<TPlan>, params: QuestionRoundSessionParams = {}) {
+  const { sessionId: initialSessionId, initialMessages, onSessionCreated, onSessionFinished } = params;
+  const [boot] = useState(() => {
+    if (!initialSessionId) return { kind: 'generate' as const };
+    const restored = initialMessages ? restoreQuestionRound(initialMessages, config.planSchema) : null;
+    return restored
+      ? { kind: 'restore' as const, restored, questions: config.toQuestions(restored.plan) }
+      : { kind: 'failed' as const };
+  });
+  const restoredRound = boot.kind === 'restore' ? boot : null;
+  const [ready, setReady] = useState(boot.kind === 'restore');
+  const [plan, setPlan] = useState<TPlan | null>(restoredRound?.restored.plan ?? null);
+  const [questions, setQuestions] = useState<string[]>(restoredRound?.questions ?? []);
+  const [questionIndex, setQuestionIndex] = useState(() =>
+    restoredRound ? Math.min(restoredRound.restored.qas.length, Math.max(restoredRound.questions.length - 1, 0)) : 0,
+  );
   const [step, setStep] = useState<QuestionRoundStep>('answer');
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [currentReaction, setCurrentReaction] = useState('');
   const [playbackUrl, setPlaybackUrl] = useState<string | null>(null);
-  const [qas, setQas] = useState<SpeakingQA[]>([]);
-  const [evaluation, setEvaluation] = useState<FormativeFeedback | null>(null);
-  const [evaluating, setEvaluating] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [qas, setQas] = useState<SpeakingQA[]>(restoredRound?.restored.qas ?? []);
+  const [evaluation, setEvaluation] = useState<FormativeFeedback | null>(restoredRound?.restored.feedback ?? null);
+  const [evaluating, setEvaluating] = useState(
+    restoredRound ? !restoredRound.restored.feedback && restoredRound.restored.qas.length >= restoredRound.questions.length : false,
+  );
+  const [error, setError] = useState<string | null>(boot.kind === 'failed' ? RESTORE_FAILED_MESSAGE : null);
   const [micDenied, setMicDenied] = useState(false);
   const [hearingQuestion, setHearingQuestion] = useState(false);
 
-  const sessionIdRef = useRef<string>('');
-  const userIdRef = useRef<string>('');
+  const sessionIdRef = useRef<string | undefined>(initialSessionId);
+  const generateStartedRef = useRef(false);
+  const evaluationStartedRef = useRef(false);
   const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const recordedBlobRef = useRef<Blob | null>(null);
 
@@ -80,13 +102,15 @@ export function useQuestionRound<TPlan>(config: QuestionRoundConfig<TPlan>) {
     releasePlayback();
   }, [stopTimer, releasePlayback]);
 
+  const adoptSession = useCallback((sessionId: string | undefined) => {
+    if (!sessionId || sessionIdRef.current === sessionId) return;
+    sessionIdRef.current = sessionId;
+    onSessionCreated?.(sessionId);
+  }, [onSessionCreated]);
+
   const startSession = useCallback(async () => {
     try {
-      const sessionResult = await createSessionAction({ mode: config.mode, title: config.sessionTitle });
-      if (!sessionResult.data) throw new Error(sessionResult.error ?? 'Failed to create session');
-      sessionIdRef.current = sessionResult.data.id;
-      userIdRef.current = sessionResult.data.user_id;
-      const sessionPlan = await config.actions.generate(sessionIdRef.current, userIdRef.current);
+      const sessionPlan = await config.actions.generate();
       setPlan(sessionPlan);
       setQuestions(config.toQuestions(sessionPlan));
       setStep('answer');
@@ -97,8 +121,10 @@ export function useQuestionRound<TPlan>(config: QuestionRoundConfig<TPlan>) {
   }, [config]);
 
   useEffect(() => {
+    if (boot.kind !== 'generate' || generateStartedRef.current) return;
+    generateStartedRef.current = true;
     void startSession();
-  }, [startSession]);
+  }, [boot.kind, startSession]);
 
   const advanceToNext = useCallback(() => {
     const nextIndex = questionIndex + 1;
@@ -161,15 +187,15 @@ export function useQuestionRound<TPlan>(config: QuestionRoundConfig<TPlan>) {
       let reaction = '';
       if (blob && blob.size > 0) {
         const audioBase64 = await blobToBase64(blob);
-        const result = await actions.processAnswer(
-          audioBase64,
-          blob.type || 'audio/webm',
-          currentQuestion,
-          sessionIdRef.current,
-          userIdRef.current,
-        );
-        transcribed = result.transcribed;
-        reaction = result.reaction;
+        if (!plan) throw new Error('Session not ready');
+        const result = await actions.processAnswer(audioBase64, blob.type || 'audio/webm', currentQuestion, {
+          sessionId: sessionIdRef.current,
+          plan,
+        });
+        if (!result.ok) throw new Error(describeFailure(result.code));
+        adoptSession(result.data.sessionId);
+        transcribed = result.data.transcribed;
+        reaction = result.data.reaction;
       }
       setQas((prev) => [...prev, { question: currentQuestion, answer: transcribed }]);
       setCurrentReaction(reaction);
@@ -184,18 +210,23 @@ export function useQuestionRound<TPlan>(config: QuestionRoundConfig<TPlan>) {
   }
 
   useEffect(() => {
-    if (!evaluating) return;
+    if (!evaluating || evaluationStartedRef.current) return;
+    evaluationStartedRef.current = true;
     void (async () => {
       try {
-        const result = await actions.evaluate(qas, sessionIdRef.current, userIdRef.current);
-        setEvaluation(result);
+        if (!plan) throw new Error('Session not ready');
+        const result = await actions.evaluate(qas, { sessionId: sessionIdRef.current, plan });
+        if (!result.ok) throw new Error(describeFailure(result.code));
+        adoptSession(result.data.sessionId);
+        setEvaluation(result.data.feedback);
+        onSessionFinished?.();
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Evaluation failed');
       } finally {
         setEvaluating(false);
       }
     })();
-  }, [evaluating, qas, actions]);
+  }, [evaluating, qas, actions, plan, adoptSession, onSessionFinished]);
 
   function handleTryAgain() {
     stopTTS();
@@ -210,6 +241,8 @@ export function useQuestionRound<TPlan>(config: QuestionRoundConfig<TPlan>) {
     setError(null);
     setMicDenied(false);
     setCurrentReaction('');
+    sessionIdRef.current = undefined;
+    evaluationStartedRef.current = false;
     releasePlayback();
     void startSession();
   }

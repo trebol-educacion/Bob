@@ -8,6 +8,7 @@ import {
   L2_GROUP, L2_ITEMS, L4_GROUP, L4_ITEMS,
 } from './fce-group-fixtures';
 
+vi.mock('next-intl', async () => (await import('./stubs/intl')).intlMock());
 vi.mock('@/components/chat/BobMascotLoader', () => ({
   BobMascotLoader: ({ message }: { message: string }) => <div>{message}</div>,
 }));
@@ -66,8 +67,10 @@ const props = { onBack: vi.fn() };
 describe('FCEListeningGapFillPractice (Listening P2)', () => {
   it('un input por hueco, corrige con accepted[] y muestra nota', async () => {
     startMocks.l2.mockResolvedValue({ sessionId: 's4', exercise: l2 });
-    submitMocks.l2.mockImplementation(async (_s: string, answers: Record<string, string>) =>
-      gradeGroupAnswers(L2_ITEMS, answers, matchesAcceptedText),
+    submitMocks.l2.mockImplementation(async (input: { answers: Record<string, string> }) => ({
+      sessionId: 'sx',
+      result: gradeGroupAnswers(L2_ITEMS, input.answers, matchesAcceptedText),
+      }),
     );
     render(<FCEListeningGapFillPractice {...props} />);
 
@@ -76,7 +79,7 @@ describe('FCEListeningGapFillPractice (Listening P2)', () => {
     fireEvent.change(screen.getByLabelText('Gap 9'), { target: { value: 'Vesuvius' } });
     fireEvent.change(screen.getByLabelText('Gap 10'), { target: { value: 'AD 79' } });
     fireEvent.change(screen.getByLabelText('Gap 11'), { target: { value: 'three' } });
-    fireEvent.click(screen.getByRole('button', { name: /Check answers \(3\/3\)/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Submit answers \(3\/3\)/ }));
 
     await waitFor(() => expect(screen.getByTestId('score-10')).toHaveTextContent('Score: 6.7 / 10'));
     expect(screen.getByText('two')).toBeInTheDocument();
@@ -86,8 +89,10 @@ describe('FCEListeningGapFillPractice (Listening P2)', () => {
 describe('FCEListeningInterviewPractice (Listening P4)', () => {
   it('audio largo, preguntas de tres opciones, revision con la clave tras corregir', async () => {
     startMocks.l4.mockResolvedValue({ sessionId: 's5', exercise: l4 });
-    submitMocks.l4.mockImplementation(async (_s: string, answers: Record<string, string>) =>
-      gradeGroupAnswers(L4_ITEMS, answers, matchesLetterKey),
+    submitMocks.l4.mockImplementation(async (input: { answers: Record<string, string> }) => ({
+      sessionId: 'sx',
+      result: gradeGroupAnswers(L4_ITEMS, input.answers, matchesLetterKey),
+      }),
     );
     render(<FCEListeningInterviewPractice {...props} />);
 
@@ -98,7 +103,7 @@ describe('FCEListeningInterviewPractice (Listening P4)', () => {
 
     const firstGroup = screen.getAllByRole('group')[0];
     fireEvent.click(firstGroup.querySelectorAll('button')[0]);
-    fireEvent.click(screen.getByRole('button', { name: /Check answers \(1\/3\)/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Submit answers \(1\/3\)/ }));
 
     await waitFor(() => expect(screen.getByTestId('score-10')).toHaveTextContent('Score: 0 / 10'));
     expect(screen.getAllByRole('group')[0].querySelectorAll('button')[1]).toHaveClass('bg-green-50');

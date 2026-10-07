@@ -5,7 +5,7 @@ import { useTranslations } from 'next-intl';
 import { PracticeSurface } from '@/components/practice/free/PracticeSurface';
 import { PracticeBootBubble } from '@/components/practice/free/PracticeBootBubble';
 import { ConversationErrorBanner } from '@/components/conversation/ConversationErrorBanner';
-import { usePracticeBoot } from '@/hooks/practice/usePracticeBoot';
+import { usePracticeBoot, type PracticeResumeInput } from '@/hooks/practice/usePracticeBoot';
 import type { Organization } from '@/lib/organization';
 import type { CefrLevel } from '@/lib/types/practice';
 import type { PracticeActivityMode } from '@/lib/practice/types';
@@ -16,17 +16,29 @@ export interface PracticeSessionViewProps {
   organization: Organization | null;
   cefrActiveLevel: CefrLevel | null;
   skillLevels: SkillLevelMap | null;
+  resume?: PracticeResumeInput;
+  onSessionCreated: (sessionId: string) => void;
+  onSessionFinished: () => void;
+  onPracticeAgain: () => void;
   onExit: () => void;
 }
 
 /** @param props PracticeSessionViewProps */
-export function PracticeSessionView({ mode, organization, cefrActiveLevel, skillLevels, onExit }: PracticeSessionViewProps) {
+export function PracticeSessionView({
+  mode,
+  organization,
+  cefrActiveLevel,
+  skillLevels,
+  resume,
+  onSessionCreated,
+  onSessionFinished,
+  onPracticeAgain,
+  onExit,
+}: PracticeSessionViewProps) {
   const t = useTranslations('practice');
-  const boot = usePracticeBoot({ mode, organization, cefrActiveLevel, skillLevels });
+  const boot = usePracticeBoot({ mode, cefrActiveLevel, skillLevels, resume });
 
-  const failed = boot.phase === 'ready' && !boot.message && boot.messages.length === 0;
-
-  if (failed) {
+  if (boot.phase === 'error') {
     return (
       <div className="flex-1 flex flex-col items-center justify-center px-4 gap-4">
         <ConversationErrorBanner
@@ -41,16 +53,21 @@ export function PracticeSessionView({ mode, organization, cefrActiveLevel, skill
   if (boot.phase === 'ready') {
     return (
       <PracticeSurface
-        key={boot.sessionId ?? 'in-memory'}
+        key={`${boot.sessionId ?? 'new'}:${boot.instance}`}
         sessionId={boot.sessionId}
+        organizationId={organization?.id ?? null}
         mode={boot.mode}
         seed={boot.seed}
         level={boot.level}
         framing={boot.framing}
         messages={boot.messages}
         turnSignals={boot.turnSignals}
+        imageUrl={boot.imageUrl}
+        initialResult={boot.result}
+        onSessionCreated={onSessionCreated}
+        onSessionFinished={onSessionFinished}
         onExit={onExit}
-        onRestart={boot.restart}
+        onRestart={resume ? onPracticeAgain : boot.restart}
       />
     );
   }

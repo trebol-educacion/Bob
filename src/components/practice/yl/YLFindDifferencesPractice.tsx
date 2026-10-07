@@ -1,33 +1,23 @@
 'use client';
 
-/**
- * YLFindDifferencesPractice, Cambridge Movers Part 1 "Find the Differences".
- *
- * Bob shows his picture (A) and describes one property of an object.
- * The child describes the same object in their picture (B) with the difference.
- * 4 turns total, one per difference. Binary evaluation per turn.
- */
-
 import React, { useEffect, useRef, useState } from 'react';
+import { ActivityLoadError } from '@/components/practice/ActivityLoadError';
+import { withBankAudio } from '@/lib/yl/bank-audio';
 import { motion } from 'motion/react';
 import { ArrowLeft } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { FindTheDifferencesIcon } from '@/components/icons/MoversIcons';
 import { CelebrationCard } from './CelebrationCard';
-import { ACTIVE_MODEL_LABEL } from '@/lib/models';
 import {
   startYLSessionAction,
-  generateYLImagesParallelAction,
-  persistYLImagesAction,
-  saveYLFinalEvalAction,
   getYLSessionPlanAction,
-  pregenerateYLCueAudiosAction,
   evaluateFindDifferencesAnswerAction,
 } from '@/actions/modes/yl';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
 import { blobToBase64 } from '@/lib/audio';
 import type { YLExam, YLPlan, FindDifference } from '@/lib/types/yl';
 import type { EvalResponse, ModeKey } from '@/lib/types/practice';
+import { useYLSession } from './useYLSession';
 import { ChatShell } from '@/components/ChatShell';
 import {
   stopCurrentAudio,
@@ -38,6 +28,7 @@ import {
   YLUserTextMessage,
   YLChatMicBar,
   YLReadOnlyMessage,
+  isYLUserTurn,
 } from './_shared';
 
 const TOTAL_TURNS = 4;
@@ -101,7 +92,7 @@ export function YLFindDifferencesPractice({
   const isReadOnly = !!initialMessages && initialMessages.length > 0;
 
   const [phase, setPhase] = useState<Phase>(isReadOnly ? 'finished' : 'loading');
-  const [sessionId, setSessionId] = useState<string | undefined>(initialSessionId);
+  const { stash, open, finish } = useYLSession({ mode, initialSessionId, onSessionCreated, onSessionFinished });
   const [plan, setPlan] = useState<YLPlan | null>(null);
   const [differences, setDifferences] = useState<FindDifference[]>([]);
   const [images, setImages] = useState<string[]>([]);
@@ -111,6 +102,7 @@ export function YLFindDifferencesPractice({
   const [correctCount, setCorrectCount] = useState(0);
   const [finalEval, setFinalEval] = useState<EvalResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loadErrorCode, setLoadErrorCode] = useState<string | null>(null);
 
   const initStartedRef = useRef(false);
   const recordedBlobRef = useRef<Blob | null>(null);
@@ -140,7 +132,7 @@ export function YLFindDifferencesPractice({
         try {
           const restoredPlan = await getYLSessionPlanAction(initialSessionId);
           if (restoredPlan) {
-            setPlan(restoredPlan);
+            setPlan(withBankAudio(restoredPlan));
             if (restoredPlan.differences && restoredPlan.differences.length > 0) {
               setDifferences(restoredPlan.differences);
             }
@@ -158,7 +150,7 @@ export function YLFindDifferencesPractice({
           if (imgs.length > 0) setImages(imgs);
 
           const userTurns = (initialMessages ?? [])
-            .filter((m) => m.role === 'user' && m.msg_type === 'user_audio')
+            .filter((m) => isYLUserTurn(m))
             .map((m) => {
               const cj = (m.content_json as Record<string, unknown> | null) ?? {};
               return {
@@ -241,38 +233,17 @@ export function YLFindDifferencesPractice({
 
     void (async () => {
       try {
-        const { sessionId: sid, plan: p } = await startYLSessionAction({ mode });
-        setSessionId(sid);
-        onSessionCreated?.(sid);
-        setPlan(p);
-
-        const diffs = p.differences ?? [];
-        setDifferences(diffs);
-
-        const imagePrompts = p.image_prompts ?? [];
-        if (imagePrompts.length >= 2) {
-          setPhase('generating-images');
-          const urls = await generateYLImagesParallelAction(
-            exam,
-            part,
-            imagePrompts,
-            sid,
-            p.character_description,
-            'scene'
-          );
-          setImages(urls);
-          persistYLImagesAction(sid, urls).catch((err) =>
-            console.warn('[YLFindDifferences] persist images failed:', err)
-          );
-
-          const cueTexts = diffs.map((d) => d.examiner_cue);
-          const reactionTexts = diffs.flatMap((d) => [
-            `Yes! Well spotted!`,
-            `Almost, ${d.expected_answer} Good try!`,
-          ]);
-          void pregenerateYLCueAudiosAction(sid, [...cueTexts, ...reactionTexts]);
+        const started = await startYLSessionAction({ mode });
+        if (!started.ok) {
+          setLoadErrorCode(started.code);
+          return;
         }
-
+        const p = withBankAudio(started.data.plan);
+        const urls = p.image_urls ?? [];
+        setPlan(p);
+        setDifferences(p.differences ?? []);
+        setImages(urls);
+        stash(p, urls);
         setPhase('ready');
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Error preparing the session');
@@ -281,7 +252,7 @@ export function YLFindDifferencesPractice({
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (phase !== 'evaluating' || !sessionId || !plan) return;
+    if (phase !== 'evaluating' || !plan) return;
     const total = TOTAL_TURNS;
     const pct = Math.round((correctCount / total) * 100);
     const result: EvalResponse = {
@@ -298,10 +269,10 @@ export function YLFindDifferencesPractice({
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setFinalEval(result);
     setPhase('finished');
-    void saveYLFinalEvalAction(sessionId, result)
-      .then(() => onSessionFinished?.())
-      .catch((err) => console.warn('[YLFindDifferences] saveYLFinalEvalAction failed:', err));
-  }, [phase, sessionId, plan, correctCount, onSessionFinished]);
+    void finish(result).then((saved) => {
+      if (!saved) setError('Could not save your result');
+    });
+  }, [phase, plan, correctCount, finish]);
 
   const handleStartRecording = async () => {
     if (phase !== 'ready' || isRecording) return;
@@ -334,19 +305,24 @@ export function YLFindDifferencesPractice({
     const duration = recordingSeconds;
     recordedBlobRef.current = null;
 
-    if (!sessionId || !currentDiff) return;
+    if (!currentDiff) return;
 
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setPhase('processing');
 
     void (async () => {
+      const sid = await open();
+      if (!sid) {
+        setError('Could not save your answer');
+        return;
+      }
       try {
         const audioBase64 = await blobToBase64(blob);
         const mimeType = blob.type || 'audio/webm;codecs=opus';
 
         stopCurrentAudio();
         const evalResult = await evaluateFindDifferencesAnswerAction({
-          sessionId,
+          sessionId: sid,
           turnIndex,
           examinerCue: currentDiff.examiner_cue,
           expectedAnswer: currentDiff.expected_answer,
@@ -393,6 +369,7 @@ export function YLFindDifferencesPractice({
     setPhase('ready');
   };
 
+  if (loadErrorCode) return <ActivityLoadError code={loadErrorCode} onBack={onBack} />;
   if (error) return <YLErrorScreen error={error} onBack={onBack} />;
   if (phase === 'loading' || phase === 'generating-images')
     return (
@@ -506,7 +483,7 @@ export function YLFindDifferencesPractice({
           ),
           online: false,
         }}
-        footerConfig={{ modeLabel: t('findDifferences.footerLabel'), modelName: ACTIVE_MODEL_LABEL }}
+        footerConfig={{ modeLabel: t('findDifferences.footerLabel') }}
         inputSlot={null}
         animationKey="yl-finddiffs-readonly"
         maxWidthClass="max-w-full"
@@ -515,7 +492,7 @@ export function YLFindDifferencesPractice({
         {sourceMessages
           .filter((m) => m.msg_type !== 'evaluation' && m.msg_type !== 'yl_tts' && m.msg_type !== 'image_scene')
           .flatMap((m): React.ReactElement[] => {
-            if (m.role === 'user' && m.msg_type === 'user_audio') {
+            if (isYLUserTurn(m)) {
               const cue = (m.content_json as { cue?: string } | null)?.cue ?? '';
               const bubbles: React.ReactElement[] = [];
               if (cue) bubbles.push(<YLBobTextMessage key={`${m.id}-cue`} text={cue} />);
@@ -633,7 +610,7 @@ export function YLFindDifferencesPractice({
         ),
         online: true,
       }}
-      footerConfig={{ modeLabel: t('findDifferences.footerLabel'), modelName: ACTIVE_MODEL_LABEL }}
+      footerConfig={{ modeLabel: t('findDifferences.footerLabel') }}
       inputSlot={inputBar}
       animationKey="yl-finddiffs"
       maxWidthClass="max-w-full"
@@ -648,24 +625,18 @@ export function YLFindDifferencesPractice({
           : null;
         return (
           <React.Fragment key={t.id}>
-            {sessionId && (
-              <YLVoiceNote
-                key={`cue-prev-${t.id}`}
-                text={t.examinerCue}
-                side="bob"
-                sessionId={sessionId}
-                autoPlay={false}
-              />
-            )}
+            <YLVoiceNote
+              key={`cue-prev-${t.id}`}
+              text={t.examinerCue}
+              side="bob"
+              autoPlay={false}
+            />
             <YLUserTextMessage text={`${t.transcript} ${t.correct ? '✓' : '✗'}`} />
-            {sessionId && (
-              <YLVoiceNote
-                text={t.reactionText}
-                side="bob"
-                sessionId={sessionId}
-                autoPlay={phase === 'reaction' && t.id === `turn-${turnIndex}`}
-              />
-            )}
+            <YLVoiceNote
+              text={t.reactionText}
+              side="bob"
+              autoPlay={phase === 'reaction' && t.id === `turn-${turnIndex}`}
+            />
             {!t.correct && hintText && (
               <div className="flex justify-start pl-12 -mt-1">
                 <div className="font-nunito text-xs font-bold text-amber-700/80 bg-amber-50 ring-1 ring-amber-200 rounded-full px-3 py-1.5 inline-flex items-center gap-1.5">
@@ -678,12 +649,11 @@ export function YLFindDifferencesPractice({
         );
       })}
 
-      {currentDiff && phase === 'ready' && sessionId && (
+      {currentDiff && phase === 'ready' && (
         <YLVoiceNote
           key={`cue-${turnIndex}`}
           text={currentDiff.examiner_cue}
           side="bob"
-          sessionId={sessionId}
           autoPlay
         />
       )}

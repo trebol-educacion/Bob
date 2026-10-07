@@ -5,13 +5,16 @@ import {
   generatePETInterviewAction,
   processPETInterviewAnswerAction,
   evaluatePETInterviewAction,
-  type PETInterviewPlan,
 } from '@/actions/modes/pet-p1';
+import { unwrapContent } from '@/lib/content/unwrap-content';
+import type { ActivityRenderProps } from '@/lib/routing';
+import { PETInterviewPlanSchema, type PETInterviewPlan } from '@/lib/speaking/pet-content';
 import { QuestionRoundPractice, type QuestionRoundConfig } from '@/components/practice/speaking';
 
-export interface PETInterviewPracticeProps {
-  onBack: () => void;
-}
+export type PETInterviewPracticeProps = Pick<
+  ActivityRenderProps,
+  'onBack' | 'sessionId' | 'initialMessages' | 'onSessionCreated' | 'onSessionFinished'
+>;
 
 function petInterviewQuestions(plan: PETInterviewPlan): string[] {
   return [
@@ -24,8 +27,7 @@ function petInterviewQuestions(plan: PETInterviewPlan): string[] {
 }
 
 const PET_INTERVIEW_CONFIG: QuestionRoundConfig<PETInterviewPlan> = {
-  mode: 'cambridge_pet_p1',
-  sessionTitle: 'B1 Speaking, Part 1',
+  planSchema: PETInterviewPlanSchema,
   headerTitle: 'Speaking · Part 1: Interview',
   headerSubtitle: 'Cambridge B1 Preliminary',
   levelBadge: 'B1',
@@ -34,12 +36,12 @@ const PET_INTERVIEW_CONFIG: QuestionRoundConfig<PETInterviewPlan> = {
   completeSubtitle: 'Cambridge B1 · Part 1',
   toQuestions: petInterviewQuestions,
   actions: {
-    generate: generatePETInterviewAction,
+    generate: async () => unwrapContent(await generatePETInterviewAction()),
     processAnswer: processPETInterviewAnswerAction,
     evaluate: evaluatePETInterviewAction,
   },
 };
 
-export function PETInterviewPractice({ onBack }: PETInterviewPracticeProps) {
-  return <QuestionRoundPractice config={PET_INTERVIEW_CONFIG} onBack={onBack} />;
+export function PETInterviewPractice(props: PETInterviewPracticeProps) {
+  return <QuestionRoundPractice config={PET_INTERVIEW_CONFIG} {...props} />;
 }

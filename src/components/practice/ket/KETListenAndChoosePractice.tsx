@@ -9,7 +9,7 @@ import { KETListeningIcon } from '@/components/icons/KETIcons';
 import { CelebrationCard } from '@/components/practice/yl/CelebrationCard';
 import { BobMascotLoader } from '@/components/chat/BobMascotLoader';
 import { BobAvatar } from '@/components/practice/yl/_shared';
-import { pcmToWavBase64 } from '@/lib/audio';
+import { ActivityLoadError } from '@/components/practice/ActivityLoadError';
 import {
   generateKETListenAndChooseAction,
   submitKETListenAnswersAction,
@@ -17,6 +17,10 @@ import {
   type ListenAnswerResult,
 } from '@/actions/modes/ket-listening-part1';
 import type { StoredMessage } from '@/actions/messages';
+import { useAudioClip } from '@/hooks/useAudioClip';
+import { stopActiveClip } from '@/lib/audio-clip';
+import { PauseIcon, PlayIcon, ReplayIcon } from '@/components/activity/audio-icons';
+import { restoreExercise } from '@/lib/ket/restore-plan';
 
 const ACCENT = '#F8AC37';
 const ACCENT_DARK = '#D8881C';
@@ -43,124 +47,23 @@ interface RestoredState {
 }
 
 function tryRestore(messages: StoredMessage[]): RestoredState | null {
-  let items: ListenItem[] | null = null;
-  let framingText = '';
-  let results: ListenAnswerResult[] | null = null;
-  let correctCount = 0;
-
-  for (const msg of messages) {
-    const cj = msg.content_json as Record<string, unknown> | null;
-    if (!cj) continue;
-
-    if (msg.role === 'bob' && cj.kind === 'listening_plan') {
-      items = cj.items as ListenItem[];
-      framingText = String(cj.framing_text ?? '');
-    }
-    if (msg.role === 'bob' && msg.msg_type === 'evaluation' && cj.is_final === true) {
-      results = cj.results as ListenAnswerResult[];
-      correctCount = Number(cj.score ?? 0);
-    }
-  }
-
-  if (items) return { items, framingText, results, correctCount };
-  return null;
+  const r = restoreExercise<ListenItem[], ListenAnswerResult>(messages, 'listening_plan', 'results', { exerciseKey: 'items' });
+  return r ? { items: r.exercise, framingText: r.framingText, results: r.results, correctCount: r.correctCount } : null;
 }
 
-let _activeAudio: HTMLAudioElement | null = null;
-
-function stopActiveAudio(): void {
-  if (_activeAudio) {
-    _activeAudio.pause();
-    _activeAudio.src = '';
-    _activeAudio = null;
-  }
-}
-
-function PlayIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
-      <path d="M8 5v14l11-7z" />
-    </svg>
-  );
-}
-
-function PauseIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
-      <rect x="6" y="5" width="4" height="14" rx="1" />
-      <rect x="14" y="5" width="4" height="14" rx="1" />
-    </svg>
-  );
-}
-
-function ReplayIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
-      <path d="M3 12a9 9 0 1 0 3-6.7" />
-      <polyline points="3 4 3 10 9 10" />
-    </svg>
-  );
-}
-
-function AudioPlayer({ audiob64, audiomime, itemNumber }: { audiob64: string; audiomime: string; itemNumber: number }) {
+function AudioPlayer({ audioUrl, itemNumber }: { audioUrl: string; itemNumber: number }) {
   const t = useTranslations('cambridge');
+  const tErrors = useTranslations('errors');
   const reduceMotion = useReducedMotion();
-  const [playing, setPlaying] = useState(false);
-  const [hasPlayed, setHasPlayed] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const clip = useAudioClip({ src: audioUrl });
+  const playing = clip.isPlaying;
+  const progress = clip.progress;
+  const hasPlayed = clip.hasPlayed;
+  const failed = clip.failed;
 
-  const stopLocal = () => {
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current = null;
-    }
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
-    }
-    setPlaying(false);
-    if (_activeAudio === audioRef.current) _activeAudio = null;
-  };
-
-  useEffect(() => () => stopLocal(), []);
-
-  const handlePlay = async () => {
-    if (playing) {
-      stopLocal();
-      setProgress(0);
-      return;
-    }
-
-    stopActiveAudio();
-
-    const url = pcmToWavBase64(audiob64, audiomime);
-    const audio = new Audio(url);
-    audioRef.current = audio;
-    _activeAudio = audio;
-
-    audio.onended = () => {
-      stopLocal();
-      setHasPlayed(true);
-      setProgress(1);
-      setTimeout(() => setProgress(0), 600);
-    };
-    audio.onerror = () => stopLocal();
-
-    setPlaying(true);
-    intervalRef.current = setInterval(() => {
-      if (audio.duration > 0) setProgress(audio.currentTime / audio.duration);
-    }, 100);
-
-    try {
-      await audio.play();
-    } catch {
-      stopLocal();
-    }
-  };
-
-  const label = playing
+  const label = failed
+    ? tErrors('retry')
+    : playing
     ? t('ket.listenAndChoose.playing')
     : hasPlayed
     ? t('ket.listenAndChoose.listenAgain')
@@ -181,7 +84,7 @@ function AudioPlayer({ audiob64, audiomime, itemNumber }: { audiob64: string; au
         )}
         <button
           type="button"
-          onClick={handlePlay}
+          onClick={clip.toggle}
           aria-label={label}
           className="relative w-14 h-14 rounded-full flex items-center justify-center transition-transform active:scale-95 text-white"
           style={{ background: ACCENT }}
@@ -318,8 +221,7 @@ function ListenCard({
         </div>
 
         <AudioPlayer
-          audiob64={item.audio_b64}
-          audiomime={item.audio_mime}
+          audioUrl={item.audio_url}
           itemNumber={item.number}
         />
 
@@ -551,13 +453,12 @@ export function KETListenAndChoosePractice({
 
   const [phase, setPhase] = useState<Phase>('loading');
   const [sessionId, setSessionId] = useState<string | undefined>(initialSessionId);
-  const [userId, setUserId] = useState<string | undefined>();
   const [items, setItems] = useState<ListenItem[]>([]);
   const [framingText, setFramingText] = useState('');
   const [answers, setAnswers] = useState<Record<number, 'A' | 'B' | 'C'>>({});
   const [results, setResults] = useState<ListenAnswerResult[]>([]);
   const [correctCount, setCorrectCount] = useState(0);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<{ code?: string; message?: string } | null>(null);
   const [isNewSession, setIsNewSession] = useState(false);
   const initStartedRef = useRef(false);
 
@@ -576,10 +477,6 @@ export function KETListenAndChoosePractice({
             setCorrectCount(restored.correctCount);
             setPhase('finished');
           } else {
-            const { createSupabaseBrowser } = await import('@/lib/supabase/browser-client');
-            const supabase = createSupabaseBrowser();
-            const { data: { user } } = await supabase.auth.getUser();
-            if (user) setUserId(user.id);
             setPhase('ready');
           }
           return;
@@ -593,21 +490,14 @@ export function KETListenAndChoosePractice({
       setIsNewSession(true);
       setPhase('generating');
 
-      const result = await generateKETListenAndChooseAction({ sessionId: initialSessionId });
+      const result = await generateKETListenAndChooseAction();
 
-      if ('error' in result) {
-        setErrorMsg(result.error);
+      if (!result.ok) {
+        setLoadError({ code: result.code });
         return;
       }
-
-      if (!initialSessionId) {
-        onSessionCreated?.(result.sessionId);
-      }
-
-      setSessionId(result.sessionId);
-      setUserId(result.userId);
-      setItems(result.items);
-      setFramingText(result.framingText);
+      setItems(result.data.items);
+      setFramingText(result.data.framingText);
       setPhase('ready');
     }
 
@@ -619,19 +509,18 @@ export function KETListenAndChoosePractice({
   }
 
   async function handleSubmit() {
-    if (!sessionId || !userId) return;
-    stopActiveAudio();
+    stopActiveClip();
     setPhase('submitting');
 
     const result = await submitKETListenAnswersAction({
       sessionId,
-      userId,
+      framingText,
       answers,
       items,
     });
 
     if ('error' in result) {
-      setErrorMsg(result.error);
+      setLoadError({ message: result.error });
       setPhase('ready');
       return;
     }
@@ -639,6 +528,8 @@ export function KETListenAndChoosePractice({
     setResults(result.results);
     setCorrectCount(result.correctCount);
     setPhase('finished');
+    if (!sessionId) onSessionCreated?.(result.sessionId);
+    setSessionId(result.sessionId);
     onSessionFinished?.();
   }
 
@@ -646,20 +537,7 @@ export function KETListenAndChoosePractice({
   const allAnswered = answeredCount === items.length && items.length > 0;
   const progressPct = items.length > 0 ? (answeredCount / items.length) * 100 : 0;
 
-  if (errorMsg) {
-    return (
-      <div className="flex flex-col items-center justify-center gap-4 p-8 text-center min-h-[40vh]">
-        <p className="text-red-500 font-semibold">{errorMsg}</p>
-        <button
-          type="button"
-          onClick={onBack}
-          className="px-5 py-2 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition-colors text-sm"
-        >
-          {t('ket.listenAndChoose.back')}
-        </button>
-      </div>
-    );
-  }
+  if (loadError) return <ActivityLoadError {...loadError} onBack={onBack} />;
 
   return (
     <div className="flex flex-col h-full relative">
@@ -784,7 +662,6 @@ export function KETListenAndChoosePractice({
             <CelebrationCard
               score={correctCount}
               scoreMax={5}
-              feedback={t('ket.listenAndChoose.celebrationFeedback')}
               onAction={onOpenDashboard}
               actionLabel={t('ket.listenAndChoose.celebrationAction')}
               animate={isNewSession}

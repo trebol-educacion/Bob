@@ -1,32 +1,19 @@
 'use server';
 
-import { z } from 'zod';
 import { getPrompt } from '@/lib/prompts/db-prompts';
-import { stripDashes } from '@/lib/text';
-import { callGemini, isOk } from '@/lib/gemini-client';
-import { persistMessage, persistMessages } from '@/lib/persist-activity';
-import { createSessionAction } from '@/actions/sessions';
-import { createSupabaseServer } from '@/lib/supabase/server';
-import { generateSpeechAction } from '@/actions/gemini';
-import { MODELS } from '@/lib/models';
 import { isAcceptedAnswer } from '@/lib/answer-match';
+import { PetGapFillPlanSchema, type PetGapFillPlan } from '@/lib/bank-plans/pet-listening-part3';
+import { bankStamp, pickPlan } from '@/lib/item-bank/plan-bank';
+import { fail, ok, type ActionResult } from '@/lib/result';
+import { completeActivity } from '@/lib/session/complete';
+import { currentUserId } from '@/lib/session/lifecycle';
+import { sealPlan, unsealPlan } from '@/lib/session/sealed-plan';
 
-const GapSchema = z.object({
-  number: z.number().int().min(1).max(6),
-  answer: z.string(),
-  accept: z.array(z.string()).default([]),
-});
+const EXAM_PART = 'pet_listening_part3';
+const FRAMING_FALLBACK =
+  'Vas a escuchar una charla corta de una sola persona. Después, completa el resumen escribiendo o arrastrando la palabra que falta en cada hueco.';
 
-const GenerationSchema = z.object({
-  context: z.string(),
-  summary_title: z.string(),
-  transcript: z.string(),
-  summary: z.string(),
-  gaps: z.array(GapSchema).length(6),
-  word_bank: z.array(z.string()).min(6).max(12),
-});
-
-type GenerationGap = z.infer<typeof GapSchema>;
+type GenerationGap = PetGapFillPlan['gaps'][number];
 
 /** A gap as sent to the client: number only, never the answer key. */
 export interface PETGapFillClientGap {
@@ -40,14 +27,12 @@ export interface PETGapFillExercise {
   summary: string;
   gaps: PETGapFillClientGap[];
   word_bank: string[];
-  audio_b64: string;
-  audio_mime: string;
+  audio_url: string;
 }
 
 /** Full result returned from generatePETListeningGapFillAction. */
 export interface PETListeningGapFillResult {
-  sessionId: string;
-  userId: string;
+  planToken: string;
   framingText: string;
   exercise: PETGapFillExercise;
 }
@@ -62,6 +47,7 @@ export interface PETGapFillGapResult {
 
 /** Full submit result. */
 export interface PETListeningGapFillSubmitResult {
+  sessionId: string;
   correct_count: number;
   total: number;
   gap_results: PETGapFillGapResult[];
@@ -72,143 +58,49 @@ function isAccepted(userInput: string, gap: GenerationGap): boolean {
   return isAcceptedAnswer(userInput, [gap.answer, ...gap.accept]);
 }
 
-function safeParse<T>(schema: z.ZodType<T>, raw: string): T | null {
-  try {
-    return schema.parse(JSON.parse(raw));
-  } catch {
-    return null;
-  }
-}
+export async function generatePETListeningGapFillAction(): Promise<ActionResult<PETListeningGapFillResult>> {
+  const userId = await currentUserId();
+  if (!userId) return fail('unauthenticated');
 
-/**
- * Generates one PET B1 Listening Part 3 interactive gap-fill exercise.
- * Returns the exercise WITHOUT the answer key and with empty audio; the key
- * stays server-side and the TTS audio is synthesized off the critical path.
- * Creates a session when none is provided.
- */
-export async function generatePETListeningGapFillAction(input: {
-  sessionId?: string;
-}): Promise<PETListeningGapFillResult | { error: string }> {
-  let sessionId = input.sessionId;
-  let userId: string | undefined;
+  const picked = await pickPlan({
+    exam: 'pet',
+    cefr: 'b1',
+    examPart: EXAM_PART,
+    skill: 'listening',
+    schema: PetGapFillPlanSchema,
+    userId,
+  });
+  if (!picked.ok) return picked;
 
-  if (!sessionId) {
-    const result = await createSessionAction({
-      mode: 'cambridge_pet_listening_part3',
-      title: 'Listening Part 3: Interactive Gap-Fill',
-    });
-    if (!result.data) return { error: result.error ?? 'Could not create session' };
-    sessionId = result.data.id;
-    userId = result.data.user_id;
-  } else {
-    const supabase = await createSupabaseServer();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return { error: 'Not authenticated' };
-    userId = user.id;
-  }
-
-  const [generationPrompt, framingText] = await Promise.all([
-    getPrompt('cambridge_pet_listening_part3_b1_generation').catch(() => null),
-    getPrompt('cambridge_pet_listening_part3_b1_framing').catch(
-      () =>
-        'Vas a escuchar una charla corta de una sola persona. Después, completa el resumen escribiendo o arrastrando la palabra que falta en cada hueco.'
-    ),
-  ]);
-
-  const cleanFramingText = stripDashes(framingText);
-
-  if (!generationPrompt) return { error: 'Could not load generation prompt' };
-
-  const geminiResult = await callGemini(
-    { promptKey: 'cambridge_pet_listening_part3_b1_generation', model: MODELS.FLASH_LITE, userId },
-    (ai) =>
-      ai.models.generateContent({
-        model: MODELS.FLASH_LITE,
-        contents: [{ role: 'user', parts: [{ text: generationPrompt }] }],
-        config: { responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
-      })
-  );
-
-  if (!isOk(geminiResult)) return { error: 'Could not generate exercise' };
-
-  const rawText = geminiResult.data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
-  const parsed = safeParse(GenerationSchema, rawText);
-  if (!parsed) return { error: 'Unexpected model response' };
-
-  const cleanGaps = parsed.gaps.map((gap) => ({
-    number: gap.number,
-    answer: stripDashes(gap.answer),
-    accept: gap.accept.map((alt) => stripDashes(alt)),
-  }));
-
-  const cleanWordBank = parsed.word_bank.map((w) => stripDashes(w));
-  const cleanSummary = stripDashes(parsed.summary);
-  const cleanSummaryTitle = stripDashes(parsed.summary_title);
-  const cleanContext = stripDashes(parsed.context);
-
-  const exercise: PETGapFillExercise = {
-    context: cleanContext,
-    summary_title: cleanSummaryTitle,
-    summary: cleanSummary,
-    gaps: cleanGaps.map((gap) => ({ number: gap.number })),
-    word_bank: cleanWordBank,
-    audio_b64: '',
-    audio_mime: 'audio/L16;codec=pcm;rate=24000',
-  };
-
-  persistMessage({
-    sessionId: sessionId!,
-    userId: userId!,
-    role: 'bob',
-    msgType: 'text',
-    contentText: null,
-    contentJson: {
-      kind: 'pet_listening_gapfill_plan',
-      framing_text: cleanFramingText,
-      exercise: {
-        context: cleanContext,
-        summary_title: cleanSummaryTitle,
-        transcript: parsed.transcript,
-        summary: cleanSummary,
-        gaps: cleanGaps,
-        word_bank: cleanWordBank,
-      },
+  const framingText = await getPrompt('cambridge_pet_listening_part3_b1_framing').catch(() => FRAMING_FALLBACK);
+  const { plan, groupId } = picked.data;
+  const sealed = {
+    kind: 'pet_listening_gapfill_plan',
+    framing_text: framingText,
+    exercise: {
+      context: plan.context,
+      summary_title: plan.summary_title,
+      transcript: plan.transcript,
+      summary: plan.summary,
+      gaps: plan.gaps,
+      word_bank: plan.word_bank,
+      audio_url: plan.audio_url,
     },
-  }).catch(() => undefined);
-
-  return {
-    sessionId: sessionId!,
-    userId: userId!,
-    framingText: cleanFramingText,
-    exercise,
+    ...bankStamp(EXAM_PART, groupId),
   };
-}
 
-/** Generates the TTS audio for the monologue transcript, off the critical path. */
-export async function generatePETListeningGapFillAudioAction(input: {
-  sessionId: string;
-  userId: string;
-}): Promise<{ data: string; mimeType: string }> {
-  const supabase = await createSupabaseServer();
-
-  const { data: planRow, error } = await supabase
-    .from('messages')
-    .select('content_json')
-    .eq('session_id', input.sessionId)
-    .eq('user_id', input.userId)
-    .eq('role', 'bob')
-    .eq('msg_type', 'text')
-    .order('created_at', { ascending: true })
-    .limit(1)
-    .single();
-
-  if (error || !planRow) return { data: '', mimeType: 'audio/L16;codec=pcm;rate=24000' };
-
-  const cj = planRow.content_json as { exercise?: { transcript?: string } } | null;
-  const transcript = cj?.exercise?.transcript;
-  if (!transcript) return { data: '', mimeType: 'audio/L16;codec=pcm;rate=24000' };
-
-  return generateSpeechAction(transcript);
+  return ok({
+    planToken: sealPlan(sealed, userId),
+    framingText,
+    exercise: {
+      context: plan.context,
+      summary_title: plan.summary_title,
+      summary: plan.summary,
+      gaps: plan.gaps.map((gap) => ({ number: gap.number })),
+      word_bank: plan.word_bank,
+      audio_url: plan.audio_url,
+    },
+  });
 }
 
 /**
@@ -216,27 +108,14 @@ export async function generatePETListeningGapFillAudioAction(input: {
  * persists results. No LLM involved; the key is re-read from the persisted plan.
  */
 export async function submitPETListeningGapFillAction(input: {
-  sessionId: string;
-  userId: string;
+  sessionId?: string;
+  planToken: string;
   answers: Record<number, string>;
 }): Promise<PETListeningGapFillSubmitResult | { error: string }> {
-  const supabase = await createSupabaseServer();
-
-  const { data: planRow, error } = await supabase
-    .from('messages')
-    .select('content_json')
-    .eq('session_id', input.sessionId)
-    .eq('user_id', input.userId)
-    .eq('role', 'bob')
-    .eq('msg_type', 'text')
-    .order('created_at', { ascending: true })
-    .limit(1)
-    .single();
-
-  if (error || !planRow) return { error: 'Could not load exercise' };
-
-  const cj = planRow.content_json as { exercise?: { gaps?: GenerationGap[] } } | null;
-  const planGaps = cj?.exercise?.gaps;
+  const userId = await currentUserId();
+  if (!userId) return { error: 'unauthenticated' };
+  const plan = unsealPlan<{ exercise?: { gaps?: GenerationGap[] } }>(input.planToken, userId);
+  const planGaps = plan?.exercise?.gaps;
   if (!planGaps || planGaps.length === 0) return { error: 'Could not load exercise' };
 
   const gap_results: PETGapFillGapResult[] = planGaps.map((gap) => {
@@ -252,36 +131,24 @@ export async function submitPETListeningGapFillAction(input: {
   const correct_count = gap_results.filter((r) => r.is_correct).length;
   const total = planGaps.length;
 
-  persistMessages(
-    gap_results.map((r) => ({
-      sessionId: input.sessionId,
-      userId: input.userId,
-      role: 'user' as const,
-      msgType: 'text' as const,
-      contentText: null,
-      contentJson: {
-        kind: 'pet_listening_gapfill_answer',
-        gap_number: r.number,
-        user_input: r.user_input,
-        is_correct: r.is_correct,
-      },
-    }))
-  ).catch(() => undefined);
-
-  persistMessage({
+  const completed = await completeActivity({
+    mode: 'cambridge_pet_listening_part3',
     sessionId: input.sessionId,
-    userId: input.userId,
-    role: 'bob',
-    msgType: 'evaluation',
-    contentText: null,
-    contentJson: {
+    plan,
+    answers: gap_results.map((r) => ({
+      kind: 'pet_listening_gapfill_answer',
+      gap_number: r.number,
+      user_input: r.user_input,
+      is_correct: r.is_correct,
+    })),
+    evaluation: {
       kind: 'pet_listening_gapfill_evaluation',
       score: correct_count,
       score_max: total,
       gap_results,
-      is_final: true,
     },
-  }).catch(() => undefined);
+  });
+  if (!completed.ok) return { error: completed.code };
 
-  return { correct_count, total, gap_results };
+  return { sessionId: completed.data.sessionId, correct_count, total, gap_results };
 }

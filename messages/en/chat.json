@@ -1,7 +1,4 @@
 {
-  "shell": {
-    "poweredBy": "BOB • Powered by {modelName}"
-  },
   "conversation": {
     "headerTitleChat": "Bob, Chat",
     "headerTitleConversation": "Bob, Conversation",
@@ -39,6 +36,7 @@
       "microphoneAccess": "Please allow microphone access.",
       "conversationError": "Conversation error. Please try again.",
       "sendMessageError": "Error sending the message. Please try again.",
+      "saveError": "We could not save your progress. Please try again.",
       "topicNotAppropriate": "Let's pick a different topic for our conversation."
     }
   },
@@ -69,12 +67,12 @@
     "defaultMessage": "Bob is thinking…",
     "tips": [
       "Practising 10 minutes a day works better than one hour a week.",
-      "Saying words out loud helps your brain remember them.",
+      "Read each instruction carefully before you start.",
       "Mistakes are part of learning. Don't worry about getting it wrong!",
-      "Repeating what you hear greatly improves your pronunciation.",
+      "Not sure? Look for clues in the task before you answer.",
+      "New words stick better when you use them in your own sentences.",
+      "Check your answers at the end: small mistakes are easy to fix.",
       "The more you play with the language, the faster you learn it.",
-      "Take a deep breath before speaking. You've got this!",
-      "Listening to songs in English is also practising.",
       "Bob is here to help you. Have fun with the practice!"
     ]
   },

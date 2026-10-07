@@ -3,6 +3,9 @@ import {
   CollaborativeScenarioSchema,
   DiscussionPlanSchema,
   FCE_COLLABORATIVE_FALLBACK,
+  FCE_COLLABORATIVE_MODE,
+  FCE_DISCUSSION_MODE,
+  FCE_INTERVIEW_MODE,
   InterviewPlanSchema,
   type FCEDiscussionPlan,
   type FCEInterviewPlan,
@@ -10,6 +13,7 @@ import {
 import type { QuestionRoundConfig } from './question-round';
 
 export const FCE_INTERVIEW_CONFIG: QuestionRoundConfig<FCEInterviewPlan> = {
+  mode: FCE_INTERVIEW_MODE,
   promptPrefix: 'cambridge_fce_p1_b2',
   transcribePromptKey: 'cambridge_fce_p1_b2_transcribe',
   planCacheKey: 'cambridge-fce-p1-b2-plan',
@@ -29,6 +33,7 @@ export const FCE_INTERVIEW_CONFIG: QuestionRoundConfig<FCEInterviewPlan> = {
 };
 
 export const FCE_DISCUSSION_CONFIG: QuestionRoundConfig<FCEDiscussionPlan> = {
+  mode: FCE_DISCUSSION_MODE,
   promptPrefix: 'cambridge_fce_p4_b2',
   transcribePromptKey: 'cambridge_fce_p4_b2_transcribe',
   planCacheKey: 'cambridge-fce-p4-b2-plan',
@@ -48,6 +53,7 @@ export const FCE_DISCUSSION_CONFIG: QuestionRoundConfig<FCEDiscussionPlan> = {
 };
 
 export const FCE_COLLABORATIVE_CONFIG: CollaborativeConfig = {
+  mode: FCE_COLLABORATIVE_MODE,
   promptPrefix: 'cambridge_fce_p3_b2',
   scenarioCacheKey: 'cambridge-fce-p3-b2-scenario',
   scenarioFallback: FCE_COLLABORATIVE_FALLBACK,

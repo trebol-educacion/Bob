@@ -4,6 +4,7 @@ import React from 'react';
 import { HomeView } from './HomeView';
 import { PracticeModeSelectView } from './PracticeModeSelectView';
 import { PracticeSessionView } from './PracticeSessionView';
+import type { PracticeResumeInput } from '@/hooks/practice/usePracticeBoot';
 import type { AppState } from '@/lib/routing';
 import type { Organization } from '@/lib/organization';
 import type { CefrLevel } from '@/lib/types/practice';
@@ -20,6 +21,10 @@ export interface PracticeHomeFlowProps {
   practiceMode: PracticeActivityMode;
   onSelectPracticeMode: (mode: PracticeActivityMode) => void;
   onExitPractice: () => void;
+  resume?: PracticeResumeInput;
+  onSessionCreated: (sessionId: string) => void;
+  onSessionFinished: () => void;
+  onPracticeAgain: () => void;
 }
 
 /**
@@ -35,6 +40,10 @@ export function PracticeHomeFlow({
   practiceMode,
   onSelectPracticeMode,
   onExitPractice,
+  resume,
+  onSessionCreated,
+  onSessionFinished,
+  onPracticeAgain,
 }: PracticeHomeFlowProps) {
   if (appState === 'practice-mode-select') {
     return <PracticeModeSelectView onSelectMode={onSelectPracticeMode} />;
@@ -43,7 +52,12 @@ export function PracticeHomeFlow({
   if (appState === 'practice-session') {
     return (
       <PracticeSessionView
+        key={`${practiceMode}:${resume?.sessionId ?? 'new'}`}
         mode={practiceMode}
+        resume={resume}
+        onSessionCreated={onSessionCreated}
+        onSessionFinished={onSessionFinished}
+        onPracticeAgain={onPracticeAgain}
         organization={organization}
         cefrActiveLevel={cefrActiveLevel}
         skillLevels={skillLevels}

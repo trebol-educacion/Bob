@@ -2,26 +2,11 @@
  * Assessment, shared type contracts.
  */
 
-import type { Skill, AssessmentResultListening, AssessmentResultReading } from '@/lib/types/skills';
+import type { Skill } from '@/lib/types/skills';
 
 export interface AssessmentPrompt {
   turn_number: number;
   prompt_text: string;
-}
-
-export interface AssessmentListeningItem {
-  id: string;
-  audio_url: string;
-  transcript: string | null;
-  question: string;
-  options: Array<{ key: string; label: string }>;
-}
-
-export interface AssessmentReadingItem {
-  id: string;
-  stimulus_text: string;
-  question: string;
-  options: Array<{ key: string; label: string }>;
 }
 
 export interface AssessmentWritingTask {
@@ -31,12 +16,10 @@ export interface AssessmentWritingTask {
 
 export type StartAssessmentResult =
   | { status: 'ok'; skill: 'speaking'; assessment_id: string; prompts: AssessmentPrompt[]; is_yl: boolean }
-  | { status: 'ok'; skill: 'listening'; assessment_id: string; items: AssessmentListeningItem[] }
-  | { status: 'ok'; skill: 'reading'; assessment_id: string; items: AssessmentReadingItem[] }
   | { status: 'ok'; skill: 'writing'; assessment_id: string; task: AssessmentWritingTask }
   | { status: 'cooldown'; days_remaining: number; available_at: string }
   | { status: 'pending' }
-  | { status: 'error'; code: 'unauthenticated' | 'db_error' | 'no_prompts' | 'no_items' };
+  | { status: 'error'; code: 'unauthenticated' | 'db_error' | 'no_prompts' | 'unsupported_skill' };
 
 export interface SubmitSpeakingTurn {
   turn_number: number;
@@ -50,24 +33,6 @@ export interface SubmitSpeakingTurn {
 export type SubmitSpeakingResult =
   | { status: 'queued'; assessment_id: string }
   | { status: 'error'; code: 'invalid_audio' | 'unauthenticated' | 'db_error' };
-
-export interface SubmitListeningAnswer {
-  item_id: string;
-  selected_key: string;
-}
-
-export type SubmitListeningResult =
-  | { status: 'ok'; result: AssessmentResultListening }
-  | { status: 'error'; code: 'unauthenticated' | 'invalid_items' | 'db_error' };
-
-export interface SubmitReadingAnswer {
-  item_id: string;
-  selected_key: string;
-}
-
-export type SubmitReadingResult =
-  | { status: 'ok'; result: AssessmentResultReading }
-  | { status: 'error'; code: 'unauthenticated' | 'invalid_items' | 'db_error' };
 
 export type SubmitWritingResult =
   | { status: 'queued'; assessment_id: string }

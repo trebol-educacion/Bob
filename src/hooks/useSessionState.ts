@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { createSessionAction, getSessionsAction, deleteSessionAction, BobSession } from '@/actions/sessions';
+import { openGenericSessionAction } from '@/actions/generic-session';
+import { getSessionsAction, deleteSessionAction, BobSession } from '@/actions/sessions';
 import { getMessagesAction, StoredMessage } from '@/actions/messages';
 
 interface UseSessionStateReturn {
@@ -16,7 +17,7 @@ interface UseSessionStateReturn {
   handleNewSession: (resetToModeSelection: () => void) => void;
   handleSelectSession: (id: string, onSelected: (mode: string, topic: string) => void) => Promise<void>;
   handleDeleteSession: (id: string, activeSessionId: string | null, resetToModeSelection: () => void) => Promise<void>;
-  handleConversationSessionStart: (topic: string) => void;
+  handleConversationSessionStart: (topic: string) => Promise<string | undefined>;
   refreshSessions: () => Promise<void>;
 }
 
@@ -83,12 +84,17 @@ export function useSessionState(userEmail: string | undefined): UseSessionStateR
     if (error) { console.error('deleteSessionAction:', error); setSessions(snapshot); }
   }, [sessions, clearActiveSession]);
 
-  const handleConversationSessionStart = useCallback((topic: string) => {
-    createSessionAction({ mode: 'generic_conversation', topic, title: topic.slice(0, 60) || 'Conversación' })
-      .then(({ data }) => {
-        if (data) { setActiveSessionId(data.id); setSessions(prev => [data, ...prev]); }
-      });
-  }, []);
+  const handleConversationSessionStart = useCallback(async (topic: string): Promise<string | undefined> => {
+    const opened = await openGenericSessionAction({
+      mode: 'generic_conversation',
+      topic,
+      title: topic.slice(0, 60) || 'Conversación',
+    });
+    if (!opened.ok) return undefined;
+    setActiveSessionId(opened.data.sessionId);
+    await refreshSessions();
+    return opened.data.sessionId;
+  }, [refreshSessions]);
 
   return {
     sessions,

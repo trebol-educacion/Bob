@@ -1,53 +1,29 @@
 'use server';
 
-import { createSupabaseServer } from '@/lib/supabase/server';
-import { ClosedItemSchema } from '@/lib/types/practice';
+import { pickPlan } from '@/lib/item-bank/plan-bank';
+import { ToeflChooseResponsePlanSchema } from '@/lib/bank-plans/toefl-choose-response';
+import { CHOOSE_RESPONSE_PART, toClosedItems } from '@/lib/toefl/choose-response-bank';
+import { currentUserId } from '@/lib/session/lifecycle';
+import { fail, ok, type ActionResult } from '@/lib/result';
 import type { ClosedItem } from '@/lib/types/practice';
 
-interface GetClosedItemsInput {
-  framework: string;
-  exam_part: string;
-  cefr_level: string | null;
+export interface ChooseResponseSet {
+  items: ClosedItem[];
+  bankGroupId: string;
 }
 
-/** Fetches closed-comprehension items from bob_closed_items for the given context. */
-export async function getClosedItemsAction(
-  input: GetClosedItemsInput
-): Promise<{ items: ClosedItem[] } | { error: string }> {
-  try {
-    const supabase = await createSupabaseServer();
-
-    let query = supabase
-      .from('closed_items')
-      .select('*')
-      .eq('framework', input.framework)
-      .eq('exam_part', input.exam_part);
-
-    if (input.cefr_level !== null) {
-      query = query.eq('cefr_level', input.cefr_level);
-    }
-
-    const { data, error } = await query;
-
-    if (error) {
-      console.error('[getClosedItemsAction] Supabase error:', error.message);
-      return { error: error.message };
-    }
-
-    const items: ClosedItem[] = [];
-    for (const row of data ?? []) {
-      const parsed = ClosedItemSchema.safeParse(row);
-      if (parsed.success) {
-        items.push(parsed.data);
-      } else {
-        console.warn('[getClosedItemsAction] Discarding invalid row:', row.id, parsed.error.issues);
-      }
-    }
-
-    return { items };
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'Unknown error';
-    console.error('[getClosedItemsAction] Unexpected error:', message);
-    return { error: message };
-  }
+/** Reads one pregenerated Listen and Choose a Response set with MP3 audio from the bank; no model or TTS call. */
+export async function getClosedItemsAction(): Promise<ActionResult<ChooseResponseSet>> {
+  const userId = await currentUserId();
+  if (!userId) return fail('unauthenticated');
+  const picked = await pickPlan({
+    exam: 'toefl',
+    cefr: 'b1',
+    examPart: CHOOSE_RESPONSE_PART,
+    skill: 'listening',
+    schema: ToeflChooseResponsePlanSchema,
+    userId,
+  });
+  if (!picked.ok) return picked;
+  return ok({ items: toClosedItems(picked.data.plan, picked.data.groupId), bankGroupId: picked.data.groupId });
 }

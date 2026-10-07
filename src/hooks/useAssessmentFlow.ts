@@ -4,23 +4,13 @@ import { useCallback, useState } from 'react';
 import { startAssessmentAction } from '@/actions/assessment';
 import { pickInitialSkillLevelAction, resetOwnSkillLevelAction } from '@/actions/skills';
 import { resolveLevelPolicy } from '@/lib/levels/level-policy';
-import type { AssessmentPrompt, AssessmentListeningItem, AssessmentReadingItem, AssessmentWritingTask } from '@/actions/assessment';
+import type { AssessmentPrompt, AssessmentWritingTask } from '@/actions/assessment';
 import type { AppState } from '@/lib/routing';
 import type { CefrLevel } from '@/lib/types/practice';
 import type {
   Skill,
   SkillLevelMap,
-  AssessmentResultSpeaking,
-  AssessmentResultListening,
-  AssessmentResultReading,
-  AssessmentResultWriting,
 } from '@/lib/types/skills';
-
-export type AssessmentResultUnion =
-  | AssessmentResultSpeaking
-  | AssessmentResultListening
-  | AssessmentResultReading
-  | AssessmentResultWriting;
 
 export interface UseAssessmentFlowParams {
   selectedSkill: Skill | null;
@@ -44,10 +34,7 @@ export function useAssessmentFlow({
   const [assessmentId, setAssessmentId] = useState<string | null>(null);
   const [assessmentPrompts, setAssessmentPrompts] = useState<AssessmentPrompt[]>([]);
   const [assessmentIsYl, setAssessmentIsYl] = useState(false);
-  const [assessmentListeningItems, setAssessmentListeningItems] = useState<AssessmentListeningItem[]>([]);
-  const [assessmentReadingItems, setAssessmentReadingItems] = useState<AssessmentReadingItem[]>([]);
   const [assessmentWritingTask, setAssessmentWritingTask] = useState<AssessmentWritingTask | null>(null);
-  const [assessmentResult, setAssessmentResult] = useState<AssessmentResultUnion | null>(null);
 
   const handleSkillSelect = useCallback((skill: Skill) => {
     setSelectedSkill(skill);
@@ -69,27 +56,12 @@ export function useAssessmentFlow({
     const result = await startAssessmentAction(selectedSkill);
     if (result.status === 'ok') {
       setAssessmentId(result.assessment_id);
-      setAssessmentResult(null);
-      if (result.skill === 'listening') {
-        setAssessmentListeningItems(result.items);
-        setAssessmentReadingItems([]);
-        setAssessmentWritingTask(null);
-        setAssessmentPrompts([]);
-      } else if (result.skill === 'reading') {
-        setAssessmentReadingItems(result.items);
-        setAssessmentListeningItems([]);
-        setAssessmentWritingTask(null);
-        setAssessmentPrompts([]);
-      } else if (result.skill === 'writing') {
+      if (result.skill === 'writing') {
         setAssessmentWritingTask(result.task);
-        setAssessmentListeningItems([]);
-        setAssessmentReadingItems([]);
         setAssessmentPrompts([]);
       } else {
         setAssessmentPrompts(result.prompts);
         setAssessmentIsYl(result.is_yl);
-        setAssessmentListeningItems([]);
-        setAssessmentReadingItems([]);
         setAssessmentWritingTask(null);
       }
       setAppState('assessment-running');
@@ -123,11 +95,7 @@ export function useAssessmentFlow({
     assessmentId,
     assessmentPrompts,
     assessmentIsYl,
-    assessmentListeningItems,
-    assessmentReadingItems,
     assessmentWritingTask,
-    assessmentResult,
-    setAssessmentResult,
     handleSkillSelect,
     handleAssessmentStart,
     handleResetSkillLevel,

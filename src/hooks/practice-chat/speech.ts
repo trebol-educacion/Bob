@@ -1,6 +1,6 @@
 import { generateSpeechAction } from '@/actions/gemini';
-import { getOrCreateCueAudioAction } from '@/actions/modes/yl/audio';
 import { pcmToWavBase64 } from '@/lib/audio';
+import { playClip } from '@/lib/audio-clip';
 
 function speakWithBrowserTts(text: string): void {
   const utterance = new SpeechSynthesisUtterance(text);
@@ -8,18 +8,16 @@ function speakWithBrowserTts(text: string): void {
   speechSynthesis.speak(utterance);
 }
 
-export async function playSpeech(sessionId: string | null, text: string): Promise<void> {
+export async function playSpeech(text: string): Promise<void> {
   try {
-    const { data, mimeType } = sessionId
-      ? await getOrCreateCueAudioAction(sessionId, text)
-      : await generateSpeechAction(text);
+    const { data, mimeType } = await generateSpeechAction(text);
     if (!data) {
       speakWithBrowserTts(text);
       return;
     }
     const audioUrl = pcmToWavBase64(data, mimeType);
-    const audio = new Audio(audioUrl);
-    audio.play();
+    const playback = playClip(audioUrl, { onError: () => speakWithBrowserTts(text) });
+    void playback.finished;
   } catch {
     speakWithBrowserTts(text);
   }

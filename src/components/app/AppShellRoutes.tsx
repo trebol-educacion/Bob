@@ -14,17 +14,15 @@ import { ModeSelectorView } from './views/ModeSelectorView';
 import { PracticeView } from './views/PracticeView';
 import { DashboardView } from './views/DashboardView';
 import { AssessmentView } from './views/AssessmentView';
-import type { BobSession } from '@/actions/sessions';
 import type { StoredMessage } from '@/actions/messages';
-import type { AssessmentPrompt, AssessmentListeningItem, AssessmentReadingItem, AssessmentWritingTask } from '@/actions/assessment';
-import type { AppState, YLRenderProps, ExamRenderProps } from '@/lib/routing';
+import type { AssessmentPrompt, AssessmentWritingTask } from '@/actions/assessment';
+import type { AppState, ActivityRenderProps } from '@/lib/routing';
 import { getRouteForMode, isConversationMode } from '@/lib/routing';
 import type { Organization } from '@/lib/organization';
 import type { AvailableMode } from '@/lib/organization/types';
 import type { PracticeMode, CefrLevel, ModeKey } from '@/lib/types/practice';
 import type { PracticeActivityMode } from '@/lib/practice/types';
 import type { Skill, SkillLevelMap } from '@/lib/types/skills';
-import type { AssessmentResultUnion } from '@/hooks/useAssessmentFlow';
 import type { PracticeTrack } from '@/lib/modes';
 
 export interface AppShellRoutesProps {
@@ -53,22 +51,17 @@ export interface AppShellRoutesProps {
   handleModeSelect: (m: PracticeMode) => void;
   handleAssessmentStart: () => void;
   handlePickLevel: (level: CefrLevel) => void;
-  onConversationSessionStart: (topic: string) => void;
+  onConversationSessionStart: (topic: string) => Promise<string | undefined>;
   refreshSessions: () => void;
   refreshSkillLevels: () => Promise<void>;
   refreshPendingAssessments: () => Promise<void>;
   requestLeaveConfirmation: (action: () => void) => void;
   setActiveSessionId: (id: string | null) => void;
-  setSessions: React.Dispatch<React.SetStateAction<BobSession[]>>;
   cefrSelectorRef: React.RefObject<HTMLDivElement | null>;
   assessmentId: string | null;
   assessmentPrompts: AssessmentPrompt[];
   assessmentIsYl: boolean;
-  assessmentListeningItems: AssessmentListeningItem[];
-  assessmentReadingItems: AssessmentReadingItem[];
   assessmentWritingTask: AssessmentWritingTask | null;
-  assessmentResult: AssessmentResultUnion | null;
-  setAssessmentResult: (result: AssessmentResultUnion | null) => void;
   track: PracticeTrack;
   setTrack: (track: PracticeTrack) => void;
 }
@@ -106,16 +99,11 @@ export function AppShellRoutes({
   refreshPendingAssessments,
   requestLeaveConfirmation,
   setActiveSessionId,
-  setSessions,
   cefrSelectorRef,
   assessmentId,
   assessmentPrompts,
   assessmentIsYl,
-  assessmentListeningItems,
-  assessmentReadingItems,
   assessmentWritingTask,
-  assessmentResult,
-  setAssessmentResult,
   track,
   setTrack,
 }: AppShellRoutesProps) {
@@ -125,22 +113,23 @@ export function AppShellRoutes({
   const onBackToCatalog = useCallback(() => leavePractice('catalog-filtered'), [leavePractice]);
   const onBackHome = useCallback(() => leavePractice('home'), [leavePractice]);
 
-  const handleYLSessionCreated = useCallback((newSessionId: string) => {
+  const handleSessionCreated = useCallback((newSessionId: string) => {
     setActiveSessionId(newSessionId);
     void refreshSessions();
   }, [setActiveSessionId, refreshSessions]);
 
-  const ylProps: YLRenderProps = {
+  const onPracticeAgain = useCallback(() => leavePractice('practice-mode-select'), [leavePractice]);
+
+  const practiceResume =
+    selectedMessages.length > 0 && activeSessionId ? { sessionId: activeSessionId, messages: selectedMessages } : undefined;
+
+  const activityProps: ActivityRenderProps = {
     onBack: onBackToCatalog,
     sessionId: selectedMessages.length > 0 ? activeSessionId ?? undefined : undefined,
     initialMessages: selectedMessages.length > 0 ? selectedMessages : undefined,
-    onSessionCreated: handleYLSessionCreated,
+    onSessionCreated: handleSessionCreated,
     onSessionFinished: refreshSessions,
     onOpenDashboard,
-  };
-
-  const examProps: ExamRenderProps = {
-    onBack: onBackToCatalog,
   };
 
   return (
@@ -164,6 +153,10 @@ export function AppShellRoutes({
             practiceMode={practiceMode}
             onSelectPracticeMode={onSelectPracticeMode}
             onExitPractice={onBackHome}
+            resume={practiceResume}
+            onSessionCreated={handleSessionCreated}
+            onSessionFinished={refreshSessions}
+            onPracticeAgain={onPracticeAgain}
           />
         </motion.div>
       )}
@@ -207,9 +200,9 @@ export function AppShellRoutes({
         </motion.div>
       )}
 
-      {(appState === 'assessment-invite' || appState === 'assessment-running' || appState === 'assessment-result') && (
+      {(appState === 'assessment-invite' || appState === 'assessment-running') && (
         <motion.div
-          key={`assessment-${appState}`}
+          key="assessment"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -20 }}
@@ -228,11 +221,7 @@ export function AppShellRoutes({
             assessmentId={assessmentId}
             assessmentPrompts={assessmentPrompts}
             assessmentIsYl={assessmentIsYl}
-            assessmentListeningItems={assessmentListeningItems}
-            assessmentReadingItems={assessmentReadingItems}
             assessmentWritingTask={assessmentWritingTask}
-            assessmentResult={assessmentResult}
-            setAssessmentResult={setAssessmentResult}
           />
         </motion.div>
       )}
@@ -299,7 +288,6 @@ export function AppShellRoutes({
             activeSessionId={activeSessionId}
             selectedMessages={selectedMessages}
             setActiveSessionId={setActiveSessionId}
-            setSessions={setSessions}
             refreshSessions={refreshSessions}
           />
         </motion.div>
@@ -319,6 +307,7 @@ export function AppShellRoutes({
             skillLevels={skillLevels} cefrActiveLevel={cefrActiveLevel}
             onFinish={onFinish}
             onConversationSessionStart={onConversationSessionStart}
+            refreshSessions={refreshSessions}
           />
         </motion.div>
       )}
@@ -331,9 +320,7 @@ export function AppShellRoutes({
           exit={{ opacity: 0 }}
           className="flex-1 flex flex-col min-h-0"
         >
-          {getRouteForMode(mode)?.render(
-            getRouteForMode(mode)?.kind === 'yl' ? ylProps : examProps
-          )}
+          {getRouteForMode(mode)?.render(activityProps)}
         </motion.div>
       )}
 
@@ -363,6 +350,7 @@ export function AppShellRoutes({
           className="flex-1 flex flex-col min-h-0"
         >
           <ChallengeHome
+            studentLevel={cefrActiveLevel}
             onSelectFramework={() => setAppState('challenge-running')}
             onBack={() => setAppState('dashboard')}
           />

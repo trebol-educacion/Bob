@@ -21,6 +21,7 @@ import {
   type FCELongTurnReferenceVocabulary,
 } from '@/actions/modes/fce-p2';
 import type { StoredMessage } from '@/actions/messages';
+import { resolveActivityBoot } from '@/lib/activity/boot';
 
 export interface FCEPictureDescriptionPracticeProps {
   onBack: () => void;
@@ -45,7 +46,7 @@ const COVERAGE_DIMENSIONS = [
 type CoverageDimension = (typeof COVERAGE_DIMENSIONS)[number];
 
 interface RestoredState {
-  plan: Pick<FCELongTurnResult, 'topic' | 'framingText' | 'comparisonQuestion' | 'scenePromptA' | 'scenePromptB' | 'referenceVocabulary' | 'languageBank' | 'imageUrlA' | 'imageUrlB'>;
+  plan: Pick<FCELongTurnResult, 'topic' | 'framingText' | 'comparisonQuestion' | 'scenePromptA' | 'scenePromptB' | 'referenceVocabulary' | 'languageBank' | 'imageUrlA' | 'imageUrlB' | 'bankGroupId'>;
   feedback: FCELongTurnFeedback | null;
   transcript: string | null;
 }
@@ -70,6 +71,7 @@ function tryRestore(messages: StoredMessage[]): RestoredState | null {
         languageBank: (cj.language_bank ?? {}) as FCELongTurnResult['languageBank'],
         imageUrlA: String(cj.image_url_a ?? ''),
         imageUrlB: String(cj.image_url_b ?? ''),
+        bankGroupId: String(cj.bank_group_id ?? ''),
       };
     }
     if (msg.role === 'user' && cj.kind === 'fce_long_turn_submission') {
@@ -438,10 +440,8 @@ export function FCEPictureDescriptionPractice({
   onOpenDashboard,
 }: FCEPictureDescriptionPracticeProps) {
   const t = useTranslations('cambridge');
-
   const [phase, setPhase] = useState<Phase>('loading');
   const [sessionId, setSessionId] = useState<string | undefined>(initialSessionId);
-  const [userId, setUserId] = useState<string | undefined>();
   const [topic, setTopic] = useState('');
   const [framingText, setFramingText] = useState('');
   const [comparisonQuestion, setComparisonQuestion] = useState('');
@@ -454,7 +454,7 @@ export function FCEPictureDescriptionPractice({
     emotions: [],
     settings: [],
   });
-  const [, setLanguageBank] = useState<FCELongTurnResult['languageBank']>({
+  const [languageBank, setLanguageBank] = useState<FCELongTurnResult['languageBank']>({
     openers: [],
     contrast: [],
     speculation: [],
@@ -462,6 +462,7 @@ export function FCEPictureDescriptionPractice({
   });
   const [imageUrlA, setImageUrlA] = useState('');
   const [imageUrlB, setImageUrlB] = useState('');
+  const [bankGroupId, setBankGroupId] = useState('');
   const [audioDuration, setAudioDuration] = useState(0);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [mimeType, setMimeType] = useState('audio/webm');
@@ -508,63 +509,58 @@ export function FCEPictureDescriptionPractice({
 
   void isRecording;
   void audioDuration;
-
   useEffect(() => {
     if (initStartedRef.current) return;
     initStartedRef.current = true;
 
     async function init() {
-      if (initialMessages && initialMessages.length > 0) {
-        const restored = tryRestore(initialMessages);
-        if (restored) {
-          setTopic(restored.plan.topic);
-          setFramingText(restored.plan.framingText);
-          setComparisonQuestion(restored.plan.comparisonQuestion);
-          setScenePromptA(restored.plan.scenePromptA);
-          setScenePromptB(restored.plan.scenePromptB);
-          setReferenceVocabulary(restored.plan.referenceVocabulary);
-          setLanguageBank(restored.plan.languageBank);
-          setImageUrlA(restored.plan.imageUrlA);
-          setImageUrlB(restored.plan.imageUrlB);
+      const boot = resolveActivityBoot({ initialMessages, sessionId: initialSessionId, tryRestore });
+      if (boot.kind === 'restore') {
+        const restored = boot.data;
+        setTopic(restored.plan.topic);
+        setFramingText(restored.plan.framingText);
+        setComparisonQuestion(restored.plan.comparisonQuestion);
+        setScenePromptA(restored.plan.scenePromptA);
+        setScenePromptB(restored.plan.scenePromptB);
+        setReferenceVocabulary(restored.plan.referenceVocabulary);
+        setLanguageBank(restored.plan.languageBank);
+        setImageUrlA(restored.plan.imageUrlA);
+        setImageUrlB(restored.plan.imageUrlB);
+        setBankGroupId(restored.plan.bankGroupId);
 
-          if (restored.feedback) {
-            setFeedback(restored.feedback);
-            setTranscript(restored.transcript);
-            setPhase('finished');
-          } else {
-            setPhase('ready');
-          }
-          return;
+        if (restored.feedback) {
+          setFeedback(restored.feedback);
+          setTranscript(restored.transcript);
+          setPhase('finished');
+        } else {
+          setPhase('ready');
         }
+        return;
       }
 
-      if (initialSessionId) {
+      if (boot.kind === 'restore-failed') {
+        setErrorMsg(t('fce.restoreFailed'));
         return;
       }
 
       setIsNewSession(true);
-      const result = await generateFCEPictureDescriptionAction({ sessionId: initialSessionId });
+      const result = await generateFCEPictureDescriptionAction();
 
-      if ('error' in result) {
-        setErrorMsg(result.error);
+      if (!result.ok) {
+        setErrorMsg(result.code === 'no_content' ? t('fce.noContent') : t('fce.loadFailed'));
         return;
       }
 
-      if (!initialSessionId) {
-        onSessionCreated?.(result.sessionId);
-      }
-
-      setSessionId(result.sessionId);
-      setUserId(result.userId);
-      setTopic(result.topic);
-      setFramingText(result.framingText);
-      setComparisonQuestion(result.comparisonQuestion);
-      setScenePromptA(result.scenePromptA);
-      setScenePromptB(result.scenePromptB);
-      setReferenceVocabulary(result.referenceVocabulary);
-      setLanguageBank(result.languageBank);
-      setImageUrlA(result.imageUrlA);
-      setImageUrlB(result.imageUrlB);
+      setTopic(result.data.topic);
+      setFramingText(result.data.framingText);
+      setComparisonQuestion(result.data.comparisonQuestion);
+      setScenePromptA(result.data.scenePromptA);
+      setScenePromptB(result.data.scenePromptB);
+      setReferenceVocabulary(result.data.referenceVocabulary);
+      setLanguageBank(result.data.languageBank);
+      setImageUrlA(result.data.imageUrlA);
+      setImageUrlB(result.data.imageUrlB);
+      setBankGroupId(result.data.bankGroupId);
       setPhase('instructions');
     }
 
@@ -585,16 +581,20 @@ export function FCEPictureDescriptionPractice({
   }
 
   async function handleEvaluate(blob: Blob, mime: string, duration: number) {
-    if (!sessionId || !userId) return;
-
     const result = await evaluateFCEPictureDescriptionAction({
       sessionId,
-      userId,
-      topic,
-      comparisonQuestion,
-      scenePromptA,
-      scenePromptB,
-      referenceVocabulary,
+      plan: {
+        topic,
+        framingText,
+        comparisonQuestion,
+        scenePromptA,
+        scenePromptB,
+        referenceVocabulary,
+        languageBank,
+        imageUrlA,
+        imageUrlB,
+        bankGroupId,
+      },
       audioBlob: blob,
       mimeType: mime,
       audioDuration: duration,
@@ -610,8 +610,12 @@ export function FCEPictureDescriptionPractice({
       return;
     }
 
-    setFeedback(result);
-    setTranscript(result.transcript || result.transcript_used);
+    if (!sessionId) {
+      setSessionId(result.sessionId);
+      onSessionCreated?.(result.sessionId);
+    }
+    setFeedback(result.feedback);
+    setTranscript(result.feedback.transcript || result.feedback.transcript_used);
     setPhase('finished');
     onSessionFinished?.();
   }
@@ -878,7 +882,6 @@ export function FCEPictureDescriptionPractice({
               score={coverageHits}
               scoreMax={6}
               hideGrade
-              feedback={t('fce.pictureDescription.celebrationFeedback')}
               onAction={onOpenDashboard}
               actionLabel={t('fce.pictureDescription.celebrationAction')}
               animate={isNewSession}

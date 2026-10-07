@@ -3,6 +3,7 @@
 import { matchesAcceptedText } from '@/lib/item-bank/group-grading';
 import { startGroupSession, submitGroupSession } from '@/lib/item-bank/group-session';
 import { createGroupStrategy } from '@/lib/item-bank/group-strategy';
+import type { GroupSubmitInput } from '@/lib/item-bank/group-session-types';
 import type { GroupAnswers } from '@/lib/item-bank/group-types';
 
 const STRATEGY = createGroupStrategy({
@@ -17,6 +18,6 @@ export async function startFCEListeningPart2Action() {
   return startGroupSession(STRATEGY);
 }
 
-export async function submitFCEListeningPart2Action(sessionId: string, answers: GroupAnswers) {
-  return submitGroupSession(STRATEGY, sessionId, answers);
+export async function submitFCEListeningPart2Action(input: GroupSubmitInput<GroupAnswers>) {
+  return submitGroupSession(STRATEGY, input);
 }

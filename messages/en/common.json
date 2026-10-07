@@ -5,5 +5,11 @@
     "lockedByOrg": "Your school locked your CEFR level",
     "lockedAria": "Locked by your school",
     "clear": "Click to clear your level"
+  },
+  "writing": {
+    "words": "Words:",
+    "moreToSend": "{remaining} more to send",
+    "submit": "Send my text",
+    "editorLabel": "Your text"
   }
 }

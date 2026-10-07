@@ -1,13 +1,16 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { CheckCircle, XCircle } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { InfoCard } from '@/components/chat';
-import { persistMessage } from '@/lib/persist-activity';
 import { getBuildSentenceItemsAction } from '@/actions/modes/writing-build-sentence';
-import { createSessionAction } from '@/actions/sessions';
+import { useClosedSetSubmit } from '@/hooks/useClosedSetSubmit';
+import { resolveActivityBoot } from '@/lib/activity/boot';
+import { restoreClosedSet, scoreClosedEntries, type ClosedEntryResult } from '@/lib/toefl/closed-set';
+import type { ActivityRenderProps } from '@/lib/routing';
+import { ActivityLoadError } from '@/components/practice/ActivityLoadError';
 import { BobMascotLoader } from '@/components/chat/BobMascotLoader';
 
 export interface BuildSentenceItem {
@@ -17,10 +20,7 @@ export interface BuildSentenceItem {
   target_sentence: string;
 }
 
-/** Props for the deterministic Build-a-Sentence activity (TOEFL Writing). */
-export interface BuildSentencePracticeProps {
-  onBack: () => void;
-}
+export type BuildSentencePracticeProps = ActivityRenderProps;
 
 interface ItemResult {
   correct: boolean;
@@ -28,58 +28,59 @@ interface ItemResult {
   expected: string;
 }
 
-function normalize(s: string): string {
-  return s.toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ').trim();
+function evaluate(ordered: string[], target: string): boolean {
+  return scoreClosedEntries([{ id: '', selected: ordered.join(' '), expected: target, match: 'sentence' }])[0].correct;
 }
 
-function evaluate(ordered: string[], target: string): boolean {
-  return normalize(ordered.join(' ')) === normalize(target);
+function toItemResult(entry: ClosedEntryResult): ItemResult {
+  return { correct: entry.correct, ordered_tokens: entry.selected.split(' '), expected: entry.expected };
 }
 
 /** TOEFL Writing, Build a Sentence: drag tokens into order, deterministic scoring. */
-export function BuildSentencePractice({ onBack }: BuildSentencePracticeProps) {
+export function BuildSentencePractice({
+  onBack,
+  sessionId,
+  initialMessages,
+  onSessionCreated,
+  onSessionFinished,
+}: BuildSentencePracticeProps) {
   const t = useTranslations('resultcard');
-  const tErrors = useTranslations('errors');
   const tLoading = useTranslations('loading');
-  const [sessionId, setSessionId] = useState('');
-  const [userId, setUserId] = useState('');
+  const [boot] = useState(() =>
+    resolveActivityBoot({ initialMessages, sessionId, tryRestore: (messages) => restoreClosedSet(messages) }),
+  );
   const [items, setItems] = useState<BuildSentenceItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(boot.kind === 'generate');
+  const [loadError, setLoadError] = useState<string | null>(boot.kind === 'restore-failed' ? 'restore_failed' : null);
+  const callbacks = useMemo(() => ({ sessionId, onSessionCreated, onSessionFinished }), [sessionId, onSessionCreated, onSessionFinished]);
+  const { submit, error: submitError } = useClosedSetSubmit(callbacks);
+  const [bankGroupId, setBankGroupId] = useState<string | undefined>(undefined);
   const [index, setIndex] = useState(0);
   const [bank, setBank] = useState<string[]>([]);
   const [ordered, setOrdered] = useState<string[]>([]);
   const [result, setResult] = useState<ItemResult | null>(null);
-  const [allResults, setAllResults] = useState<ItemResult[]>([]);
-  const [done, setDone] = useState(false);
+  const [allResults, setAllResults] = useState<ItemResult[]>(() =>
+    boot.kind === 'restore' ? boot.data.map(toItemResult) : [],
+  );
+  const [done, setDone] = useState(boot.kind === 'restore');
 
   useEffect(() => {
+    if (boot.kind !== 'generate') return;
     async function init() {
-      const sessionResult = await createSessionAction({
-        mode: 'toefl_writing_build_sentence',
-        title: 'TOEFL Writing, Build a Sentence',
-      });
-      if (!sessionResult.data) {
-        setLoadError(sessionResult.error ?? 'Failed to create session');
-        setLoading(false);
-        return;
-      }
-      setSessionId(sessionResult.data.id);
-      setUserId(sessionResult.data.user_id);
-
       const res = await getBuildSentenceItemsAction();
-      if ('error' in res) {
-        setLoadError(res.error);
+      if (!res.ok) {
+        setLoadError(res.code);
       } else {
-        setItems(res.items);
-        if (res.items[0]) {
-          setBank([...res.items[0].tokens].sort(() => Math.random() - 0.5));
+        setItems(res.data.items);
+        setBankGroupId(res.data.bankGroupId);
+        if (res.data.items[0]) {
+          setBank([...res.data.items[0].tokens].sort(() => Math.random() - 0.5));
         }
       }
       setLoading(false);
     }
     void init();
-  }, []);
+  }, [boot.kind]);
 
   function pickToken(token: string, bankIdx: number) {
     if (result) return;
@@ -103,15 +104,19 @@ export function BuildSentencePractice({ onBack }: BuildSentencePracticeProps) {
     const correct = evaluate(ordered, item.target_sentence);
     const itemResult: ItemResult = { correct, ordered_tokens: [...ordered], expected: item.target_sentence };
     setResult(itemResult);
+  }
 
-    persistMessage({
-      sessionId,
-      userId,
-      role: 'bob',
-      msgType: 'evaluation',
-      contentJson: { kind: 'closed', correct, selected: ordered.join(' '), expected: item.target_sentence },
-    }).catch((err: unknown) => {
-      console.error('[BuildSentencePractice] evaluation persist failed:', err);
+  function submitAll(results: ItemResult[]) {
+    void submit({
+      mode: 'toefl_writing_build_sentence',
+      bankGroupId,
+      items,
+      entries: items.map((item, index) => ({
+        id: item.id,
+        selected: results[index]?.ordered_tokens.join(' ') ?? '',
+        expected: item.target_sentence,
+        match: 'sentence' as const,
+      })),
     });
   }
 
@@ -125,6 +130,7 @@ export function BuildSentencePractice({ onBack }: BuildSentencePracticeProps) {
     const nextIndex = index + 1;
     if (nextIndex >= items.length) {
       setDone(true);
+      submitAll(nextResults);
     } else {
       setIndex(nextIndex);
       setBank([...items[nextIndex].tokens].sort(() => Math.random() - 0.5));
@@ -136,12 +142,7 @@ export function BuildSentencePractice({ onBack }: BuildSentencePracticeProps) {
   }
 
   if (loadError) {
-    return (
-      <div className="flex flex-col items-center gap-4 py-10">
-        <p className="text-sm text-red-500">{tErrors('couldNotLoadItems')}</p>
-        <button onClick={onBack} className="text-sm text-blue-600 underline">Go back</button>
-      </div>
-    );
+    return <ActivityLoadError code={loadError} onBack={onBack} />;
   }
 
   if (done || items.length === 0) {
@@ -161,6 +162,9 @@ export function BuildSentencePractice({ onBack }: BuildSentencePracticeProps) {
             </span>
           </div>
         ))}
+        {submitError && (
+          <button onClick={() => submitAll(allResults)} className="text-sm text-red-500 underline">{t('retrySave')}</button>
+        )}
         <button onClick={onBack} className="mt-2 text-sm text-blue-600 underline">{t('done')}</button>
       </div>
     );

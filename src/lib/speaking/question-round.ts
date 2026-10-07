@@ -1,17 +1,20 @@
 import { MODELS } from '@/lib/models';
 import { FormativeFeedbackSchema, type FormativeFeedback } from '@/lib/types/practice';
 import { getPrompt } from '@/lib/prompts/db-prompts';
-import { persistMessage, readSessionMessagesForCurrentOrUser } from '@/lib/persist-activity';
+import { currentUserId, finishSession, openSession, recordTurn, type TurnMessage } from '@/lib/session/lifecycle';
+import { fail, ok, type ActionResult } from '@/lib/result';
 import { getOrCreateCachedContent } from '@/lib/cache';
+import { parseJsonResult } from '@/lib/llm/parse-json-result';
 import { callGemini, safeParseFallback } from '@/lib/gemini-client';
-import { toExaminerFeedback } from './examiner-score';
-import type { SpeakingQA } from './types';
+import { toExaminerFeedback, withRubricScore } from './examiner-score';
+import { SPEAKING_ANSWER_KIND } from './question-round-restore';
+import type { QuestionRoundSchema } from './question-round-schema';
+import type { QuestionRoundAnswer, QuestionRoundContext, QuestionRoundEvaluation, SpeakingQA } from './types';
 
-export interface QuestionRoundSchema<TPlan> {
-  safeParse: (x: unknown) => { success: boolean; data?: TPlan; error?: unknown };
-}
+export type { QuestionRoundSchema };
 
 export interface QuestionRoundConfig<TPlan extends object> {
+  mode: string;
   promptPrefix: string;
   transcribePromptKey: string;
   planCacheKey: string;
@@ -20,6 +23,7 @@ export interface QuestionRoundConfig<TPlan extends object> {
   logTag: string;
   eventName: string;
   examinerReaction?: boolean;
+  reactionPromptKey?: string;
   scoredEvaluation?: boolean;
 }
 
@@ -56,7 +60,6 @@ function extractTranscript(raw: string): string {
 
 export async function generateQuestionRoundPlan<TPlan extends object>(
   config: QuestionRoundConfig<TPlan>,
-  sessionId: string,
   userId: string,
   variables: Record<string, string> = {},
 ): Promise<TPlan> {
@@ -74,21 +77,9 @@ export async function generateQuestionRoundPlan<TPlan extends object>(
         })
       );
 
-      if (!result.ok || !result.data.text) {
-        console.error(JSON.stringify({ event: `generate${config.eventName}Action`, error: result.ok ? 'empty response' : result.error }));
-        return config.planFallback;
-      }
-
-      let parsed: unknown;
-      try {
-        parsed = JSON.parse(result.data.text);
-      } catch {
-        console.error(JSON.stringify({ event: `generate${config.eventName}Action`, error: 'invalid JSON' }));
-        return config.planFallback;
-      }
-      return safeParseFallback(config.planSchema, parsed, config.planFallback);
+      return parseJsonResult<TPlan>(result, config.planSchema, `generate${config.eventName}Action`);
     },
-    { storeAs: 'json' }
+    { storeAs: 'json', validate: (plan) => config.planSchema.safeParse(plan).success }
   );
 
   if ('error' in cached) {
@@ -96,18 +87,20 @@ export async function generateQuestionRoundPlan<TPlan extends object>(
     return config.planFallback;
   }
 
-  const persistResult = await persistMessage({
-    sessionId,
-    userId,
-    role: 'bob',
-    msgType: 'phrase',
-    contentJson: cached as unknown as Record<string, unknown>,
-  });
-  if ('error' in persistResult) {
-    console.error(`[${config.logTag} persist] plan:`, persistResult.error);
-  }
-
   return cached;
+}
+
+function planOpening<TPlan extends object>(plan: TPlan): TurnMessage[] {
+  return [{ role: 'bob', msgType: 'phrase', contentJson: plan as unknown as Record<string, unknown> }];
+}
+
+function answerMessage(question: string, answer: string): TurnMessage {
+  return {
+    role: 'user',
+    msgType: 'text',
+    contentText: answer,
+    contentJson: { kind: SPEAKING_ANSWER_KIND, question },
+  };
 }
 
 export async function processQuestionRoundAnswer<TPlan extends object>(
@@ -115,9 +108,11 @@ export async function processQuestionRoundAnswer<TPlan extends object>(
   audioBase64: string,
   mimeType: string,
   question: string,
-  sessionId: string,
-  userId: string,
-): Promise<{ transcribed: string; reaction: string }> {
+  context: QuestionRoundContext<TPlan>,
+): Promise<ActionResult<QuestionRoundAnswer>> {
+  const userId = await currentUserId();
+  if (!userId) return fail('unauthenticated');
+
   const transcribePromptText = await getPrompt(config.transcribePromptKey);
   const transcribeResult = await callGemini(
     { promptKey: config.transcribePromptKey, model: MODELS.FLASH_LITE_PREVIEW, userId },
@@ -138,24 +133,23 @@ export async function processQuestionRoundAnswer<TPlan extends object>(
   const transcribed =
     transcribeResult.ok && transcribeResult.data.text ? extractTranscript(transcribeResult.data.text.trim()) : '';
 
-  const persistResult = await persistMessage({
-    sessionId,
-    userId,
-    role: 'user',
-    msgType: 'user_audio',
-    contentText: transcribed,
-    contentJson: { question },
+  const session = await openSession({
+    mode: config.mode,
+    sessionId: context.sessionId,
+    opening: planOpening(context.plan),
   });
-  if ('error' in persistResult) {
-    console.error(`[${config.logTag} persist] user_audio:`, persistResult.error);
-  }
+  if (!session.ok) return session;
+  const turn = await recordTurn({ ...session.data, messages: [answerMessage(question, transcribed)] });
+  if (!turn.ok) return turn;
 
-  if (config.examinerReaction === false) return { transcribed, reaction: '' };
+  const sessionId = session.data.sessionId;
+  if (config.examinerReaction === false) return ok({ transcribed, reaction: '', sessionId });
 
-  const reactionKey = `${config.promptPrefix}_examiner_reaction`;
+  const reactionKey = config.reactionPromptKey ?? `${config.promptPrefix}_examiner_reaction`;
   const reactionPromptText = await getPrompt(reactionKey, {
     USER_TRANSCRIPT: transcribed,
     LAST_QUESTION: question,
+    QUESTION: question,
   });
   const reactionResult = await callGemini(
     { promptKey: reactionKey, model: MODELS.FLASH_LITE_PREVIEW, userId },
@@ -167,15 +161,18 @@ export async function processQuestionRoundAnswer<TPlan extends object>(
 
   const reaction = cleanReaction(reactionResult.ok ? (reactionResult.data.text ?? '') : '');
 
-  return { transcribed, reaction };
+  return ok({ transcribed, reaction, sessionId });
 }
 
 export async function evaluateQuestionRound<TPlan extends object>(
   config: QuestionRoundConfig<TPlan>,
   questionsAndAnswers: SpeakingQA[],
-  sessionId: string,
-  userId: string,
-): Promise<FormativeFeedback> {
+  context: QuestionRoundContext<TPlan>,
+): Promise<ActionResult<QuestionRoundEvaluation>> {
+  const userId = await currentUserId();
+  if (!userId) return fail('unauthenticated');
+  const unscored = (): ActionResult<QuestionRoundEvaluation> =>
+    ok({ feedback: FormativeFeedbackFallback, sessionId: context.sessionId });
   const transcript = questionsAndAnswers
     .map((qa, i) => `Q${i + 1}: ${qa.question}\nA: ${qa.answer}`)
     .join('\n\n');
@@ -195,56 +192,35 @@ export async function evaluateQuestionRound<TPlan extends object>(
 
   if (!result.ok || !result.data.text) {
     console.error(JSON.stringify({ event: `evaluate${config.eventName}Action`, error: result.ok ? 'empty response' : result.error }));
-    return FormativeFeedbackFallback;
+    return unscored();
   }
 
   let parsed: unknown;
   try {
     parsed = JSON.parse(result.data.text);
   } catch {
-    return FormativeFeedbackFallback;
+    return unscored();
   }
 
   const scored = config.scoredEvaluation ? toExaminerFeedback(parsed) : null;
-  if (config.scoredEvaluation && !scored) return FormativeFeedbackFallback;
-  const feedback = scored ?? safeParseFallback(FormativeFeedbackSchema, parsed, FormativeFeedbackFallback);
+  if (config.scoredEvaluation && !scored) return unscored();
+  const feedback = scored ?? withRubricScore(safeParseFallback(FormativeFeedbackSchema, parsed, FormativeFeedbackFallback));
 
-  const persistResult = await persistMessage({
-    sessionId,
-    userId,
-    role: 'bob',
-    msgType: 'evaluation',
-    contentJson: { ...(feedback as unknown as Record<string, unknown>), is_final: true },
+  const session = await openSession({
+    mode: config.mode,
+    sessionId: context.sessionId,
+    opening: [
+      ...planOpening(context.plan),
+      ...questionsAndAnswers.map((qa) => answerMessage(qa.question, qa.answer)),
+    ],
   });
-  if ('error' in persistResult) {
-    console.error(`[${config.logTag} persist] evaluation:`, persistResult.error);
-  }
+  if (!session.ok) return session;
 
-  return feedback;
-}
+  const finished = await finishSession({
+    ...session.data,
+    evaluation: feedback as unknown as Record<string, unknown>,
+  });
+  if (!finished.ok) return finished;
 
-export async function readQuestionRoundMessages<TPlan extends object>(
-  config: QuestionRoundConfig<TPlan>,
-  sessionId: string,
-): Promise<{ plan: TPlan | null; qas: SpeakingQA[]; feedback: FormativeFeedback | null }> {
-  const messages = await readSessionMessagesForCurrentOrUser(sessionId);
-
-  let plan: TPlan | null = null;
-  const qas: SpeakingQA[] = [];
-  let feedback: FormativeFeedback | null = null;
-
-  for (const msg of messages) {
-    if (msg.role === 'bob' && msg.msg_type === 'phrase' && plan === null) {
-      const r = config.planSchema.safeParse(msg.content_json);
-      if (r.success) plan = r.data as TPlan;
-    } else if (msg.role === 'user' && msg.msg_type === 'user_audio') {
-      const json = msg.content_json as { question?: string } | null;
-      qas.push({ question: json?.question ?? '', answer: msg.content_text ?? '' });
-    } else if (msg.role === 'bob' && msg.msg_type === 'evaluation') {
-      const r = FormativeFeedbackSchema.safeParse(msg.content_json);
-      if (r.success) feedback = r.data;
-    }
-  }
-
-  return { plan, qas, feedback };
+  return ok({ feedback, sessionId: session.data.sessionId });
 }

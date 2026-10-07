@@ -1,6 +1,7 @@
-import type { BankItem, ItemBankSkill, ItemGroup } from './types';
+import type { BankItem, ItemBankExam, ItemBankSkill, ItemGroup } from './types';
 
 export const GROUP_PLAN_KIND = 'fce_group_plan';
+export const GROUP_ANSWERS_KIND = 'fce_group_answers';
 export const GROUP_EVALUATION_KIND = 'fce_group_evaluation';
 
 export interface GroupScoreSummary {
@@ -11,6 +12,8 @@ export interface GroupScoreSummary {
 
 export interface GroupSessionStrategy<E extends { groupId: string }, A, R> {
   mode: string;
+  exam: ItemBankExam;
+  cefr: string;
   examPart: string;
   skill: ItemBankSkill;
   title: string;
@@ -19,9 +22,15 @@ export interface GroupSessionStrategy<E extends { groupId: string }, A, R> {
   summarize: (result: R) => GroupScoreSummary;
 }
 
-export type GroupStartOutcome<E> = { sessionId: string; exercise: E } | { error: string };
+export interface GroupSubmitInput<A> {
+  sessionId?: string;
+  groupId: string;
+  answers: A;
+}
 
-export type GroupSubmitOutcome<R> = R | { error: string };
+export type GroupStartOutcome<E> = { exercise: E } | { error: string };
+
+export type GroupSubmitOutcome<R> = { sessionId: string; result: R } | { error: string };
 
 export function isGroupFailure<T>(outcome: T | { error: string }): outcome is { error: string } {
   return typeof outcome === 'object' && outcome !== null && 'error' in outcome;

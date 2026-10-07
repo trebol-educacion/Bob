@@ -15,10 +15,6 @@ vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServer: vi.fn(),
 }));
 
-vi.mock('@/actions/practice/repository', () => ({
-  savePracticeImageAction: vi.fn(),
-}));
-
 function buildSupabase(overrides: {
   uploadError?: { message: string } | null;
   signError?: { message: string } | null;
@@ -44,12 +40,12 @@ describe('generatePracticeImageAction', () => {
     vi.clearAllMocks();
   });
 
-  it('shows the image even without a sessionId (degraded repository, tables not migrated)', async () => {
+  it('shows the inline image when there is no authenticated user to store it', async () => {
     const { generateImageAction } = await import('@/actions/gemini/image');
     (generateImageAction as ReturnType<typeof vi.fn>).mockResolvedValue(DATA_URI);
 
     const { generatePracticeImageAction } = await import('@/actions/practice/image');
-    const result = await generatePracticeImageAction(null, 'a rainy street');
+    const result = await generatePracticeImageAction('a rainy street');
 
     expect(result.ok).toBe(true);
     expect(result.imageUrl).toBe(DATA_URI);
@@ -64,7 +60,7 @@ describe('generatePracticeImageAction', () => {
     );
 
     const { generatePracticeImageAction } = await import('@/actions/practice/image');
-    const result = await generatePracticeImageAction('session-1', 'a busy market');
+    const result = await generatePracticeImageAction('a busy market');
 
     expect(result.ok).toBe(true);
     expect(result.imageUrl).toBe(DATA_URI);
@@ -75,11 +71,8 @@ describe('generatePracticeImageAction', () => {
     (generateImageAction as ReturnType<typeof vi.fn>).mockResolvedValue(DATA_URI);
     const { createSupabaseServer } = await import('@/lib/supabase/server');
     (createSupabaseServer as ReturnType<typeof vi.fn>).mockResolvedValue(buildSupabase());
-    const { savePracticeImageAction } = await import('@/actions/practice/repository');
-    (savePracticeImageAction as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, data: {} });
-
     const { generatePracticeImageAction } = await import('@/actions/practice/image');
-    const result = await generatePracticeImageAction('session-1', 'a quiet library');
+    const result = await generatePracticeImageAction('a quiet library');
 
     expect(result.ok).toBe(true);
     expect(result.imageUrl).toBe('https://signed.example/image.png');
@@ -90,8 +83,8 @@ describe('generatePracticeImageAction', () => {
     (generateImageAction as ReturnType<typeof vi.fn>).mockResolvedValue('');
 
     const { generatePracticeImageAction } = await import('@/actions/practice/image');
-    const result = await generatePracticeImageAction(null, 'a topic');
+    const result = await generatePracticeImageAction('a topic');
 
-    expect(result).toEqual({ ok: false, imageUrl: null });
+    expect(result).toEqual({ ok: false, imageUrl: null, prompt: null });
   });
 });

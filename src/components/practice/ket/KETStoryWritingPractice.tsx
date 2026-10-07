@@ -10,14 +10,18 @@ import { BobMascotLoader } from '@/components/chat/BobMascotLoader';
 import { BobAvatar } from '@/components/practice/yl/_shared';
 import {
   generateKETPictureStoryPlanAction,
-  generateKETSceneImageAction,
   evaluateKETPictureStoryAction,
   type StorySceneWithImage,
-  type StoryScene,
   type PictureStoryFeedback,
 } from '@/actions/modes/ket-writing-part7';
 import type { StoredMessage } from '@/actions/messages';
+import { restorePictureStory } from '@/lib/ket/writing-restore';
 import { resolveActivityBoot } from '@/lib/activity/boot';
+import { ActivityLoadError } from '@/components/practice/ActivityLoadError';
+import { ActivityHeader } from '@/components/activity/ActivityHeader';
+import { toScore10 } from '@/lib/session/score';
+
+const NO_LOADING: Set<number> = new Set();
 
 export interface KETStoryWritingPracticeProps {
   onBack: () => void;
@@ -36,47 +40,8 @@ function countWords(text: string): number {
   return text.trim() === '' ? 0 : text.trim().split(/\s+/).length;
 }
 
-interface RestoredState {
-  story_premise: string;
-  scenes: StorySceneWithImage[];
-  framingText: string;
-  userText: string;
-  feedback: PictureStoryFeedback | null;
-}
-
-function tryRestore(messages: StoredMessage[]): RestoredState | null {
-  let story_premise = '';
-  let scenes: StorySceneWithImage[] | null = null;
-  let framingText = '';
-  let userText = '';
-  let feedback: PictureStoryFeedback | null = null;
-
-  for (const msg of messages) {
-    const cj = msg.content_json as Record<string, unknown> | null;
-    if (!cj) continue;
-
-    if (msg.role === 'bob' && cj.kind === 'picture_story_prompt') {
-      story_premise = String(cj.story_premise ?? '');
-      framingText = String(cj.framing_text ?? '');
-      const rawScenes = cj.scenes as StoryScene[];
-      const imageUrls = cj.image_urls as string[];
-      scenes = rawScenes.map((s, i) => ({ ...s, image_url: imageUrls?.[i] ?? '' }));
-    }
-    if (msg.role === 'user' && msg.content_text) {
-      userText = msg.content_text;
-    }
-    if (msg.role === 'bob' && msg.msg_type === 'evaluation' && cj.is_final === true) {
-      feedback = {
-        understood: Boolean(cj.understood),
-        highlights: (cj.highlights as string[]) ?? [],
-        suggestions: (cj.suggestions as string[]) ?? [],
-        model_answer: (cj.model_answer as string) ?? null,
-      };
-    }
-  }
-
-  if (scenes) return { story_premise, scenes, framingText, userText, feedback };
-  return null;
+function tryRestore(messages: StoredMessage[]) {
+  return restorePictureStory(messages);
 }
 
 function SceneStrip({ scenes, loadingNumbers }: { scenes: StorySceneWithImage[]; loadingNumbers?: Set<number> }) {
@@ -194,10 +159,9 @@ function FeedbackPanel({
 
       <div className="flex justify-center pt-2">
         <CelebrationCard
-          score={feedback.understood ? 1 : 0}
-          scoreMax={1}
-          hideGrade
-          feedback="Keep practising your writing!"
+          score={toScore10(feedback) ?? 0}
+          scoreMax={10}
+          showPoints={false}
           onAction={onOpenDashboard}
           actionLabel="See my progress"
           animate={animate}
@@ -218,41 +182,18 @@ export function KETStoryWritingPractice({
 }: KETStoryWritingPracticeProps) {
   const [phase, setPhase] = useState<Phase>('loading');
   const [sessionId, setSessionId] = useState<string | undefined>(initialSessionId);
-  const [userId, setUserId] = useState<string | undefined>();
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [story_premise, setStoryPremise] = useState('');
   const [scenes, setScenes] = useState<StorySceneWithImage[]>([]);
   const [framingText, setFramingText] = useState('');
   const [text, setText] = useState('');
   const [feedback, setFeedback] = useState<PictureStoryFeedback | null>(null);
-  const [imageLoading, setImageLoading] = useState<Set<number>>(new Set());
+  const [bankGroupId, setBankGroupId] = useState<string | undefined>(undefined);
+  const [loadErrorCode, setLoadErrorCode] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isNewSession, setIsNewSession] = useState(false);
   const initRef = useRef(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-
-  /**
-   * Phase 2 of two-phase loading: fetches each scene image in parallel and
-   * patches it in as it resolves, so the strip fills progressively instead of
-   * blocking the screen on a ~9s "Creating your story pictures…".
-   */
-  async function loadSceneImagesInBackground(sid: string, planScenes: StoryScene[]) {
-    setImageLoading(new Set(planScenes.map((s) => s.number)));
-    await Promise.all(
-      planScenes.map(async (scene) => {
-        const { image_url } = await generateKETSceneImageAction({ imagePrompt: scene.image_prompt, sessionId: sid }).catch(
-          () => ({ image_url: '' })
-        );
-        setScenes((prev) =>
-          prev.map((s) => (s.number === scene.number ? { ...s, image_url } : s))
-        );
-        setImageLoading((prev) => {
-          const next = new Set(prev);
-          next.delete(scene.number);
-          return next;
-        });
-      })
-    );
-  }
 
   useEffect(() => {
     if (initRef.current) return;
@@ -267,68 +208,55 @@ export function KETStoryWritingPractice({
         setFramingText(r.framingText);
         setText(r.userText);
         if (r.feedback) { setFeedback(r.feedback); setPhase('finished'); }
-        else {
-          const { createSupabaseBrowser } = await import('@/lib/supabase/browser-client');
-          const { data: { user } } = await createSupabaseBrowser().auth.getUser();
-          if (user) setUserId(user.id);
-          setPhase('ready');
-          const missing = r.scenes.filter((s) => !s.image_url);
-          if (missing.length > 0 && initialSessionId) {
-            void loadSceneImagesInBackground(initialSessionId, missing.map(({ image_url: _i, ...s }) => s));
-          }
-        }
+        else setPhase('ready');
         return;
       }
       if (boot.kind === 'restore-failed') { setErrorMsg('Could not restore session. Please start a new one.'); return; }
       setIsNewSession(true); setPhase('generating');
-      const plan = await generateKETPictureStoryPlanAction({ sessionId: initialSessionId });
-      if ('error' in plan) { setErrorMsg(plan.error); return; }
-      onSessionCreated?.(plan.sessionId);
-      setSessionId(plan.sessionId); setUserId(plan.userId);
-      setStoryPremise(plan.story_premise);
-      setScenes(plan.scenes.map((s) => ({ ...s, image_url: '' })));
-      setFramingText(plan.framing_text);
+      const plan = await generateKETPictureStoryPlanAction();
+      if (!plan.ok) { setLoadErrorCode(plan.code); return; }
+      setStoryPremise(plan.data.story_premise);
+      setScenes(plan.data.scenes);
+      setFramingText(plan.data.framing_text);
+      setBankGroupId(plan.data.bank_group_id);
       setPhase('ready');
-      void loadSceneImagesInBackground(plan.sessionId, plan.scenes);
     }
     void init();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleSubmit() {
-    if (!sessionId || !userId) return;
     setPhase('evaluating');
+    setSubmitError(null);
     const result = await evaluateKETPictureStoryAction({
-      sessionId, userId, userText: text,
+      sessionId, userText: text,
       story_premise,
+      framing_text: framingText,
       scenes: scenes.map(({ image_url: _, ...s }) => s),
+      image_urls: scenes.map((s) => s.image_url),
+      bank_group_id: bankGroupId,
     });
-    if ('error' in result) { setErrorMsg(result.error); setPhase('ready'); return; }
-    setFeedback(result); setPhase('finished'); onSessionFinished?.();
+    if ('error' in result) { setSubmitError('We could not check your story. Please try again.'); setPhase('ready'); return; }
+    setFeedback(result.feedback); setPhase('finished');
+    if (!sessionId) onSessionCreated?.(result.sessionId);
+    setSessionId(result.sessionId);
+    onSessionFinished?.();
   }
 
   const wordCount = countWords(text);
   const hasEnoughWords = wordCount >= MIN_WORDS;
 
-  if (errorMsg) return (
-    <div className="flex flex-col items-center justify-center gap-4 p-8 text-center min-h-[40vh]">
-      <p className="text-red-500 font-semibold">{errorMsg}</p>
-      <button type="button" onClick={onBack} className="px-5 py-2 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 text-sm">Back</button>
-    </div>
-  );
+  if (loadErrorCode || errorMsg) return <ActivityLoadError code={loadErrorCode} message={errorMsg} onBack={onBack} />;
 
   return (
     <div className="flex flex-col h-full relative">
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-100 bg-white shrink-0">
-        <button type="button" onClick={onBack} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-600">←</button>
-        <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style={{ background: 'color-mix(in oklab, var(--color-bob-brand) 12%, white)' }}>
-          <KETWritingIcon size={18} className="text-bob-brand" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-bold text-gray-800 truncate">Picture Story</p>
-          <p className="text-xs text-gray-400">Writing · Part 7</p>
-        </div>
-        <span className="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-widest" style={{ background: 'color-mix(in oklab, var(--color-bob-brand) 12%, white)', color: 'var(--color-bob-brand)' }}>A2</span>
-      </div>
+      <ActivityHeader
+        title="Picture Story"
+        subtitle="Writing · Part 7"
+        badge="Part 7"
+        icon={<KETWritingIcon size={18} className="text-bob-brand" />}
+        iconStyle={{ background: 'color-mix(in oklab, var(--color-bob-brand) 12%, white)' }}
+        onBack={onBack}
+      />
 
       {(phase === 'loading' || phase === 'generating') && (
         <div className="flex-1 flex flex-col min-h-0">
@@ -351,7 +279,7 @@ export function KETStoryWritingPractice({
             </div>
 
             <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}>
-              <SceneStrip scenes={scenes} loadingNumbers={imageLoading} />
+              <SceneStrip scenes={scenes} loadingNumbers={NO_LOADING} />
             </motion.div>
 
             <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden">
@@ -377,7 +305,7 @@ export function KETStoryWritingPractice({
           </div>
 
           <div className="shrink-0 border-t border-gray-100 bg-white px-4 py-3 flex items-center gap-3">
-            <p className="text-xs text-gray-400 flex-1">Write at least {MIN_WORDS} words</p>
+            <p className={`text-xs flex-1 ${submitError ? 'text-red-500' : 'text-gray-400'}`}>{submitError ?? `Write at least ${MIN_WORDS} words`}</p>
             <button
               type="button"
               onClick={handleSubmit}

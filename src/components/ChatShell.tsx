@@ -3,7 +3,6 @@
 import React, { useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
 import type { LucideIcon } from 'lucide-react';
-import { useTranslations } from 'next-intl';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 
@@ -31,8 +30,6 @@ export type ChatHeaderConfig = {
 export type ChatFooterConfig = {
   /** Badge text: "SITUACIONES" | "CONVERSACIÓN" | "YL PART 1" */
   modeLabel: string;
-  /** Model display name, import from ACTIVE_MODEL_LABEL in gemini.ts */
-  modelName: string;
   /** Optional helper text rendered as a third line */
   helperText?: string;
 };
@@ -116,11 +113,9 @@ function ChatHeader({
 
 function ChatFooter({
   modeLabel,
-  modelName,
   helperText,
   accentColor = 'amber',
 }: ChatFooterConfig & { accentColor?: ChatAccentColor }) {
-  const t = useTranslations('chat');
   const a = ACCENT[accentColor];
   return (
     <div className="flex-none px-4 py-2 bg-white border-t border-gray-100 flex flex-col items-center gap-1">
@@ -131,9 +126,6 @@ function ChatFooter({
           {modeLabel}
         </Badge>
       </div>
-      <p className="text-[10px] text-gray-400">
-        {t('shell.poweredBy', { modelName })}
-      </p>
       {helperText && (
         <p className="text-[10px] text-gray-400 italic">{helperText}</p>
       )}

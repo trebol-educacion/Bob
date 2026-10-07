@@ -4,6 +4,7 @@ import { Part } from '@google/genai';
 import { MODELS } from '@/lib/models';
 import { getOrCreateCachedContent } from '@/lib/cache';
 import { callGemini } from '@/lib/gemini-client';
+import { fail, ok } from '@/lib/result';
 
 /** Generates high-quality speech for a given text using Gemini's native audio output. */
 export async function generateSpeechAction(text: string): Promise<{ data: string; mimeType: string }> {
@@ -30,22 +31,22 @@ export async function generateSpeechAction(text: string): Promise<{ data: string
 
       if (!result.ok) {
         console.error(JSON.stringify({ event: 'generateSpeechAction', error: result.error }));
-        return fallback;
+        return fail(result.code, result.retryable);
       }
 
       const audioPart = result.data.candidates?.[0]?.content?.parts?.find((p: Part) => p.inlineData);
 
       if (!audioPart?.inlineData?.data) {
         console.error(JSON.stringify({ event: 'generateSpeechAction', error: 'No audio data in response' }));
-        return fallback;
+        return fail('empty_audio', true);
       }
 
-      return {
+      return ok({
         data: audioPart.inlineData.data,
         mimeType: audioPart.inlineData.mimeType || 'audio/L16;codec=pcm;rate=24000',
-      };
+      });
     },
-    { storeAs: 'json' }
+    { storeAs: 'json', validate: (chunk) => chunk.data.length > 0 }
   );
 
   if ('error' in cached) {

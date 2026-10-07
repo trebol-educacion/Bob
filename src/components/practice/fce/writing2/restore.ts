@@ -13,8 +13,6 @@ export interface FcePart2Restored {
   taskNumber: number | null;
   text: string | null;
   feedback: WritingFormativeFeedback | null;
-  sessionId: string | null;
-  userId: string | null;
 }
 
 function readFeedback(json: Record<string, unknown>): WritingFormativeFeedback | null {
@@ -38,15 +36,13 @@ function readFeedback(json: Record<string, unknown>): WritingFormativeFeedback |
  * @returns the task set, the chosen task, the submitted text and the final feedback found in the history
  */
 export function restoreFcePart2(messages: StoredMessage[]): FcePart2Restored {
-  const restored: FcePart2Restored = { plan: null, taskNumber: null, text: null, feedback: null, sessionId: null, userId: null };
+  const restored: FcePart2Restored = { plan: null, taskNumber: null, text: null, feedback: null };
   for (const message of messages) {
     const json = message.content_json as Record<string, unknown> | null;
     if (!json) continue;
     const plan = message.role === 'bob' ? readFcePart2Plan(json) : null;
     if (plan) {
       restored.plan = plan;
-      restored.sessionId = message.session_id ?? null;
-      restored.userId = message.user_id ?? null;
     }
     if (message.role === 'user' && json.kind === FCE_PART2_SUBMISSION_KIND) {
       restored.text = String(json.text ?? '');

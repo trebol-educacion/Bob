@@ -13,9 +13,9 @@ import {
 import { QuestionRoundStage } from './QuestionRoundStage';
 import type { QuestionRoundPracticeProps } from './types';
 
-export function QuestionRoundPractice<TPlan>({ config, onBack }: QuestionRoundPracticeProps<TPlan>) {
+export function QuestionRoundPractice<TPlan>({ config, onBack, ...sessionParams }: QuestionRoundPracticeProps<TPlan>) {
   const t = useTranslations('cambridge');
-  const round = useQuestionRound(config);
+  const round = useQuestionRound(config, sessionParams);
 
   const header = (
     <QuestionRoundHeader

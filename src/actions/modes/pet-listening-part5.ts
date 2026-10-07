@@ -1,48 +1,21 @@
 'use server';
 
-import { z } from 'zod';
 import { getPrompt } from '@/lib/prompts/db-prompts';
-import { stripDashes } from '@/lib/text';
-import { callGemini, isOk } from '@/lib/gemini-client';
-import { persistMessage, persistMessages } from '@/lib/persist-activity';
-import { createSessionAction } from '@/actions/sessions';
-import { createSupabaseServer } from '@/lib/supabase/server';
-import { generateSpeechAction } from '@/actions/gemini';
-import { MODELS } from '@/lib/models';
+import { PetJustifyPlanSchema, type PetJustifyPlan } from '@/lib/bank-plans/pet-listening-part5';
+import { bankStamp, pickPlan } from '@/lib/item-bank/plan-bank';
+import { fail, ok, type ActionResult } from '@/lib/result';
+import { completeActivity } from '@/lib/session/complete';
+import { currentUserId } from '@/lib/session/lifecycle';
+import { sealPlan, unsealPlan } from '@/lib/session/sealed-plan';
+
+const EXAM_PART = 'pet_listening_part5';
+const FRAMING_FALLBACK =
+  'Vas a escuchar una entrevista. Lee cada frase y decide si es Verdadera o Falsa según lo que oyes. Si marcas Falsa, elige también por qué es falsa entre las opciones.';
 
 export type WhyKey = 'A' | 'B' | 'C';
 
-const AudioTurnSchema = z.object({
-  speaker: z.enum(['M', 'W']),
-  line: z.string(),
-});
-
-const WhyOptionsSchema = z.object({
-  A: z.string(),
-  B: z.string(),
-  C: z.string().optional(),
-});
-
-const StatementSchema = z
-  .object({
-    number: z.number().int().min(1).max(6),
-    text: z.string(),
-    is_true: z.boolean(),
-    why_options: WhyOptionsSchema.optional(),
-    why_correct: z.enum(['A', 'B', 'C']).optional(),
-  })
-  .refine((s) => s.is_true || (s.why_options !== undefined && s.why_correct !== undefined), {
-    message: 'False statements require why_options and why_correct',
-  });
-
-const GenerationSchema = z.object({
-  context: z.string(),
-  audio: z.array(AudioTurnSchema).min(2),
-  statements: z.array(StatementSchema).length(6),
-});
-
-export type PETJustifyAudioTurn = z.infer<typeof AudioTurnSchema>;
-export type PETJustifyStatement = z.infer<typeof StatementSchema>;
+export type PETJustifyAudioTurn = PetJustifyPlan['audio'][number];
+export type PETJustifyStatement = PetJustifyPlan['statements'][number];
 
 /** A single statement as sent to the client: keeps why_options for the UI but never the keys. */
 export interface PETJustifyClientStatement {
@@ -53,11 +26,11 @@ export interface PETJustifyClientStatement {
 
 /** Full result returned from generatePETListeningTrueFalseJustifyAction. */
 export interface PETListeningTrueFalseJustifyResult {
-  sessionId: string;
-  userId: string;
+  planToken: string;
   framingText: string;
   context: string;
   audio: PETJustifyAudioTurn[];
+  audio_url: string;
   statements: PETJustifyClientStatement[];
 }
 
@@ -78,6 +51,7 @@ export interface PETJustifyStatementResult {
 
 /** Full submit result. */
 export interface PETListeningTrueFalseJustifySubmitResult {
+  sessionId: string;
   score: number;
   score_max: number;
   correct_count: number;
@@ -91,162 +65,67 @@ interface ClientAnswer {
   why?: WhyKey | null;
 }
 
-function buildAudioText(turns: PETJustifyAudioTurn[]): string {
-  return turns.map((t) => `${t.speaker === 'M' ? 'Man' : 'Woman'}: ${t.line}`).join('\n');
-}
+export async function generatePETListeningTrueFalseJustifyAction(): Promise<ActionResult<PETListeningTrueFalseJustifyResult>> {
+  const userId = await currentUserId();
+  if (!userId) return fail('unauthenticated');
 
-function safeParse<T>(schema: z.ZodType<T>, raw: string): T | null {
-  try {
-    return schema.parse(JSON.parse(raw));
-  } catch {
-    return null;
-  }
-}
+  const picked = await pickPlan({
+    exam: 'pet',
+    cefr: 'b1',
+    examPart: EXAM_PART,
+    skill: 'listening',
+    schema: PetJustifyPlanSchema,
+    userId,
+  });
+  if (!picked.ok) return picked;
 
-/**
- * Generates one PET B1 Listening Part 5 exercise: a ~150-word interview plus 6
- * true/false statements, false ones carrying a justification correction. Returns
- * statements WITHOUT the verdict/why keys and with empty audio; keys stay
- * server-side and the TTS audio is synthesized off the critical path. Creates a
- * session when none is provided.
- */
-export async function generatePETListeningTrueFalseJustifyAction(input: {
-  sessionId?: string;
-}): Promise<PETListeningTrueFalseJustifyResult | { error: string }> {
-  let sessionId = input.sessionId;
-  let userId: string | undefined;
-
-  if (!sessionId) {
-    const result = await createSessionAction({
-      mode: 'cambridge_pet_listening_part5',
-      title: 'Listening Part 5: True or False with Justification',
-    });
-    if (!result.data) return { error: result.error ?? 'Could not create session' };
-    sessionId = result.data.id;
-    userId = result.data.user_id;
-  } else {
-    const supabase = await createSupabaseServer();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return { error: 'Not authenticated' };
-    userId = user.id;
-  }
-
-  const [generationPrompt, framingText] = await Promise.all([
-    getPrompt('cambridge_pet_listening_part5_b1_generation').catch(() => null),
-    getPrompt('cambridge_pet_listening_part5_b1_framing').catch(
-      () =>
-        'Vas a escuchar una entrevista. Lee cada frase y decide si es Verdadera o Falsa según lo que oyes. Si marcas Falsa, elige también por qué es falsa entre las opciones.'
-    ),
-  ]);
-
-  const cleanFramingText = stripDashes(framingText);
-
-  if (!generationPrompt) return { error: 'Could not load generation prompt' };
-
-  const geminiResult = await callGemini(
-    { promptKey: 'cambridge_pet_listening_part5_b1_generation', model: MODELS.FLASH_LITE, userId },
-    (ai) =>
-      ai.models.generateContent({
-        model: MODELS.FLASH_LITE,
-        contents: [{ role: 'user', parts: [{ text: generationPrompt }] }],
-        config: { responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
-      })
-  );
-
-  if (!isOk(geminiResult)) return { error: 'Could not generate exercise' };
-
-  const rawText = geminiResult.data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
-  const parsed = safeParse(GenerationSchema, rawText);
-  if (!parsed) return { error: 'Unexpected model response' };
-
-  const cleanStatements: PETJustifyStatement[] = parsed.statements.map((s) => ({
-    number: s.number,
-    text: stripDashes(s.text),
-    is_true: s.is_true,
-    ...(s.why_options
-      ? {
-          why_options: {
-            A: stripDashes(s.why_options.A),
-            B: stripDashes(s.why_options.B),
-            ...(s.why_options.C !== undefined ? { C: stripDashes(s.why_options.C) } : {}),
-          },
-        }
-      : {}),
-    ...(s.why_correct ? { why_correct: s.why_correct } : {}),
-  }));
-
-  const clientStatements: PETJustifyClientStatement[] = cleanStatements.map((s) => ({
-    number: s.number,
-    text: s.text,
-    ...(s.why_options ? { why_options: s.why_options } : {}),
-  }));
-
-  persistMessage({
-    sessionId: sessionId!,
-    userId: userId!,
-    role: 'bob',
-    msgType: 'text',
-    contentText: null,
-    contentJson: {
-      kind: 'pet_listening_tf_justify_plan',
-      framing_text: cleanFramingText,
-      context: stripDashes(parsed.context),
-      audio: parsed.audio,
-      statements: cleanStatements,
-    },
-  }).catch(() => undefined);
-
-  return {
-    sessionId: sessionId!,
-    userId: userId!,
-    framingText: cleanFramingText,
-    context: stripDashes(parsed.context),
-    audio: parsed.audio,
-    statements: clientStatements,
+  const framingText = await getPrompt('cambridge_pet_listening_part5_b1_framing').catch(() => FRAMING_FALLBACK);
+  const { plan, groupId } = picked.data;
+  const sealed = {
+    kind: 'pet_listening_tf_justify_plan',
+    framing_text: framingText,
+    context: plan.context,
+    audio: plan.audio,
+    audio_url: plan.audio_url,
+    statements: plan.statements,
+    ...bankStamp(EXAM_PART, groupId),
   };
-}
 
-/** Generates the TTS audio for the long interview stimulus, off the critical path. */
-export async function generatePETListeningTrueFalseJustifyAudioAction(input: {
-  audio: PETJustifyAudioTurn[];
-}): Promise<{ data: string; mimeType: string }> {
-  return generateSpeechAction(buildAudioText(input.audio));
+  return ok({
+    planToken: sealPlan(sealed, userId),
+    framingText,
+    context: plan.context,
+    audio: plan.audio,
+    audio_url: plan.audio_url,
+    statements: plan.statements.map((s) => ({
+      number: s.number,
+      text: s.text,
+      ...(s.why_options ? { why_options: s.why_options } : {}),
+    })),
+  });
 }
 
 /**
  * Evaluates answers deterministically against the server-side keys re-read from
- * the persisted plan, then persists results. No LLM involved. Scoring convention:
+ * the persisted plan, then creates the session on this first turn and closes it. No LLM involved. Scoring convention:
  * each statement is worth 1 point for a true statement (correct verdict), and 2
  * points for a false statement, 1 for the correct verdict plus 1 for the correct
  * justification, only awarded when the verdict was also right. correct_count
  * counts statements fully right (verdict, and justification when false).
  */
 export async function submitPETListeningTrueFalseJustifyAction(input: {
-  sessionId: string;
-  userId: string;
+  sessionId?: string;
+  planToken: string;
   answers: Record<number, ClientAnswer>;
 }): Promise<PETListeningTrueFalseJustifySubmitResult | { error: string }> {
-  const supabase = await createSupabaseServer();
-
-  const { data: planRow, error } = await supabase
-    .from('messages')
-    .select('content_json')
-    .eq('session_id', input.sessionId)
-    .eq('user_id', input.userId)
-    .eq('role', 'bob')
-    .eq('msg_type', 'text')
-    .order('created_at', { ascending: true })
-    .limit(1)
-    .single();
-
-  if (error || !planRow) return { error: 'Could not load exercise' };
-
-  const cj = planRow.content_json as {
+  const userId = await currentUserId();
+  if (!userId) return { error: 'unauthenticated' };
+  const plan = unsealPlan<{
     audio?: PETJustifyAudioTurn[];
     statements?: PETJustifyStatement[];
-  } | null;
-  const planStatements = cj?.statements;
-  const audio = cj?.audio ?? [];
+  }>(input.planToken, userId);
+  const planStatements = plan?.statements;
+  const audio = plan?.audio ?? [];
   if (!planStatements || planStatements.length === 0) return { error: 'Could not load exercise' };
 
   const statement_results: PETJustifyStatementResult[] = planStatements.map((s) => {
@@ -296,32 +175,20 @@ export async function submitPETListeningTrueFalseJustifyAction(input: {
   ).length;
   const total = planStatements.length;
 
-  persistMessages(
-    statement_results.map((r) => ({
-      sessionId: input.sessionId,
-      userId: input.userId,
-      role: 'user' as const,
-      msgType: 'text' as const,
-      contentText: null,
-      contentJson: {
-        kind: 'pet_listening_tf_justify_answer',
-        statement_number: r.number,
-        chosen_verdict: r.chosen_verdict,
-        chosen_why: r.chosen_why,
-        verdict_correct: r.verdict_correct,
-        why_correct: r.why_correct,
-        points: r.points,
-      },
-    }))
-  ).catch(() => undefined);
-
-  persistMessage({
+  const completed = await completeActivity({
+    mode: 'cambridge_pet_listening_part5',
     sessionId: input.sessionId,
-    userId: input.userId,
-    role: 'bob',
-    msgType: 'evaluation',
-    contentText: null,
-    contentJson: {
+    plan,
+    answers: statement_results.map((r) => ({
+      kind: 'pet_listening_tf_justify_answer',
+      statement_number: r.number,
+      chosen_verdict: r.chosen_verdict,
+      chosen_why: r.chosen_why,
+      verdict_correct: r.verdict_correct,
+      why_correct: r.why_correct,
+      points: r.points,
+    })),
+    evaluation: {
       kind: 'pet_listening_tf_justify_evaluation',
       score,
       score_max,
@@ -329,26 +196,9 @@ export async function submitPETListeningTrueFalseJustifyAction(input: {
       total,
       statement_results,
       audio,
-      is_final: true,
     },
-  }).catch(() => undefined);
+  });
+  if (!completed.ok) return { error: completed.code };
 
-  return { score, score_max, correct_count, total, statement_results, audio };
-}
-
-/** Finalizes the session by persisting a closing marker; safe no-op on failure. */
-export async function finalizePETListeningTrueFalseJustifyAction(input: {
-  sessionId: string;
-  userId: string;
-}): Promise<{ ok: true }> {
-  persistMessage({
-    sessionId: input.sessionId,
-    userId: input.userId,
-    role: 'bob',
-    msgType: 'text',
-    contentText: null,
-    contentJson: { kind: 'pet_listening_tf_justify_closed' },
-  }).catch(() => undefined);
-
-  return { ok: true };
+  return { sessionId: completed.data.sessionId, score, score_max, correct_count, total, statement_results, audio };
 }

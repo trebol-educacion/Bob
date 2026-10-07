@@ -9,21 +9,17 @@ vi.mock('@/actions/gemini', () => ({
   generateSpeechAction: vi.fn(),
 }));
 
-vi.mock('@/actions/practice/repository', () => ({
-  addPracticeTurnAction: vi.fn().mockResolvedValue({ ok: true, data: null }),
-  updatePracticeModeAction: vi.fn().mockResolvedValue({ ok: true, data: null }),
-}));
-
 vi.mock('@/actions/practice/turn', () => ({
-  generatePracticeInitialTurnAction: vi.fn(),
+  recordPracticeTurnAction: vi.fn().mockResolvedValue({ ok: true, data: { sessionId: 'session-1' } }),
 }));
 
 vi.mock('@/actions/practice/image', () => ({
-  generatePracticeImageAction: vi.fn().mockResolvedValue({ ok: false, imageUrl: null }),
+  generatePracticeImageAction: vi.fn().mockResolvedValue({ ok: false, imageUrl: null, prompt: null }),
 }));
 
 import { chatTextConversationAction, generateSpeechAction, suggestStudentAnswerAction } from '@/actions/gemini';
 import { generatePracticeImageAction } from '@/actions/practice/image';
+import { recordPracticeTurnAction } from '@/actions/practice/turn';
 import { usePracticeTurn } from '@/hooks/practice/usePracticeTurn';
 
 const SEED = { angle: 'a', character: 'a friend', tone: 'warm', topic: 'a warm chat' };
@@ -31,6 +27,7 @@ const SEED = { angle: 'a', character: 'a friend', tone: 'warm', topic: 'a warm c
 function baseArgs() {
   return {
     sessionId: 'session-1',
+    organizationId: 'org-1',
     mode: 'conversation' as const,
     seed: SEED,
     level: 'b1' as const,
@@ -78,7 +75,7 @@ describe('usePracticeTurn', () => {
     expect(result.current.playCounts[0]).toBe(1);
   });
 
-  it('un turno de texto registra la señal de rubrica y persiste sin bloquear', async () => {
+  it('un turno de texto registra la señal de rubrica y persiste con await antes de mostrarse', async () => {
     (generateSpeechAction as ReturnType<typeof vi.fn>).mockResolvedValue({ data: '', mimeType: 'audio/L16;rate=24000' });
     (chatTextConversationAction as ReturnType<typeof vi.fn>).mockResolvedValue({
       evaluation: { score: 80, feedback: 'good', transcribed_text: 'hi' },
@@ -98,6 +95,72 @@ describe('usePracticeTurn', () => {
     expect(result.current.turnSignals).toHaveLength(1);
     expect(result.current.turnSignals[0]).toMatchObject({ hasAudio: false, turnScore: 80 });
     expect(result.current.messages).toHaveLength(3);
+    expect(recordPracticeTurnAction).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessionId: 'session-1',
+        mode: 'conversation',
+        student: expect.objectContaining({ text: 'hi there' }),
+        botText: 'Nice to meet you!',
+      })
+    );
+  });
+
+  it('primer turno sin sesion: la persistencia la crea y avisa con onSessionCreated, el siguiente turno la reutiliza', async () => {
+    (generateSpeechAction as ReturnType<typeof vi.fn>).mockResolvedValue({ data: '', mimeType: 'audio/L16;rate=24000' });
+    (chatTextConversationAction as ReturnType<typeof vi.fn>).mockResolvedValue({
+      evaluation: { score: 80, feedback: 'good', transcribed_text: 'hi' },
+      ai_response: 'Nice!',
+    });
+    (recordPracticeTurnAction as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, data: { sessionId: 'created-1' } });
+    const onSessionCreated = vi.fn();
+
+    const { result } = renderHook(() => usePracticeTurn({ ...baseArgs(), sessionId: null, onSessionCreated }));
+
+    act(() => {
+      result.current.setInputText('first');
+    });
+    await act(async () => {
+      await result.current.handleSendText();
+    });
+
+    expect(recordPracticeTurnAction).toHaveBeenLastCalledWith(
+      expect.objectContaining({ sessionId: null, opening: expect.objectContaining({ message: 'Hello!', framing: 'framing' }) })
+    );
+    expect(onSessionCreated).toHaveBeenCalledWith('created-1');
+    expect(result.current.sessionId).toBe('created-1');
+
+    act(() => {
+      result.current.setInputText('second');
+    });
+    await act(async () => {
+      await result.current.handleSendText();
+    });
+
+    expect(recordPracticeTurnAction).toHaveBeenLastCalledWith(expect.objectContaining({ sessionId: 'created-1' }));
+    expect(onSessionCreated).toHaveBeenCalledTimes(1);
+  });
+
+  it('si la persistencia falla el turno no se muestra, sale el error con reintento y no se pierden las ayudas usadas', async () => {
+    (generateSpeechAction as ReturnType<typeof vi.fn>).mockResolvedValue({ data: '', mimeType: 'audio/L16;rate=24000' });
+    (chatTextConversationAction as ReturnType<typeof vi.fn>).mockResolvedValue({
+      evaluation: { score: 80, feedback: 'good', transcribed_text: 'hi' },
+      ai_response: 'Nice!',
+    });
+    (recordPracticeTurnAction as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ ok: false, code: 'persist_failed', retryable: true });
+
+    const { result } = renderHook(() => usePracticeTurn(baseArgs()));
+
+    act(() => {
+      result.current.setInputText('hi there');
+    });
+    await act(async () => {
+      await result.current.handleSendText();
+    });
+
+    expect(result.current.errorMessage).toBe('persistError');
+    expect(result.current.canRetry).toBe(true);
+    expect(result.current.messages).toHaveLength(1);
+    expect(result.current.turnSignals).toHaveLength(0);
   });
 
   it('Show me an answer: pide una respuesta modelo ya interpretada, nunca JSON crudo, y marca el turno como asistido', async () => {
@@ -208,14 +271,14 @@ describe('usePracticeTurn', () => {
     }
   });
 
-  it('modo picture sin sessionId (repositorio degradado) igual pide la imagen, no se queda mudo', async () => {
+  it('modo picture sin sesion pide la imagen solo por el tema, sin sessionId', async () => {
     (generateSpeechAction as ReturnType<typeof vi.fn>).mockResolvedValue({ data: '', mimeType: 'audio/L16;rate=24000' });
-    (generatePracticeImageAction as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, imageUrl: 'data:image/png;base64,AAAA' });
+    (generatePracticeImageAction as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, imageUrl: 'data:image/png;base64,AAAA', prompt: 'scene' });
 
     const { result } = renderHook(() => usePracticeTurn({ ...baseArgs(), sessionId: null, mode: 'picture' }));
 
     await waitFor(() => {
-      expect(generatePracticeImageAction).toHaveBeenCalledWith(null, SEED.topic);
+      expect(generatePracticeImageAction).toHaveBeenCalledWith(SEED.topic);
     });
     await waitFor(() => {
       expect(result.current.imageUrl).toBe('data:image/png;base64,AAAA');

@@ -6,19 +6,20 @@ import { CheckCircle, XCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { FCEWritingIcon } from '@/components/icons/FCEIcons';
 import { CelebrationCard } from '@/components/practice/yl/CelebrationCard';
 import { BobMascotLoader } from '@/components/chat/BobMascotLoader';
-import { ChatInputBar } from '@/components/chat/ChatInputBar';
+import { WritingComposer } from '@/components/practice/writing/WritingComposer';
 import { BobAvatar } from '@/components/practice/yl/_shared';
 import {
   generateFCEEssayAction,
   evaluateFCEEssayAction,
   type FCEEssayPrompt,
   type FCEEssayFeedback,
-  type EssayNote,
 } from '@/actions/modes/fce-writing-part1';
+import type { EssayNote } from '@/lib/writing/fce-essay-bank';
 import type { StoredMessage } from '@/actions/messages';
 import { EssayBriefCard } from '@/components/practice/fce/essay/EssayBriefCard';
 import { tryRestoreFromMessages } from '@/components/practice/fce/essay/restore';
 import { FceScoreCard, ScoreHeadline } from '@/components/practice/writing/FceScoreCard';
+import { resolveActivityBoot } from '@/lib/activity/boot';
 import { countWords } from '@/lib/writing/word-count';
 import { useTranslations } from 'next-intl';
 
@@ -197,7 +198,6 @@ function FeedbackPanel({
         score={coveredCount}
         scoreMax={3}
         hideGrade
-        feedback={t('fce.essay.celebrationFeedback')}
         onAction={onOpenDashboard}
         actionLabel={t('fce.essay.celebrationAction')}
         animate={animate}
@@ -217,6 +217,7 @@ export function FCEEssayWritingPractice({
 }: FCEEssayWritingPracticeProps) {
   const t = useTranslations('cambridge');
   const [phase, setPhase] = useState<Phase>('loading');
+  const [sessionId, setSessionId] = useState<string | undefined>(initialSessionId);
   const [prompt, setPrompt] = useState<FCEEssayPrompt | null>(null);
   const [text, setText] = useState('');
   const [feedback, setFeedback] = useState<FCEEssayFeedback | null>(null);
@@ -230,42 +231,39 @@ export function FCEEssayWritingPractice({
     initStartedRef.current = true;
 
     async function init() {
-      if (initialMessages && initialMessages.length > 0) {
-        const restored = tryRestoreFromMessages(initialMessages);
-        if (restored.prompt && restored.feedback) {
-          setPrompt(restored.prompt);
-          setRestoredUserText(restored.userText);
-          setFeedback(restored.feedback);
+      const boot = resolveActivityBoot({
+        initialMessages,
+        sessionId: initialSessionId,
+        tryRestore: (messages: StoredMessage[]) => {
+          const restored = tryRestoreFromMessages(messages);
+          return restored.prompt ? { ...restored, prompt: restored.prompt } : null;
+        },
+      });
+      if (boot.kind === 'restore') {
+        setPrompt(boot.data.prompt);
+        if (boot.data.feedback) {
+          setRestoredUserText(boot.data.userText);
+          setFeedback(boot.data.feedback);
           setPhase('finished');
-          return;
-        }
-        if (restored.prompt) {
-          setPrompt(restored.prompt);
+        } else {
           setPhase('ready');
-          return;
         }
+        return;
       }
-
-      if (initialSessionId) {
+      if (boot.kind === 'restore-failed') {
+        setErrorMsg(t('fce.restoreFailed'));
         return;
       }
 
       setIsNewSession(true);
-      const result = await generateFCEEssayAction({
-        sessionId: initialSessionId,
-        userId: undefined,
-      });
+      const result = await generateFCEEssayAction();
 
-      if ('error' in result) {
-        setErrorMsg(result.error);
+      if (!result.ok) {
+        setErrorMsg(result.code === 'no_content' ? t('fce.noContent') : t('fce.loadFailed'));
         return;
       }
 
-      if (!initialSessionId) {
-        onSessionCreated?.(result.sessionId);
-      }
-
-      setPrompt(result);
+      setPrompt(result.data);
       setPhase('ready');
     }
 
@@ -276,13 +274,7 @@ export function FCEEssayWritingPractice({
     if (!prompt || !text.trim()) return;
     setPhase('evaluating');
 
-    const result = await evaluateFCEEssayAction({
-      sessionId: prompt.sessionId,
-      userId: prompt.userId,
-      title: prompt.title,
-      notes: prompt.notes,
-      userText: text,
-    });
+    const result = await evaluateFCEEssayAction({ sessionId, prompt, userText: text });
 
     if ('error' in result) {
       setErrorMsg(result.error);
@@ -290,7 +282,11 @@ export function FCEEssayWritingPractice({
       return;
     }
 
-    setFeedback(result);
+    if (!sessionId) {
+      setSessionId(result.sessionId);
+      onSessionCreated?.(result.sessionId);
+    }
+    setFeedback(result.feedback);
     setPhase('finished');
     onSessionFinished?.();
   }
@@ -374,37 +370,17 @@ export function FCEEssayWritingPractice({
             </motion.div>
           </div>
 
-          <ChatInputBar
-            variant="text"
+          <WritingComposer
             value={text}
             placeholder={t('fce.essay.placeholder')}
+            wordCount={wordCount}
+            minWords={MIN_WORDS}
+            maxWords={WARN_WORDS}
+            target={t('fce.essay.target')}
             disabled={phase !== 'ready'}
-            sendDisabled={wordCount < MIN_WORDS}
             onChange={setText}
-            onSend={handleSubmit}
+            onSubmit={handleSubmit}
           />
-          <div className="shrink-0 px-4 pb-3 -mt-1 flex items-center justify-between text-xs text-gray-400 bg-white">
-            <span>
-              {t('fce.essay.words')}{' '}
-              <strong
-                className={
-                  wordCount < MIN_WORDS
-                    ? 'text-amber-500'
-                    : wordCount > WARN_WORDS
-                      ? 'text-red-400'
-                      : 'text-green-600'
-                }
-              >
-                {wordCount}
-              </strong>{' '}
-              {t('fce.essay.target')}
-            </span>
-            {wordCount < MIN_WORDS && (
-              <span className="text-amber-500">
-                {t('fce.essay.moreToSend', { remaining: MIN_WORDS - wordCount })}
-              </span>
-            )}
-          </div>
         </>
       )}
 

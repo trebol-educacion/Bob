@@ -59,7 +59,7 @@ export interface InitialTurnStreamState {
  */
 export function parseInitialTurnStream(buffer: string): InitialTurnStreamState {
   const framing = extractPartialStringField(buffer, 'framing');
-  const message = extractPartialStringField(buffer, 'message');
+  const message = extractPartialStringField(buffer, 'message') ?? extractPartialStringField(buffer, 'first_message');
   return {
     framing: framing?.value ?? '',
     message: message?.value ?? '',

@@ -103,6 +103,30 @@ describe('GapText modo sentence-bank', () => {
     expect(onChange).toHaveBeenCalledWith(2, 'C');
   });
 
+  it('sin repeticion: la frase usada en un hueco queda desactivada en los demas', () => {
+    render(
+      <GapText
+        text={TEXT}
+        mode="sentence-bank"
+        sentences={sentences}
+        values={{ 1: 'B' }}
+        onChange={vi.fn()}
+        allowRepeatOptions={false}
+      />,
+    );
+    const first = screen.getByLabelText('Gap 1') as HTMLSelectElement;
+    const second = screen.getByLabelText('Gap 2') as HTMLSelectElement;
+    const optionB = (select: HTMLSelectElement) => Array.from(select.options).find((option) => option.value === 'B');
+    expect(optionB(second)?.disabled).toBe(true);
+    expect(optionB(first)?.disabled).toBe(false);
+  });
+
+  it('con repeticion permitida ninguna frase se desactiva', () => {
+    render(<GapText text={TEXT} mode="sentence-bank" sentences={sentences} values={{ 1: 'B' }} onChange={vi.fn()} />);
+    const second = screen.getByLabelText('Gap 2') as HTMLSelectElement;
+    expect(Array.from(second.options).some((option) => option.disabled)).toBe(false);
+  });
+
   it('revision: muestra la frase elegida y la esperada', () => {
     render(
       <GapText

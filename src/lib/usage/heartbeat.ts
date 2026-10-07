@@ -1,6 +1,6 @@
-export const HEARTBEAT_INTERVAL_MS = 30_000;
+export const HEARTBEAT_INTERVAL_MS = 120_000;
 export const INACTIVITY_LIMIT_MS = 2 * 60_000;
-export const MAX_SECONDS_PER_TICK = 60;
+export const MAX_SECONDS_PER_TICK = 150;
 
 export interface HeartbeatTickState {
   visible: boolean;

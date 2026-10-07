@@ -1,6 +1,7 @@
 'use server';
 
 import { createSupabaseServer } from '@/lib/supabase/server';
+import { isLevelSelectorTesterEnabled } from '@/lib/levels/level-policy';
 import type { Skill, SkillLevel, SkillLevelMap, SkillLevelHistoryEntry } from '@/lib/types/skills';
 import type { CefrLevel } from '@/lib/types/practice';
 import { resolveCallerContext, TEACHER_ROLES } from './shared';
@@ -157,3 +158,8 @@ export async function getStudentsOverview(
   }
 }
 
+
+/** @returns true when the tester level selector is enabled on the server */
+export async function isLevelSelectorEnabledAction(): Promise<boolean> {
+  return isLevelSelectorTesterEnabled(process.env.BOB_LEVEL_SELECTOR_ENABLED);
+}

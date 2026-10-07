@@ -1,32 +1,23 @@
 'use client';
 
-/**
- * YLTellTheStoryPractice, Cambridge Movers Part 3 "Tell the Story".
- *
- * Bob shares 4 sequential pictures. Bob models scene 1; the child narrates
- * scenes 2, 3, and 4 in chronological order. Binary evaluation per turn.
- */
-
 import React, { useEffect, useRef, useState } from 'react';
+import { ActivityLoadError } from '@/components/practice/ActivityLoadError';
+import { withBankAudio } from '@/lib/yl/bank-audio';
 import { motion } from 'motion/react';
 import { ArrowLeft } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { PictureStoryMoversIcon } from '@/components/icons/MoversIcons';
 import { CelebrationCard } from './CelebrationCard';
-import { ACTIVE_MODEL_LABEL } from '@/lib/models';
 import {
   startYLSessionAction,
-  generateYLImagesParallelAction,
-  persistYLImagesAction,
-  saveYLFinalEvalAction,
   getYLSessionPlanAction,
-  pregenerateYLCueAudiosAction,
   evaluateTellTheStoryAnswerAction,
 } from '@/actions/modes/yl';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
 import { blobToBase64 } from '@/lib/audio';
 import type { YLExam, YLPlan, StoryScene } from '@/lib/types/yl';
 import type { EvalResponse, ModeKey } from '@/lib/types/practice';
+import { useYLSession } from './useYLSession';
 import { ChatShell } from '@/components/ChatShell';
 import {
   stopCurrentAudio,
@@ -37,6 +28,7 @@ import {
   YLUserTextMessage,
   YLChatMicBar,
   YLReadOnlyMessage,
+  isYLUserTurn,
 } from './_shared';
 
 const TOTAL_IMAGES = 4;
@@ -50,12 +42,10 @@ const RECORDING_MAX_SECONDS = 30;
  */
 function BobAudioOnly({
   text,
-  sessionId,
   autoPlay,
   voiceKey,
 }: {
   text: string;
-  sessionId: string;
   autoPlay?: boolean;
   voiceKey?: string;
 }) {
@@ -63,7 +53,7 @@ function BobAudioOnly({
   const [showText, setShowText] = useState(false);
   return (
     <div className="flex flex-col gap-1">
-      <YLVoiceNote key={voiceKey} text={text} side="bob" sessionId={sessionId} autoPlay={autoPlay} />
+      <YLVoiceNote key={voiceKey} text={text} side="bob" autoPlay={autoPlay} />
       <div className="pl-12">
         {showText ? (
           <div className="flex flex-col gap-1 items-start">
@@ -150,7 +140,7 @@ export function YLTellTheStoryPractice({
   const isReadOnly = !!initialMessages && initialMessages.length > 0;
 
   const [phase, setPhase] = useState<Phase>(isReadOnly ? 'finished' : 'loading');
-  const [sessionId, setSessionId] = useState<string | undefined>(initialSessionId);
+  const { stash, open, finish } = useYLSession({ mode, initialSessionId, onSessionCreated, onSessionFinished });
   const [plan, setPlan] = useState<YLPlan | null>(null);
   const [scenes, setScenes] = useState<StoryScene[]>([]);
   const [images, setImages] = useState<string[]>([]);
@@ -160,6 +150,7 @@ export function YLTellTheStoryPractice({
   const [correctCount, setCorrectCount] = useState(0);
   const [finalEval, setFinalEval] = useState<EvalResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loadErrorCode, setLoadErrorCode] = useState<string | null>(null);
 
   const initStartedRef = useRef(false);
   const recordedBlobRef = useRef<Blob | null>(null);
@@ -189,7 +180,7 @@ export function YLTellTheStoryPractice({
         try {
           const restoredPlan = await getYLSessionPlanAction(initialSessionId);
           if (restoredPlan) {
-            setPlan(restoredPlan);
+            setPlan(withBankAudio(restoredPlan));
             if (restoredPlan.scenes && restoredPlan.scenes.length === TOTAL_IMAGES) {
               setScenes(restoredPlan.scenes);
             }
@@ -207,7 +198,7 @@ export function YLTellTheStoryPractice({
           if (imgs.length > 0) setImages(imgs);
 
           const userTurns = (initialMessages ?? [])
-            .filter((m) => m.role === 'user' && m.msg_type === 'user_audio')
+            .filter((m) => isYLUserTurn(m))
             .map((m) => {
               const cj = (m.content_json as Record<string, unknown> | null) ?? {};
               return {
@@ -291,44 +282,17 @@ export function YLTellTheStoryPractice({
 
     void (async () => {
       try {
-        const { sessionId: sid, plan: p } = await startYLSessionAction({ mode });
-        setSessionId(sid);
-        onSessionCreated?.(sid);
-        setPlan(p);
-
-        const planScenes = p.scenes ?? [];
-        setScenes(planScenes);
-
-        const imagePrompts = p.image_prompts ?? [];
-        if (imagePrompts.length >= 4) {
-          setPhase('generating-images');
-          const urls = await generateYLImagesParallelAction(
-            exam,
-            part,
-            imagePrompts,
-            sid,
-            p.character_description,
-            'scene'
-          );
-          setImages(urls);
-          persistYLImagesAction(sid, urls).catch((err) =>
-            console.warn('[YLTellTheStory] persist images failed:', err)
-          );
-
-          const storySetupText = p.story_setup ?? '';
-          const scene1Model = planScenes[0]?.modeled_description ?? '';
-          const cueTexts = planScenes.slice(1).map((s) => s.examiner_cue ?? '');
-          const reactionCorrect = planScenes.slice(1).map(() => 'Great storytelling! Keep going!');
-          const reactionWrong = planScenes.slice(1).map((s) => `Almost, ${s.expected_answer ?? ''}`);
-          void pregenerateYLCueAudiosAction(sid, [
-            storySetupText,
-            scene1Model,
-            ...cueTexts,
-            ...reactionCorrect,
-            ...reactionWrong,
-          ].filter(Boolean));
+        const started = await startYLSessionAction({ mode });
+        if (!started.ok) {
+          setLoadErrorCode(started.code);
+          return;
         }
-
+        const p = withBankAudio(started.data.plan);
+        const urls = p.image_urls ?? [];
+        setPlan(p);
+        setScenes(p.scenes ?? []);
+        setImages(urls);
+        stash(p, urls);
         setPhase('setup');
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Error preparing the session');
@@ -337,7 +301,7 @@ export function YLTellTheStoryPractice({
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (phase !== 'evaluating' || !sessionId || !plan) return;
+    if (phase !== 'evaluating' || !plan) return;
     const total = CHILD_TURNS;
     const pct = Math.round((correctCount / total) * 100);
     const result: EvalResponse = {
@@ -354,10 +318,10 @@ export function YLTellTheStoryPractice({
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setFinalEval(result);
     setPhase('finished');
-    void saveYLFinalEvalAction(sessionId, result)
-      .then(() => onSessionFinished?.())
-      .catch((err) => console.warn('[YLTellTheStory] saveYLFinalEvalAction failed:', err));
-  }, [phase, sessionId, plan, correctCount, onSessionFinished]);
+    void finish(result).then((saved) => {
+      if (!saved) setError('Could not save your result');
+    });
+  }, [phase, plan, correctCount, finish]);
 
   const handleStartRecording = async () => {
     if (phase !== 'ready' || isRecording) return;
@@ -390,19 +354,24 @@ export function YLTellTheStoryPractice({
     const duration = recordingSeconds;
     recordedBlobRef.current = null;
 
-    if (!sessionId || !currentScene) return;
+    if (!currentScene) return;
 
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setPhase('processing');
 
     void (async () => {
+      const sid = await open();
+      if (!sid) {
+        setError('Could not save your answer');
+        return;
+      }
       try {
         const audioBase64 = await blobToBase64(blob);
         const mimeType = blob.type || 'audio/webm;codecs=opus';
 
         stopCurrentAudio();
         const evalResult = await evaluateTellTheStoryAnswerAction({
-          sessionId,
+          sessionId: sid,
           sceneIndex,
           examinerCue: currentScene.examiner_cue ?? '',
           expectedAnswer: currentScene.expected_answer ?? '',
@@ -452,6 +421,7 @@ export function YLTellTheStoryPractice({
     setPhase('ready');
   };
 
+  if (loadErrorCode) return <ActivityLoadError code={loadErrorCode} onBack={onBack} />;
   if (error) return <YLErrorScreen error={error} onBack={onBack} />;
   if (phase === 'loading' || phase === 'generating-images')
     return (
@@ -565,7 +535,7 @@ export function YLTellTheStoryPractice({
           ),
           online: false,
         }}
-        footerConfig={{ modeLabel: t('tellTheStory.footerLabel'), modelName: ACTIVE_MODEL_LABEL }}
+        footerConfig={{ modeLabel: t('tellTheStory.footerLabel') }}
         inputSlot={null}
         animationKey="yl-tellthestory-readonly"
         maxWidthClass="max-w-full"
@@ -574,7 +544,7 @@ export function YLTellTheStoryPractice({
         {sourceMessages
           .filter((m) => m.msg_type !== 'evaluation' && m.msg_type !== 'yl_tts' && m.msg_type !== 'image_scene')
           .flatMap((m): React.ReactElement[] => {
-            if (m.role === 'user' && m.msg_type === 'user_audio') {
+            if (isYLUserTurn(m)) {
               const cue = (m.content_json as { cue?: string } | null)?.cue ?? '';
               const bubbles: React.ReactElement[] = [];
               if (cue) bubbles.push(<YLBobTextMessage key={`${m.id}-cue`} text={cue} />);
@@ -717,20 +687,19 @@ export function YLTellTheStoryPractice({
         ),
         online: true,
       }}
-      footerConfig={{ modeLabel: t('tellTheStory.footerLabel'), modelName: ACTIVE_MODEL_LABEL }}
+      footerConfig={{ modeLabel: t('tellTheStory.footerLabel') }}
       inputSlot={inputBar}
       animationKey="yl-tellthestory"
       maxWidthClass="max-w-full"
     >
       {imageStrip}
 
-      {sessionId && plan && phase !== 'finished' && (
+      {plan && phase !== 'finished' && (
         <>
           {plan.story_setup && (
             <BobAudioOnly
               voiceKey="story-setup"
               text={plan.story_setup}
-              sessionId={sessionId}
               autoPlay={phase === 'setup'}
             />
           )}
@@ -738,7 +707,6 @@ export function YLTellTheStoryPractice({
             <BobAudioOnly
               voiceKey="modeled-description"
               text={scene1.modeled_description}
-              sessionId={sessionId}
               autoPlay={false}
             />
           )}
@@ -747,23 +715,17 @@ export function YLTellTheStoryPractice({
 
       {turns.map((t) => (
         <React.Fragment key={t.id}>
-          {sessionId && (
-            <BobAudioOnly
-              voiceKey={`cue-prev-${t.id}`}
-              text={t.examinerCue}
-              sessionId={sessionId}
-              autoPlay={false}
-            />
-          )}
+          <BobAudioOnly
+            voiceKey={`cue-prev-${t.id}`}
+            text={t.examinerCue}
+            autoPlay={false}
+          />
           <YLUserTextMessage text={`${t.transcript} ${t.correct ? '✓' : '✗'}`} />
-          {sessionId && (
-            <BobAudioOnly
-              voiceKey={`reaction-${t.id}`}
-              text={t.reactionText}
-              sessionId={sessionId}
-              autoPlay={phase === 'reaction' && t.id === `turn-${sceneIndex}`}
-            />
-          )}
+          <BobAudioOnly
+            voiceKey={`reaction-${t.id}`}
+            text={t.reactionText}
+            autoPlay={phase === 'reaction' && t.id === `turn-${sceneIndex}`}
+          />
           {!t.correct && t.expectedAnswer && (
             <div className="flex justify-start pl-12 -mt-1">
               <div className="font-nunito text-xs font-bold text-amber-700/80 bg-amber-50 ring-1 ring-amber-200 rounded-full px-3 py-1.5 inline-flex items-center gap-1.5">
@@ -775,11 +737,10 @@ export function YLTellTheStoryPractice({
         </React.Fragment>
       ))}
 
-      {currentScene && phase === 'ready' && sessionId && (
+      {currentScene && phase === 'ready' && (
         <BobAudioOnly
           voiceKey={`cue-${sceneIndex}`}
           text={currentScene.examiner_cue ?? 'And now? Tell me what happens.'}
-          sessionId={sessionId}
           autoPlay
         />
       )}

@@ -5,17 +5,21 @@ vi.mock('server-only', () => ({}));
 
 const fetchGroups = vi.fn();
 const fetchGroupItems = vi.fn();
-const createSessionAction = vi.fn();
-const persistMessage = vi.fn();
+const ensureSession = vi.fn();
+const recordTurn = vi.fn();
+const finishSession = vi.fn();
 const readSessionMessagesForCurrentOrUser = vi.fn();
 
 vi.mock('@/actions/item-bank/repository', () => ({
   fetchGroups: (...args: unknown[]) => fetchGroups(...args),
   fetchGroupItems: (...args: unknown[]) => fetchGroupItems(...args),
 }));
-vi.mock('@/actions/sessions', () => ({ createSessionAction: (...args: unknown[]) => createSessionAction(...args) }));
+vi.mock('@/lib/session/lifecycle', () => ({
+  ensureSession: (...args: unknown[]) => ensureSession(...args),
+  recordTurn: (...args: unknown[]) => recordTurn(...args),
+  finishSession: (...args: unknown[]) => finishSession(...args),
+}));
 vi.mock('@/lib/persist-activity', () => ({
-  persistMessage: (...args: unknown[]) => persistMessage(...args),
   readSessionMessagesForCurrentOrUser: (...args: unknown[]) => readSessionMessagesForCurrentOrUser(...args),
 }));
 
@@ -45,12 +49,13 @@ beforeEach(() => {
   getUser.mockResolvedValue({ data: { user: { id: 'user-1' } } });
   fetchGroups.mockResolvedValue({ ok: true, data: [L3_GROUP] });
   fetchGroupItems.mockResolvedValue({ ok: true, data: L3_ITEMS });
-  createSessionAction.mockResolvedValue({ data: { id: 'session-1', user_id: 'user-1' }, error: null });
-  persistMessage.mockResolvedValue({ id: 'msg-1' });
+  ensureSession.mockResolvedValue({ ok: true, data: { sessionId: 'session-1', userId: 'user-1', created: true } });
+  recordTurn.mockResolvedValue({ ok: true, data: { ids: ['a'] } });
+  finishSession.mockResolvedValue({ ok: true, data: { score10: 6, messageId: 'm' } });
 });
 
 describe('startGroupSession', () => {
-  it('carga el ejercicio pregenerado sin clave ni transcript y lo persiste', async () => {
+  it('carga el ejercicio pregenerado sin clave ni transcript y no crea sesión', async () => {
     const started = await startGroupSession(STRATEGY);
     expect('error' in started).toBe(false);
     const serialized = JSON.stringify(started);
@@ -58,15 +63,14 @@ describe('startGroupSession', () => {
     expect(serialized).not.toContain(SECRET_EXPLANATION);
     expect(serialized).not.toContain('correct_key');
     expect(fetchGroups).toHaveBeenCalledWith(expect.objectContaining({ exam_part: 'fce_listening_part3', status: 'published' }));
-    const plan = persistMessage.mock.calls[0][0];
-    expect(JSON.stringify(plan.contentJson)).not.toContain('correct_key');
-    expect(JSON.stringify(plan.contentJson)).not.toContain(SECRET_TRANSCRIPT);
+    expect(ensureSession).not.toHaveBeenCalled();
+    expect(recordTurn).not.toHaveBeenCalled();
   });
 
   it('sin contenido devuelve un error claro y no crea sesion', async () => {
     fetchGroups.mockResolvedValue({ ok: true, data: [] });
     expect(await startGroupSession(STRATEGY)).toEqual({ error: 'No exercise available' });
-    expect(createSessionAction).not.toHaveBeenCalled();
+    expect(ensureSession).not.toHaveBeenCalled();
   });
 
   it('sin usuario devuelve error', async () => {
@@ -76,29 +80,23 @@ describe('startGroupSession', () => {
 });
 
 describe('submitGroupSession', () => {
-  const planMessage = async () => {
-    const started = await startGroupSession(STRATEGY);
-    if ('error' in started) throw new Error('start failed');
-    const contentJson = persistMessage.mock.calls[0][0].contentJson;
-    persistMessage.mockClear();
-    return { role: 'bob', content_json: contentJson };
-  };
+  const answers = { 'l3-item-1': 'E', 'l3-item-2': 'B', 'l3-item-3': 'H', 'l3-item-4': 'G', 'l3-item-5': 'A' };
 
-  it('corrige contra la clave del servidor y persiste la nota 0-10 final', async () => {
-    const plan = await planMessage();
-    readSessionMessagesForCurrentOrUser.mockResolvedValue([plan]);
+  it('primer envío: crea sesión, guarda plan sin secretos y cierra con la nota 0-10', async () => {
+    const outcome = await submitGroupSession(STRATEGY, { groupId: L3_GROUP.id, answers });
 
-    const answers = { 'l3-item-1': 'E', 'l3-item-2': 'B', 'l3-item-3': 'H', 'l3-item-4': 'G', 'l3-item-5': 'A' };
-    const graded = await submitGroupSession(STRATEGY, 'session-1', answers);
-
-    expect(graded).toMatchObject({ correct: 3, total: 5, score_10: 6 });
-    const evaluation = persistMessage.mock.calls[0][0];
-    expect(evaluation.msgType).toBe('evaluation');
-    expect(evaluation.contentJson).toMatchObject({ score: 3, score_max: 5, score_10: 6, is_final: true });
+    expect(outcome).toMatchObject({ sessionId: 'session-1', result: { correct: 3, total: 5, score_10: 6 } });
+    expect(ensureSession).toHaveBeenCalledWith({ mode: 'cambridge_fce_listening_part3', sessionId: undefined });
+    const turn = recordTurn.mock.calls[0][0];
+    const plan = turn.messages.find((m: { role: string }) => m.role === 'bob');
+    expect(JSON.stringify(plan.contentJson)).not.toContain('correct_key');
+    expect(JSON.stringify(plan.contentJson)).not.toContain(SECRET_TRANSCRIPT);
+    expect(turn.messages.some((m: { role: string }) => m.role === 'user')).toBe(true);
+    expect(finishSession.mock.calls[0][0].evaluation).toMatchObject({ score: 3, score_max: 5, score_10: 6 });
   });
 
   it('un segundo envio devuelve el resultado guardado sin persistir de nuevo', async () => {
-    const plan = await planMessage();
+    const plan = { role: 'bob', content_json: { kind: 'fce_group_plan', exam_part: 'fce_listening_part3', exercise: { groupId: L3_GROUP.id } } };
     const evaluation = {
       role: 'bob',
       content_json: {
@@ -109,20 +107,18 @@ describe('submitGroupSession', () => {
       },
     };
     readSessionMessagesForCurrentOrUser.mockResolvedValue([plan, evaluation]);
-    const outcome = await submitGroupSession(STRATEGY, 'session-1', {});
-    expect(outcome).toMatchObject({ correct: 5, score_10: 10 });
-    expect(persistMessage).not.toHaveBeenCalled();
+    const outcome = await submitGroupSession(STRATEGY, { sessionId: 'session-1', groupId: L3_GROUP.id, answers: {} });
+    expect(outcome).toMatchObject({ sessionId: 'session-1', result: { correct: 5, score_10: 10 } });
+    expect(finishSession).not.toHaveBeenCalled();
   });
 
   it('sin plan en la sesion devuelve error', async () => {
     readSessionMessagesForCurrentOrUser.mockResolvedValue([]);
-    expect(await submitGroupSession(STRATEGY, 'session-x', {})).toEqual({ error: 'Could not load exercise' });
+    expect(await submitGroupSession(STRATEGY, { sessionId: 'session-x', groupId: 'g', answers: {} })).toEqual({ error: 'Could not load exercise' });
   });
 
   it('si no se puede guardar el resultado devuelve error para reintentar', async () => {
-    const plan = await planMessage();
-    readSessionMessagesForCurrentOrUser.mockResolvedValue([plan]);
-    persistMessage.mockResolvedValue({ error: 'db' });
-    expect(await submitGroupSession(STRATEGY, 'session-1', {})).toEqual({ error: 'Could not save result' });
+    finishSession.mockResolvedValue({ ok: false, code: 'persist_failed', retryable: true });
+    expect(await submitGroupSession(STRATEGY, { groupId: L3_GROUP.id, answers })).toEqual({ error: 'Could not save result' });
   });
 });

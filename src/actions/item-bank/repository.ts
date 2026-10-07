@@ -21,6 +21,13 @@ export interface FetchGroupsFilter {
   module_code?: string | null;
 }
 
+export interface FetchItemsFilter {
+  framework: string;
+  exam_part: string;
+  cefr_level: string | null;
+  skill: ItemBankSkill;
+}
+
 export interface FetchOpenTasksFilter {
   exam?: ItemBankExam;
   skill?: Extract<ItemBankSkill, 'writing' | 'speaking'>;
@@ -68,6 +75,7 @@ export async function fetchGroupItems(groupIds: string[]): Promise<ItemBankResul
       .from('closed_items')
       .select('*')
       .in('group_id', groupIds)
+      .eq('status', 'published')
       .order('group_order', { ascending: true });
 
     if (error) {
@@ -88,6 +96,38 @@ export async function fetchGroupItems(groupIds: string[]): Promise<ItemBankResul
     return { ok: true, data: items };
   } catch (err) {
     console.error('[fetchGroupItems] Unexpected error:', err instanceof Error ? err.message : err);
+    return { ok: false, code: 'db_error' };
+  }
+}
+
+/** @param filter */
+export async function fetchPublishedItems(filter: FetchItemsFilter): Promise<ItemBankResult<BankItem[]>> {
+  try {
+    const supabase = await createSupabaseServer();
+    let query = supabase
+      .from('closed_items')
+      .select('*')
+      .eq('framework', filter.framework)
+      .eq('exam_part', filter.exam_part)
+      .eq('skill', filter.skill)
+      .eq('status', 'published');
+    if (filter.cefr_level !== null) query = query.eq('cefr_level', filter.cefr_level);
+
+    const { data, error } = await query;
+    if (error) {
+      console.error('[fetchPublishedItems] Supabase error:', error.message);
+      return { ok: false, code: 'db_error' };
+    }
+
+    const items: BankItem[] = [];
+    for (const row of data ?? []) {
+      const parsed = ClosedItemSchema.safeParse(row);
+      if (parsed.success) items.push(parsed.data);
+      else console.warn('[fetchPublishedItems] Discarding invalid row:', row.id, parsed.error.issues);
+    }
+    return { ok: true, data: items };
+  } catch (err) {
+    console.error('[fetchPublishedItems] Unexpected error:', err instanceof Error ? err.message : err);
     return { ok: false, code: 'db_error' };
   }
 }

@@ -41,7 +41,7 @@ describe('variant ids', () => {
     expect(() => variantId('nope', 1)).toThrow();
   });
   it('builds bucket relative audio paths', () => {
-    expect(audioPath('fce_listening_part3', 'gen-l3-001', 's2')).toBe('/fce-listening-part3/gen-l3-001-s2.wav');
+    expect(audioPath('fce_listening_part3', 'gen-l3-001', 's2')).toBe('/fce-listening-part3/gen-l3-001-s2.mp3');
   });
 });
 

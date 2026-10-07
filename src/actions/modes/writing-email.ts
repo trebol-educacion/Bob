@@ -1,147 +1,50 @@
 'use server';
 
-import { z } from 'zod';
-import { getPrompt } from '@/lib/prompts/db-prompts';
-import { callGemini, isOk } from '@/lib/gemini-client';
-import { persistMessage } from '@/lib/persist-activity';
-import { MODELS } from '@/lib/models';
-import type { WritingFormativeFeedback } from '@/lib/types/practice';
+import { pickPlan } from '@/lib/item-bank/plan-bank';
+import { ToeflEmailPlanSchema } from '@/lib/bank-plans/toefl-writing';
+import { toEmailTask, type WritingTask } from '@/lib/toefl/writing-task';
+import { currentUserId } from '@/lib/session/lifecycle';
+import { fail, ok, type ActionResult } from '@/lib/result';
+import { evaluateAndSaveOpenWriting, type OpenWritingOutcome } from '@/lib/writing/open-writing';
 
 interface EvaluateEmailInput {
   text: string;
-  sessionId: string;
-  userId: string;
-  framework: string;
+  sessionId?: string;
   exam_part: string;
+  instructions: string;
   targetWordCount: [number, number];
-  bullets?: string[];
+  task?: Record<string, unknown>;
+  bankGroupId?: string;
 }
 
-const GeminiEmailFeedbackSchema = z.object({
-  understood:      z.boolean(),
-  highlights:      z.array(z.string()),
-  suggestions:     z.array(z.string()),
-  model_answer:    z.string().optional(),
-  covered_bullets: z.array(z.string()).optional(),
-  missing_bullets: z.array(z.string()).optional(),
-  rubric: z
-    .object({
-      task_coverage: z.number().int().min(0).max(4),
-      grammar:       z.number().int().min(0).max(4),
-      vocabulary:    z.number().int().min(0).max(4),
-      fluency:       z.number().int().min(0).max(4),
-    })
-    .optional(),
-});
-
-function buildFallback(wordCount: number, targetWordCount: [number, number]): WritingFormativeFeedback {
-  return {
-    kind: 'writing_formative',
-    understood: false,
-    highlights: [],
-    suggestions: [],
-    indicators: { word_count: wordCount, target_word_count_range: targetWordCount },
-  };
+/** Reads one pregenerated email scenario from the bank; no model call and no session row. */
+export async function getEmailTaskAction(): Promise<ActionResult<WritingTask>> {
+  const userId = await currentUserId();
+  if (!userId) return fail('unauthenticated');
+  const picked = await pickPlan({
+    exam: 'toefl',
+    cefr: 'b1',
+    examPart: 'toefl_writing_email',
+    skill: 'writing',
+    schema: ToeflEmailPlanSchema,
+    userId,
+  });
+  if (!picked.ok) return picked;
+  return ok(toEmailTask(picked.data.plan, picked.data.groupId));
 }
 
-function countWords(text: string): number {
-  return text.trim() === '' ? 0 : text.trim().split(/\s+/).length;
-}
-
-/** Evaluates an email writing task using Gemini and returns formative feedback (no numeric score). */
-export async function evaluateEmailAction(
-  input: EvaluateEmailInput
-): Promise<WritingFormativeFeedback | { error: string }> {
-  const wordCount = countWords(input.text);
-  const fallback = buildFallback(wordCount, input.targetWordCount);
-
-  let evalPromptText: string;
-  try {
-    evalPromptText = await getPrompt(input.exam_part);
-  } catch {
-    try {
-      evalPromptText = await getPrompt(`${input.exam_part}_evaluation`);
-    } catch {
-      persistMessage({
-        sessionId: input.sessionId,
-        userId: input.userId,
-        role: 'bob',
-        msgType: 'evaluation',
-        contentJson: { ...(fallback as unknown as Record<string, unknown>), is_final: true },
-      }).catch(() => undefined);
-      return fallback;
-    }
-  }
-
-  const systemInstruction = `You are a Cambridge/TOEFL writing examiner providing FORMATIVE feedback only.
-Never assign a numeric score. Return JSON with: understood (boolean), highlights (array of 2-3 strengths),
-suggestions (array of 2-3 improvement points), model_answer (optional short example),
-covered_bullets (optional array of task points addressed), missing_bullets (optional array of task points missed),
-rubric (object with integer scores 0-4 for: task_coverage, grammar, vocabulary, fluency).`;
-
-  const userContent = `Exam part prompt:\n${evalPromptText}\n\nStudent answer (${wordCount} words):\n${input.text}`;
-
-  const result = await callGemini(
-    { promptKey: input.exam_part, model: MODELS.FLASH_LITE_PREVIEW, userId: input.userId },
-    (ai) =>
-      ai.models.generateContent({
-        model: MODELS.FLASH_LITE_PREVIEW,
-        contents: [{ role: 'user', parts: [{ text: userContent }] }],
-        config: {
-          systemInstruction,
-          responseMimeType: 'application/json',
-        },
-      })
-  );
-
-  if (!isOk(result)) {
-    persistMessage({
-      sessionId: input.sessionId,
-      userId: input.userId,
-      role: 'bob',
-      msgType: 'evaluation',
-      contentJson: { ...(fallback as unknown as Record<string, unknown>), is_final: true },
-    }).catch(() => undefined);
-    return fallback;
-  }
-
-  const rawText = result.data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
-  let parsed: z.infer<typeof GeminiEmailFeedbackSchema>;
-  try {
-    parsed = GeminiEmailFeedbackSchema.parse(JSON.parse(rawText));
-  } catch {
-    persistMessage({
-      sessionId: input.sessionId,
-      userId: input.userId,
-      role: 'bob',
-      msgType: 'evaluation',
-      contentJson: { ...(fallback as unknown as Record<string, unknown>), is_final: true },
-    }).catch(() => undefined);
-    return fallback;
-  }
-
-  const feedback: WritingFormativeFeedback = {
-    kind: 'writing_formative',
-    understood: parsed.understood,
-    highlights: parsed.highlights,
-    suggestions: parsed.suggestions,
-    model_answer: parsed.model_answer,
-    rubric: parsed.rubric,
-    indicators: {
-      word_count: wordCount,
-      target_word_count_range: input.targetWordCount,
-      covered_bullets: parsed.covered_bullets,
-      missing_bullets: parsed.missing_bullets,
-    },
-  };
-
-  persistMessage({
+/** Evaluates an email writing task by rubric and saves the session on this first turn; returns formative feedback. */
+export async function evaluateEmailAction(input: EvaluateEmailInput): Promise<OpenWritingOutcome | { error: string }> {
+  const outcome = await evaluateAndSaveOpenWriting({
+    text: input.text,
     sessionId: input.sessionId,
-    userId: input.userId,
-    role: 'bob',
-    msgType: 'evaluation',
-    contentJson: { ...(feedback as unknown as Record<string, unknown>), rubric: parsed.rubric ?? null, is_final: true },
-  }).catch(() => undefined);
-
-  return feedback;
+    mode: input.exam_part,
+    examPart: input.exam_part,
+    targetWordCount: input.targetWordCount,
+    instructions: input.instructions,
+    examinerRole: 'Cambridge/TOEFL writing examiner',
+    task: input.task,
+    bankGroupId: input.bankGroupId,
+  });
+  return outcome.ok ? outcome.data : { error: outcome.code };
 }

@@ -4,7 +4,8 @@ import { Type, Part } from '@google/genai';
 import { MODELS } from '@/lib/models';
 import { getPrompt } from '@/lib/prompts/db-prompts';
 import { getOrCreateCachedContent } from '@/lib/cache';
-import { callGemini, safeParseFallback } from '@/lib/gemini-client';
+import { parseJsonResult } from '@/lib/llm/parse-json-result';
+import { callGemini } from '@/lib/gemini-client';
 import { ImageSceneSchema } from '@/lib/types/gemini';
 import type { ImageScene } from './types';
 
@@ -80,20 +81,9 @@ export async function generateImageSceneAction(
         })
       );
 
-      if (!result.ok || !result.data.text) {
-        console.error(JSON.stringify({ event: 'generateImageSceneAction', error: result.ok ? 'empty response' : result.error }));
-        return fallbackScene;
-      }
-
-      let parsed: unknown;
-      try {
-        parsed = JSON.parse(result.data.text);
-      } catch {
-        return fallbackScene;
-      }
-      return safeParseFallback(ImageSceneSchema, parsed, fallbackScene);
+      return parseJsonResult<ImageScene>(result, ImageSceneSchema, 'generateImageSceneAction');
     },
-    { storeAs: 'json' }
+    { storeAs: 'json', validate: (scene) => ImageSceneSchema.safeParse(scene).success }
   );
 
   if ('error' in cached) {

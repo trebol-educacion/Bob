@@ -11,6 +11,14 @@ vi.mock('@/actions/item-bank/repository', () => ({
   fetchGroupItems: vi.fn(),
 }));
 
+vi.mock('@/lib/item-bank/content-source', () => ({
+  pickContent: vi.fn(),
+}));
+
+vi.mock('@/actions/assessment/shared', () => ({
+  resolveCooldownDays: vi.fn().mockResolvedValue(7),
+}));
+
 vi.mock('@/actions/assessment/queue-guard', () => ({
   hasPendingAssessment: vi.fn().mockResolvedValue(false),
 }));
@@ -78,10 +86,10 @@ describe('startPlacementAction', () => {
 
     const { startPlacementAction } = await import('@/actions/placement/start');
     const result = await startPlacementAction('listening');
-    expect(result).toEqual({ status: 'error', code: 'unauthenticated' });
+    expect(result).toEqual({ status: 'error', code: 'unauthenticated', retryable: false });
   });
 
-  it('sin item_groups de placement cae a fallback (placement actual sin romper)', async () => {
+  it('sin item_groups de placement devuelve error visible no_content, nunca un fallback silencioso', async () => {
     const { createSupabaseServer } = await import('@/lib/supabase/server');
     vi.mocked(createSupabaseServer).mockResolvedValue(
       buildSupabaseMock({
@@ -90,12 +98,31 @@ describe('startPlacementAction', () => {
       }) as never
     );
 
-    const { fetchGroups } = await import('@/actions/item-bank/repository');
-    vi.mocked(fetchGroups).mockResolvedValue({ ok: true, data: [] });
+    const { pickContent } = await import('@/lib/item-bank/content-source');
+    vi.mocked(pickContent).mockResolvedValue({ ok: false, code: 'no_content', retryable: false });
 
     const { startPlacementAction } = await import('@/actions/placement/start');
     const result = await startPlacementAction('listening');
-    expect(result).toEqual({ status: 'fallback' });
+    expect(result).toEqual({ status: 'error', code: 'no_content', retryable: false });
+  });
+
+  it('la seleccion pide siempre purpose placement, framework cefr y el nivel del motor', async () => {
+    const { createSupabaseServer } = await import('@/lib/supabase/server');
+    vi.mocked(createSupabaseServer).mockResolvedValue(
+      buildSupabaseMock({
+        placement_attempts: { data: { id: 'attempt-1' }, error: null },
+        test_configs: { data: null, error: null },
+      }) as never
+    );
+
+    const { pickContent } = await import('@/lib/item-bank/content-source');
+    vi.mocked(pickContent).mockResolvedValue({ ok: true, data: { kind: 'group', group: GROUP as never, items: [ITEM as never] } });
+
+    const { startPlacementAction } = await import('@/actions/placement/start');
+    await startPlacementAction('reading');
+    expect(pickContent).toHaveBeenCalledWith(
+      expect.objectContaining({ purpose: 'placement', framework: 'cefr', skill: 'reading', cefr: 'a1', groupsOnly: true })
+    );
   });
 
   it('con contenido curado crea el intento y devuelve el primer paso', async () => {
@@ -107,21 +134,20 @@ describe('startPlacementAction', () => {
       }) as never
     );
 
-    const { fetchGroups, fetchGroupItems } = await import('@/actions/item-bank/repository');
-    vi.mocked(fetchGroups).mockResolvedValue({ ok: true, data: [GROUP as never] });
-    vi.mocked(fetchGroupItems).mockResolvedValue({ ok: true, data: [ITEM as never] });
+    const { pickContent } = await import('@/lib/item-bank/content-source');
+    vi.mocked(pickContent).mockResolvedValue({ ok: true, data: { kind: 'group', group: GROUP as never, items: [ITEM as never] } });
 
     const { startPlacementAction } = await import('@/actions/placement/start');
     const result = await startPlacementAction('listening');
     expect(result.status).toBe('ok');
     if (result.status === 'ok') {
       expect(result.attempt_id).toBe('attempt-1');
-      expect(result.level).toBe('a2');
+      expect(result.level).toBe('a1');
       expect(result.items).toHaveLength(1);
     }
   });
 
-  it('error de Supabase al leer el intento existente cae a fallback', async () => {
+  it('error de Supabase al leer el intento existente devuelve error db_error reintentable', async () => {
     const { createSupabaseServer } = await import('@/lib/supabase/server');
     vi.mocked(createSupabaseServer).mockResolvedValue(
       buildSupabaseMock({
@@ -131,7 +157,7 @@ describe('startPlacementAction', () => {
 
     const { startPlacementAction } = await import('@/actions/placement/start');
     const result = await startPlacementAction('reading');
-    expect(result).toEqual({ status: 'fallback' });
+    expect(result).toEqual({ status: 'error', code: 'db_error', retryable: true });
   });
 });
 
@@ -163,20 +189,5 @@ describe('answerPlacementStepAction', () => {
     const { answerPlacementStepAction } = await import('@/actions/placement/answer');
     const result = await answerPlacementStepAction('attempt-1', 'listening', 'group-a2-1', []);
     expect(result).toEqual({ status: 'error', code: 'invalid_step' });
-  });
-});
-
-describe('resumePlacementAction', () => {
-  it('sin intento en curso devuelve status none', async () => {
-    const { createSupabaseServer } = await import('@/lib/supabase/server');
-    vi.mocked(createSupabaseServer).mockResolvedValue(
-      buildSupabaseMock({
-        placement_attempts: { data: null, error: null },
-      }) as never
-    );
-
-    const { resumePlacementAction } = await import('@/actions/placement/resume');
-    const result = await resumePlacementAction('listening');
-    expect(result).toEqual({ status: 'none' });
   });
 });

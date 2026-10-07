@@ -5,7 +5,7 @@ import { motion } from 'motion/react';
 import { Sparkles, BookOpen, MessageSquare } from 'lucide-react';
 import { PETWritingIcon } from '@/components/icons/PETIcons';
 import { BobMascotLoader } from '@/components/chat/BobMascotLoader';
-import { ChatInputBar } from '@/components/chat/ChatInputBar';
+import { WritingComposer } from '@/components/practice/writing/WritingComposer';
 import { BobAvatar } from '@/components/practice/yl/_shared';
 import {
   generatePETWritingChallengeAction,
@@ -13,10 +13,12 @@ import {
   type PETWritingChallengePrompt,
   type PETWritingChallengeFeedback,
 } from '@/actions/modes/pet-writing-challenge';
+import { ActivityLoadError } from '@/components/practice/ActivityLoadError';
 import type { StoredMessage } from '@/actions/messages';
-import type { YLRenderProps } from '@/lib/routing';
+import type { ActivityRenderProps } from '@/lib/routing';
+import { ActivityHeader } from '@/components/activity/ActivityHeader';
 
-export type PETWritingChallengePracticeProps = YLRenderProps;
+export type PETWritingChallengePracticeProps = ActivityRenderProps;
 
 type Phase = 'loading' | 'ready' | 'evaluating' | 'finished';
 
@@ -159,7 +161,7 @@ function FeedbackPanel({
   );
 }
 
-function tryRestoreFromMessages(messages: StoredMessage[]): {
+export function tryRestoreFromMessages(messages: StoredMessage[]): {
   prompt: PETWritingChallengePrompt | null;
   userText: string | null;
   feedback: PETWritingChallengeFeedback | null;
@@ -175,8 +177,6 @@ function tryRestoreFromMessages(messages: StoredMessage[]): {
     if (msg.role === 'bob' && cj.kind === 'pet_writing_challenge_prompt') {
       const fmt = cj.format as PETWritingChallengePrompt['format'];
       prompt = {
-        sessionId: msg.session_id ?? '',
-        userId: msg.user_id ?? '',
         format: fmt === 'email' || fmt === 'review' || fmt === 'story' ? fmt : 'email',
         title: String(cj.title ?? ''),
         theme: String(cj.theme ?? ''),
@@ -214,11 +214,13 @@ export function PETWritingChallengePractice({
   onOpenDashboard,
 }: PETWritingChallengePracticeProps) {
   const [phase, setPhase] = useState<Phase>('loading');
+  const [sessionId, setSessionId] = useState<string | undefined>(initialSessionId);
   const [prompt, setPrompt] = useState<PETWritingChallengePrompt | null>(null);
   const [text, setText] = useState('');
   const [feedback, setFeedback] = useState<PETWritingChallengeFeedback | null>(null);
   const [restoredUserText, setRestoredUserText] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [loadErrorCode, setLoadErrorCode] = useState<string | null>(null);
   const [isNewSession, setIsNewSession] = useState(false);
   const initStartedRef = useRef(false);
 
@@ -248,15 +250,14 @@ export function PETWritingChallengePractice({
       }
 
       setIsNewSession(true);
-      const result = await generatePETWritingChallengeAction({ sessionId: initialSessionId, userId: undefined });
+      const result = await generatePETWritingChallengeAction();
 
-      if ('error' in result) {
-        setErrorMsg(result.error);
+      if (!result.ok) {
+        setLoadErrorCode(result.code);
         return;
       }
 
-      onSessionCreated?.(result.sessionId);
-      setPrompt(result);
+      setPrompt(result.data);
       setPhase('ready');
     }
 
@@ -268,9 +269,8 @@ export function PETWritingChallengePractice({
     setPhase('evaluating');
 
     const result = await submitPETWritingChallengeAction({
-      sessionId: prompt.sessionId,
-      userId: prompt.userId,
-      task: prompt.task,
+      sessionId,
+      prompt,
       userText: text,
     });
 
@@ -280,6 +280,8 @@ export function PETWritingChallengePractice({
       return;
     }
 
+    if (!sessionId && result.sessionId) onSessionCreated?.(result.sessionId);
+    setSessionId(result.sessionId ?? sessionId);
     setFeedback(result);
     setPhase('finished');
     onSessionFinished?.();
@@ -288,6 +290,8 @@ export function PETWritingChallengePractice({
   const wordCount = countWords(text);
   const minWords = prompt?.minWords ?? 60;
   const maxWords = prompt?.maxWords ?? 100;
+
+  if (loadErrorCode) return <ActivityLoadError code={loadErrorCode} onBack={onBack} />;
 
   if (errorMsg) {
     return (
@@ -306,32 +310,13 @@ export function PETWritingChallengePractice({
 
   return (
     <div className="flex flex-col h-full relative">
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-100 bg-white shrink-0">
-        <button
-          type="button"
-          onClick={onBack}
-          className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-600"
-          aria-label="Back"
-        >
-          ←
-        </button>
-        <div
-          className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0"
-          style={{ background: 'color-mix(in oklab, var(--color-bob-brand) 12%, white)' }}
-        >
-          <PETWritingIcon size={18} className="text-bob-brand" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-bold text-gray-800 truncate">Writing Challenge</p>
-          <p className="text-xs text-gray-400">Cambridge B1 · Writing</p>
-        </div>
-        <span
-          className="shrink-0 px-2 py-0.5 rounded-full text-bob-brand text-[10px] font-bold uppercase tracking-widest"
-          style={{ background: 'color-mix(in oklab, var(--color-bob-brand) 12%, white)' }}
-        >
-          B1
-        </span>
-      </div>
+      <ActivityHeader
+        title="Writing Challenge"
+        subtitle="Writing"
+        icon={<PETWritingIcon size={18} className="text-bob-brand" />}
+        iconStyle={{ background: 'color-mix(in oklab, var(--color-bob-brand) 12%, white)' }}
+        onBack={onBack}
+      />
 
       {phase === 'loading' && (
         <div className="flex-1 flex flex-col min-h-0">
@@ -364,34 +349,17 @@ export function PETWritingChallengePractice({
             </motion.div>
           </div>
 
-          <ChatInputBar
-            variant="text"
+          <WritingComposer
             value={text}
             placeholder="Write your text in English..."
-            disabled={phase !== 'ready'} sendDisabled={wordCount < minWords}
+            wordCount={wordCount}
+            minWords={minWords}
+            maxWords={maxWords}
+            target={`/ ${minWords}-${maxWords}`}
+            disabled={phase !== 'ready'}
             onChange={setText}
-            onSend={handleSubmit}
+            onSubmit={handleSubmit}
           />
-          <div className="shrink-0 px-4 pb-3 -mt-1 flex items-center justify-between text-xs text-gray-400 bg-white">
-            <span>
-              Words:{' '}
-              <strong
-                className={
-                  wordCount < minWords
-                    ? 'text-amber-500'
-                    : wordCount > maxWords
-                    ? 'text-red-400'
-                    : 'text-green-600'
-                }
-              >
-                {wordCount}
-              </strong>{' '}
-              / {minWords}-{maxWords}
-            </span>
-            {wordCount < minWords && (
-              <span className="text-amber-500">{minWords - wordCount} more to send</span>
-            )}
-          </div>
         </>
       )}
 

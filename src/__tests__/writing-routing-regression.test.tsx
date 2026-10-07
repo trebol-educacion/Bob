@@ -11,30 +11,34 @@ vi.mock('next-intl', () => ({
 vi.mock('@/components/chat/BobMascotLoader', () => ({
   BobMascotLoader: ({ message }: { message: string }) => <div>{message}</div>,
 }));
-vi.mock('@/components/chat/ChatInputBar', () => ({
-  ChatInputBar: ({ value, disabled, onChange, onSend }: {
-    value: string; disabled: boolean; onChange: (v: string) => void; onSend: () => void;
-  }) => (
-    <div>
-      <textarea aria-label="text" value={value} onChange={(e) => onChange(e.target.value)} />
-      <button type="button" disabled={disabled} onClick={onSend}>send</button>
-    </div>
-  ),
-}));
 vi.mock('@/components/chat', () => ({
   InfoCard: ({ title, children }: { title: string; children: React.ReactNode }) => (
     <section><h4>{title}</h4>{children}</section>
   ),
 }));
-vi.mock('@/lib/persist-activity', () => ({ persistMessage: vi.fn(() => Promise.resolve({ id: 'x' })) }));
 
 const evaluateAcademicMock = vi.fn();
+const getAcademicTaskMock = vi.fn();
 vi.mock('@/actions/modes/writing-academic', () => ({
   evaluateAcademicAction: (...a: unknown[]) => evaluateAcademicMock(...a),
+  getAcademicTaskAction: (...a: unknown[]) => getAcademicTaskMock(...a),
 }));
-vi.mock('@/actions/sessions', () => ({
-  createSessionAction: vi.fn(async () => ({ data: { id: 's1', user_id: 'u1' } })),
-}));
+
+const ACADEMIC_TASK = {
+  ok: true,
+  data: {
+    instructions: 'Add your contribution to the discussion (minimum 100 words).',
+    bankGroupId: 'g1',
+    task: {
+      professor_post: { name: 'Dr. Smith', text: 'Should universities require students to study abroad?' },
+      peer_posts: [
+        { name: 'Maria', text: 'Yes, it builds empathy.' },
+        { name: 'James', text: 'No, it is too expensive.' },
+      ],
+      writing_prompt: 'Add your contribution to the discussion (minimum 100 words).',
+    },
+  },
+};
 
 import { AcademicWritingPractice } from '@/components/practice/AcademicWritingPractice';
 import { EXAM_PART_COMPONENT_MAP } from '@/lib/routing';
@@ -44,7 +48,10 @@ function words(n: number): string {
   return Array.from({ length: n }, (_, i) => `w${i}`).join(' ');
 }
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => {
+  vi.clearAllMocks();
+  getAcademicTaskMock.mockResolvedValue(ACADEMIC_TASK);
+});
 afterEach(cleanup);
 
 describe('Academic Discussion and Writing routing', () => {
@@ -60,21 +67,31 @@ describe('Academic Discussion and Writing routing', () => {
 
   it('keeps the TOEFL Academic Discussion flow: forum, 100-200 range and formative feedback without mark', async () => {
     evaluateAcademicMock.mockResolvedValue({
-      kind: 'writing_formative',
-      understood: true,
-      highlights: ['Clear opinion'],
-      suggestions: ['Add an example'],
-      indicators: { word_count: 100, target_word_count_range: [100, 200] },
+      sessionId: 's1',
+      feedback: {
+        kind: 'writing_formative',
+        understood: true,
+        highlights: ['Clear opinion'],
+        suggestions: ['Add an example'],
+        indicators: { word_count: 100, target_word_count_range: [100, 200] },
+      },
     });
     render(<AcademicWritingPractice mode="toefl_writing_academic_discussion" onBack={vi.fn()} />);
     await screen.findByText(/study abroad/);
     expect(screen.getByText(/100-200/)).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText('text'), { target: { value: words(100) } });
-    fireEvent.click(screen.getByText('send'));
+    fireEvent.change(screen.getByLabelText('editorLabel'), { target: { value: words(100) } });
+    fireEvent.click(screen.getByText('submit'));
     await waitFor(() => expect(screen.getByText('Clear opinion')).toBeInTheDocument());
     expect(evaluateAcademicMock).toHaveBeenCalledWith(
-      expect.objectContaining({ framework: 'toefl', exam_part: 'toefl_writing_academic_discussion', targetWordCount: [100, 200] }),
+      expect.objectContaining({ exam_part: 'toefl_writing_academic_discussion', targetWordCount: [100, 200], bankGroupId: 'g1' }),
     );
     expect(screen.queryByTestId('fce-score-card')).not.toBeInTheDocument();
+  });
+
+  it('shows the empty-bank state instead of an empty forum', async () => {
+    getAcademicTaskMock.mockResolvedValue({ ok: false, code: 'no_content', retryable: false });
+    render(<AcademicWritingPractice mode="toefl_writing_academic_discussion" onBack={vi.fn()} />);
+    expect(await screen.findByText('activityNoContent')).toBeInTheDocument();
+    expect(evaluateAcademicMock).not.toHaveBeenCalled();
   });
 });

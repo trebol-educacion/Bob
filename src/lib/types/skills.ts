@@ -50,31 +50,11 @@ export interface AssessmentResultSpeaking extends AssessmentResultBase {
   pending_evaluation: boolean;
 }
 
-export interface AssessmentResultListening extends AssessmentResultBase {
-  skill: 'listening';
-  score: number;
-  score_max: number;
-  failed_item_ids: string[];
-}
-
-export interface AssessmentResultReading extends AssessmentResultBase {
-  skill: 'reading';
-  score: number;
-  score_max: number;
-  failed_item_ids: string[];
-}
-
 export interface AssessmentResultWriting extends AssessmentResultBase {
   skill: 'writing';
   bullets_covered: number;
   feedback: AssessmentWritingFeedback;
 }
-
-export type AssessmentResult =
-  | AssessmentResultSpeaking
-  | AssessmentResultListening
-  | AssessmentResultReading
-  | AssessmentResultWriting;
 
 export interface SkillLevelHistoryEntry {
   id: number;

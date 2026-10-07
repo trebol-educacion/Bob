@@ -1,142 +1,90 @@
 'use server';
 
-import { z } from 'zod';
 import { getPrompt } from '@/lib/prompts/db-prompts';
-import { stripDashes } from '@/lib/text';
-import { callGemini, isOk } from '@/lib/gemini-client';
-import { persistMessage, persistMessages } from '@/lib/persist-activity';
-import { createSessionAction } from '@/actions/sessions';
-import { createSupabaseServer } from '@/lib/supabase/server';
-import { MODELS } from '@/lib/models';
+import { bankStamp, loadPlan, pickPlan } from '@/lib/item-bank/plan-bank';
+import { fail, ok, type ActionResult } from '@/lib/result';
+import { currentUserId } from '@/lib/session/lifecycle';
+import { completeActivity } from '@/lib/session/complete';
+import {
+  KetOpenClozePlanSchema,
+  toPublicOpenCloze,
+  type KetOpenClozePublic,
+} from '@/lib/bank-plans/ket-reading-part5';
+import { gradeOpenCloze, type OpenClozeGapResult } from '@/lib/ket/open-cloze-grading';
 
-export type Verdict = 'T' | 'F' | 'DS';
+const KET_OPEN_CLOZE_PART = 'ket_reading_part5';
+const FRAMING_FALLBACK = 'Read the text and write ONE word in each gap.';
 
-const StatementSchema = z.object({
-  number: z.number().int().min(1).max(6),
-  text: z.string(),
-  verdict: z.enum(['T', 'F', 'DS']),
-});
-
-const GenerationSchema = z.object({
-  title: z.string(),
-  text: z.string(),
-  statements: z.array(StatementSchema).length(6),
-});
-
-export type ReadingStatement = z.infer<typeof StatementSchema>;
-
-export interface ReadingTFDSExercise {
-  title: string;
-  text: string;
-  statements: ReadingStatement[];
+export interface KetOpenClozeExercise extends KetOpenClozePublic {
+  bank_group_id: string;
 }
 
-export interface ReadingTFDSResult {
-  sessionId: string;
-  userId: string;
+export interface KetOpenClozeStart {
   framing_text: string;
-  exercise: ReadingTFDSExercise;
+  exercise: KetOpenClozeExercise;
 }
 
-export interface ReadingStatementResult {
-  number: number;
-  text: string;
-  chosen: Verdict | null;
-  correct_verdict: Verdict;
-  is_correct: boolean;
-}
-
-export interface ReadingTFDSSubmitResult {
+export interface KetOpenClozeSubmitResult {
+  sessionId: string;
   correct_count: number;
   total: number;
-  statement_results: ReadingStatementResult[];
+  gap_results: OpenClozeGapResult[];
 }
 
-function safeParse<T>(schema: z.ZodType<T>, raw: string): T | null {
-  try { return schema.parse(JSON.parse(raw)); } catch { return null; }
-}
+/** @returns a published open cloze from the bank, without its keys */
+export async function startKETOpenClozeAction(): Promise<ActionResult<KetOpenClozeStart>> {
+  const userId = await currentUserId();
+  if (!userId) return fail('unauthenticated');
 
-export async function generateKETReadingTFDSAction(input: {
-  sessionId?: string;
-}): Promise<ReadingTFDSResult | { error: string }> {
-  let sessionId = input.sessionId;
-  let userId: string | undefined;
-
-  if (!sessionId) {
-    const result = await createSessionAction({ mode: 'cambridge_ket_reading_part5', title: 'Reading Part 5, True, False or Doesn\'t Say' });
-    if (!result.data) return { error: result.error ?? 'Could not create session' };
-    sessionId = result.data.id;
-    userId = result.data.user_id;
-  } else {
-    const supabase = await createSupabaseServer();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return { error: 'Not authenticated' };
-    userId = user.id;
-  }
-
-  const [generationPrompt, framingText] = await Promise.all([
-    getPrompt('cambridge_ket_reading_part5_a2_generation').catch(() => null),
-    getPrompt('cambridge_ket_reading_part5_a2_framing').catch(() => 'Read the text carefully. Then decide if each statement is True, False, or Doesn\'t Say, T, F or DS.'),
-  ]);
-
-  if (!generationPrompt) return { error: 'Could not load generation prompt' };
-
-  const geminiResult = await callGemini(
-    { promptKey: 'cambridge_ket_reading_part5_a2_generation', model: MODELS.FLASH_LITE, userId },
-    (ai) => ai.models.generateContent({
-      model: MODELS.FLASH_LITE,
-      contents: [{ role: 'user', parts: [{ text: generationPrompt }] }],
-      config: { responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
-    })
-  );
-
-  if (!isOk(geminiResult)) return { error: 'Could not generate exercise' };
-
-  const rawText = geminiResult.data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
-  const parsed = safeParse(GenerationSchema, rawText);
-  if (!parsed) return { error: 'Unexpected model response' };
-
-  const exercise: ReadingTFDSExercise = {
-    title: stripDashes(parsed.title),
-    text: stripDashes(parsed.text),
-    statements: parsed.statements.map((s) => ({ ...s, text: stripDashes(s.text) })),
-  };
-
-  const cleanFramingText = stripDashes(framingText);
-
-  persistMessage({
-    sessionId: sessionId!, userId: userId!, role: 'bob', msgType: 'text',
-    contentText: null,
-    contentJson: { kind: 'reading_tfds_plan', framing_text: cleanFramingText, exercise },
-  }).catch(() => undefined);
-
-  return { sessionId: sessionId!, userId: userId!, framing_text: cleanFramingText, exercise };
-}
-
-export async function submitKETReadingTFDSAction(input: {
-  sessionId: string;
-  userId: string;
-  answers: Record<number, Verdict | null>;
-  statements: ReadingStatement[];
-}): Promise<ReadingTFDSSubmitResult | { error: string }> {
-  const statement_results: ReadingStatementResult[] = input.statements.map((s) => {
-    const chosen = input.answers[s.number] ?? null;
-    return { number: s.number, text: s.text, chosen, correct_verdict: s.verdict, is_correct: chosen === s.verdict };
+  const picked = await pickPlan({
+    exam: 'ket',
+    cefr: 'a2',
+    examPart: KET_OPEN_CLOZE_PART,
+    skill: 'reading',
+    schema: KetOpenClozePlanSchema,
+    userId,
   });
+  if (!picked.ok) return picked;
 
-  const correct_count = statement_results.filter((r) => r.is_correct).length;
+  const framingText = await getPrompt('cambridge_ket_reading_part5_a2_framing').catch(() => FRAMING_FALLBACK);
+  return ok({
+    framing_text: framingText,
+    exercise: { ...toPublicOpenCloze(picked.data.plan), bank_group_id: picked.data.groupId },
+  });
+}
 
-  persistMessages(statement_results.map((r) => ({
-    sessionId: input.sessionId, userId: input.userId, role: 'user' as const, msgType: 'text' as const,
-    contentText: null,
-    contentJson: { kind: 'reading_tfds_answer', statement_number: r.number, chosen: r.chosen, is_correct: r.is_correct },
-  }))).catch(() => undefined);
+/**
+ * @param input.exercise public exercise shown to the student
+ * @param input.answers word written per gap number
+ * @returns per-gap results graded against the keys stored in the bank
+ */
+export async function submitKETOpenClozeAction(input: {
+  sessionId?: string;
+  framing_text: string;
+  exercise: KetOpenClozeExercise;
+  answers: Record<number, string>;
+}): Promise<ActionResult<KetOpenClozeSubmitResult>> {
+  const plan = await loadPlan(input.exercise.bank_group_id, KetOpenClozePlanSchema);
+  if (!plan.ok) return plan;
 
-  persistMessage({
-    sessionId: input.sessionId, userId: input.userId, role: 'bob', msgType: 'evaluation',
-    contentText: null,
-    contentJson: { kind: 'reading_tfds_evaluation', score: correct_count, score_max: input.statements.length, statement_results, is_final: true },
-  }).catch(() => undefined);
+  const gap_results = gradeOpenCloze(plan.data, input.answers);
+  const correct_count = gap_results.filter((r) => r.is_correct).length;
 
-  return { correct_count, total: input.statements.length, statement_results };
+  const completed = await completeActivity({
+    mode: 'cambridge_ket_reading_part5',
+    sessionId: input.sessionId,
+    bank: bankStamp(KET_OPEN_CLOZE_PART, input.exercise.bank_group_id),
+    plan: { kind: 'ket_open_cloze_plan', framing_text: input.framing_text, exercise: input.exercise },
+    answers: gap_results.map((r) => ({ kind: 'ket_open_cloze_answer', gap_number: r.number, given: r.given, is_correct: r.is_correct })),
+    evaluation: {
+      kind: 'ket_open_cloze_evaluation',
+      score: correct_count,
+      score_max: gap_results.length,
+      gap_results,
+      is_final: true,
+    },
+  });
+  if (!completed.ok) return fail(completed.code);
+
+  return ok({ sessionId: completed.data.sessionId, correct_count, total: gap_results.length, gap_results });
 }

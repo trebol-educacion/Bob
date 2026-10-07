@@ -4,7 +4,7 @@ import { MODELS } from '@/lib/models';
 import { EvalResponseSchema, type EvalResponse, type ModeKey } from '@/lib/types/practice';
 import { getPrompt } from '@/lib/prompts/db-prompts';
 import { createSupabaseServer } from '@/lib/supabase/server';
-import { persistMessage } from '@/lib/persist-activity';
+import { finishSession } from '@/lib/session/lifecycle';
 import { callGemini, safeParseFallback } from '@/lib/gemini-client';
 import { parseYLMode, evaluationKey, EvalFallback } from '../_helpers';
 
@@ -68,13 +68,14 @@ export async function evaluateYLFinalAction(input: {
 
   const evalResult = safeParseFallback(EvalResponseSchema, parsed, EvalFallback);
 
-  await persistMessage({
+  const finished = await finishSession({
     sessionId: input.sessionId,
     userId: user.id,
-    role: 'bob',
-    msgType: 'evaluation',
-    contentJson: { ...evalResult, is_final: true },
+    evaluation: { ...evalResult },
   });
+  if (!finished.ok) {
+    console.error(JSON.stringify({ event: 'evaluateYLFinalAction', error: finished.code }));
+  }
 
   return evalResult;
 }

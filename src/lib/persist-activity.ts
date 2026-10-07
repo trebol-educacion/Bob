@@ -3,6 +3,7 @@
 import { after } from 'next/server';
 import { createSupabaseServer } from '@/lib/supabase/server';
 import { inferSkillFromMode, inferModeMetadata } from '@/lib/skill-from-mode';
+import { ratioToScore10, toScore10 } from '@/lib/session/score';
 import { getProfileSnapshot, type ProfileSnapshotSupabase } from '@/lib/activity/profile-snapshot';
 
 export interface PersistMessageInput {
@@ -12,6 +13,7 @@ export interface PersistMessageInput {
   msgType: 'text' | 'phrase' | 'image_scene' | 'evaluation' | 'user_audio' | 'yl_cue' | 'yl_tts';
   contentText?: string | null;
   contentJson?: Record<string, unknown> | unknown[] | null;
+  skipActivityResult?: boolean;
 }
 
 /** Returns true only when the user's org has allow_voice_storage=true; defaults to false on any error. */
@@ -55,6 +57,7 @@ export async function persistMessage(
   const newId = (data as { id: string }).id;
 
   if (
+    !input.skipActivityResult &&
     input.msgType === 'evaluation' &&
     input.contentJson !== null &&
     input.contentJson !== undefined &&
@@ -204,11 +207,6 @@ export interface PersistActivityResultInput {
   contentJson: Record<string, unknown>;
 }
 
-function deriveScore10(raw: number, max: number): number | null {
-  if (max <= 0) return null;
-  return Math.round((raw / max) * 100) / 10;
-}
-
 async function resolveStartedAt(
   supabase: ProfileSnapshotSupabase,
   sessionId: string,
@@ -280,7 +278,7 @@ export async function persistActivityResult(
       measure_type = 'score';
       raw_score = input.contentJson.score as number;
       max_score = input.contentJson.score_max as number;
-      score_10 = deriveScore10(raw_score, max_score);
+      score_10 = ratioToScore10(raw_score, max_score);
     } else {
       measure_type = 'rubric';
       const rubric = input.contentJson.rubric as Record<string, unknown> | undefined;
@@ -293,8 +291,10 @@ export async function persistActivityResult(
       ) {
         raw_score = rubric.task_coverage + rubric.grammar + rubric.vocabulary + rubric.fluency;
         max_score = 16;
-        score_10 = deriveScore10(raw_score, max_score);
+        score_10 = ratioToScore10(raw_score, max_score);
         rubric_json = { ...rubric, max_per_criterion: 4 };
+      } else {
+        score_10 = toScore10(input.contentJson);
       }
     }
 

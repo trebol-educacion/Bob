@@ -1,63 +1,28 @@
 'use server';
 
-import { createSupabaseServer } from '@/lib/supabase/server';
-import type { BuildSentenceItem } from '@/components/practice/BuildSentencePractice';
+import { pickPlan } from '@/lib/item-bank/plan-bank';
+import { ToeflBuildSentencePlanSchema } from '@/lib/bank-plans/toefl-build-sentence';
+import { toBuildSentenceItems, type BuildSentenceBankItem } from '@/lib/toefl/build-sentence-bank';
+import { currentUserId } from '@/lib/session/lifecycle';
+import { fail, ok, type ActionResult } from '@/lib/result';
 
-const MOCK_ITEMS: BuildSentenceItem[] = [
-  {
-    id: 'mock-1',
-    prompt: 'Rearrange the words to form a correct sentence.',
-    tokens: ['studying', 'been', 'She', 'has', 'hard'],
-    target_sentence: 'She has been studying hard',
-  },
-  {
-    id: 'mock-2',
-    prompt: 'Build a sentence using all the tokens below.',
-    tokens: ['the', 'environment', 'protect', 'We', 'must'],
-    target_sentence: 'We must protect the environment',
-  },
-];
+export interface BuildSentenceSet {
+  items: BuildSentenceBankItem[];
+  bankGroupId: string;
+}
 
-/** Fetches Build-a-Sentence items from bob_closed_items; returns mock items if none found. */
-export async function getBuildSentenceItemsAction(): Promise<
-  { items: BuildSentenceItem[] } | { error: string }
-> {
-  try {
-    const supabase = await createSupabaseServer();
-
-    const { data, error } = await supabase
-      .from('closed_items')
-      .select('id, stimulus_text, options, correct_key')
-      .eq('framework', 'toefl')
-      .eq('exam_part', 'toefl_writing_build_sentence');
-
-    if (error) {
-      console.error('[getBuildSentenceItemsAction] Supabase error:', error.message);
-      return { items: MOCK_ITEMS };
-    }
-
-    if (!data || data.length === 0) {
-      return { items: MOCK_ITEMS };
-    }
-
-    const items: BuildSentenceItem[] = (
-      data as Array<{
-        id: string;
-        stimulus_text: string | null;
-        options: Array<{ key: string; label: string }>;
-        correct_key: string;
-      }>
-    ).map((row) => ({
-      id: row.id,
-      prompt: row.stimulus_text ?? 'Arrange the tokens to form a correct sentence.',
-      tokens: row.options.map((o) => o.label),
-      target_sentence: row.correct_key,
-    }));
-
-    return { items };
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'Unknown error';
-    console.error('[getBuildSentenceItemsAction] Unexpected error:', message);
-    return { items: MOCK_ITEMS };
-  }
+/** Reads one pregenerated Build a Sentence set from the bank; no model call and no session row. */
+export async function getBuildSentenceItemsAction(): Promise<ActionResult<BuildSentenceSet>> {
+  const userId = await currentUserId();
+  if (!userId) return fail('unauthenticated');
+  const picked = await pickPlan({
+    exam: 'toefl',
+    cefr: 'b1',
+    examPart: 'toefl_writing_build_sentence',
+    skill: 'writing',
+    schema: ToeflBuildSentencePlanSchema,
+    userId,
+  });
+  if (!picked.ok) return picked;
+  return ok({ items: toBuildSentenceItems(picked.data.plan, picked.data.groupId), bankGroupId: picked.data.groupId });
 }

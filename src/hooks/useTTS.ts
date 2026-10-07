@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { generateSpeechAction } from '@/actions/gemini';
 import { pcmToWavBase64 } from '@/lib/audio';
+import { playClip, type ClipPlayback } from '@/lib/audio-clip';
 
 export interface TTSPlaybackHooks {
   /** Fires once audio is built and about to play, before `audio.play()`. */
@@ -26,37 +27,20 @@ export interface UseTTS {
 
 /** React hook that owns one HTMLAudioElement ref and its cleanup; never throws. */
 export function useTTS(): UseTTS {
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const playbackRef = useRef<ClipPlayback | null>(null);
 
   const stop = useCallback(() => {
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current = null;
-    }
+    playbackRef.current?.stop();
+    playbackRef.current = null;
   }, []);
 
   const playUrl = useCallback(
     async (url: string, hooks?: TTSPlaybackHooks): Promise<void> => {
       stop();
-      try {
-        const audio = new Audio(url);
-        audioRef.current = audio;
-        hooks?.onStart?.();
-        await new Promise<void>((resolve) => {
-          audio.onended = () => resolve();
-          audio.onerror = () => {
-            hooks?.onError?.();
-            resolve();
-          };
-          audio.play().catch(() => {
-            hooks?.onError?.();
-            resolve();
-          });
-        });
-        audioRef.current = null;
-      } catch {
-        /* Audio failure is non-fatal: the flow continues (regla 4) */
-      }
+      const playback = playClip(url, hooks);
+      playbackRef.current = playback;
+      await playback.finished;
+      if (playbackRef.current === playback) playbackRef.current = null;
     },
     [stop],
   );
@@ -80,19 +64,13 @@ export function useTTS(): UseTTS {
       try {
         const { data, mimeType } = await generateSpeechAction(text);
         const url = pcmToWavBase64(data, mimeType);
-        const audio = new Audio(url);
-        audioRef.current = audio;
-        audio.onended = () => {
-          if (audioRef.current === audio) audioRef.current = null;
-        };
-        audio.onerror = () => {
-          if (audioRef.current === audio) audioRef.current = null;
-        };
-        audio.play().catch(() => {
-          if (audioRef.current === audio) audioRef.current = null;
+        const playback = playClip(url);
+        playbackRef.current = playback;
+        void playback.finished.then(() => {
+          if (playbackRef.current === playback) playbackRef.current = null;
         });
       } catch {
-        /* TTS failure is non-fatal: the flow continues (regla 4) */
+        playbackRef.current = null;
       }
     },
     [stop],

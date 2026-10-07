@@ -1,0 +1,18 @@
+{
+  "legacyFirstMessageB2": [
+    "```",
+    "json\n{\n  \"framing\": \"¡Hola! Vamos a practicar",
+    " inglés como si fueras mi vecino. Yo soy Bob y tú puedes ser quien quieras.  Tú empiezas la conversación sobre algo cotidiano, como si nos encontráramos por casualidad.\",\n  \"first_message\": \"Hey there",
+    "! Fancy seeing you out and about this afternoon. I was just about to head over to the garden centre, thought I'd grab some more of those petunias. How are you doing today?\"\n}\n```"
+  ],
+  "framingEnglishB2": [
+    "{\n  \"framing\": \"",
+    "You are meeting your neighbor Bob. You're having a relaxed conversation about a simple, everyday event. It's a friendly chat.\",\n  \"message\": \"Oh, hello there! Fancy seeing you out and about. It'",
+    "s such a lovely day today, isn't it? I was just about to head out for a little walk myself.\"\n}"
+  ],
+  "framingSpanishA2": [
+    "{\n  \"framing",
+    "\": \"Estás charlando tranquilamente con un vecino amigable sobre un momento cotidiano. Es una conversación informal y relajada.\",\n  \"message\": \"Hi there! Lovely weather today, isn't it? Perfect for a little",
+    " chat.\"\n}"
+  ]
+}

@@ -9,17 +9,12 @@ vi.mock('@/actions/gemini', () => ({
   generateSpeechAction: vi.fn(),
 }));
 
-vi.mock('@/actions/practice/repository', () => ({
-  addPracticeTurnAction: vi.fn().mockResolvedValue({ ok: true, data: null }),
-  updatePracticeModeAction: vi.fn().mockResolvedValue({ ok: true, data: null }),
-}));
-
 vi.mock('@/actions/practice/turn', () => ({
-  generatePracticeInitialTurnAction: vi.fn(),
+  recordPracticeTurnAction: vi.fn().mockResolvedValue({ ok: true, data: { sessionId: 'session-1' } }),
 }));
 
 vi.mock('@/actions/practice/image', () => ({
-  generatePracticeImageAction: vi.fn().mockResolvedValue({ ok: false, imageUrl: null }),
+  generatePracticeImageAction: vi.fn().mockResolvedValue({ ok: false, imageUrl: null, prompt: null }),
 }));
 
 vi.mock('@/lib/audio', async (importOriginal) => {
@@ -40,6 +35,7 @@ type ChatResult = { ai_response: string; evaluation: { score: number; feedback: 
 function baseArgs() {
   return {
     sessionId: 'session-1',
+    organizationId: 'org-1',
     mode: 'conversation' as const,
     seed: SEED,
     level: 'b1' as const,
