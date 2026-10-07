@@ -10,5 +10,10 @@
   "unavailableRetry": "Try again",
   "unavailableContinue": "Continue without the test",
   "unavailableBack": "Back",
-  "audioPlay": "Play audio"
+  "audioPlay": "Play audio",
+  "result": {
+    "title": "Test complete!",
+    "levelLabel": "Your {skill} level",
+    "continue": "Continue"
+  }
 }

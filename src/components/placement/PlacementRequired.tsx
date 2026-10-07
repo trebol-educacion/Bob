@@ -5,6 +5,7 @@ import { usePlacementRunner, type PlacementRunnerSkill } from '@/hooks/usePlacem
 import { PlacementStepRunner } from './PlacementStepRunner';
 import { PlacementUnavailable } from './PlacementUnavailable';
 import { BobMascotLoader } from '@/components/chat/BobMascotLoader';
+import { PlacementResult } from './PlacementResult';
 import type { AppState } from '@/lib/routing';
 
 export interface PlacementRequiredProps {
@@ -17,7 +18,7 @@ const GATE_SKILL: PlacementRunnerSkill = 'reading';
 
 /** @param props PlacementRequiredProps */
 export function PlacementRequired({ setAppState, refreshSkillLevels, refreshPendingAssessments }: PlacementRequiredProps) {
-  const { begin, status, step, stepsCompleted, startFailure, submitStep, cancel, reset } = usePlacementRunner();
+  const { begin, status, step, stepsCompleted, resultLevel, startFailure, submitStep, cancel, reset } = usePlacementRunner();
 
   useEffect(() => {
     void begin(GATE_SKILL);
@@ -31,13 +32,9 @@ export function PlacementRequired({ setAppState, refreshSkillLevels, refreshPend
 
   useEffect(() => {
     if (status !== 'done') return;
-    void (async () => {
-      await refreshSkillLevels();
-      await refreshPendingAssessments();
-      reset();
-      setAppState('skill-selection');
-    })();
-  }, [status, refreshSkillLevels, refreshPendingAssessments, reset, setAppState]);
+    void refreshSkillLevels();
+    void refreshPendingAssessments();
+  }, [status, refreshSkillLevels, refreshPendingAssessments]);
 
   const handleCancel = () => {
     void cancel();
@@ -58,6 +55,10 @@ export function PlacementRequired({ setAppState, refreshSkillLevels, refreshPend
         leaveLabel="continue"
       />
     );
+  }
+
+  if (status === 'done') {
+    return <PlacementResult skill={GATE_SKILL} level={resultLevel} onContinue={handleLeave} />;
   }
 
   if (step) {

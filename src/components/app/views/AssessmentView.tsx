@@ -6,7 +6,7 @@ import { AssessmentSpeakingRunner } from '@/components/assessment/AssessmentSpea
 import { AssessmentWritingRunner } from '@/components/assessment/AssessmentWritingRunner';
 import { PlacementUnavailable } from '@/components/placement/PlacementUnavailable';
 import { PlacementStepRunner } from '@/components/placement/PlacementStepRunner';
-import { BobMascotLoader } from '@/components/chat/BobMascotLoader';
+import { PlacementResult } from '@/components/placement/PlacementResult';
 import { usePlacementRunner } from '@/hooks/usePlacementRunner';
 import type { AssessmentPrompt, AssessmentWritingTask } from '@/actions/assessment';
 import type { AppState } from '@/lib/routing';
@@ -79,13 +79,9 @@ export function AssessmentView({
 
   useEffect(() => {
     if (placementRunner.status !== 'done') return;
-    void (async () => {
-      await refreshSkillLevels();
-      await refreshPendingAssessments();
-      resetPlacementRunner();
-      leavePractice('catalog-filtered');
-    })();
-  }, [placementRunner.status, refreshSkillLevels, refreshPendingAssessments, resetPlacementRunner, leavePractice]);
+    void refreshSkillLevels();
+    void refreshPendingAssessments();
+  }, [placementRunner.status, refreshSkillLevels, refreshPendingAssessments]);
 
   if (appState === 'assessment-invite' && selectedSkill && placementRunner.status === 'unavailable') {
     return (
@@ -125,7 +121,16 @@ export function AssessmentView({
   }
 
   if (appState === 'assessment-running' && placementRunner.status === 'done') {
-    return <BobMascotLoader size="lg" message="Great job! Preparing your practice…" />;
+    return (
+      <PlacementResult
+        skill={selectedSkill ?? ''}
+        level={placementRunner.resultLevel}
+        onContinue={() => {
+          resetPlacementRunner();
+          leavePractice('catalog-filtered');
+        }}
+      />
+    );
   }
 
   if (appState === 'assessment-running' && assessmentId && assessmentPrompts.length > 0) {
