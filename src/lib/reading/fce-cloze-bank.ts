@@ -42,6 +42,25 @@ function ordered(items: BankItem[]): BankItem[] {
   return [...items].sort((a, b) => (a.group_order ?? 0) - (b.group_order ?? 0));
 }
 
+interface ClozeExample {
+  sentence?: unknown;
+  answer?: unknown;
+  options?: unknown;
+}
+
+/**
+ * @param example metadata.example of the group
+ * @returns the example sentence with its answer filled in, or an empty string
+ */
+export function filledExample(example: unknown): string {
+  if (typeof example !== 'object' || example === null) return '';
+  const { sentence, answer, options } = example as ClozeExample;
+  if (typeof sentence !== 'string' || !Array.isArray(options)) return '';
+  const match = options.find((o): o is { key: string; label: string } =>
+    typeof o === 'object' && o !== null && (o as { key?: unknown }).key === answer && typeof (o as { label?: unknown }).label === 'string');
+  return match ? sentence.replace(/___0___/, match.label) : '';
+}
+
 /**
  * @param group published cloze group
  * @param items its items
@@ -52,7 +71,7 @@ export function toClozePlan(group: ItemGroup, items: BankItem[]): ClozePlan {
   return {
     groupId: group.id,
     title,
-    text_with_gaps: group.stimulus_text ?? '',
+    text_with_gaps: [filledExample(group.metadata.example), group.stimulus_text ?? ''].filter(Boolean).join(' '),
     gaps: ordered(items).map((item, index) => ({
       number: numberOf(item, index),
       options: item.options
