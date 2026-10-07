@@ -11,7 +11,7 @@ export interface PracticeImagePanelProps {
 
 export function PracticeImagePanel({ imageUrl, loading, loadingLabel, unavailableLabel }: PracticeImagePanelProps) {
   return (
-    <div className="w-full aspect-video rounded-2xl overflow-hidden bg-gray-50 border border-gray-100 flex items-center justify-center mb-3">
+    <div className="w-full max-w-xl mx-auto aspect-video rounded-2xl overflow-hidden bg-gray-50 border border-gray-100 flex items-center justify-center mb-3">
       {imageUrl ? (
         <Image src={imageUrl} alt="" width={800} height={450} className="w-full h-full object-cover" unoptimized />
       ) : loading ? (
