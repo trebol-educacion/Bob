@@ -20,7 +20,6 @@ import { generateKETSignsAndNoticesAction, submitKETSignsAnswersAction } from '@
 import { generateKETMatchQuestionAction, submitKETMatchQuestionAction } from '@/actions/modes/ket-reading-part2';
 import { generateKETLongTextAction, submitKETLongTextAction } from '@/actions/modes/ket-reading-part3';
 import { generateKETVocabGapAction, submitKETVocabGapAction } from '@/actions/modes/ket-reading-part4';
-import { generateKETReadingTFDSAction, submitKETReadingTFDSAction } from '@/actions/modes/ket-reading-part5';
 import { restoreExercise } from '@/lib/ket/restore-plan';
 
 const options = { A: 'a', B: 'b', C: 'c' };
@@ -74,16 +73,6 @@ const CASES = [
         framing_text: 'f',
         answers: { 1: 'B' },
         exercise: { title: 't', text: 'x', items: [{ number: 1, options, answer: 'A' }] } as never,
-      }),
-  },
-  {
-    mode: 'cambridge_ket_reading_part5',
-    generate: () => generateKETReadingTFDSAction(),
-    submit: () =>
-      submitKETReadingTFDSAction({
-        framing_text: 'f',
-        answers: { 1: 'T' },
-        exercise: { title: 't', text: 'x', statements: [{ number: 1, text: 's', verdict: 'T' }] } as never,
       }),
   },
 ];

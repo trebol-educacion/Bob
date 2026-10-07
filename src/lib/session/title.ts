@@ -36,7 +36,7 @@ const PART_LABELS: Record<string, string> = {
   cambridge_ket_reading_part2: 'Match the Question',
   cambridge_ket_reading_part3: 'Read and Decide',
   cambridge_ket_reading_part4: 'Choose the Word',
-  cambridge_ket_reading_part5: 'True, False or Doesn\'t Say',
+  cambridge_ket_reading_part5: 'Open Cloze',
   cambridge_ket_listening_part1: 'Listen and Choose',
   cambridge_ket_listening_part2: 'Listen and Complete',
   cambridge_ket_listening_part3: 'Listen and Decide',

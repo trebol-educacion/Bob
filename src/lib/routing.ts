@@ -32,7 +32,7 @@ import {
   KETMatchQuestionPractice,
   KETLongTextPractice,
   KETVocabGapPractice,
-  KETReadingTFDSPractice,
+  KETOpenClozePractice,
   KETStoryWritingPractice,
   KETHobbyTalkPractice,
   KETDescribePicturePractice,
@@ -218,7 +218,7 @@ export const EXAM_PART_COMPONENT_MAP: Record<ModeKey, RouteEntry> = {
   },
   cambridge_ket_reading_part5: {
     appState: 'exam-practicing',
-    render: (p) => React.createElement(KETReadingTFDSPractice, { key: ylInstanceKey(p), ...p }),
+    render: (p) => React.createElement(KETOpenClozePractice, { key: ylInstanceKey(p), ...p }),
   },
   cambridge_ket_listening_part1: {
     appState: 'exam-practicing',

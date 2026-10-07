@@ -24,7 +24,7 @@ vi.mock('@/lib/prompts/db-prompts', () => ({ getPrompt: vi.fn(async () => 'frami
 import { generateKETSignsAndNoticesAction } from '@/actions/modes/ket-reading-part1';
 import { generateKETLongTextAction } from '@/actions/modes/ket-reading-part3';
 import { generateKETVocabGapAction } from '@/actions/modes/ket-reading-part4';
-import { generateKETReadingTFDSAction } from '@/actions/modes/ket-reading-part5';
+import { startKETOpenClozeAction } from '@/actions/modes/ket-reading-part5';
 import { generateKETShortMessageAction } from '@/actions/modes/ket-writing-part6';
 import { generateKETPictureStoryPlanAction } from '@/actions/modes/ket-writing-part7';
 
@@ -71,9 +71,9 @@ const CASES = [
     name: 'reading part 5',
     part: 'ket_reading_part5',
     skill: 'reading',
-    open: () => generateKETReadingTFDSAction(),
-    plan: { title: 't', text: 'x', statements: six((n) => ({ number: n, text: 's', verdict: 'DS' })) },
-    expected: { exercise: { bank_group_id: 'g1', title: 't' } },
+    open: () => startKETOpenClozeAction(),
+    plan: { title: 't', text: 'x ___1___', gaps: six((n) => ({ number: n, answer: 'the', accepted: [] })) },
+    expected: { exercise: { bank_group_id: 'g1', title: 't', gap_numbers: [1, 2, 3, 4, 5, 6] } },
   },
   {
     name: 'writing part 6',

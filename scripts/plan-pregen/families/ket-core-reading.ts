@@ -1,7 +1,7 @@
 import { KetSignsPlanSchema, type KetSignsPlan } from '../../../src/lib/bank-plans/ket-reading-part1';
 import { KetLongTextPlanSchema, type KetLongTextPlan } from '../../../src/lib/bank-plans/ket-reading-part3';
 import { KetVocabGapPlanSchema, type KetVocabGapPlan } from '../../../src/lib/bank-plans/ket-reading-part4';
-import { KetTfdsPlanSchema, type KetTfdsPlan } from '../../../src/lib/bank-plans/ket-reading-part5';
+import { KET_OPEN_CLOZE_GAPS, KetOpenClozePlanSchema, type KetOpenClozePlan } from '../../../src/lib/bank-plans/ket-reading-part5';
 import { drawImage, assetPath, inBatches } from '../assets';
 import { stripAllDashes } from '../clean';
 import { kidsImagePrompt } from '../kids-image';
@@ -148,50 +148,40 @@ const ketVocabGap = definePart<KetVocabGapPlan>({
   labelOf: (plan) => plan.title,
 });
 
-const ketTfds = definePart<KetTfdsPlan>({
+const OPEN_CLOZE_MAX_WORDS = 1;
+
+const ketOpenCloze = definePart<KetOpenClozePlan>({
   exam: 'ket',
   cefr: 'a2',
   skill: 'reading',
   examPart: 'ket_reading_part5',
   promptKey: 'cambridge_ket_reading_part5_a2_generation',
-  short: 'kr5',
-  schema: KetTfdsPlanSchema,
+  short: 'kr5c',
+  schema: KetOpenClozePlanSchema,
   topics: [
     'a local sports centre',
     'a small bookshop',
-    'a school trip leaflet',
+    'a school trip',
     'a new cafe in town',
     'a summer language course',
     'a community garden',
   ],
   normalize: stripAllDashes,
-  rules: (plan) => {
-    const verdicts = plan.statements.map((s) => s.verdict);
-    return [
-      ...wordRangeIssues(plan.text, 55, 120, 'text'),
-      ...numberingIssues(plan.statements.map((s) => s.number), 6),
-      ...(['T', 'F', 'DS'] as const).filter((v) => !verdicts.includes(v)).map((v) => `statements: at least one must be ${v}`),
-      ...duplicateIssues(plan.statements.map((s) => s.text), 'statement'),
-    ];
-  },
+  rules: (plan) => [
+    ...wordRangeIssues(plan.text, 55, 120, 'text'),
+    ...numberingIssues(plan.gaps.map((g) => g.number), KET_OPEN_CLOZE_GAPS),
+    ...plan.gaps.map((g) => g.number).filter((n) => !plan.text.includes(`___${n}___`)).map((n) => `text: marker ___${n}___ is missing`),
+    ...plan.gaps.flatMap((g) => [g.answer, ...g.accepted].filter((w) => wordsIn(w) > OPEN_CLOZE_MAX_WORDS).map((w) => `gap ${g.number}: "${w}" must be ONE word`)),
+    ...duplicateIssues(plan.gaps.map((g) => g.answer.toLowerCase()), 'answer'),
+  ],
   judge: (plan) => ({
-    kind: 'comprehension',
+    kind: 'open',
     input: {
       text: plan.text,
-      items: plan.statements.map((s) => ({
-        number: s.number,
-        question: `Is this statement True (T), False (F) or Doesn't Say (DS)? "${s.text}"`,
-        options: [
-          { key: 'T', label: 'True: the text says so' },
-          { key: 'F', label: 'False: the text says the opposite' },
-          { key: 'DS', label: "Doesn't Say: the topic is not mentioned in the text" },
-        ],
-        claimed_key: s.verdict,
-        explanation: 'Verdict in relation to the text.',
-      })),
+      items: plan.gaps.map((g) => ({ number: g.number, claimed: g.answer, accepted: g.accepted })),
     },
   }),
   labelOf: (plan) => plan.title,
 });
 
-export const KET_READING_PARTS: PlanPart[] = [ketSigns, ketLongText, ketVocabGap, ketTfds];
+export const KET_READING_PARTS: PlanPart[] = [ketSigns, ketLongText, ketVocabGap, ketOpenCloze];

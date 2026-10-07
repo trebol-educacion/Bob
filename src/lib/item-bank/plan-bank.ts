@@ -3,6 +3,7 @@ import 'server-only';
 import type { z } from 'zod';
 import { fail, ok, type ActionResult } from '@/lib/result';
 import { pickContent } from './content-source';
+import { createSupabaseServer } from '@/lib/supabase/server';
 import type { ItemBankExam, ItemBankSkill } from './types';
 
 export interface PlanQuery<P> {
@@ -56,4 +57,17 @@ export async function pickPlan<P>(query: PlanQuery<P>): Promise<ActionResult<Pic
  */
 export function bankStamp(examPart: string, groupId: string | null | undefined): BankStamp {
   return { exam_part: examPart, bank_group_id: groupId ?? null };
+}
+
+/**
+ * @param groupId bank group chosen when the activity opened
+ * @param schema contract of the stored plan
+ * @returns the stored plan, or `no_content` when the group is missing or invalid
+ */
+export async function loadPlan<P>(groupId: string, schema: z.ZodType<P>): Promise<ActionResult<P>> {
+  const supabase = await createSupabaseServer();
+  const { data, error } = await supabase.from('item_groups').select('metadata').eq('id', groupId).maybeSingle();
+  if (error || !data) return fail('no_content');
+  const parsed = schema.safeParse((data.metadata as { plan?: unknown } | null)?.plan);
+  return parsed.success ? ok(parsed.data) : fail('no_content');
 }
