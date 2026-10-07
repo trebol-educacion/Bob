@@ -21,3 +21,12 @@ export function toTenScale(score: number, scoreMax: number): number {
   if (!(scoreMax > 0)) return 0;
   return Math.round((score / scoreMax) * 100) / 10;
 }
+
+/**
+ * @param score10 grade on the 0-10 scale
+ * @returns true from the good tier upwards
+ */
+export function isPassingScore(score10: number): boolean {
+  const tier = scoreTier(score10);
+  return tier !== 'fair' && tier !== 'keep';
+}

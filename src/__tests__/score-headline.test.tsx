@@ -66,3 +66,13 @@ describe('ScoreHeadline', () => {
     expect(screen.getByText('Great essay!')).toBeInTheDocument();
   });
 });
+
+describe('isPassingScore', () => {
+  it('passes from the good tier upwards', async () => {
+    const { isPassingScore } = await import('@/lib/score/headline');
+    expect(isPassingScore(2.5)).toBe(false);
+    expect(isPassingScore(5.9)).toBe(false);
+    expect(isPassingScore(6)).toBe(true);
+    expect(isPassingScore(10)).toBe(true);
+  });
+});

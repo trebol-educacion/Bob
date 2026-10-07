@@ -21,6 +21,7 @@ export interface CelebrationCardProps {
    * exam-style score (decision D-D2). The trophy, stars and feedback remain.
    */
   hideGrade?: boolean;
+  showPoints?: boolean;
 }
 
 function fireConfetti(intensity: 'mega' | 'normal' | 'mini') {
@@ -82,6 +83,7 @@ export function CelebrationCard({
   actionLabel,
   animate = true,
   hideGrade = false,
+  showPoints = true,
 }: CelebrationCardProps) {
   const t = useTranslations('yl');
   const resolvedActionLabel = actionLabel ?? t('celebration.defaultActionLabel');
@@ -211,9 +213,11 @@ export function CelebrationCard({
             </motion.span>
             <span className="text-2xl font-black text-slate-400">/ 10</span>
           </div>
-          <p className="mt-1 text-center text-[11px] font-bold uppercase tracking-widest text-slate-400">
-            {score} / {scoreMax} {t('celebration.pointsLabel')}
-          </p>
+          {showPoints && (
+            <p className="mt-1 text-center text-[11px] font-bold uppercase tracking-widest text-slate-400">
+              {score} / {scoreMax} {t('celebration.pointsLabel')}
+            </p>
+          )}
         </>
       )}
 

@@ -161,6 +161,7 @@ function FeedbackPanel({
         <CelebrationCard
           score={toScore10(feedback) ?? 0}
           scoreMax={10}
+          showPoints={false}
           onAction={onOpenDashboard}
           actionLabel="See my progress"
           animate={animate}

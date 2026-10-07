@@ -18,6 +18,7 @@ import { ActivityLoadError } from '@/components/practice/ActivityLoadError';
 import { restoreShortMessage } from '@/lib/ket/writing-restore';
 import { useTranslations } from 'next-intl';
 import { toScore10 } from '@/lib/session/score';
+import { isPassingScore } from '@/lib/score/headline';
 
 const ACCENT = '#469E7B';
 const ACCENT_TEXT = '#2F6B52';
@@ -73,6 +74,8 @@ function FeedbackPanel({ feedback, userText, onOpenDashboard, animate }: {
 }) {
   const t = useTranslations('cambridge');
   const [modelOpen, setModelOpen] = useState(false);
+  const score10 = toScore10(feedback) ?? 0;
+  const passed = isPassingScore(score10);
 
   return (
     <motion.div
@@ -88,11 +91,11 @@ function FeedbackPanel({ feedback, userText, onOpenDashboard, animate }: {
 
       <div className="rounded-3xl border border-gray-100 shadow-sm px-4 py-3 space-y-3" style={{ background: CARD_SURFACE }}>
         <div className="flex items-center gap-2">
-          {feedback.understood
+          {passed
             ? <CheckCircle size={18} className="text-green-500 shrink-0" />
             : <XCircle size={18} className="text-amber-500 shrink-0" />}
           <span className="text-sm font-semibold text-gray-700">
-            {feedback.understood ? t('ket.shortMessage.youDidIt') : t('ket.shortMessage.reviewYourMessage')}
+            {passed ? t('ket.shortMessage.youDidIt') : t('ket.shortMessage.reviewYourMessage')}
           </span>
         </div>
 
@@ -154,8 +157,9 @@ function FeedbackPanel({ feedback, userText, onOpenDashboard, animate }: {
       </div>
 
       <CelebrationCard
-        score={toScore10(feedback) ?? 0}
+        score={score10}
         scoreMax={10}
+        showPoints={false}
         onAction={onOpenDashboard}
         animate={animate}
       />

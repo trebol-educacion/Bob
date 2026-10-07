@@ -18,6 +18,7 @@ import { ActivityLoadError } from '@/components/practice/ActivityLoadError';
 import type { StoredMessage } from '@/actions/messages';
 import { useTranslations } from 'next-intl';
 import { toScore10 } from '@/lib/session/score';
+import { isPassingScore } from '@/lib/score/headline';
 
 export interface PETEmailWritingPracticeProps {
   onBack: () => void;
@@ -102,6 +103,8 @@ function FeedbackPanel({
 }) {
   const t = useTranslations('cambridge');
   const [modelOpen, setModelOpen] = useState(false);
+  const score10 = toScore10(feedback) ?? 0;
+  const passed = isPassingScore(score10);
 
   return (
     <motion.div
@@ -117,11 +120,11 @@ function FeedbackPanel({
 
       <div className="rounded-2xl bg-white border border-gray-100 shadow-sm px-4 py-3 space-y-3">
         <div className="flex items-center gap-2">
-          {feedback.understood
+          {passed
             ? <CheckCircle size={18} className="text-green-500 shrink-0" />
             : <XCircle size={18} className="text-amber-500 shrink-0" />}
           <span className="text-sm font-semibold text-gray-700">
-            {feedback.understood ? t('pet.emailWriting.youDidIt') : t('pet.emailWriting.reviewYourMessage')}
+            {passed ? t('pet.emailWriting.youDidIt') : t('pet.emailWriting.reviewYourMessage')}
           </span>
         </div>
 
@@ -199,8 +202,9 @@ function FeedbackPanel({
       </div>
 
       <CelebrationCard
-        score={toScore10(feedback) ?? 0}
+        score={score10}
         scoreMax={10}
+        showPoints={false}
         onAction={onOpenDashboard}
         actionLabel={t('pet.emailWriting.celebrationAction')}
         animate={animate}
