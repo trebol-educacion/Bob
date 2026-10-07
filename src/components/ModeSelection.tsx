@@ -1,6 +1,7 @@
 import React, { forwardRef } from 'react';
 import { motion } from 'motion/react';
 import { useTranslations } from 'next-intl';
+import { CatalogEmptyState } from '@/components/catalog/CatalogEmptyState';
 import type { ModeKey, PracticeMode, CefrLevel, DynamicCard, CardVisibility } from '@/lib/types/practice';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import type { AvailableMode } from '@/contexts/OrganizationContext';
@@ -78,7 +79,7 @@ export const ModeSelection = forwardRef<HTMLDivElement, ModeSelectionProps>(func
   { onSelect, cefrActiveLevel = null, track = 'official' },
   selectorRef
 ) {
-  const { allDynamicCards, resolvedCards } = useOrganization();
+  const { allDynamicCards, resolvedCards, loading } = useOrganization();
   const t = useTranslations('home.modeSelection');
   const tTrack = useTranslations('mode_ui.track');
 
@@ -124,6 +125,8 @@ export const ModeSelection = forwardRef<HTMLDivElement, ModeSelectionProps>(func
     }
     return undefined;
   }
+
+  const isEmpty = !loading && Boolean(cefrActiveLevel) && (track === 'free' ? genericCards.length === 0 : sectionMap.size === 0);
 
   function renderCard(card: DynamicCard) {
     const resolved = resolvedCardMap.get(card.mode_key);
@@ -182,6 +185,8 @@ export const ModeSelection = forwardRef<HTMLDivElement, ModeSelectionProps>(func
             </div>
           </motion.div>
         )}
+
+        {isEmpty && <CatalogEmptyState title={t('emptyTitle')} body={t('emptyBody')} />}
 
         {cefrActiveLevel && track === 'official' && Array.from(sectionMap.entries()).map(([sectionName, cards], i) => (
           <motion.div

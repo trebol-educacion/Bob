@@ -10,7 +10,9 @@
     "pickLevelHint": "Pick your level above to see the activities available for you.",
     "explore": "Explore",
     "availableForLevel": "Available for level {level}",
-    "notAvailableYet": "Not available yet"
+    "notAvailableYet": "Not available yet",
+    "emptyTitle": "Coming soon",
+    "emptyBody": "Activities for this skill at your level are on the way. Try another skill in the meantime."
   },
   "cefrBanner": {
     "message": "Select your CEFR level to access more activities"
