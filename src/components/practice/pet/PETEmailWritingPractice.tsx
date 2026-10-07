@@ -248,6 +248,7 @@ export function tryRestoreFromMessages(messages: StoredMessage[]): {
         suggestions: (cj.suggestions as string[]) ?? [],
         contentPointsCovered: (cj.contentPointsCovered as [boolean, boolean, boolean, boolean]) ?? [false, false, false, false],
         modelAnswer: (cj.modelAnswer as string | null) ?? null,
+        rubric: (cj.rubric as PETEmailFeedback['rubric']) ?? undefined,
       };
     }
   }

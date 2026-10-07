@@ -46,6 +46,7 @@ export function restoreShortMessage(messages: StoredMessage[]): RestoredShortMes
         highlights: (json.highlights as string[]) ?? [],
         suggestions: (json.suggestions as string[]) ?? [],
         modelAnswer: (json.modelAnswer as string | null) ?? null,
+        rubric: (json.rubric as KETShortMessageFeedback['rubric']) ?? undefined,
       };
     }
   }
@@ -80,6 +81,7 @@ export function restorePictureStory(messages: StoredMessage[]): RestoredPictureS
         highlights: (json.highlights as string[]) ?? [],
         suggestions: (json.suggestions as string[]) ?? [],
         model_answer: (json.model_answer as string) ?? null,
+        rubric: (json.rubric as PictureStoryFeedback['rubric']) ?? undefined,
       };
     }
   }
