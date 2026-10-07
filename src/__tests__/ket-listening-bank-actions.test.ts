@@ -24,8 +24,8 @@ vi.mock('@/lib/prompts/db-prompts', () => ({ getPrompt: vi.fn(async () => 'frami
 import { generateKETListenAndChooseAction } from '@/actions/modes/ket-listening-part1';
 import { generateKETListenCompleteAction } from '@/actions/modes/ket-listening-part2';
 import { generateKETListenDecideAction } from '@/actions/modes/ket-listening-part3';
-import { generateKETShortTalksPlanAction } from '@/actions/modes/ket-listening-part4';
-import { generateKETTFDSAction } from '@/actions/modes/ket-listening-part5';
+import { startKETShortConversationsAction } from '@/actions/modes/ket-listening-part4';
+import { startKETListenMatchAction } from '@/actions/modes/ket-listening-part5';
 
 const URL = 'https://cdn/audio.mp3';
 const turns = [
@@ -62,14 +62,14 @@ const DECIDE = {
   audio_url: URL,
 };
 const KEYS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
-const TALKS = {
-  people: numbers.map((n) => ({ number: n, name: `n${n}`, monologue: 'm', correct_key: KEYS[n - 1], audio_url: URL })),
-  characteristics: KEYS.map((key) => ({ key, text: 't' })),
+const SHORT = {
+  items: numbers.map((n) => ({ number: n, context: `c${n}`, dialogue: turns, question: 'q', options: abc, answer: 'A', audio_url: URL })),
 };
-const TFDS = {
-  context: 'c',
-  audio: turns,
-  statements: numbers.map((n) => ({ number: n, text: 's', verdict: 'T' })),
+const MATCH = {
+  instruction: 'What present does each person get?',
+  conversation: [...turns, ...turns],
+  people: numbers.map((n) => ({ number: n, name: `n${n}`, answer: KEYS[n - 1] })),
+  options: KEYS.map((key) => ({ key, text: 't' })),
   audio_url: URL,
 };
 
@@ -77,8 +77,8 @@ const CASES = [
   { part: 'ket_listening_part1', plan: CHOOSE, open: () => generateKETListenAndChooseAction() },
   { part: 'ket_listening_part2', plan: COMPLETE, open: () => generateKETListenCompleteAction() },
   { part: 'ket_listening_part3', plan: DECIDE, open: () => generateKETListenDecideAction() },
-  { part: 'ket_listening_part4', plan: TALKS, open: () => generateKETShortTalksPlanAction() },
-  { part: 'ket_listening_part5', plan: TFDS, open: () => generateKETTFDSAction() },
+  { part: 'ket_listening_part4', plan: SHORT, open: () => startKETShortConversationsAction() },
+  { part: 'ket_listening_part5', plan: MATCH, open: () => startKETListenMatchAction() },
 ];
 
 function groupOf(plan: unknown) {
@@ -110,9 +110,9 @@ describe.each(CASES)('$part opens from the bank', ({ part, plan, open }) => {
 
   it('returns no_content when the stored plan lacks its audio', async () => {
     const { audio_url: _audio, ...withoutAudioUrl } = plan as Record<string, unknown>;
-    const stripped = 'people' in withoutAudioUrl
-      ? { ...withoutAudioUrl, people: (plan as typeof TALKS).people.map(({ audio_url: _a, ...p }) => p) }
-      : 'items' in withoutAudioUrl && part === 'ket_listening_part1'
+    const stripped = part === 'ket_listening_part4'
+      ? { items: SHORT.items.map(({ audio_url: _a, ...i }) => i) }
+      : part === 'ket_listening_part1'
         ? { items: CHOOSE.items.map(({ audio_url: _a, ...i }) => i) }
         : withoutAudioUrl;
     pickContent.mockResolvedValue(groupOf(stripped));

@@ -27,8 +27,8 @@ import {
   KETListenAndChoosePractice,
   KETListenAndCompletePractice,
   KETListenAndDecidePractice,
-  KETShortTalksPractice,
-  KETTrueFalseDoesntSayPractice,
+  KETShortConversationsPractice,
+  KETListenMatchPractice,
   KETMatchQuestionPractice,
   KETLongTextPractice,
   KETVocabGapPractice,
@@ -234,11 +234,11 @@ export const EXAM_PART_COMPONENT_MAP: Record<ModeKey, RouteEntry> = {
   },
   cambridge_ket_listening_part4: {
     appState: 'exam-practicing',
-    render: (p) => React.createElement(KETShortTalksPractice, { key: ylInstanceKey(p), ...p }),
+    render: (p) => React.createElement(KETShortConversationsPractice, { key: ylInstanceKey(p), ...p }),
   },
   cambridge_ket_listening_part5: {
     appState: 'exam-practicing',
-    render: (p) => React.createElement(KETTrueFalseDoesntSayPractice, { key: ylInstanceKey(p), ...p }),
+    render: (p) => React.createElement(KETListenMatchPractice, { key: ylInstanceKey(p), ...p }),
   },
   cambridge_pet_listening_part1: {
     appState: 'exam-practicing',

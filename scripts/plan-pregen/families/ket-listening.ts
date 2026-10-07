@@ -1,9 +1,9 @@
 import { KetListenChooseGenSchema, type KetListenChooseGen } from '../../../src/lib/bank-plans/ket-listening-part1';
 import { KetListenCompleteGenSchema, type KetListenCompleteGen } from '../../../src/lib/bank-plans/ket-listening-part2';
 import { KetListenDecideGenSchema, type KetListenDecideGen } from '../../../src/lib/bank-plans/ket-listening-part3';
-import { KetShortTalksGenSchema, type KetShortTalksGen } from '../../../src/lib/bank-plans/ket-listening-part4';
-import { KetTfdsGenSchema, type KetTfdsGen } from '../../../src/lib/bank-plans/ket-listening-part5';
-import { assetPath, drawImage, inBatches, soloVoice, speak } from '../assets';
+import { KetShortConversationsGenSchema, type KetShortConversationsGen } from '../../../src/lib/bank-plans/ket-listening-part4';
+import { KetListenMatchGenSchema, type KetListenMatchGen } from '../../../src/lib/bank-plans/ket-listening-part5';
+import { assetPath, drawImage, inBatches, speak } from '../assets';
 import { stripAllDashes } from '../clean';
 import { kidsImagePrompt } from '../kids-image';
 import { spokenTranscript, spokenTurns } from '../ket-listening-media';
@@ -14,10 +14,10 @@ import {
   completeRules,
   decideJudge,
   decideRules,
-  talksJudge,
-  talksRules,
-  tfdsJudge,
-  tfdsRules,
+  matchJudge,
+  matchRules,
+  shortJudge,
+  shortRules,
 } from '../ket-listening-rules';
 import { definePart, type PlanPart } from '../types';
 
@@ -106,44 +106,45 @@ const decide = definePart<KetListenDecideGen>({
   },
 });
 
-const talks = definePart<KetShortTalksGen>({
+const shortConversations = definePart<KetShortConversationsGen>({
   ...BASE,
   examPart: 'ket_listening_part4',
   promptKey: 'cambridge_ket_listening_part4_a2_generation',
-  short: 'kl4',
-  schema: KetShortTalksGenSchema,
-  topics: ['hobbies and sports', 'food and shopping', 'music and travel', 'school and daily life'],
+  short: 'kl4c',
+  schema: KetShortConversationsGenSchema,
+  topics: TOPICS,
   normalize: stripAllDashes,
-  rules: talksRules,
-  judge: talksJudge,
-  labelOf: (plan) => plan.people.map((p) => p.name).join(', '),
+  rules: shortRules,
+  judge: shortJudge,
+  labelOf: (plan) => plan.items.map((i) => i.context).join(' | '),
   produce: async (plan, env) => {
     const audio = await inBatches(
-      plan.people.map((person, index) => async () =>
-        speak(env.ai, env.db, assetPath(env.examPart, env.variant, `s${person.number}.mp3`), person.monologue, soloVoice(env.slot + index)),
-      ),
+      plan.items.map((item) => async () => {
+        const spoken = spokenTurns(item.dialogue, env.slot + item.number);
+        return speak(env.ai, env.db, assetPath(env.examPart, env.variant, `q${item.number}.mp3`), spoken.text, spoken.speakers);
+      }),
       2,
     );
-    return { ...plan, people: plan.people.map((person, index) => ({ ...person, audio_url: audio[index] })) };
+    return { items: plan.items.map((item, index) => ({ ...item, audio_url: audio[index] })) };
   },
 });
 
-const tfds = definePart<KetTfdsGen>({
+const listenMatch = definePart<KetListenMatchGen>({
   ...BASE,
   examPart: 'ket_listening_part5',
   promptKey: 'cambridge_ket_listening_part5_a2_generation',
-  short: 'kl5',
-  schema: KetTfdsGenSchema,
-  topics: ['a school event', 'a club announcement', 'a personal story', 'a trip', 'a hobby', 'a sports activity'],
+  short: 'kl5m',
+  schema: KetListenMatchGenSchema,
+  topics: ['presents for a family', 'jobs in a family', 'what friends do at the weekend', 'favourite school subjects', 'things to take on a trip', 'food for a party'],
   normalize: stripAllDashes,
-  rules: tfdsRules,
-  judge: tfdsJudge,
-  labelOf: (plan) => plan.context,
+  rules: matchRules,
+  judge: matchJudge,
+  labelOf: (plan) => plan.instruction,
   produce: async (plan, env) => {
-    const spoken = spokenTurns(plan.audio, env.slot);
+    const spoken = spokenTurns(plan.conversation, env.slot);
     const audio_url = await speak(env.ai, env.db, assetPath(env.examPart, env.variant, 'audio.mp3'), spoken.text, spoken.speakers);
     return { ...plan, audio_url };
   },
 });
 
-export const KET_LISTENING_PARTS: PlanPart[] = [choose, complete, decide, talks, tfds];
+export const KET_LISTENING_PARTS: PlanPart[] = [choose, complete, decide, shortConversations, listenMatch];

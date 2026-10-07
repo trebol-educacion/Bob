@@ -20,8 +20,6 @@ vi.mock('@/lib/item-bank/plan-bank', async (original) => ({
 import { generateKETListenAndChooseAction, submitKETListenAnswersAction } from '@/actions/modes/ket-listening-part1';
 import { generateKETListenCompleteAction, submitKETListenCompleteAction } from '@/actions/modes/ket-listening-part2';
 import { generateKETListenDecideAction, submitKETListenDecideAction } from '@/actions/modes/ket-listening-part3';
-import { generateKETShortTalksPlanAction, submitKETShortTalksAction } from '@/actions/modes/ket-listening-part4';
-import { generateKETTFDSAction, submitKETTFDSAction } from '@/actions/modes/ket-listening-part5';
 import { restoreExercise } from '@/lib/ket/restore-plan';
 import { EMPTY_AUDIO, withoutAudio } from '@/lib/ket/plan';
 
@@ -70,32 +68,6 @@ const CASES = [
         framing_text: 'f',
         answers: { 1: 'A' },
         exercise: { context: 'c', conversation: [], items: [{ number: 1, question: 'q', options, answer: 'A' }], audio_url: 'https://cdn/a.mp3', bank_group_id: 'g1' } as never,
-      }),
-  },
-  {
-    mode: 'cambridge_ket_listening_part4',
-    planKind: 'short_talks_plan',
-    generate: () => generateKETShortTalksPlanAction(),
-    submit: () =>
-      submitKETShortTalksAction({
-        framing_text: 'f',
-        answers: { 1: 'A' },
-        exercise: {
-          people: [{ number: 1, name: 'n', monologue: 'm', correct_key: 'A', audio_url: 'https://cdn/a.mp3' }],
-          characteristics: [],
-          bank_group_id: 'g1',
-        } as never,
-      }),
-  },
-  {
-    mode: 'cambridge_ket_listening_part5',
-    planKind: 'tfds_plan',
-    generate: () => generateKETTFDSAction(),
-    submit: () =>
-      submitKETTFDSAction({
-        framing_text: 'f',
-        answers: { 1: 'T' },
-        exercise: { context: 'c', audio: [], statements: [{ number: 1, text: 's', verdict: 'T' }], audio_url: 'https://cdn/a.mp3', bank_group_id: 'g1' } as never,
       }),
   },
 ];

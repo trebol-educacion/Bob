@@ -1,119 +1,78 @@
 'use server';
 
 import { getPrompt } from '@/lib/prompts/db-prompts';
-import { pickPlan, bankStamp } from '@/lib/item-bank/plan-bank';
+import { bankStamp, loadPlan, pickPlan } from '@/lib/item-bank/plan-bank';
 import { fail, ok, type ActionResult } from '@/lib/result';
-import { KetShortTalksPlanSchema, KET_CHAR_KEYS, type KetShortTalksPlan } from '@/lib/bank-plans/ket-listening-part4';
 import { currentUserId } from '@/lib/session/lifecycle';
 import { completeActivity } from '@/lib/session/complete';
 import { stripDashes } from '@/lib/text';
+import {
+  KetShortConversationsPlanSchema,
+  toPublicShortConversations,
+  type KetShortConversationPublicItem,
+} from '@/lib/bank-plans/ket-listening-part4';
+import { gradeShortConversations, type KeyedResult } from '@/lib/ket/listening-grading';
 
-export type CharKey = (typeof KET_CHAR_KEYS)[number];
+const PART = 'ket_listening_part4';
+const FRAMING_FALLBACK = 'You will hear five short conversations. For each one, listen and choose the right answer, A, B or C.';
 
-export type Person = KetShortTalksPlan['people'][number];
-export type Characteristic = KetShortTalksPlan['characteristics'][number];
-
-export interface ShortTalksExercise {
-  people: Person[];
-  characteristics: Characteristic[];
-  bank_group_id?: string;
-}
-
-export interface ShortTalksResult {
-  framing_text: string;
-  exercise: ShortTalksExercise;
-}
-
-export interface ShortTalksPlan {
-  framing_text: string;
-  people: Person[];
-  characteristics: Characteristic[];
+export interface KetShortConversationsExercise {
+  items: KetShortConversationPublicItem[];
   bank_group_id: string;
 }
 
-export interface PersonResult {
-  number: number;
-  name: string;
-  chosen: CharKey | null;
-  correct_key: CharKey;
-  is_correct: boolean;
+export interface KetShortConversationsStart {
+  framing_text: string;
+  exercise: KetShortConversationsExercise;
 }
 
-export interface ShortTalksSubmitResult {
+export interface KetShortConversationsSubmitResult {
   sessionId: string;
   correct_count: number;
   total: number;
-  person_results: PersonResult[];
-  characteristics: Characteristic[];
+  item_results: KeyedResult[];
 }
 
-const FRAMING_FALLBACK =
-  'You will hear five people talking about themselves. Match each person to the correct description, A to H. There are three descriptions you do not need.';
-
-export async function generateKETShortTalksPlanAction(): Promise<ActionResult<ShortTalksPlan>> {
+/** @returns five short conversations from the bank, without keys or transcripts */
+export async function startKETShortConversationsAction(): Promise<ActionResult<KetShortConversationsStart>> {
   const userId = await currentUserId();
   if (!userId) return fail('unauthenticated');
 
-  const picked = await pickPlan({
-    exam: 'ket',
-    cefr: 'a2',
-    examPart: 'ket_listening_part4',
-    skill: 'listening',
-    schema: KetShortTalksPlanSchema,
-    userId,
-  });
+  const picked = await pickPlan({ exam: 'ket', cefr: 'a2', examPart: PART, skill: 'listening', schema: KetShortConversationsPlanSchema, userId });
   if (!picked.ok) return picked;
 
   const framingText = await getPrompt('cambridge_ket_listening_part4_a2_framing').catch(() => FRAMING_FALLBACK);
-  return ok({ framing_text: stripDashes(framingText), ...picked.data.plan, bank_group_id: picked.data.groupId });
+  return ok({
+    framing_text: stripDashes(framingText),
+    exercise: { items: toPublicShortConversations(picked.data.plan), bank_group_id: picked.data.groupId },
+  });
 }
 
-export async function submitKETShortTalksAction(input: {
+/**
+ * @param input.answers option chosen per item number
+ * @returns per-item results graded against the keys stored in the bank
+ */
+export async function submitKETShortConversationsAction(input: {
   sessionId?: string;
   framing_text: string;
-  answers: Record<number, CharKey | null>;
-  exercise: ShortTalksExercise;
-}): Promise<ShortTalksSubmitResult | { error: string }> {
-  const person_results: PersonResult[] = input.exercise.people.map((p) => {
-    const chosen = input.answers[p.number] ?? null;
-    return {
-      number: p.number,
-      name: p.name,
-      chosen,
-      correct_key: p.correct_key,
-      is_correct: chosen === p.correct_key,
-    };
-  });
+  exercise: KetShortConversationsExercise;
+  answers: Record<number, string>;
+}): Promise<ActionResult<KetShortConversationsSubmitResult>> {
+  const plan = await loadPlan(input.exercise.bank_group_id, KetShortConversationsPlanSchema);
+  if (!plan.ok) return plan;
 
-  const correct_count = person_results.filter((r) => r.is_correct).length;
+  const item_results = gradeShortConversations(plan.data, input.answers);
+  const correct_count = item_results.filter((r) => r.is_correct).length;
 
   const completed = await completeActivity({
     mode: 'cambridge_ket_listening_part4',
     sessionId: input.sessionId,
-    bank: bankStamp('ket_listening_part4', input.exercise.bank_group_id),
-    plan: { kind: 'short_talks_plan', framing_text: input.framing_text, exercise: input.exercise },
-    answers: person_results.map((r) => ({
-        kind: 'short_talks_answer',
-        person_number: r.number,
-        chosen: r.chosen,
-        is_correct: r.is_correct,
-      })),
-    evaluation: {
-      kind: 'short_talks_evaluation',
-      score: correct_count,
-      score_max: input.exercise.people.length,
-      person_results,
-      characteristics: input.exercise.characteristics,
-      is_final: true,
-    },
+    bank: bankStamp(PART, input.exercise.bank_group_id),
+    plan: { kind: 'ket_short_conversations_plan', framing_text: input.framing_text, exercise: input.exercise },
+    answers: item_results.map((r) => ({ kind: 'ket_short_conversations_answer', item_number: r.number, chosen: r.chosen, is_correct: r.is_correct })),
+    evaluation: { kind: 'ket_short_conversations_evaluation', score: correct_count, score_max: item_results.length, item_results, is_final: true },
   });
-  if (!completed.ok) return { error: completed.code };
+  if (!completed.ok) return fail(completed.code);
 
-  return {
-    sessionId: completed.data.sessionId,
-    correct_count,
-    total: input.exercise.people.length,
-    person_results,
-    characteristics: input.exercise.characteristics,
-  };
+  return ok({ sessionId: completed.data.sessionId, correct_count, total: item_results.length, item_results });
 }

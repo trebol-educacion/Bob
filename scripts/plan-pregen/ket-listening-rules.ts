@@ -1,8 +1,8 @@
 import type { KetListenChooseGen } from '../../src/lib/bank-plans/ket-listening-part1';
 import type { KetListenCompleteGen } from '../../src/lib/bank-plans/ket-listening-part2';
 import type { KetListenDecideGen } from '../../src/lib/bank-plans/ket-listening-part3';
-import type { KetShortTalksGen } from '../../src/lib/bank-plans/ket-listening-part4';
-import type { KetTfdsGen } from '../../src/lib/bank-plans/ket-listening-part5';
+import type { KetShortConversationsGen } from '../../src/lib/bank-plans/ket-listening-part4';
+import type { KetListenMatchGen } from '../../src/lib/bank-plans/ket-listening-part5';
 import type { JudgeRequest } from './types';
 import { duplicateIssues, keyDistributionIssues, optionIssues, wordRangeIssues, wordsIn } from './rules';
 import { labelledTranscript } from './ket-listening-media';
@@ -95,72 +95,65 @@ export function decideJudge(plan: KetListenDecideGen): JudgeRequest {
   };
 }
 
-export function talksRules(plan: KetShortTalksGen): string[] {
-  const keys = plan.people.map((p) => p.correct_key);
-  const issues = [
-    ...numberIssues(plan.people.map((p) => p.number), 'person'),
-    ...duplicateIssues(plan.people.map((p) => p.name), 'name'),
-    ...duplicateIssues(plan.characteristics.map((c) => c.text), 'characteristic'),
+export function shortRules(plan: KetShortConversationsGen): string[] {
+  return [
+    ...numberIssues(plan.items.map((i) => i.number), 'item'),
+    ...keyDistributionIssues(plan.items.map((i) => i.answer), 3, 'items'),
+    ...duplicateIssues(plan.items.map((i) => i.context), 'context'),
+    ...duplicateIssues(plan.items.map((i) => i.question), 'question'),
+    ...plan.items.flatMap((item) => [
+      ...wordRangeIssues(item.dialogue.map((t) => t.line).join(' '), 30, 90, `item ${item.number} dialogue`),
+      ...optionIssues(Object.values(item.options), `item ${item.number}`),
+    ]),
   ];
-  if (new Set(keys).size !== keys.length) issues.push('each person must have a different correct_key');
-  const letters = plan.characteristics.map((c) => c.key).join('');
-  if (letters !== 'ABCDEFGH') issues.push('characteristics must be labelled A to H in order, once each');
-  for (const person of plan.people) {
-    issues.push(...wordRangeIssues(person.monologue, 22, 90, `person ${person.number} monologue`));
-    const target = plan.characteristics.find((c) => c.key === person.correct_key)?.text.toLowerCase();
-    if (target && person.monologue.toLowerCase().includes(target)) {
-      issues.push(`person ${person.number}: the correct characteristic is copied word for word in the monologue`);
-    }
-  }
-  return issues;
 }
 
-export function talksJudge(plan: KetShortTalksGen): JudgeRequest {
+export function shortJudge(plan: KetShortConversationsGen): JudgeRequest {
   return {
     kind: 'comprehension',
     input: {
       text: null,
-      items: plan.people.map((person) => ({
-        number: person.number,
-        question: `Which description fits ${person.name}?`,
-        options: plan.characteristics.map((c) => ({ key: c.key, label: c.text })),
-        claimed_key: person.correct_key,
-        explanation: 'The description that best matches what the person says.',
-        source: person.monologue,
+      items: plan.items.map((item) => ({
+        number: item.number,
+        question: item.question,
+        options: (['A', 'B', 'C'] as const).map((key) => ({ key, label: item.options[key] })),
+        claimed_key: item.answer,
+        explanation: 'The answer is what the speakers finally say or decide.',
+        source: labelledTranscript(item.dialogue),
       })),
     },
   };
 }
 
-const VERDICT_OPTIONS = [
-  { key: 'T', label: 'True: the audio says it' },
-  { key: 'F', label: 'False: the audio says the opposite' },
-  { key: 'DS', label: "Doesn't say: the audio never mentions it" },
-];
-
-export function tfdsRules(plan: KetTfdsGen): string[] {
-  const verdicts = new Set(plan.statements.map((s) => s.verdict));
+export function matchRules(plan: KetListenMatchGen): string[] {
+  const answers = plan.people.map((p) => p.answer);
   const issues = [
-    ...numberIssues(plan.statements.map((s) => s.number), 'statement'),
-    ...wordRangeIssues(plan.audio.map((t) => t.line).join(' '), 120, 240, 'audio'),
-    ...duplicateIssues(plan.statements.map((s) => s.text), 'statement'),
+    ...numberIssues(plan.people.map((p) => p.number), 'person'),
+    ...wordRangeIssues(plan.conversation.map((t) => t.line).join(' '), 140, 260, 'conversation'),
+    ...duplicateIssues(plan.people.map((p) => p.name), 'name'),
+    ...duplicateIssues(plan.options.map((o) => o.text), 'option'),
   ];
-  if (verdicts.size < 3) issues.push('use at least one T, one F and one DS statement');
+  if (new Set(answers).size !== answers.length) issues.push('each person must have a different answer letter');
+  if (plan.options.map((o) => o.key).join('') !== 'ABCDEFGH') issues.push('options must be labelled A to H in order, once each');
+  const spoken = plan.conversation.map((t) => t.line.toLowerCase()).join(' ');
+  for (const person of plan.people) {
+    if (!spoken.includes(person.name.toLowerCase())) issues.push(`person ${person.number}: ${person.name} must be named in the conversation`);
+  }
   return issues;
 }
 
-export function tfdsJudge(plan: KetTfdsGen): JudgeRequest {
-  const source = labelledTranscript(plan.audio);
+export function matchJudge(plan: KetListenMatchGen): JudgeRequest {
+  const source = labelledTranscript(plan.conversation);
   return {
     kind: 'comprehension',
     input: {
       text: source,
-      items: plan.statements.map((s) => ({
-        number: s.number,
-        question: s.text,
-        options: VERDICT_OPTIONS,
-        claimed_key: s.verdict,
-        explanation: 'Verdict of the statement against the audio.',
+      items: plan.people.map((person) => ({
+        number: person.number,
+        question: `${plan.instruction} ${person.name}?`,
+        options: plan.options.map((o) => ({ key: o.key, label: o.text })),
+        claimed_key: person.answer,
+        explanation: 'The option the conversation finally gives for this person, not one only mentioned as a distractor.',
         source,
       })),
     },
