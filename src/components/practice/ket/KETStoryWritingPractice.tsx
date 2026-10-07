@@ -19,6 +19,7 @@ import { restorePictureStory } from '@/lib/ket/writing-restore';
 import { resolveActivityBoot } from '@/lib/activity/boot';
 import { ActivityLoadError } from '@/components/practice/ActivityLoadError';
 import { ActivityHeader } from '@/components/activity/ActivityHeader';
+import { toScore10 } from '@/lib/session/score';
 
 const NO_LOADING: Set<number> = new Set();
 
@@ -158,9 +159,8 @@ function FeedbackPanel({
 
       <div className="flex justify-center pt-2">
         <CelebrationCard
-          score={feedback.understood ? 1 : 0}
-          scoreMax={1}
-          hideGrade
+          score={toScore10(feedback) ?? 0}
+          scoreMax={10}
           onAction={onOpenDashboard}
           actionLabel="See my progress"
           animate={animate}

@@ -17,6 +17,7 @@ import type { StoredMessage } from '@/actions/messages';
 import { ActivityLoadError } from '@/components/practice/ActivityLoadError';
 import { restoreShortMessage } from '@/lib/ket/writing-restore';
 import { useTranslations } from 'next-intl';
+import { toScore10 } from '@/lib/session/score';
 
 const ACCENT = '#469E7B';
 const ACCENT_TEXT = '#2F6B52';
@@ -72,7 +73,6 @@ function FeedbackPanel({ feedback, userText, onOpenDashboard, animate }: {
 }) {
   const t = useTranslations('cambridge');
   const [modelOpen, setModelOpen] = useState(false);
-  const score = feedback.understood ? 1 : 0;
 
   return (
     <motion.div
@@ -154,12 +154,8 @@ function FeedbackPanel({ feedback, userText, onOpenDashboard, animate }: {
       </div>
 
       <CelebrationCard
-        score={score}
-        scoreMax={1}
-        hideGrade
-        feedback={feedback.understood
-          ? 'You wrote your message! Keep practicing to make it even better.'
-          : 'Try again, every attempt makes you stronger.'}
+        score={toScore10(feedback) ?? 0}
+        scoreMax={10}
         onAction={onOpenDashboard}
         animate={animate}
       />

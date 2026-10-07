@@ -17,6 +17,7 @@ import {
 import { ActivityLoadError } from '@/components/practice/ActivityLoadError';
 import type { StoredMessage } from '@/actions/messages';
 import { useTranslations } from 'next-intl';
+import { toScore10 } from '@/lib/session/score';
 
 export interface PETEmailWritingPracticeProps {
   onBack: () => void;
@@ -101,7 +102,6 @@ function FeedbackPanel({
 }) {
   const t = useTranslations('cambridge');
   const [modelOpen, setModelOpen] = useState(false);
-  const coveredCount = feedback.contentPointsCovered.filter(Boolean).length;
 
   return (
     <motion.div
@@ -199,9 +199,8 @@ function FeedbackPanel({
       </div>
 
       <CelebrationCard
-        score={coveredCount}
-        scoreMax={4}
-        hideGrade
+        score={toScore10(feedback) ?? 0}
+        scoreMax={10}
         onAction={onOpenDashboard}
         actionLabel={t('pet.emailWriting.celebrationAction')}
         animate={animate}
