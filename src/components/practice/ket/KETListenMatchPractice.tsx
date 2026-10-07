@@ -155,7 +155,7 @@ export function KETListenMatchPractice({
               <AudioClipPlayer src={exercise.audio_url} maxPlays={phase === 'finished' ? undefined : MAX_PLAYS} />
             </section>
             <MatchingBoard
-              choices={exercise.options.map((option) => ({ key: option.key, label: option.key, text: option.text }))}
+              choices={exercise.options.map((option) => ({ key: option.key, label: option.text }))}
               questions={exercise.people.map((person) => ({ id: String(person.number), number: person.number, text: person.name }))}
               answers={answers}
               onAnswer={phase === 'ready' ? (id, key) => setAnswers((prev) => ({ ...prev, [id]: key })) : undefined}
