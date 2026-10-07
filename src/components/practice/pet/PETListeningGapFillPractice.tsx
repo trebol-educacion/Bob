@@ -18,10 +18,10 @@ import {
 } from '@/actions/modes/pet-listening-part3';
 import type { StoredMessage } from '@/actions/messages';
 import { resolveActivityBoot } from '@/lib/activity/boot';
+import { ActivityHeader } from '@/components/activity/ActivityHeader';
 
 const ACCENT = '#10B981';
 const ACCENT_DARK = '#0E9F6E';
-const ACCENT_TEXT = '#047857';
 const ACCENT_TINT = 'color-mix(in oklab, #10B981 12%, white)';
 const CARD_SURFACE = '#FAFAF8';
 
@@ -342,32 +342,14 @@ export function PETListeningGapFillPractice({
 
   return (
     <div className="flex flex-col h-full relative">
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-100 bg-white shrink-0">
-        <button
-          type="button"
-          onClick={onBack}
-          className="w-11 h-11 flex items-center justify-center rounded-xl hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-600 text-lg"
-          aria-label="Back"
-        >
-          ←
-        </button>
-        <div
-          className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0"
-          style={{ background: ACCENT_TINT, color: ACCENT }}
-        >
-          <PETListeningIcon size={18} />
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-bold text-gray-800 truncate">Interactive Gap-Fill</p>
-          <p className="text-xs text-gray-400">Listening · Part 3</p>
-        </div>
-        <span
-          className="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-widest"
-          style={{ background: ACCENT_TINT, color: ACCENT_TEXT }}
-        >
-          B1
-        </span>
-      </div>
+      <ActivityHeader
+        title="Gap-Fill"
+        subtitle="Listening · Part 3"
+        badge="Part 3"
+        icon={<PETListeningIcon size={18} />}
+        iconStyle={{ background: ACCENT_TINT, color: ACCENT }}
+        onBack={onBack}
+      />
 
       {phase === 'ready' && (
         <div className="h-1.5 w-full bg-gray-100 shrink-0 overflow-hidden">
@@ -463,7 +445,7 @@ export function PETListeningGapFillPractice({
                 className="px-6 py-3 rounded-2xl text-white text-sm font-bold transition-transform duration-75 cursor-pointer active:translate-y-1 active:shadow-none disabled:opacity-40 disabled:cursor-not-allowed disabled:translate-y-0 disabled:shadow-none"
                 style={{ background: ACCENT, boxShadow: allAnswered ? `0 4px 0 ${ACCENT_DARK}` : 'none' }}
               >
-                Check answers
+                Submit answers
               </button>
             </div>
           </div>

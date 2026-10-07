@@ -16,6 +16,7 @@ import {
 } from '@/actions/modes/fce-listening-part1';
 import type { StoredMessage } from '@/actions/messages';
 import { resolveActivityBoot } from '@/lib/activity/boot';
+import { ActivityHeader } from '@/components/activity/ActivityHeader';
 
 const ITEMS_PER_SESSION = 8;
 const MAX_PLAYS = 2;
@@ -503,39 +504,14 @@ function Header({
   phase: Phase;
 }) {
   return (
-    <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-100 bg-white shrink-0">
-      <button
-        type="button"
-        onClick={onBack}
-        className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-600 cursor-pointer"
-        aria-label="Go back"
-      >
-        ←
-      </button>
-      <div
-        className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0"
-        style={{ background: 'color-mix(in oklab, #6366f1 12%, white)' }}
-      >
-        <Volume2 size={18} className="text-indigo-600" />
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-bold text-gray-800 truncate">Listening Part 1, Short Extracts</p>
-        <p className="text-xs text-gray-400">Multiple Choice</p>
-      </div>
-      <div className="shrink-0 flex items-center gap-2">
-        <ProgressDots
-          total={total}
-          currentIdx={currentIdx}
-          turns={turns}
-          phase={phase}
-        />
-        <span
-          className="shrink-0 px-2 py-0.5 rounded-full text-indigo-600 text-[10px] font-bold uppercase tracking-widest"
-          style={{ background: 'color-mix(in oklab, #6366f1 12%, white)' }}
-        >
-          B2 · FCE
-        </span>
-      </div>
-    </div>
+    <ActivityHeader
+      title="Short Extracts"
+      subtitle="Listening · Part 1"
+      badge="Part 1"
+      icon={<Volume2 size={18} className="text-indigo-600" />}
+      iconStyle={{ background: 'color-mix(in oklab, #6366f1 12%, white)' }}
+      trailing={<ProgressDots total={total} currentIdx={currentIdx} turns={turns} phase={phase} />}
+      onBack={onBack}
+    />
   );
 }

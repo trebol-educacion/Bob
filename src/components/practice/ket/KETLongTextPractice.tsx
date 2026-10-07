@@ -17,6 +17,7 @@ import type { StoredMessage } from '@/actions/messages';
 import { resolveActivityBoot } from '@/lib/activity/boot';
 import { ActivityLoadError } from '@/components/practice/ActivityLoadError';
 import { restoreExercise } from '@/lib/ket/restore-plan';
+import { ActivityHeader } from '@/components/activity/ActivityHeader';
 
 const ACCENT = '#469E7B';
 const ACCENT_DARK = '#37795E';
@@ -306,24 +307,14 @@ export function KETLongTextPractice({
 
   return (
     <div className="flex flex-col h-full relative">
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-100 bg-white shrink-0">
-        <button
-          type="button"
-          onClick={onBack}
-          className="w-11 h-11 flex items-center justify-center rounded-xl hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-600 text-lg"
-          aria-label="Back"
-        >
-          ←
-        </button>
-        <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style={{ background: ACCENT_TINT, color: ACCENT }}>
-          <KETReadingIcon size={18} />
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-bold text-gray-800 truncate">Read and Decide</p>
-          <p className="text-xs text-gray-400">Reading · Part 3</p>
-        </div>
-        <span className="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-widest" style={{ background: ACCENT_TINT, color: ACCENT_TEXT }}>A2</span>
-      </div>
+      <ActivityHeader
+        title="Read and Decide"
+        subtitle="Reading · Part 3"
+        badge="Part 3"
+        icon={<KETReadingIcon size={18} />}
+        iconStyle={{ background: ACCENT_TINT, color: ACCENT }}
+        onBack={onBack}
+      />
 
       {(phase === 'loading' || phase === 'generating') && <div className="flex-1 flex flex-col min-h-0"><BobMascotLoader message="Preparing exercise…" /></div>}
       {phase === 'submitting' && <div className="flex-1 flex flex-col min-h-0"><BobMascotLoader message="Checking your answers…" /></div>}
@@ -432,7 +423,7 @@ export function KETLongTextPractice({
                 className="w-full px-6 py-3 rounded-2xl text-white text-sm font-bold transition-transform duration-75 cursor-pointer active:translate-y-1 active:shadow-none disabled:opacity-40 disabled:cursor-not-allowed disabled:translate-y-0 disabled:shadow-none"
                 style={{ background: ACCENT, boxShadow: allAnswered ? `0 4px 0 ${ACCENT_DARK}` : 'none' }}
               >
-                Check answers
+                Submit answers
               </button>
             </div>
           </div>

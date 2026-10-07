@@ -17,6 +17,7 @@ import {
 import { ActivityLoadError } from '@/components/practice/ActivityLoadError';
 import type { StoredMessage } from '@/actions/messages';
 import { resolveActivityBoot } from '@/lib/activity/boot';
+import { ActivityHeader } from '@/components/activity/ActivityHeader';
 
 const ACCENT_RING = 'border-emerald-200';
 
@@ -369,26 +370,12 @@ export function PETReadingComprehensionPractice({
 
   return (
     <div className="flex flex-col h-full relative">
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-100 bg-white shrink-0">
-        <button
-          type="button"
-          onClick={onBack}
-          className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-600"
-          aria-label="Back"
-        >
-          ←
-        </button>
-        <div className="w-8 h-8 rounded-xl bg-emerald-100 flex items-center justify-center shrink-0">
-          <PETReadingIcon size={18} className="text-emerald-700" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-bold text-gray-800 truncate">Reading, Comprehensive Text</p>
-          <p className="text-xs text-gray-400">Reading · B1</p>
-        </div>
-        <span className="shrink-0 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-bold uppercase tracking-widest">
-          B1
-        </span>
-      </div>
+      <ActivityHeader
+        title="Comprehensive Text"
+        subtitle="Reading"
+        icon={<PETReadingIcon size={18} className="text-emerald-700" />}
+        onBack={onBack}
+      />
 
       {phase === 'loading' && (
         <div className="flex-1 flex flex-col min-h-0">
@@ -461,7 +448,7 @@ export function PETReadingComprehensionPractice({
               disabled={!allAnswered}
               className="px-5 py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-bold shadow-sm hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
             >
-              Check answers
+              Submit answers
             </button>
           </div>
         </>

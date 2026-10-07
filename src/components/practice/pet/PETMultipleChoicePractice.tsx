@@ -17,6 +17,7 @@ import { resolveActivityBoot } from '@/lib/activity/boot';
 import { AudioClipPlayer } from '@/components/activity/AudioClipPlayer';
 import { stopActiveClip } from '@/lib/audio-clip';
 import { loadErrorMessage } from '@/lib/item-bank/load-error-message';
+import { ActivityHeader } from '@/components/activity/ActivityHeader';
 
 const ITEMS_PER_SESSION = 6;
 const MAX_PLAYS = 2;
@@ -529,39 +530,14 @@ function Header({
   phase: Phase;
 }) {
   return (
-    <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-100 bg-white shrink-0">
-      <button
-        type="button"
-        onClick={onBack}
-        className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-600 cursor-pointer"
-        aria-label="Go back"
-      >
-        ←
-      </button>
-      <div
-        className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0"
-        style={{ background: 'color-mix(in oklab, var(--color-bob-brand) 12%, white)' }}
-      >
-        <Volume2 size={18} className="text-bob-brand" />
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-bold text-gray-800 truncate">Listening Part 2</p>
-        <p className="text-xs text-gray-400">Multiple Choice</p>
-      </div>
-      <div className="shrink-0 flex items-center gap-2">
-        <ProgressDots
-          total={total}
-          currentIdx={currentIdx}
-          turns={turns}
-          phase={phase}
-        />
-        <span
-          className="shrink-0 px-2 py-0.5 rounded-full text-bob-brand text-[10px] font-bold uppercase tracking-widest"
-          style={{ background: 'color-mix(in oklab, var(--color-bob-brand) 12%, white)' }}
-        >
-          B1 · PET
-        </span>
-      </div>
-    </div>
+    <ActivityHeader
+      title="Short Talks"
+      subtitle="Listening · Part 2"
+      badge="Part 2"
+      icon={<Volume2 size={18} className="text-bob-brand" />}
+      iconStyle={{ background: 'color-mix(in oklab, var(--color-bob-brand) 12%, white)' }}
+      trailing={<ProgressDots total={total} currentIdx={currentIdx} turns={turns} phase={phase} />}
+      onBack={onBack}
+    />
   );
 }

@@ -18,6 +18,7 @@ import type { StoredMessage } from '@/actions/messages';
 import { restorePictureStory } from '@/lib/ket/writing-restore';
 import { resolveActivityBoot } from '@/lib/activity/boot';
 import { ActivityLoadError } from '@/components/practice/ActivityLoadError';
+import { ActivityHeader } from '@/components/activity/ActivityHeader';
 
 const NO_LOADING: Set<number> = new Set();
 
@@ -247,17 +248,14 @@ export function KETStoryWritingPractice({
 
   return (
     <div className="flex flex-col h-full relative">
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-100 bg-white shrink-0">
-        <button type="button" onClick={onBack} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-600">←</button>
-        <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style={{ background: 'color-mix(in oklab, var(--color-bob-brand) 12%, white)' }}>
-          <KETWritingIcon size={18} className="text-bob-brand" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-bold text-gray-800 truncate">Picture Story</p>
-          <p className="text-xs text-gray-400">Writing · Part 7</p>
-        </div>
-        <span className="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-widest" style={{ background: 'color-mix(in oklab, var(--color-bob-brand) 12%, white)', color: 'var(--color-bob-brand)' }}>A2</span>
-      </div>
+      <ActivityHeader
+        title="Picture Story"
+        subtitle="Writing · Part 7"
+        badge="Part 7"
+        icon={<KETWritingIcon size={18} className="text-bob-brand" />}
+        iconStyle={{ background: 'color-mix(in oklab, var(--color-bob-brand) 12%, white)' }}
+        onBack={onBack}
+      />
 
       {(phase === 'loading' || phase === 'generating') && (
         <div className="flex-1 flex flex-col min-h-0">

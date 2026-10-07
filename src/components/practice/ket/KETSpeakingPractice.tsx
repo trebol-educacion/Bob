@@ -13,6 +13,7 @@ import { useAudioClip } from '@/hooks/useAudioClip';
 import { PlaybackPlayer } from '@/components/practice/speaking/PlaybackPlayer';
 import { ACCENT, ACCENT_DARK, ACCENT_TINT } from '@/components/practice/speaking/speaking-theme';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
+import { ActivityHeader } from '@/components/activity/ActivityHeader';
 
 const CARD_SURFACE = '#FAFAF8';
 
@@ -265,26 +266,13 @@ export function KETSpeakingPractice({
 
   return (
     <div className="flex flex-col h-full relative">
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-100 bg-white shrink-0">
-        <button
-          type="button"
-          onClick={onBack}
-          className="w-11 h-11 flex items-center justify-center rounded-xl hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-600 text-lg"
-          aria-label="Back"
-        >
-          ←
-        </button>
-        <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style={{ background: ACCENT_TINT, color: ACCENT }}>
-          <KETSpeakingIcon size={18} />
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-bold text-gray-800 truncate">{title}</p>
-          <p className="text-xs text-gray-400">Speaking · {partLabel}</p>
-        </div>
-        <span className="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-widest" style={{ background: ACCENT_TINT, color: ACCENT_DARK }}>
-          A2
-        </span>
-      </div>
+      <ActivityHeader
+        title={title}
+        subtitle={`Speaking · ${partLabel}`}
+        icon={<KETSpeakingIcon size={18} />}
+        iconStyle={{ background: ACCENT_TINT, color: ACCENT }}
+        onBack={onBack}
+      />
 
       {phase === 'evaluating' && (
         <div className="flex-1 flex flex-col min-h-0">
