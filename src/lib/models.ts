@@ -25,7 +25,7 @@ export const MODELS = {
    * Used to keep activity generation off the critical path; do NOT use for
    * grading or pronunciation where full Flash accuracy matters.
    */
-  FLASH_LITE: 'gemini-2.5-flash-lite',
+  FLASH_LITE: 'gemini-2.5-flash',
 
   /** Image generation via generateContent + IMAGE modality. */
   IMAGE: 'gemini-2.5-flash-image',
