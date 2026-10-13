@@ -1,32 +1,26 @@
-/**
- * Gemini model identifiers used across the application.
- * Kept as separate constants, do NOT unify; each model has distinct capabilities.
- */
-
-/** TTS model, generates native audio output */
-export const MODELS = {
+const DEFAULT_MODELS = {
+  TEXT: 'gemini-3-flash-preview',
+  FAST: 'gemini-flash-lite-latest',
+  IMAGE: 'gemini-3-pro-image-preview',
   TTS: 'gemini-2.5-flash-preview-tts',
+} as const;
 
-  /**
-   * Stable text model for structured JSON tasks (phrases, evaluation, conversation, questions).
-   * Name kept for compat;
-   * rename to FLASH_TEXT planned in bob-core B6 (wrapper único).
-   */
-  FLASH_LITE_PREVIEW: 'gemini-2.5-flash',
+/**
+ * @param name - environment variable holding the model id
+ * @param fallback - model id used when the variable is unset or blank
+ * @returns model id
+ */
+function modelFromEnv(name: string, fallback: string): string {
+  const value = process.env[name]?.trim();
+  return value ? value : fallback;
+}
 
-  /**
-   * Same stable text model used for image-scene description (plain text task).
-   * Kept as a distinct constant for now; converges with FLASH_LITE_PREVIEW in B6.
-   */
-  FLASH_LITE_LATEST: 'gemini-2.5-flash',
+const TEXT_MODEL = modelFromEnv('GEMINI_TEXT_MODEL', DEFAULT_MODELS.TEXT);
 
-  /**
-   * Genuinely low-latency text model for simple structured exercise generation.
-   * Used to keep activity generation off the critical path; do NOT use for
-   * grading or pronunciation where full Flash accuracy matters.
-   */
-  FLASH_LITE: 'gemini-2.5-flash',
-
-  /** Image generation via generateContent + IMAGE modality. */
-  IMAGE: 'gemini-2.5-flash-image',
+export const MODELS = {
+  TTS: modelFromEnv('GEMINI_TTS_MODEL', DEFAULT_MODELS.TTS),
+  FLASH_LITE_PREVIEW: TEXT_MODEL,
+  FLASH_LITE_LATEST: TEXT_MODEL,
+  FLASH_LITE: modelFromEnv('GEMINI_FAST_MODEL', DEFAULT_MODELS.FAST),
+  IMAGE: modelFromEnv('GEMINI_IMAGE_MODEL', DEFAULT_MODELS.IMAGE),
 } as const;
