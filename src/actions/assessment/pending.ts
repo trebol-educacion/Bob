@@ -3,6 +3,7 @@
 import { createSupabaseServer } from '@/lib/supabase/server';
 import type { Skill } from '@/lib/types/skills';
 import type { PendingAssessmentsMap } from './types';
+import { assessmentQueueFreshSince } from '@/lib/assessment/queue-freshness';
 
 /**
  * Returns the most recent pending or processing queue row per skill for the current user.
@@ -20,6 +21,7 @@ export async function getPendingAssessmentsAction(): Promise<PendingAssessmentsM
     .select('skill, assessment_id, started_at')
     .eq('user_id', user.id)
     .in('status', ['pending', 'processing'])
+    .gte('created_at', assessmentQueueFreshSince())
     .order('created_at', { ascending: false });
 
   const result: PendingAssessmentsMap = { speaking: null, listening: null, reading: null, writing: null };

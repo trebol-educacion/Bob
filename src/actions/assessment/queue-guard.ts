@@ -1,5 +1,6 @@
 import type { createSupabaseServer } from '@/lib/supabase/server';
 import type { Skill } from '@/lib/types/skills';
+import { assessmentQueueFreshSince } from '@/lib/assessment/queue-freshness';
 
 export type AssessmentQueueSupabase = Awaited<ReturnType<typeof createSupabaseServer>>;
 
@@ -20,6 +21,7 @@ export async function hasPendingAssessment(
     .eq('user_id', userId)
     .eq('skill', skill)
     .in('status', ['pending', 'processing'])
+    .gte('created_at', assessmentQueueFreshSince())
     .limit(1);
 
   if (error) return false;

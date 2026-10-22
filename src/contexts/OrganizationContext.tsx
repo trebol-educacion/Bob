@@ -167,10 +167,12 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
   useEffect(() => {
     const supabase = createSupabaseBrowser();
     let userId: string | null = null;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    let disposed = false;
 
     supabase.auth.getUser().then(({ data }) => {
       userId = data.user?.id ?? null;
-      if (!userId) return;
+      if (!userId || disposed) return;
 
       const refreshAll = () => {
         void getPendingAssessmentsAction().then(setPendingAssessments);
@@ -183,24 +185,25 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
         })();
       };
 
-      const channel = supabase
+      channel = supabase
         .channel('bob_assessment_changes')
         .on(
           'postgres_changes',
-          { event: '*', schema: 'public', table: 'bob_skill_levels', filter: `user_id=eq.${userId}` },
+          { event: '*', schema: 'bob', table: 'skill_levels', filter: `user_id=eq.${userId}` },
           refreshAll
         )
         .on(
           'postgres_changes',
-          { event: '*', schema: 'public', table: 'bob_assessment_queue', filter: `user_id=eq.${userId}` },
+          { event: '*', schema: 'bob', table: 'assessment_queue', filter: `user_id=eq.${userId}` },
           refreshAll
         )
         .subscribe();
-
-      return () => {
-        void supabase.removeChannel(channel);
-      };
     });
+
+    return () => {
+      disposed = true;
+      if (channel) void supabase.removeChannel(channel);
+    };
   }, []);
 
   const setCefrActiveLevel = useCallback(async (level: CefrLevel | null) => {
