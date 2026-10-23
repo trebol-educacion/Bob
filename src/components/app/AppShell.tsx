@@ -106,7 +106,7 @@ export function AppShell({
   assessmentIsYl,
   assessmentWritingTask,
 }: AppShellProps) {
-  const { track, setTrack } = useOrganization();
+  const { track, setTrack, freeTrackAvailable } = useOrganization();
 
   const [pendingLeaveAction, setPendingLeaveAction] = useState<(() => void) | null>(null);
 
@@ -199,6 +199,7 @@ export function AppShell({
             assessmentWritingTask={assessmentWritingTask}
             track={track}
             setTrack={setTrack}
+            freeTrackAvailable={freeTrackAvailable}
           />
         </main>
       </div>
