@@ -112,7 +112,6 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
   }, []);
 
   const [cachedOrg, setCachedOrg] = useState<Organization | null>(null);
-  const [cachedStudentFrameworks, setCachedStudentFrameworks] = useState<ModeFramework[]>([]);
   const [cachedOrgFrameworks, setCachedOrgFrameworks] = useState<ModeFramework[]>([]);
   const [cachedUserId, setCachedUserId] = useState<string | null>(null);
 
@@ -153,7 +152,6 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
         setSkillLevels(bundle.skillLevels);
         setAssessmentCooldownDays(bundle.assessmentCooldownDays);
         setAccessDenialReason(bundle.accessDenialReason);
-        setCachedStudentFrameworks(bundle.studentFrameworks);
         setCachedOrgFrameworks(bundle.orgFrameworks);
         setAllDynamicCards(bundle.allDynamicCards);
         setEnabledModes(bundle.enabledModes);
@@ -170,10 +168,12 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
   useEffect(() => {
     const supabase = createSupabaseBrowser();
     let userId: string | null = null;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    let disposed = false;
 
     supabase.auth.getUser().then(({ data }) => {
       userId = data.user?.id ?? null;
-      if (!userId) return;
+      if (!userId || disposed) return;
 
       const refreshAll = () => {
         void getPendingAssessmentsAction().then(setPendingAssessments);
@@ -186,24 +186,25 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
         })();
       };
 
-      const channel = supabase
+      channel = supabase
         .channel('bob_assessment_changes')
         .on(
           'postgres_changes',
-          { event: '*', schema: 'public', table: 'bob_skill_levels', filter: `user_id=eq.${userId}` },
+          { event: '*', schema: 'bob', table: 'skill_levels', filter: `user_id=eq.${userId}` },
           refreshAll
         )
         .on(
           'postgres_changes',
-          { event: '*', schema: 'public', table: 'bob_assessment_queue', filter: `user_id=eq.${userId}` },
+          { event: '*', schema: 'bob', table: 'assessment_queue', filter: `user_id=eq.${userId}` },
           refreshAll
         )
         .subscribe();
-
-      return () => {
-        void supabase.removeChannel(channel);
-      };
     });
+
+    return () => {
+      disposed = true;
+      if (channel) void supabase.removeChannel(channel);
+    };
   }, []);
 
   const setCefrActiveLevel = useCallback(async (level: CefrLevel | null) => {
@@ -228,16 +229,15 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
     setCefrActiveLevelState(level);
 
     const isBobEnabled = cachedOrg?.is_bob_enabled ?? true;
-    const effectiveFrameworks = cachedStudentFrameworks.filter(f => cachedOrgFrameworks.includes(f));
     const newModes = computeEnabledModes({
       isBobEnabled,
       cards: allDynamicCards,
       activeLevel: level,
-      effectiveFrameworks,
-      hasAssignedFrameworks: effectiveFrameworks.length > 0,
+      effectiveFrameworks: cachedOrgFrameworks,
+      hasAssignedFrameworks: cachedOrgFrameworks.length > 0,
     });
     setEnabledModes(newModes);
-  }, [cefrLevelLocked, cachedOrg, cachedStudentFrameworks, cachedOrgFrameworks, allDynamicCards]);
+  }, [cefrLevelLocked, cachedOrg, cachedOrgFrameworks, allDynamicCards]);
 
   const refreshSkillLevels = useCallback(async () => {
     if (!cachedUserId) return;
@@ -282,12 +282,11 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
       isBobEnabled: cachedOrg?.is_bob_enabled ?? false,
       selectedSkill,
       skillLevels,
-      studentFrameworks: cachedStudentFrameworks,
       orgFrameworks: cachedOrgFrameworks,
       allDynamicCards,
       track: effectiveTrack,
     });
-  }, [selectedSkill, skillLevels, cachedOrg, cachedStudentFrameworks, cachedOrgFrameworks, allDynamicCards, effectiveTrack]);
+  }, [selectedSkill, skillLevels, cachedOrg, cachedOrgFrameworks, allDynamicCards, effectiveTrack]);
 
   const accessGranted = accessDenialReason === null && !loading;
 

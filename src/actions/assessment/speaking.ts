@@ -1,7 +1,7 @@
 'use server';
 
 import { createSupabaseServer } from '@/lib/supabase/server';
-import { loadStudentFrameworks } from '@/lib/organization/student-frameworks';
+import { loadOrganizationFrameworks, logOrgFrameworksError } from '@/lib/organization/org-frameworks';
 import type { AssessmentResultSpeaking, AssessmentCefrBand, AssessmentConfidence } from '@/lib/types/skills';
 import type { SubmitSpeakingTurn, SubmitSpeakingResult } from './types';
 import { resolveCooldownUntil } from './shared';
@@ -28,33 +28,30 @@ export async function submitAssessmentSpeakingAction(
     return { status: 'error', code: 'invalid_audio' };
   }
 
-  const [profileResult, skillLevelResult, studentFwResult] = await Promise.all([
+  const [profileResult, skillLevelResult] = await Promise.all([
     supabase.schema('public').from('profiles').select('organization_id, cefr_active_level').eq('id', user.id).single(),
     supabase.from('skill_levels').select('cefr_level').eq('user_id', user.id).eq('skill', 'speaking').maybeSingle(),
-    loadStudentFrameworks(supabase, user.id),
   ]);
 
-  if (studentFwResult.error) {
-    const { table, schema, code, message } = studentFwResult.error;
-    console.error(
-      `[submitAssessmentSpeakingAction] student frameworks resolution failed: table=${table} schema=${schema} code=${code ?? 'unknown'} message=${message}`,
-    );
-  }
-
   const profile = profileResult.data;
+  const organizationId = profile?.organization_id ?? null;
 
-  const { data: org } = profile?.organization_id
-    ? await supabase
-        .schema('public').from('organizations')
-        .select('allow_voice_storage')
-        .eq('id', profile.organization_id)
-        .maybeSingle()
-    : { data: null };
+  const [{ data: org }, orgFwResult] = await Promise.all([
+    organizationId
+      ? supabase
+          .schema('public').from('organizations')
+          .select('allow_voice_storage')
+          .eq('id', organizationId)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+    loadOrganizationFrameworks(supabase, organizationId),
+  ]);
+  logOrgFrameworksError('submitAssessmentSpeakingAction', orgFwResult);
 
   const allowVoiceStorage = org?.allow_voice_storage === true;
 
   const speakingLevel = skillLevelResult.data?.cefr_level ?? profile?.cefr_active_level ?? 'a2';
-  const isYl = studentFwResult.frameworks.includes('cambridge') && (speakingLevel === 'pre_a1' || speakingLevel === 'a1');
+  const isYl = orgFwResult.frameworks.includes('cambridge') && (speakingLevel === 'pre_a1' || speakingLevel === 'a1');
 
   const { data: session, error: sessionError } = await supabase
     .from('sessions')
