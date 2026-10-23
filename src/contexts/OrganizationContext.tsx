@@ -4,6 +4,7 @@ import React, { createContext, useContext, useEffect, useState, useCallback, use
 import { Organization, getOrganizationForUser } from '@/lib/organization';
 import { createSupabaseBrowser } from '@/lib/supabase/browser-client';
 import { resolveEnabledModes } from '@/lib/modes';
+import { hasFreePracticeCards } from '@/lib/free-practice';
 import { detectSustainedImprovementAction } from '@/actions/skills';
 import { getPendingAssessmentsAction, type PendingAssessmentsMap } from '@/actions/assessment';
 import { loadOrganizationData } from '@/lib/organization/load-organization';
@@ -30,6 +31,7 @@ interface OrganizationContextValue {
   resolvedCards: ResolvedCard[];
   track: PracticeTrack;
   setTrack: (track: PracticeTrack) => void;
+  freeTrackAvailable: boolean;
   assessmentCooldownDays: number;
   pendingAssessments: PendingAssessmentsMap;
   sustainedImprovementDetected: boolean | null;
@@ -55,6 +57,7 @@ const OrganizationContext = createContext<OrganizationContextValue>({
   setSelectedSkill: () => {},
   resolvedCards: [],
   track: 'official',
+  freeTrackAvailable: false,
   setTrack: () => {},
   assessmentCooldownDays: 7,
   pendingAssessments: { speaking: null, listening: null, reading: null, writing: null },
@@ -266,6 +269,13 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
     });
   }, [selectedSkill]);
 
+  const freeTrackAvailable = useMemo(() => {
+    const level = (selectedSkill ? skillLevels?.[selectedSkill]?.cefr_level : null) ?? cefrActiveLevel;
+    return hasFreePracticeCards(allDynamicCards, selectedSkill, level);
+  }, [allDynamicCards, selectedSkill, skillLevels, cefrActiveLevel]);
+
+  const effectiveTrack: PracticeTrack = freeTrackAvailable ? track : 'official';
+
   const resolvedCards = useMemo<ResolvedCard[]>(() => {
     if (!selectedSkill || !skillLevels) return [];
     return resolveEnabledModes({
@@ -275,9 +285,9 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
       studentFrameworks: cachedStudentFrameworks,
       orgFrameworks: cachedOrgFrameworks,
       allDynamicCards,
-      track,
+      track: effectiveTrack,
     });
-  }, [selectedSkill, skillLevels, cachedOrg, cachedStudentFrameworks, cachedOrgFrameworks, allDynamicCards, track]);
+  }, [selectedSkill, skillLevels, cachedOrg, cachedStudentFrameworks, cachedOrgFrameworks, allDynamicCards, effectiveTrack]);
 
   const accessGranted = accessDenialReason === null && !loading;
 
@@ -294,8 +304,9 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
       selectedSkill,
       setSelectedSkill,
       resolvedCards,
-      track,
+      track: effectiveTrack,
       setTrack,
+      freeTrackAvailable,
       assessmentCooldownDays,
       pendingAssessments,
       sustainedImprovementDetected,

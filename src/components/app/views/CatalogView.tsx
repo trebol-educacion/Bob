@@ -26,6 +26,7 @@ export interface CatalogViewProps {
   organization: Organization | null;
   track: PracticeTrack;
   setTrack: (track: PracticeTrack) => void;
+  freeTrackAvailable: boolean;
 }
 
 export function CatalogView({
@@ -42,6 +43,7 @@ export function CatalogView({
   organization,
   track,
   setTrack,
+  freeTrackAvailable,
 }: CatalogViewProps) {
   const tPlacement = useTranslations('placement');
   return (
@@ -73,7 +75,7 @@ export function CatalogView({
             </button>
           </motion.div>
         )}
-        <TrackTabs track={track} onChange={setTrack} />
+        {freeTrackAvailable && <TrackTabs track={track} onChange={setTrack} />}
       </div>
       <ModeSelection
         ref={cefrSelectorRef}

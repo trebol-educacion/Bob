@@ -64,6 +64,7 @@ export interface AppShellRoutesProps {
   assessmentWritingTask: AssessmentWritingTask | null;
   track: PracticeTrack;
   setTrack: (track: PracticeTrack) => void;
+  freeTrackAvailable: boolean;
 }
 
 /** @param props AppShellRoutesProps */
@@ -106,6 +107,7 @@ export function AppShellRoutes({
   assessmentWritingTask,
   track,
   setTrack,
+  freeTrackAvailable,
 }: AppShellRoutesProps) {
   const t = useTranslations('home.bobUnavailable');
 
@@ -244,7 +246,7 @@ export function AppShellRoutes({
             skillLevels={skillLevels}
             cefrActiveLevel={cefrActiveLevel} cefrLevelLocked={cefrLevelLocked}
             organization={organization}
-            track={track} setTrack={setTrack}
+            track={track} setTrack={setTrack} freeTrackAvailable={freeTrackAvailable}
           />
         </motion.div>
       )}
