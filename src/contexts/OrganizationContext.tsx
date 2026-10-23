@@ -109,7 +109,6 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
   }, []);
 
   const [cachedOrg, setCachedOrg] = useState<Organization | null>(null);
-  const [cachedStudentFrameworks, setCachedStudentFrameworks] = useState<ModeFramework[]>([]);
   const [cachedOrgFrameworks, setCachedOrgFrameworks] = useState<ModeFramework[]>([]);
   const [cachedUserId, setCachedUserId] = useState<string | null>(null);
 
@@ -150,7 +149,6 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
         setSkillLevels(bundle.skillLevels);
         setAssessmentCooldownDays(bundle.assessmentCooldownDays);
         setAccessDenialReason(bundle.accessDenialReason);
-        setCachedStudentFrameworks(bundle.studentFrameworks);
         setCachedOrgFrameworks(bundle.orgFrameworks);
         setAllDynamicCards(bundle.allDynamicCards);
         setEnabledModes(bundle.enabledModes);
@@ -225,16 +223,15 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
     setCefrActiveLevelState(level);
 
     const isBobEnabled = cachedOrg?.is_bob_enabled ?? true;
-    const effectiveFrameworks = cachedStudentFrameworks.filter(f => cachedOrgFrameworks.includes(f));
     const newModes = computeEnabledModes({
       isBobEnabled,
       cards: allDynamicCards,
       activeLevel: level,
-      effectiveFrameworks,
-      hasAssignedFrameworks: effectiveFrameworks.length > 0,
+      effectiveFrameworks: cachedOrgFrameworks,
+      hasAssignedFrameworks: cachedOrgFrameworks.length > 0,
     });
     setEnabledModes(newModes);
-  }, [cefrLevelLocked, cachedOrg, cachedStudentFrameworks, cachedOrgFrameworks, allDynamicCards]);
+  }, [cefrLevelLocked, cachedOrg, cachedOrgFrameworks, allDynamicCards]);
 
   const refreshSkillLevels = useCallback(async () => {
     if (!cachedUserId) return;
@@ -272,12 +269,11 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
       isBobEnabled: cachedOrg?.is_bob_enabled ?? false,
       selectedSkill,
       skillLevels,
-      studentFrameworks: cachedStudentFrameworks,
       orgFrameworks: cachedOrgFrameworks,
       allDynamicCards,
       track,
     });
-  }, [selectedSkill, skillLevels, cachedOrg, cachedStudentFrameworks, cachedOrgFrameworks, allDynamicCards, track]);
+  }, [selectedSkill, skillLevels, cachedOrg, cachedOrgFrameworks, allDynamicCards, track]);
 
   const accessGranted = accessDenialReason === null && !loading;
 

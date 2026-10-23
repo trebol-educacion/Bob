@@ -51,7 +51,6 @@ describe('resolveEnabledModes (skill-first)', () => {
       isBobEnabled: true,
       selectedSkill: 'speaking',
       skillLevels: skillLevelsA2,
-      studentFrameworks: ['cambridge'],
       orgFrameworks: ['cambridge'],
       allDynamicCards: mockCards,
     });
@@ -67,7 +66,6 @@ describe('resolveEnabledModes (skill-first)', () => {
       isBobEnabled: true,
       selectedSkill: 'speaking',
       skillLevels: skillLevelsA2,
-      studentFrameworks: ['cambridge'],
       orgFrameworks: ['cambridge'],
       allDynamicCards: mockCards,
     });
@@ -91,7 +89,6 @@ describe('resolveEnabledModes (skill-first)', () => {
           updated_at: '2026-01-01T00:00:00Z',
         },
       },
-      studentFrameworks: ['cambridge'],
       orgFrameworks: ['cambridge'],
       allDynamicCards: mockCards,
     });
@@ -107,7 +104,6 @@ describe('resolveEnabledModes (skill-first)', () => {
       isBobEnabled: false,
       selectedSkill: 'speaking',
       skillLevels: skillLevelsA2,
-      studentFrameworks: ['cambridge'],
       orgFrameworks: ['cambridge'],
       allDynamicCards: mockCards,
     });
@@ -120,7 +116,6 @@ describe('resolveEnabledModes (skill-first)', () => {
       isBobEnabled: true,
       selectedSkill: 'speaking',
       skillLevels: {},
-      studentFrameworks: ['cambridge'],
       orgFrameworks: ['cambridge'],
       allDynamicCards: [mockCards[0]],
     });
@@ -178,7 +173,6 @@ describe('resolveEnabledModes (apertura NOO-1597)', () => {
       isBobEnabled: true,
       selectedSkill: 'reading',
       skillLevels: skillLevelsB1Reading,
-      studentFrameworks: ['cambridge'],
       orgFrameworks: ['cambridge'],
       allDynamicCards: readingCardsB1,
     });
@@ -191,7 +185,7 @@ describe('resolveEnabledModes (apertura NOO-1597)', () => {
     expect(results.find(r => r.mode_key === 'cambridge_pet_reading_part2')).toBeUndefined();
   });
 
-  it('alumno sin marco asignado solo ve tarjetas genéricas universales', () => {
+  it('colegio sin exámenes activados: el alumno solo ve tarjetas genéricas universales', () => {
     const genericCard: DynamicCard = {
       framework: 'generic',
       exam_part: 'generic_situation',
@@ -206,8 +200,7 @@ describe('resolveEnabledModes (apertura NOO-1597)', () => {
       isBobEnabled: true,
       selectedSkill: 'speaking',
       skillLevels: {},
-      studentFrameworks: [],
-      orgFrameworks: ['cambridge'],
+      orgFrameworks: [],
       allDynamicCards: [...mockCards, genericCard],
     });
 

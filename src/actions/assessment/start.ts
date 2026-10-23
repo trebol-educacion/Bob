@@ -3,7 +3,7 @@
 import { createSupabaseServer } from '@/lib/supabase/server';
 import { getPrompt } from '@/lib/prompts/db-prompts';
 import { fetchOpenTasks } from '@/actions/item-bank/repository';
-import { loadStudentFrameworks } from '@/lib/organization/student-frameworks';
+import { loadOrganizationFrameworks, logOrgFrameworksError } from '@/lib/organization/org-frameworks';
 import { hasPendingAssessment } from './queue-guard';
 import { resolveCooldownDays } from './shared';
 import { FALLBACK_SPEAKING_PROMPTS, openTaskQuestionsToPrompts } from './speaking-fallback';
@@ -90,15 +90,10 @@ export async function startAssessmentAction(skill: Skill): Promise<StartAssessme
 
   const currentLevel = skillLevel?.cefr_level ?? profile.cefr_active_level ?? 'a2';
 
-  const studentFwResult = await loadStudentFrameworks(supabase, user.id);
-  if (studentFwResult.error) {
-    const { table, schema, code, message } = studentFwResult.error;
-    console.error(
-      `[startAssessmentAction] student frameworks resolution failed: table=${table} schema=${schema} code=${code ?? 'unknown'} message=${message}`,
-    );
-  }
+  const orgFwResult = await loadOrganizationFrameworks(supabase, profile.organization_id);
+  logOrgFrameworksError('startAssessmentAction', orgFwResult);
 
-  const hasCambridge = studentFwResult.frameworks.includes('cambridge');
+  const hasCambridge = orgFwResult.frameworks.includes('cambridge');
   const isYlLevel = currentLevel === 'pre_a1' || currentLevel === 'a1';
   const isYl = hasCambridge && isYlLevel;
 
