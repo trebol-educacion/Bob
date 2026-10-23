@@ -7,42 +7,22 @@ export interface ResolveModesArgs {
   isBobEnabled: boolean;
   selectedSkill: Skill;
   skillLevels: SkillLevelMap;
-  studentFrameworks: ModeFramework[];
   orgFrameworks: ModeFramework[];
   allDynamicCards: DynamicCard[];
   track?: PracticeTrack;
 }
 
-/**
- * Returns resolved cards for the selected skill with visibility per card.
- *
- * Visibility rules (spec bob-skill-first-assessment §4, D3):
- *   - `enabled`               , framework + CEFR level match the student's level for selectedSkill.
- *   - `disabled-mismatch`     , framework matches but CEFR level differs from the student's level.
- *   - `disabled-not-available`, card is marked status='coming_soon' or 'hidden', or skill has
- *                                no level assigned in skillLevels.
- *
- * Cards whose framework is not in the effective intersection are excluded entirely.
- * Generic cards follow the same level-match logic unless cefr_level is null (universal).
- *
- * `track` (D9-18) governs generic-card visibility once the student has assigned
- * frameworks: `official` (default) hides `generic_*` except
- * `GENERIC_ALWAYS_VISIBLE_WITH_FRAMEWORK`; `free` keeps evaluating every generic
- * card by level match regardless of assigned frameworks.
- */
 export function resolveEnabledModes({
   isBobEnabled,
   selectedSkill,
   skillLevels,
-  studentFrameworks,
   orgFrameworks,
   allDynamicCards,
   track = 'official',
 }: ResolveModesArgs): ResolvedCard[] {
   if (!isBobEnabled) return [];
 
-  const effectiveFrameworks = studentFrameworks.filter(f => orgFrameworks.includes(f));
-  const hasAssignedFrameworks = effectiveFrameworks.length > 0;
+  const hasAssignedFrameworks = orgFrameworks.length > 0;
 
   const studentLevel = skillLevels[selectedSkill]?.cefr_level ?? null;
 
@@ -83,7 +63,7 @@ export function resolveEnabledModes({
       continue;
     }
 
-    if (!(effectiveFrameworks as string[]).includes(card.framework)) continue;
+    if (!(orgFrameworks as string[]).includes(card.framework)) continue;
 
     if (card.status === 'coming_soon') {
       resolved.push({ ...card, visibility: 'disabled-not-available', reason: 'status_not_available' });
@@ -106,11 +86,6 @@ export function resolveEnabledModes({
   return resolved;
 }
 
-/**
- * Generic mode keys that remain visible even when the student has Cambridge / TOEFL
- * frameworks assigned. These cards render inside the framework section via the
- * override in mode-ui.ts (Phrase Practice inside PET / FCE).
- */
 const GENERIC_ALWAYS_VISIBLE_WITH_FRAMEWORK = new Set<string>([
   'generic_situation|b1',
   'generic_situation|b2',

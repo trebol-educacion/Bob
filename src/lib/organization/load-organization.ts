@@ -6,9 +6,8 @@ import type { SkillLevelMap } from '@/lib/types/skills';
 import { mapSkillLevelRows, type RawSkillLevelRow } from './skill-levels';
 import { computeEnabledModes } from './enabled-modes';
 import { dedupeAvailableModes, dedupeDynamicCards, type RawAvailableModeRow, type RawDynamicCardRow } from './catalog';
-import { extractOrgFrameworks, type OrgFrameworkQueryRow } from './frameworks';
 import { attachPresentation, type RawPresentationRow } from './presentation';
-import { loadStudentFrameworks } from './student-frameworks';
+import { loadOrganizationFrameworks, logOrgFrameworksError } from './org-frameworks';
 import type { AvailableMode, BobAccessDenialReason } from './types';
 
 export interface OrganizationDataBundle {
@@ -18,7 +17,6 @@ export interface OrganizationDataBundle {
   skillLevels: SkillLevelMap;
   assessmentCooldownDays: number;
   accessDenialReason: BobAccessDenialReason | null;
-  studentFrameworks: ModeFramework[];
   orgFrameworks: ModeFramework[];
   allDynamicCards: DynamicCard[];
   enabledModes: ModeKey[];
@@ -30,19 +28,13 @@ export async function loadOrganizationData(
   userId: string,
   org: Organization | null,
 ): Promise<OrganizationDataBundle> {
-  const [profileResult, studentFwResult, orgFwResult, availableModesResult, allCardsResult, skillLevelsResult, cooldownResult, licenseResult, presentationResult] = await Promise.all([
+  const [profileResult, orgFwResult, availableModesResult, allCardsResult, skillLevelsResult, cooldownResult, licenseResult, presentationResult] = await Promise.all([
     supabase
       .schema('public').from('profiles')
       .select('role, cefr_active_level, cefr_level_locked')
       .eq('id', userId)
       .maybeSingle(),
-    loadStudentFrameworks(supabase, userId),
-    org?.id
-      ? supabase
-          .schema('mia').from('organization_frameworks')
-          .select('framework_id, pedagogical_frameworks(name, type)')
-          .eq('organization_id', org.id)
-      : Promise.resolve({ data: [], error: null } as { data: never[]; error: null }),
+    loadOrganizationFrameworks(supabase, org?.id ?? null),
     supabase
       .from('prompts')
       .select('framework, exam_part, cefr_level, label, description')
@@ -79,17 +71,7 @@ export async function loadOrganizationData(
   if (profileResult.error) {
     console.error('[OrganizationContext] profiles query failed:', profileResult.error);
   }
-  if (studentFwResult.error) {
-    const { table, schema, code, message } = studentFwResult.error;
-    console.error(
-      `[OrganizationContext] student frameworks resolution failed: table=${table} schema=${schema} code=${code ?? 'unknown'} message=${message}`,
-    );
-  }
-  if (orgFwResult.error) {
-    console.error(
-      `[OrganizationContext] organization_frameworks query failed: table=organization_frameworks schema=mia code=${orgFwResult.error.code ?? 'unknown'} message=${orgFwResult.error.message}`,
-    );
-  }
+  logOrgFrameworksError('OrganizationContext', orgFwResult);
   if (availableModesResult.error) {
     console.error('[OrganizationContext] bob_prompts (availableModes) query failed:', availableModesResult.error);
   }
@@ -128,21 +110,19 @@ export async function loadOrganizationData(
     console.warn('[Bob access gate] access denied:', accessDenialReason, 'user:', userId);
   }
 
-  const studentFrameworks = studentFwResult.frameworks;
-  const orgFrameworks = extractOrgFrameworks((orgFwResult.data ?? []) as OrgFrameworkQueryRow[]);
+  const orgFrameworks = orgFwResult.frameworks;
 
   const allDynamicCards = attachPresentation(
     dedupeDynamicCards((allCardsResult.data ?? []) as RawDynamicCardRow[]),
     (presentationResult.data ?? []) as RawPresentationRow[],
   );
 
-  const effectiveFrameworks = studentFrameworks.filter(f => orgFrameworks.includes(f));
   const enabledModes = computeEnabledModes({
     isBobEnabled: org?.is_bob_enabled ?? false,
     cards: allDynamicCards,
     activeLevel,
-    effectiveFrameworks,
-    hasAssignedFrameworks: effectiveFrameworks.length > 0,
+    effectiveFrameworks: orgFrameworks,
+    hasAssignedFrameworks: orgFrameworks.length > 0,
   });
 
   const availableModes = dedupeAvailableModes((availableModesResult.data ?? []) as RawAvailableModeRow[]);
@@ -154,7 +134,6 @@ export async function loadOrganizationData(
     skillLevels,
     assessmentCooldownDays,
     accessDenialReason,
-    studentFrameworks,
     orgFrameworks,
     allDynamicCards,
     enabledModes,
