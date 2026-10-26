@@ -121,7 +121,6 @@ export async function submitAssessmentSpeakingAction(
 
   after(() =>
     runSpeakingEvaluation({
-      supabase,
       queueId: queueRow.id as string,
       userId: user.id,
       turns,

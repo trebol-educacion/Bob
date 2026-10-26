@@ -13,6 +13,7 @@ const rpc = vi.fn();
 let supabase: unknown;
 
 vi.mock('@/lib/supabase/server', () => ({ createSupabaseServer: async () => supabase }));
+vi.mock('@/lib/supabase/admin', () => ({ createSupabaseAdmin: () => ({ rpc }) }));
 vi.mock('@/lib/organization/org-frameworks', () => ({
   loadOrganizationFrameworks: async () => ({ frameworks: ['cambridge'] }),
   logOrgFrameworksError: () => undefined,
@@ -48,7 +49,6 @@ function buildSupabase() {
     auth: { getUser: async () => ({ data: { user: { id: 'user-1' } } }) },
     from: (name: string) => table(name),
     schema: () => ({ from: (name: string) => table(name) }),
-    rpc,
   };
 }
 

@@ -1,13 +1,12 @@
 import 'server-only';
 
 import type { SubmitSpeakingTurn } from '@/actions/assessment/types';
-import type { createSupabaseServer } from '@/lib/supabase/server';
+import { createSupabaseAdmin } from '@/lib/supabase/admin';
 import { evaluateSpeakingAssessment } from './speaking-evaluation';
 
-type AssessmentSupabase = Awaited<ReturnType<typeof createSupabaseServer>>;
+type AssessmentSupabase = ReturnType<typeof createSupabaseAdmin>;
 
 export interface RunSpeakingEvaluationInput {
-  supabase: AssessmentSupabase;
   queueId: string;
   userId: string;
   turns: SubmitSpeakingTurn[];
@@ -34,7 +33,8 @@ async function failAssessment(supabase: AssessmentSupabase, queueId: string, err
  * @returns Promise<void> evaluates in memory and settles the queue row via RPC; never throws
  */
 export async function runSpeakingEvaluation(input: RunSpeakingEvaluationInput): Promise<void> {
-  const { supabase, queueId, userId, turns, currentLevel, isYl } = input;
+  const { queueId, userId, turns, currentLevel, isYl } = input;
+  const supabase = createSupabaseAdmin();
   try {
     const outcome = await evaluateSpeakingAssessment({ turns, currentLevel, isYl, userId });
     if (!outcome.ok) {

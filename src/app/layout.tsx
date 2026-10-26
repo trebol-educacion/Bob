@@ -7,8 +7,6 @@ import { EcosystemFrame } from '@/components/ecosystem/EcosystemFrame';
 import { NextIntlClientProvider } from 'next-intl';
 import { getLocale, getMessages } from 'next-intl/server';
 
-export const maxDuration = 60;
-
 const poppins = Poppins({
   weight: ['300', '400', '500', '600', '700', '800', '900'],
   subsets: ['latin'],
