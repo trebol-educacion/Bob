@@ -1,15 +1,17 @@
 'use server';
 
+import { after } from 'next/server';
 import { createSupabaseServer } from '@/lib/supabase/server';
 import { loadOrganizationFrameworks, logOrgFrameworksError } from '@/lib/organization/org-frameworks';
 import type { AssessmentResultSpeaking, AssessmentCefrBand, AssessmentConfidence } from '@/lib/types/skills';
 import type { SubmitSpeakingTurn, SubmitSpeakingResult } from './types';
 import { resolveCooldownUntil } from './shared';
+import { runSpeakingEvaluation } from '@/lib/assessment/run-speaking-evaluation';
 
 /**
- * Submits the recorded audio turns for Speaking Assessment.
- * Returns queued immediately (fire-and-forget); evaluation runs in background.
- * D-A1 compliance: never blocks the student waiting for Gemini.
+ * @param assessment_id string
+ * @param turns SubmitSpeakingTurn[]
+ * @returns Promise<SubmitSpeakingResult> queued once the evaluation is scheduled with after()
  */
 export async function submitAssessmentSpeakingAction(
   assessment_id: string,
@@ -96,23 +98,36 @@ export async function submitAssessmentSpeakingAction(
       content_json: { assessment_id, status: 'pending' },
     });
 
-  const { error: queueError } = await supabase
+  const { data: queueRow, error: queueError } = await supabase
     .from('assessment_queue')
     .insert({
       user_id: user.id,
       assessment_id,
       skill: 'speaking',
       session_id: sessionId,
-      status: 'pending',
+      status: 'processing',
+      started_at: new Date().toISOString(),
       payload: {
         current_level: speakingLevel,
         is_yl: isYl,
       },
-    });
+    })
+    .select('id')
+    .single();
 
-  if (queueError) {
+  if (queueError || !queueRow) {
     return { status: 'error', code: 'db_error' };
   }
+
+  after(() =>
+    runSpeakingEvaluation({
+      queueId: queueRow.id as string,
+      userId: user.id,
+      turns,
+      currentLevel: speakingLevel,
+      isYl,
+    })
+  );
 
   return { status: 'queued', assessment_id };
 }
