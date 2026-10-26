@@ -2,6 +2,7 @@ import type { z } from 'zod';
 import { getPrompt } from '@/lib/prompts/db-prompts';
 import { callGemini, isOk } from '@/lib/gemini-client';
 import { MODELS } from '@/lib/models';
+import { parseModelJson } from '@/lib/llm/parse-model-json';
 
 export interface FceEvaluationRequest<S extends z.ZodTypeAny> {
   promptKey: string;
@@ -37,7 +38,7 @@ export async function requestFceEvaluation<S extends z.ZodTypeAny>(
 
   const rawText = result.data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
   try {
-    return request.schema.parse(JSON.parse(rawText));
+    return request.schema.parse(parseModelJson(rawText));
   } catch (err) {
     console.warn(
       JSON.stringify({

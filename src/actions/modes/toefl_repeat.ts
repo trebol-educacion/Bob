@@ -9,6 +9,7 @@ import { ToeflRepeatPlanSchema } from '@/lib/bank-plans/toefl-repeat';
 import { readSessionMessages } from '@/lib/persist-activity';
 import { fail, ok, type ActionResult } from '@/lib/result';
 import { callGemini } from '@/lib/gemini-client';
+import { parseModelJson } from '@/lib/llm/parse-model-json';
 
 const REPEAT_LEVEL = 'b1';
 const REPEAT_PART = 'toefl_listen_repeat';
@@ -81,7 +82,7 @@ Return ONLY valid JSON. No score, no pronunciation rating, no subjective assessm
     return null;
   }
   try {
-    const parsed = RepetitionObjectiveFeedbackSchema.safeParse(JSON.parse(result.data.text));
+    const parsed = RepetitionObjectiveFeedbackSchema.safeParse(parseModelJson(result.data.text));
     return parsed.success ? { ...parsed.data, original_text: originalText } : null;
   } catch {
     return null;

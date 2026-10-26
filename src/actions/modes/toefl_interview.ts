@@ -10,6 +10,7 @@ import { readSessionMessages } from '@/lib/persist-activity';
 import { currentUserId, finishSession, openSession, recordTurn } from '@/lib/session/lifecycle';
 import { buildInterviewEvaluation, restoreInterview, INTERVIEW_ANSWER_KIND, type ToeflInterviewPlan } from '@/lib/toefl/interview';
 import { callGemini } from '@/lib/gemini-client';
+import { parseModelJson } from '@/lib/llm/parse-model-json';
 
 const INTERVIEW_LEVEL = 'b2';
 const INTERVIEW_PART = 'toefl_interview';
@@ -76,7 +77,7 @@ Return ONLY valid JSON. No score, no band, no percentage outside the rubric obje
     return null;
   }
   try {
-    const parsed = FormativeFeedbackSchema.safeParse(JSON.parse(result.data.text));
+    const parsed = FormativeFeedbackSchema.safeParse(parseModelJson(result.data.text));
     return parsed.success && parsed.data.rubric ? parsed.data : null;
   } catch {
     return null;

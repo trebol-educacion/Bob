@@ -7,6 +7,7 @@ import { callGemini } from '@/lib/gemini-client';
 import { ChatTurnSchema, InitialChatResponse, SimulatedConversationResponse, QuestionsResponse } from '@/lib/types/gemini';
 import type { ChatMessage, ChatTurnResult, InitialChatResult, Question } from './types';
 import type { CefrLevel } from '@/lib/types/practice';
+import { parseModelJson } from '@/lib/llm/parse-model-json';
 
 /**
  * Generates a structured initial framing and first message for the simulation.
@@ -48,7 +49,7 @@ export async function generateInitialChatAction(
 
   let parsed: unknown;
   try {
-    parsed = JSON.parse(result.data.text);
+    parsed = parseModelJson(result.data.text);
   } catch {
     return defaultResult;
   }
@@ -98,7 +99,7 @@ export async function simulateConversationAction(
 
   let parsed: unknown;
   try {
-    parsed = JSON.parse(result.data.text);
+    parsed = parseModelJson(result.data.text);
   } catch {
     return history;
   }
@@ -150,7 +151,7 @@ export async function generateQuestionsAction(
 
   let parsed: unknown;
   try {
-    parsed = JSON.parse(result.data.text);
+    parsed = parseModelJson(result.data.text);
   } catch {
     return [];
   }
@@ -239,7 +240,7 @@ export async function chatTextConversationAction(
 
   let parsed: unknown;
   try {
-    parsed = JSON.parse(result.data.text);
+    parsed = parseModelJson(result.data.text);
   } catch {
     return fallback;
   }
@@ -313,7 +314,7 @@ export async function chatConversationAction(
 
   let parsed: unknown;
   try {
-    parsed = JSON.parse(result.data.text);
+    parsed = parseModelJson(result.data.text);
   } catch {
     return fallback;
   }

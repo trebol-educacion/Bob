@@ -3,6 +3,7 @@ import { getPrompt } from '@/lib/prompts/db-prompts';
 import { MODELS } from '@/lib/models';
 import { fail, ok, type ActionResult } from '@/lib/result';
 import { KetSpeakingFeedbackSchema, normalizeKetFeedback, type KetSpeakingFeedback } from './ket-speaking';
+import { parseModelJson } from '@/lib/llm/parse-model-json';
 
 /**
  * @param input.promptKey evaluation prompt key in bob.prompts
@@ -42,7 +43,7 @@ export async function evaluateKetAudio(input: {
 
   const raw = result.data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
   try {
-    const parsed = KetSpeakingFeedbackSchema.safeParse(JSON.parse(raw));
+    const parsed = KetSpeakingFeedbackSchema.safeParse(parseModelJson(raw));
     return parsed.success ? ok(normalizeKetFeedback(parsed.data)) : fail('evaluation_invalid', true);
   } catch {
     return fail('evaluation_invalid', true);

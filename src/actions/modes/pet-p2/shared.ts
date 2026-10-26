@@ -3,6 +3,7 @@
  */
 
 import { z } from 'zod';
+import { parseModelJson } from '@/lib/llm/parse-model-json';
 
 export const B1_PICTURE_TOPICS = [
   'Free Time',
@@ -17,7 +18,7 @@ export const B1_PICTURE_TOPICS = [
 
 export function safeParse<T>(schema: z.ZodType<T>, raw: string): T | null {
   try {
-    return schema.parse(JSON.parse(raw));
+    return schema.parse(parseModelJson(raw));
   } catch {
     return null;
   }

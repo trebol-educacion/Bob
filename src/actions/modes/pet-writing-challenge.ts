@@ -9,6 +9,7 @@ import { fail, ok, type ActionResult } from '@/lib/result';
 import { completeActivity } from '@/lib/session/complete';
 import { currentUserId } from '@/lib/session/lifecycle';
 import { MODELS } from '@/lib/models';
+import { parseModelJson } from '@/lib/llm/parse-model-json';
 
 const FALLBACK_FRAMING =
   'Te propongo un reto de escritura corto. Bob te dará un punto de partida y unos puntos para guiarte. Escribe entre 60 y 100 palabras en inglés. Anímate y escribe con tus propias palabras.';
@@ -73,7 +74,7 @@ const EvaluationSchema = z.object({
 
 function safeParse<T>(schema: z.ZodType<T>, raw: string): T | null {
   try {
-    return schema.parse(JSON.parse(raw));
+    return schema.parse(parseModelJson(raw));
   } catch (err) {
     console.warn(
       JSON.stringify({

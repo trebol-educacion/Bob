@@ -6,6 +6,7 @@ import { getPrompt } from '@/lib/prompts/db-prompts';
 import { callGemini } from '@/lib/gemini-client';
 import { PhraseGenerationSchema } from '@/lib/types/gemini';
 import { pickVocabulary, wordsToPromptVars, type CefrLevel } from '@/lib/vocabulary';
+import { parseModelJson } from '@/lib/llm/parse-model-json';
 
 /**
  * Generates 10 progressive phrases based on a user-provided topic and CEFR level.
@@ -57,7 +58,7 @@ export async function generateTopicPhrasesAction(
 
   let parsed: unknown;
   try {
-    parsed = JSON.parse(result.data.text);
+    parsed = parseModelJson(result.data.text);
   } catch {
     console.error(JSON.stringify({ event: 'generateTopicPhrasesAction', error: 'invalid JSON' }));
     return [];

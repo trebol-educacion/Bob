@@ -9,6 +9,7 @@ import { currentUserId } from '@/lib/session/lifecycle';
 import { countWords } from '@/lib/writing/word-count';
 import { OPEN_WRITING_PLAN_KIND, OPEN_WRITING_SUBMISSION_KIND } from '@/lib/writing/open-writing-restore';
 import type { WritingFormativeFeedback } from '@/lib/types/practice';
+import { parseModelJson } from '@/lib/llm/parse-model-json';
 
 const FeedbackSchema = z.object({
   understood: z.boolean(),
@@ -84,7 +85,7 @@ async function evaluate(input: OpenWritingInput): Promise<ActionResult<WritingFo
   const rawText = result.data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
   let parsed: z.infer<typeof FeedbackSchema>;
   try {
-    parsed = FeedbackSchema.parse(JSON.parse(rawText));
+    parsed = FeedbackSchema.parse(parseModelJson(rawText));
   } catch {
     return fail('evaluation_unparseable', true);
   }

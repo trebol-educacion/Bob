@@ -6,6 +6,7 @@ import { type YLTurnEvalResult } from '@/lib/types/yl';
 import { getPrompt } from '@/lib/prompts/db-prompts';
 import { callGemini } from '@/lib/gemini-client';
 import { parseYLMode, evaluationKey, reactionKey, EvalFallback } from '../_helpers';
+import { parseModelJson } from '@/lib/llm/parse-model-json';
 
 export async function evaluateYLTurnAction(input: {
   mode: ModeKey;
@@ -71,7 +72,7 @@ export async function evaluateYLTurnAction(input: {
   let reaction = 'Great job! 🌟';
   if (reactionResult.ok && reactionResult.data.text) {
     try {
-      const reactionJson = JSON.parse(reactionResult.data.text) as { reaction?: string };
+      const reactionJson = parseModelJson(reactionResult.data.text) as { reaction?: string };
       if (reactionJson.reaction && reactionJson.reaction.trim()) {
         reaction = reactionJson.reaction.trim();
       }
@@ -88,7 +89,7 @@ export async function evaluateYLTurnAction(input: {
 
   let parsed: unknown;
   try {
-    parsed = JSON.parse(evalResult.data.text);
+    parsed = parseModelJson(evalResult.data.text);
   } catch {
     console.error('[evaluateYLTurnAction] Failed to parse eval JSON');
     return { ...EvalFallback, reaction, transcript: transcribed };
