@@ -3,7 +3,12 @@ import { resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const completeMock = vi.fn();
+const loadPlanMock = vi.fn();
 vi.mock('@/lib/session/complete', () => ({ completeActivity: (...a: unknown[]) => completeMock(...a) }));
+vi.mock('@/lib/item-bank/plan-bank', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/item-bank/plan-bank')>()),
+  loadPlan: (...a: unknown[]) => loadPlanMock(...a),
+}));
 
 import { submitClosedSetAction } from '@/actions/modes/closed-set';
 import { EXAM_PART_COMPONENT_MAP } from '@/lib/routing';
@@ -91,10 +96,12 @@ describe('T8.5 closed comprehension flow: stimulus, answer, deterministic evalua
   });
 
   it('grades by key without any model call and persists plan, answers and evaluation', async () => {
-    const items = toClosedItems(planWith('/a/q'), 'g1');
+    const plan = planWith('/a/q');
+    loadPlanMock.mockResolvedValue({ ok: true, data: plan });
+    const items = toClosedItems(plan, 'g1');
     const selected = ['A', 'B', 'C', 'A', 'A', 'B', 'C', 'D'];
     const entries: ClosedEntry[] = items.map((item, index) => ({
-      id: item.id,
+      id: item.variant_id,
       selected: selected[index],
       expected: item.correct_key,
       explanation: item.explanation,

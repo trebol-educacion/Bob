@@ -1,12 +1,30 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const completeMock = vi.fn();
+const loadPlanMock = vi.fn();
 vi.mock('@/lib/session/complete', () => ({ completeActivity: (...a: unknown[]) => completeMock(...a) }));
+vi.mock('@/lib/item-bank/plan-bank', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/item-bank/plan-bank')>()),
+  loadPlan: (...a: unknown[]) => loadPlanMock(...a),
+}));
+
+const storedItem = (key: string) => ({
+  speaker: 'Woman',
+  utterance: 'Did you attend the seminar?',
+  options: ['A', 'B', 'C', 'D'].map((k) => ({ key: k, label: `Option ${k}` })),
+  correct_key: key,
+  explanation: 'Official key.',
+  audio_url: '/toefl/choose-response/q.mp3',
+});
+const storedPlan = { items: ['A', 'C', 'B', 'D', 'A', 'B', 'C', 'D'].map(storedItem) };
 
 import { submitClosedSetAction } from '@/actions/modes/closed-set';
 import { buildClosedEvaluation, restoreClosedSet, scoreClosedEntries } from '@/lib/toefl/closed-set';
 
-beforeEach(() => completeMock.mockReset().mockResolvedValue({ ok: true, data: { sessionId: 's1', score10: 5 } }));
+beforeEach(() => {
+  completeMock.mockReset().mockResolvedValue({ ok: true, data: { sessionId: 's1', score10: 5 } });
+  loadPlanMock.mockReset().mockResolvedValue({ ok: true, data: storedPlan });
+});
 
 describe('scoreClosedEntries', () => {
   it('compares keys exactly and sentences ignoring case and punctuation', () => {
@@ -50,16 +68,61 @@ describe('restoreClosedSet', () => {
 });
 
 describe('submitClosedSetAction', () => {
-  it('opens the session on the submit and returns graded results', async () => {
+  it('opens the session on the submit and grades Choose a Response against the stored keys', async () => {
     const outcome = await submitClosedSetAction({
       mode: 'toefl_listen_choose_response',
-      items: [{ id: 'i1' }],
-      entries: [{ id: 'i1', selected: 'a', expected: 'a', match: 'key' }],
+      bankGroupId: 'g1',
+      items: [],
+      entries: [
+        { id: 'g1-q1', selected: 'A', expected: 'A', match: 'key' },
+        { id: 'g1-q2', selected: 'C', expected: 'C', match: 'key' },
+      ],
     });
+    expect(loadPlanMock).toHaveBeenCalledWith('g1', expect.anything());
     expect(completeMock).toHaveBeenCalledWith(
-      expect.objectContaining({ mode: 'toefl_listen_choose_response', evaluation: expect.objectContaining({ score: 1, score_max: 1 }) }),
+      expect.objectContaining({ mode: 'toefl_listen_choose_response', evaluation: expect.objectContaining({ score: 2, score_max: 8 }) }),
     );
     expect(outcome).toMatchObject({ sessionId: 's1' });
+  });
+
+  it('ignores answer keys and items forged by the client', async () => {
+    const outcome = await submitClosedSetAction({
+      mode: 'toefl_listen_choose_response',
+      bankGroupId: 'g1',
+      items: [{ id: 'forged' }],
+      entries: [{ id: 'g1-q1', selected: 'D', expected: 'D', match: 'key' }],
+    });
+    const call = completeMock.mock.calls[0][0];
+    expect(call.evaluation).toMatchObject({ score: 0, score_max: 8 });
+    expect(call.plan.items).toHaveLength(8);
+    expect(call.plan.items[0]).toMatchObject({ variant_id: 'g1-q1', correct_key: 'A' });
+    expect(outcome).toMatchObject({ results: expect.arrayContaining([expect.objectContaining({ id: 'g1-q1', expected: 'A', correct: false })]) });
+  });
+
+  it('rejects a Choose a Response submission whose bank set cannot be loaded', async () => {
+    expect(
+      await submitClosedSetAction({ mode: 'toefl_listen_choose_response', items: [], entries: [{ id: 'x', selected: 'A', expected: 'A', match: 'key' }] }),
+    ).toEqual({ error: 'invalid_submission' });
+    loadPlanMock.mockResolvedValue({ ok: false, code: 'no_content' });
+    expect(
+      await submitClosedSetAction({
+        mode: 'toefl_listen_choose_response',
+        bankGroupId: 'gone',
+        items: [],
+        entries: [{ id: 'x', selected: 'A', expected: 'A', match: 'key' }],
+      }),
+    ).toEqual({ error: 'invalid_submission' });
+    expect(completeMock).not.toHaveBeenCalled();
+  });
+
+  it('keeps grading Build a Sentence from the submitted entries', async () => {
+    await submitClosedSetAction({
+      mode: 'toefl_writing_build_sentence',
+      items: [],
+      entries: [{ id: 'x', selected: 'I like it.', expected: 'i like it', match: 'sentence' }],
+    });
+    expect(loadPlanMock).not.toHaveBeenCalled();
+    expect(completeMock.mock.calls[0][0].evaluation).toMatchObject({ score: 1, score_max: 1 });
   });
 
   it('rejects unknown modes and empty submissions without touching the session', async () => {
