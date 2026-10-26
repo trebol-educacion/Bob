@@ -11,6 +11,8 @@ import { inferModeMetadata, inferSkillFromMode } from '@/lib/skill-from-mode';
 import { toClosedItems } from '@/lib/toefl/choose-response-bank';
 import { scoreClosedEntries, type ClosedEntry } from '@/lib/toefl/closed-set';
 import type { ToeflChooseResponsePlan } from '@/lib/bank-plans/toefl-choose-response';
+import { OFFICIAL_LISTENING_PARTS } from '@/lib/bank-plans/toefl-official-listening';
+import { resolveListeningAudioUrl } from '@/components/practice/group-exercise/listening-audio-url';
 
 const SUPABASE_URL = 'https://project.supabase.co';
 const LETTERS = ['A', 'B', 'C', 'D'] as const;
@@ -53,6 +55,11 @@ describe('T10.7 closed comprehension activity per framework and level', () => {
     expect(closedModes).toContain('toefl_listen_choose_response');
   });
 
+  it.each(OFFICIAL_LISTENING_PARTS)('toefl %s routes as a closed listening activity', (part) => {
+    expect(closedModes).toContain(part);
+    expect(inferModeMetadata(part).framework).toBe('toefl');
+  });
+
   it('every closed comprehension mode renders in the exam flow', () => {
     for (const mode of closedModes) {
       const route = EXAM_PART_COMPONENT_MAP[mode];
@@ -74,6 +81,13 @@ describe('T8.5 closed comprehension flow: stimulus, answer, deterministic evalua
     expect(relative[0].stimulus_audio_url).toBe(`${SUPABASE_URL}/storage/v1/object/public/bob-listening/toefl/choose-response/official-m1-q1.mp3`);
     const absolute = toClosedItems(planWith('https://cdn.example.com/q'), 'g2');
     expect(absolute[0].stimulus_audio_url).toBe('https://cdn.example.com/q1.mp3');
+  });
+
+  it('resolves official listening audio paths with the same bucket resolver', () => {
+    expect(resolveListeningAudioUrl('/toefl/official/conversation/m1-q9-10.mp3')).toBe(
+      `${SUPABASE_URL}/storage/v1/object/public/bob-listening/toefl/official/conversation/m1-q9-10.mp3`,
+    );
+    expect(resolveListeningAudioUrl('https://cdn.example.com/talk.mp3')).toBe('https://cdn.example.com/talk.mp3');
   });
 
   it('grades by key without any model call and persists plan, answers and evaluation', async () => {
@@ -98,7 +112,12 @@ describe('T8.5 closed comprehension flow: stimulus, answer, deterministic evalua
   });
 
   it('keeps the grading path free of model clients', () => {
-    for (const file of ['src/actions/modes/closed-set.ts', 'src/lib/toefl/closed-set.ts']) {
+    for (const file of [
+      'src/actions/modes/closed-set.ts',
+      'src/lib/toefl/closed-set.ts',
+      'src/actions/modes/toefl-official-listening.ts',
+      'src/lib/toefl/official-listening-bank.ts',
+    ]) {
       const source = readFileSync(resolve(process.cwd(), file), 'utf8');
       expect(source).not.toMatch(/gemini|genai/i);
     }
