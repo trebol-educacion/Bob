@@ -86,5 +86,15 @@
       "exactRepetitions": "exact repetitions",
       "itemBreakdown": "Item Breakdown"
     }
+  },
+  "officialListening": {
+    "subtitle": "Listen first, then answer the questions",
+    "listenLabel": "Listen to the audio",
+    "transcript": "Show what you heard",
+    "titles": {
+      "toefl_listening_conversation": "Listen to a Conversation",
+      "toefl_listening_announcement": "Listen to an Announcement",
+      "toefl_listening_academic_talk": "Listen to an Academic Talk"
+    }
   }
 }

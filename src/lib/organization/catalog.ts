@@ -19,6 +19,15 @@ export interface RawAvailableModeRow {
   description: string | null;
 }
 
+/**
+ * @param framework catalog framework
+ * @param examPart exam part, with or without the framework prefix
+ * @returns route mode key without a doubled framework prefix
+ */
+export function modeKeyOf(framework: string, examPart: string): string {
+  return examPart.startsWith(`${framework}_`) ? examPart : `${framework}_${examPart}`;
+}
+
 export function dedupeDynamicCards(rows: RawDynamicCardRow[]): DynamicCard[] {
   const seen = new Set<string>();
   const deduped: DynamicCard[] = [];
@@ -35,7 +44,7 @@ export function dedupeDynamicCards(rows: RawDynamicCardRow[]): DynamicCard[] {
         cefr_level: (row.cefr_level ?? null) as CefrLevel | null,
         label: row.label,
         description: row.description,
-        mode_key: `${row.framework}_${row.exam_part}`,
+        mode_key: modeKeyOf(row.framework, row.exam_part),
         status,
         skill: row.skill,
       });
