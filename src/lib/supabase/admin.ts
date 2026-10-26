@@ -14,3 +14,5 @@ export function createSupabaseAdmin() {
     }
   );
 }
+
+export type BobDbClient = Pick<ReturnType<typeof createSupabaseAdmin>, 'from'>;

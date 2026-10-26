@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { isServiceRoleRequest } from '@/lib/api/service-auth';
 import { createSupabaseAdmin } from '@/lib/supabase/admin';
 import { generateImageWithFallback } from '@/lib/yl-imagen';
 import { CHALLENGE_IMAGE_SLOTS } from '@/lib/challenge/cambridge-a2';
@@ -15,8 +16,7 @@ const CHUNK_SIZE = 6;
  * making it safe to re-run when a Vercel function times out mid-batch.
  */
 export async function POST(req: NextRequest): Promise<NextResponse> {
-  const token = req.headers.get('authorization')?.replace(/^Bearer\s+/i, '');
-  if (!token || token !== process.env.SUPABASE_SERVICE_ROLE_KEY) {
+  if (!isServiceRoleRequest(req)) {
     return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
   }
 

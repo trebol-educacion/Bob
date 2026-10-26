@@ -1,4 +1,5 @@
 import { createSupabaseServer } from '@/lib/supabase/server';
+import type { BobDbClient } from '@/lib/supabase/admin';
 import { type CacheKey, hashCacheKey } from '@/lib/cache-keys';
 import type { ActionResult } from '@/lib/result';
 
@@ -32,10 +33,11 @@ function buildInsertPayload(key: CacheKey, cacheKey: string, value: unknown, sto
 /** Read a cached entry without side effects; returns null on miss or error. */
 export async function getCachedContentIfExists<T>(
   key: CacheKey,
-  storeAs: StoreAs = 'json'
+  storeAs: StoreAs = 'json',
+  client?: BobDbClient
 ): Promise<T | null> {
   const cacheKey = hashCacheKey(key);
-  const supabase = await createSupabaseServer();
+  const supabase = client ?? (await createSupabaseServer());
   const { data, error } = await supabase
     .from('generation_cache')
     .select('output_text, output_json, output_blob_url, hit_count')
@@ -49,6 +51,7 @@ export async function getCachedContentIfExists<T>(
 export interface CachedContentOptions<T> {
   storeAs?: StoreAs;
   validate: (value: T) => boolean;
+  client?: BobDbClient;
 }
 
 function logCacheError(event: string, cacheKey: string, error: { message: string } | null): void {
@@ -67,7 +70,7 @@ export async function getOrCreateCachedContent<T>(
 ): Promise<T | { error: string }> {
   const storeAs = options.storeAs ?? 'json';
   const cacheKey = hashCacheKey(key);
-  const supabase = await createSupabaseServer();
+  const supabase = options.client ?? (await createSupabaseServer());
 
   const { data: existing, error: readError } = await supabase
     .from('generation_cache')
