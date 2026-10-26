@@ -33,6 +33,15 @@ describe('usePracticeBoot', () => {
     expect(result.current).toMatchObject({ seed: SEED, level: 'b2', sessionId: null, messages: [{ role: 'model', text: 'Hello' }] });
   });
 
+  it('reenvia el topic elegido al servidor al preparar la practica', async () => {
+    (streamInitialTurn as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, framing: 'F', message: 'Hello' });
+
+    const { result } = renderHook(() => usePracticeBoot({ ...args, topicSlug: 'food_health' }));
+
+    await waitFor(() => expect(result.current.phase).toBe('ready'));
+    expect(preparePracticeAction).toHaveBeenCalledWith({ mode: 'conversation', skillLevels: null, cefrActiveLevel: null, topicSlug: 'food_health' });
+  });
+
   it('un fallo del stream deja el estado en error con su codigo y reintento, no un mensaje de relleno', async () => {
     (streamInitialTurn as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ ok: false, code: 'rate_limited', retryable: true, aborted: false });
 

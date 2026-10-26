@@ -20,6 +20,7 @@ export interface UsePracticeBootArgs {
   mode: PracticeActivityMode;
   cefrActiveLevel: CefrLevel | null;
   skillLevels: SkillLevelMap | null;
+  topicSlug?: string | null;
   resume?: PracticeResumeInput;
 }
 
@@ -73,13 +74,13 @@ export function usePracticeBoot(args: UsePracticeBootArgs): PracticeBootState & 
   const resumeId = args.resume?.sessionId ?? null;
 
   useEffect(() => {
-    const { mode, skillLevels, cefrActiveLevel, resume } = argsRef.current;
+    const { mode, skillLevels, cefrActiveLevel, topicSlug, resume } = argsRef.current;
     const controller = new AbortController();
 
     const run = async (): Promise<PracticeBootState | null> => {
       if (resume) return bootResumed(resume);
 
-      const prepared = await preparePracticeAction({ mode, skillLevels, cefrActiveLevel });
+      const prepared = await preparePracticeAction({ mode, skillLevels, cefrActiveLevel, topicSlug });
       if (!prepared.ok) return { phase: 'error', code: prepared.code, retryable: prepared.retryable };
       const { level, seed } = prepared.data;
 

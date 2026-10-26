@@ -1,7 +1,9 @@
 'use server';
 
 import { pickPracticeSeed } from '@/lib/practice/seed';
-import { resolveEffectiveLevel } from '@/lib/levels/effective-level';
+import { resolvePracticeLevel } from '@/lib/practice/level';
+import { fetchPracticeTopics } from '@/lib/practice/topics-repository';
+import { buildTopicSeed } from '@/lib/practice/topics';
 import { MODE_PROMPT_KEY } from '@/lib/practice/mode-prompt-key';
 import { fail, ok, type ActionResult } from '@/lib/result';
 import type { PracticeActivityMode, PracticeSeed } from '@/lib/practice/types';
@@ -12,6 +14,7 @@ export interface PreparePracticeInput {
   mode: PracticeActivityMode;
   skillLevels: SkillLevelMap | null;
   cefrActiveLevel: CefrLevel | null;
+  topicSlug?: string | null;
 }
 
 export interface PreparedPractice {
@@ -20,16 +23,21 @@ export interface PreparedPractice {
   seed: PracticeSeed;
 }
 
-const DEFAULT_LEVEL: CefrLevel = 'b1';
-
 /**
  * @param input.mode - practice activity chosen by the student
  * @param input.skillLevels - per-skill levels of the student
  * @param input.cefrActiveLevel - level fixed by the tenant, when locked
+ * @param input.topicSlug - topic chosen by the student; only conversation accepts it, absent keeps the random seed
  * @returns effective level and the only seed of the run; creates no session and calls no LLM
  */
 export async function preparePracticeAction(input: PreparePracticeInput): Promise<ActionResult<PreparedPractice>> {
   if (!(input.mode in MODE_PROMPT_KEY)) return fail('invalid_mode');
-  const level = resolveEffectiveLevel(input.skillLevels, input.cefrActiveLevel, 'speaking').level ?? DEFAULT_LEVEL;
-  return ok({ mode: input.mode, level, seed: pickPracticeSeed(input.mode) });
+  const level = resolvePracticeLevel(input.skillLevels, input.cefrActiveLevel);
+  if (!input.topicSlug) return ok({ mode: input.mode, level, seed: pickPracticeSeed(input.mode) });
+  if (input.mode !== 'conversation') return fail('invalid_topic');
+
+  const topics = await fetchPracticeTopics(level, input.topicSlug);
+  if (!topics) return fail('topics_unavailable', true);
+  if (topics.length === 0) return fail('invalid_topic');
+  return ok({ mode: input.mode, level, seed: buildTopicSeed(topics[0]) });
 }
