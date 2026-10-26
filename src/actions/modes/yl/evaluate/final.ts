@@ -7,6 +7,7 @@ import { createSupabaseServer } from '@/lib/supabase/server';
 import { finishSession } from '@/lib/session/lifecycle';
 import { callGemini, safeParseFallback } from '@/lib/gemini-client';
 import { parseYLMode, evaluationKey, EvalFallback } from '../_helpers';
+import { parseModelJson } from '@/lib/llm/parse-model-json';
 
 export async function evaluateYLFinalAction(input: {
   sessionId: string;
@@ -61,7 +62,7 @@ export async function evaluateYLFinalAction(input: {
 
   let parsed: unknown;
   try {
-    parsed = JSON.parse(result.data.text);
+    parsed = parseModelJson(result.data.text);
   } catch {
     return EvalFallback;
   }

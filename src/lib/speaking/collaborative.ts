@@ -11,6 +11,7 @@ import { parseJsonResult } from '@/lib/llm/parse-json-result';
 import { callGemini, safeParseFallback } from '@/lib/gemini-client';
 import { toExaminerFeedback } from './examiner-score';
 import type { Part3ChatMessage, Part3Scenario } from './types';
+import { parseModelJson } from '@/lib/llm/parse-model-json';
 
 export interface CollaborativeTemplateContext {
   scenario: Part3Scenario;
@@ -90,7 +91,7 @@ function extractExaminerLine(raw: string): string {
   const stripped = raw.replace(/```[a-z]*\s*/gi, '').replace(/```/g, '').trim();
   if (!stripped.startsWith('{')) return stripped;
   try {
-    const obj = JSON.parse(stripped) as Record<string, unknown>;
+    const obj = parseModelJson(stripped) as Record<string, unknown>;
     const line = [obj.partner_turn, obj.examiner_response, obj.examiner_prompt].find((v) => typeof v === 'string');
     return typeof line === 'string' ? line.trim() : '';
   } catch {
@@ -236,7 +237,7 @@ export async function chatCollaborativeAudio(
 
   let parsed: unknown;
   try {
-    parsed = JSON.parse(result.data.text);
+    parsed = parseModelJson(result.data.text);
   } catch {
     return fail('chat_failed', true);
   }
@@ -354,7 +355,7 @@ export async function evaluateCollaborative(
 
   let parsed: unknown;
   try {
-    parsed = JSON.parse(result.data.text);
+    parsed = parseModelJson(result.data.text);
   } catch {
     return ok({ feedback: FormativeFeedbackFallback, sessionId });
   }

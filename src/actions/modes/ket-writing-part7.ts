@@ -9,6 +9,7 @@ import { MODELS } from '@/lib/models';
 import { bankStamp, pickPlan } from '@/lib/item-bank/plan-bank';
 import { fail, ok, type ActionResult } from '@/lib/result';
 import { KetPictureStoryPlanSchema, type KetStoryScene } from '@/lib/bank-plans/ket-writing-part7';
+import { parseModelJson } from '@/lib/llm/parse-model-json';
 
 const KET_PICTURE_STORY_PART = 'ket_writing_part7';
 
@@ -51,7 +52,7 @@ export interface PictureStoryFeedback {
 }
 
 function safeParse<T>(schema: z.ZodType<T>, raw: string): T | null {
-  try { return schema.parse(JSON.parse(raw)); } catch { return null; }
+  try { return schema.parse(parseModelJson(raw)); } catch { return null; }
 }
 
 const FRAMING_FALLBACK = 'Look at the three pictures. They tell a story. Write the story in about 35 words or more.';

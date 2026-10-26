@@ -4,6 +4,7 @@ import { Type } from '@google/genai';
 import { MODELS } from '@/lib/models';
 import { getPrompt } from '@/lib/prompts/db-prompts';
 import { callGemini } from '@/lib/gemini-client';
+import { parseModelJson } from '@/lib/llm/parse-model-json';
 
 export interface TopicGuardResult {
   appropriate: boolean;
@@ -43,7 +44,7 @@ export async function checkTopicIsAppropriateAction(topic: string): Promise<Topi
 
   let parsed: unknown;
   try {
-    parsed = JSON.parse(result.data.text);
+    parsed = parseModelJson(result.data.text);
   } catch {
     return fallback;
   }

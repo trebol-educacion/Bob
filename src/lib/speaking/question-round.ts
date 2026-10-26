@@ -10,6 +10,7 @@ import { toExaminerFeedback, withRubricScore } from './examiner-score';
 import { SPEAKING_ANSWER_KIND } from './question-round-restore';
 import type { QuestionRoundSchema } from './question-round-schema';
 import type { QuestionRoundAnswer, QuestionRoundContext, QuestionRoundEvaluation, SpeakingQA } from './types';
+import { parseModelJson } from '@/lib/llm/parse-model-json';
 
 export type { QuestionRoundSchema };
 
@@ -40,7 +41,7 @@ function cleanReaction(raw: string): string {
   if (stripped.startsWith('[')) return '';
   if (stripped.startsWith('{')) {
     try {
-      const obj = JSON.parse(stripped) as { reaction?: unknown };
+      const obj = parseModelJson(stripped) as { reaction?: unknown };
       return typeof obj.reaction === 'string' ? obj.reaction.trim() : '';
     } catch {
       return '';
@@ -51,7 +52,7 @@ function cleanReaction(raw: string): string {
 
 function extractTranscript(raw: string): string {
   try {
-    const obj = JSON.parse(raw) as { transcript?: unknown };
+    const obj = parseModelJson(raw) as { transcript?: unknown };
     return typeof obj.transcript === 'string' ? obj.transcript.trim() : raw;
   } catch {
     return raw;
@@ -197,7 +198,7 @@ export async function evaluateQuestionRound<TPlan extends object>(
 
   let parsed: unknown;
   try {
-    parsed = JSON.parse(result.data.text);
+    parsed = parseModelJson(result.data.text);
   } catch {
     return unscored();
   }

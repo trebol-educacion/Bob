@@ -7,6 +7,7 @@ import { callGemini, safeParseFallback } from '@/lib/gemini-client';
 import { PronunciationEvaluationSchema, ImageDescriptionEvaluationSchema } from '@/lib/types/gemini';
 import type { CefrLevel } from '@/lib/vocabulary';
 import type { EvaluationResult } from './types';
+import { parseModelJson } from '@/lib/llm/parse-model-json';
 
 export async function evaluateImageDescriptionAction(
   audioBase64: string,
@@ -68,7 +69,7 @@ export async function evaluateImageDescriptionAction(
 
   let parsed: unknown;
   try {
-    parsed = JSON.parse(result.data.text);
+    parsed = parseModelJson(result.data.text);
   } catch {
     return fallback;
   }
@@ -125,7 +126,7 @@ export async function evaluatePronunciationAction(
 
   let parsed: unknown;
   try {
-    parsed = JSON.parse(result.data.text);
+    parsed = parseModelJson(result.data.text);
   } catch {
     return fallback;
   }

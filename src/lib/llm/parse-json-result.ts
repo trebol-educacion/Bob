@@ -1,5 +1,6 @@
 import type { GeminiCallResult } from '@/lib/gemini-client';
 import { fail, ok, type ActionResult } from '@/lib/result';
+import { parseModelJson } from '@/lib/llm/parse-model-json';
 
 export interface JsonSchemaLike<T> {
   safeParse: (value: unknown) => { success: boolean; data?: T; error?: unknown };
@@ -27,7 +28,7 @@ export function parseJsonResult<T>(
   }
   let parsed: unknown;
   try {
-    parsed = JSON.parse(text);
+    parsed = parseModelJson(text);
   } catch {
     console.error(JSON.stringify({ event, error: 'invalid JSON' }));
     return fail('invalid_json', true);

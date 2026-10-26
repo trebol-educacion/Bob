@@ -10,6 +10,7 @@ import { stripDashes } from '@/lib/text';
 import { bankStamp, pickPlan } from '@/lib/item-bank/plan-bank';
 import { fail, ok, type ActionResult } from '@/lib/result';
 import { KetShortMessagePlanSchema } from '@/lib/bank-plans/ket-writing-part6';
+import { parseModelJson } from '@/lib/llm/parse-model-json';
 
 const KET_SHORT_MESSAGE_PART = 'ket_writing_part6';
 
@@ -54,7 +55,7 @@ const EvaluationSchema = z.object({
 
 function safeParse<T>(schema: z.ZodType<T>, raw: string): T | null {
   try {
-    return schema.parse(JSON.parse(raw));
+    return schema.parse(parseModelJson(raw));
   } catch {
     return null;
   }

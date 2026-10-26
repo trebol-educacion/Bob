@@ -9,6 +9,7 @@ import { fail, ok, type ActionResult } from '@/lib/result';
 import { completeActivity } from '@/lib/session/complete';
 import { currentUserId } from '@/lib/session/lifecycle';
 import { MODELS } from '@/lib/models';
+import { parseModelJson } from '@/lib/llm/parse-model-json';
 
 export interface PETEmailPrompt {
   emailReceived: { from: string; subject: string; body: string };
@@ -49,7 +50,7 @@ const EvaluationSchema = z.object({
 
 function safeParse<T>(schema: z.ZodType<T>, raw: string): T | null {
   try {
-    return schema.parse(JSON.parse(raw));
+    return schema.parse(parseModelJson(raw));
   } catch {
     return null;
   }

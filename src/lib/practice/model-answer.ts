@@ -1,17 +1,11 @@
-const CODE_FENCE_RE = /^```(?:json)?\s*([\s\S]*?)\s*```$/i;
-const ANSWER_FIELD_RE = /"answer"\s*:\s*"((?:\\.|[^"\\])*)"/;
+import { parseModelJson, stripCodeFence } from '@/lib/llm/parse-model-json';
 
-/** @param raw string */
-function stripCodeFence(raw: string): string {
-  const trimmed = raw.trim();
-  const match = trimmed.match(CODE_FENCE_RE);
-  return match ? match[1].trim() : trimmed;
-}
+const ANSWER_FIELD_RE = /"answer"\s*:\s*"((?:\\.|[^"\\])*)"/;
 
 /** @param text string */
 function extractAnswerFromParsedJson(text: string): string | null {
   try {
-    const parsed: unknown = JSON.parse(text);
+    const parsed: unknown = parseModelJson(text);
     if (
       parsed !== null &&
       typeof parsed === 'object' &&

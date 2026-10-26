@@ -6,6 +6,7 @@ import { callGemini } from '@/lib/gemini-client';
 import { WhatsThisEvalResultSchema, WhatsThisEvalFallback } from '../types';
 import type { WhatsThisEvalResult } from '../types';
 import { saveYLTurnAction } from '../persist';
+import { parseModelJson } from '@/lib/llm/parse-model-json';
 
 export async function evaluateWhatsThisAnswerAction(input: {
   sessionId: string;
@@ -87,7 +88,7 @@ export async function evaluateWhatsThisAnswerAction(input: {
 
   let parsed: unknown;
   try {
-    parsed = JSON.parse(evalResult.data.text);
+    parsed = parseModelJson(evalResult.data.text);
   } catch {
     console.error(JSON.stringify({ event: 'evaluateWhatsThisAnswerAction', error: 'invalid JSON' }));
     return { ...WhatsThisEvalFallback, transcript: transcribed };

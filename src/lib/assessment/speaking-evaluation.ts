@@ -6,6 +6,7 @@ import { callGemini } from '@/lib/gemini-client';
 import { getPrompt } from '@/lib/prompts/db-prompts';
 import { MODELS } from '@/lib/models';
 import type { SubmitSpeakingTurn } from '@/actions/assessment/types';
+import { parseModelJson } from '@/lib/llm/parse-model-json';
 
 const NO_TRANSCRIPT = '[no transcript]';
 
@@ -97,7 +98,7 @@ export function parseSpeakingEvaluation(raw: string | undefined): SpeakingEvalua
   if (!raw) return { ok: false, error: 'empty_response' };
   let json: unknown;
   try {
-    json = JSON.parse(raw);
+    json = parseModelJson(raw);
   } catch {
     return { ok: false, error: 'invalid_json' };
   }
