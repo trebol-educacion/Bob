@@ -1,6 +1,7 @@
 'use server';
 
 import { gradePracticeSession, type PracticeTurnSignal } from '@/lib/grading/practice-rubric';
+import { gradeFromTurnCriteria } from '@/lib/grading/practice-criteria';
 import { finishSession, currentUserId } from '@/lib/session/lifecycle';
 import { buildPracticeResultEvaluation } from '@/lib/practice/messages';
 import { closePracticeSidecar } from '@/lib/practice/sidecar';
@@ -16,13 +17,13 @@ export interface FinishPracticeResult {
 /**
  * @param sessionId - session created at the first exchange; null when there was none
  * @param turnSignals - scaffolding and score signals of every student turn
- * @returns rubric grade 0-10 computed in code; the session keeps it as score_10 and never counts toward progress
+ * @returns four-criteria grade 0-10 computed in code (legacy participation grade when no turn carried criteria); the session keeps it as score_10 and never counts toward progress
  */
 export async function finishPracticeAction(
   sessionId: string | null,
   turnSignals: PracticeTurnSignal[]
 ): Promise<FinishPracticeResult> {
-  const graded = gradePracticeSession(turnSignals);
+  const graded = gradeFromTurnCriteria(turnSignals.map((signal) => signal.criteria)) ?? gradePracticeSession(turnSignals);
   if (!sessionId) return { ...graded, persisted: true };
 
   const userId = await currentUserId();

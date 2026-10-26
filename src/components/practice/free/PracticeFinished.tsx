@@ -1,14 +1,18 @@
 import React from 'react';
 import { RotateCcw, Home } from 'lucide-react';
 import { Button } from '@/components/Button';
-import type { PracticeRubricDetail } from '@/lib/practice/types';
+import { isCriteriaDetail, type PracticeCriteriaRubricDetail, type PracticeRubricDetail } from '@/lib/practice/types';
+
+const CRITERIA_ORDER: ReadonlyArray<keyof PracticeCriteriaRubricDetail> = ['pronunciation', 'fluency', 'grammar', 'vocabulary'];
+const BAR_MAX = 10;
 
 export interface PracticeFinishedLabels {
   title: string;
   scoreLabel: string;
   again: string;
   home: string;
-  criteria: Record<keyof PracticeRubricDetail, string>;
+  notRated: string;
+  criteria: Record<string, string>;
 }
 
 export interface PracticeFinishedProps {
@@ -18,6 +22,50 @@ export interface PracticeFinishedProps {
   labels: PracticeFinishedLabels;
   onRestart: () => void;
   onExit: () => void;
+}
+
+function CriteriaBars({ detail, labels }: { detail: PracticeCriteriaRubricDetail; labels: PracticeFinishedLabels }) {
+  return (
+    <ul className="w-full max-w-xs space-y-3 text-left">
+      {CRITERIA_ORDER.map((key) => {
+        const value = detail[key];
+        return (
+          <li key={key}>
+            <div className="flex items-baseline justify-between">
+              <span className="text-[10px] font-black uppercase tracking-wider text-gray-400">{labels.criteria[key]}</span>
+              <span className="text-sm font-black text-trebol-text">{value === null ? labels.notRated : value.toFixed(1)}</span>
+            </div>
+            <div
+              className="mt-1 h-2 rounded-full bg-gray-100 overflow-hidden"
+              role="progressbar"
+              aria-label={labels.criteria[key]}
+              aria-valuemin={0}
+              aria-valuemax={BAR_MAX}
+              aria-valuenow={value ?? undefined}
+            >
+              <div
+                className="h-full rounded-full"
+                style={{ width: `${((value ?? 0) / BAR_MAX) * 100}%`, background: 'var(--color-bob-brand)' }}
+              />
+            </div>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+function LegacyTiles({ detail, labels }: { detail: Record<string, number | null>; labels: PracticeFinishedLabels }) {
+  return (
+    <div className="grid grid-cols-2 gap-3 w-full max-w-xs">
+      {Object.keys(detail).map((key) => (
+        <div key={key} className="bg-gray-50 rounded-xl px-3 py-2">
+          <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">{labels.criteria[key]}</p>
+          <p className="text-lg font-black text-trebol-text">{(detail[key] ?? 0).toFixed(1)}</p>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 export function PracticeFinished({ score, detail, feedback, labels, onRestart, onExit }: PracticeFinishedProps) {
@@ -34,14 +82,11 @@ export function PracticeFinished({ score, detail, feedback, labels, onRestart, o
 
       <p className="max-w-sm text-sm font-medium text-gray-600 italic">&quot;{feedback}&quot;</p>
 
-      <div className="grid grid-cols-2 gap-3 w-full max-w-xs">
-        {(Object.keys(detail) as Array<keyof PracticeRubricDetail>).map((key) => (
-          <div key={key} className="bg-gray-50 rounded-xl px-3 py-2">
-            <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">{labels.criteria[key]}</p>
-            <p className="text-lg font-black text-trebol-text">{detail[key].toFixed(1)}</p>
-          </div>
-        ))}
-      </div>
+      {isCriteriaDetail(detail) ? (
+        <CriteriaBars detail={detail} labels={labels} />
+      ) : (
+        <LegacyTiles detail={{ ...detail }} labels={labels} />
+      )}
 
       <div className="flex items-center gap-3">
         <Button variant="secondary" onClick={onRestart} className="flex items-center gap-2">

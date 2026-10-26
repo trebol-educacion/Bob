@@ -1,15 +1,17 @@
-import type { PracticeRubricDetail } from '@/lib/practice/types';
+import type { PracticeLegacyRubricDetail } from '@/lib/practice/types';
+import type { PracticeTurnCriteria } from './practice-criteria';
 
 export interface PracticeTurnSignal {
   hasAudio: boolean;
   hintUsed: boolean;
   modelAnswerUsed: boolean;
   turnScore: number | null;
+  criteria?: PracticeTurnCriteria | null;
 }
 
 export interface PracticeRubricResult {
   score: number;
-  detail: PracticeRubricDetail;
+  detail: PracticeLegacyRubricDetail;
   feedback: string;
 }
 

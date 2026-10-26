@@ -28,6 +28,18 @@ export interface ProgressPeriods {
 
 export type ActivityTargets = Record<string, Record<string, number>>;
 
+export interface SpeakingPoint {
+  at: string;
+  score10: number;
+  source: 'exam' | 'practice';
+}
+
+export interface SpeakingCriterionAverage {
+  criterion: string;
+  avg: number;
+  samples: number;
+}
+
 export interface StudentStatsResult {
   rows: StudentStatRow[];
   total_sessions: number;
@@ -39,6 +51,8 @@ export interface StudentStatsResult {
   periods: ProgressPeriods;
   targets: ActivityTargets;
   last_tests: Record<StatsSkill, LastAssessment | null>;
+  speaking_series: SpeakingPoint[];
+  speaking_criteria: SpeakingCriterionAverage[];
 }
 
 const SKILLS: StatsSkill[] = ['speaking', 'reading', 'listening', 'writing'];
@@ -58,6 +72,8 @@ export function emptyStudentStats(): StudentStatsResult {
     periods: { week: 0, month: 0, year: 0, total: 0 },
     targets: {},
     last_tests: { speaking: null, reading: null, listening: null, writing: null },
+    speaking_series: [],
+    speaking_criteria: [],
   };
 }
 
@@ -117,6 +133,18 @@ export function mapProgressSummary(raw: unknown): StudentStatsResult {
       result.last_tests[skill] = { cefr_band: String(t.cefr_band), occurred_at: String(t.occurred_at) };
     }
   }
+
+  result.speaking_series = asArray(data.speaking_series).flatMap((p) =>
+    typeof p.at === 'string' && p.score10 !== null && p.score10 !== undefined
+      ? [{ at: p.at, score10: asNumber(p.score10), source: p.source === 'practice' ? ('practice' as const) : ('exam' as const) }]
+      : []
+  );
+
+  result.speaking_criteria = asArray(data.speaking_criteria).map((c) => ({
+    criterion: String(c.criterion),
+    avg: asNumber(c.avg),
+    samples: asNumber(c.samples),
+  }));
 
   return result;
 }

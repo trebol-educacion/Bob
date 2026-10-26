@@ -45,7 +45,8 @@ export interface AppShellRoutesProps {
   onSelectExam: () => void;
   onSelectPractice: () => void;
   practiceMode: PracticeActivityMode;
-  onSelectPracticeMode: (mode: PracticeActivityMode) => void;
+  onSelectPracticeMode: (mode: PracticeActivityMode, topicSlug: string | null) => void;
+  practiceTopicSlug: string | null;
   handleSkillSelect: (skill: Skill) => void;
   setSelectedSkill: (skill: Skill | null) => void;
   handleModeSelect: (m: PracticeMode) => void;
@@ -88,6 +89,7 @@ export function AppShellRoutes({
   onSelectExam,
   onSelectPractice,
   practiceMode,
+  practiceTopicSlug,
   onSelectPracticeMode,
   handleSkillSelect,
   setSelectedSkill,
@@ -153,6 +155,7 @@ export function AppShellRoutes({
             onSelectExam={onSelectExam}
             onSelectPractice={onSelectPractice}
             practiceMode={practiceMode}
+            practiceTopicSlug={practiceTopicSlug}
             onSelectPracticeMode={onSelectPracticeMode}
             onExitPractice={onBackHome}
             resume={practiceResume}

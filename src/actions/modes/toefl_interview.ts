@@ -11,6 +11,7 @@ import { currentUserId, finishSession, openSession, recordTurn } from '@/lib/ses
 import { buildInterviewEvaluation, restoreInterview, INTERVIEW_ANSWER_KIND, type ToeflInterviewPlan } from '@/lib/toefl/interview';
 import { callGemini } from '@/lib/gemini-client';
 import { parseModelJson } from '@/lib/llm/parse-model-json';
+import { getPrompt } from '@/lib/prompts/db-prompts';
 
 const INTERVIEW_LEVEL = 'b2';
 const INTERVIEW_PART = 'toefl_interview';
@@ -48,20 +49,7 @@ export interface ToeflAnswerOutcome {
 }
 
 async function evaluateSpokenAnswer(question: string, audioBase64: string, mimeType: string): Promise<FormativeFeedback | null> {
-  const prompt = `You are a supportive TOEFL iBT speaking coach giving formative feedback to an English learner.
-
-The student answered this question:
-"${question}"
-
-Listen to the audio and return ONLY a JSON object with these fields:
-- "kind": always "formative"
-- "understood": boolean, did the student communicate their main idea clearly?
-- "highlights": array of 1-3 strings celebrating specific strengths (e.g. "Good use of examples", "Clear main idea stated at the start")
-- "suggestions": array of 1-3 specific improvement tips (e.g. "Try to elaborate more on your second point", "Use discourse markers like 'firstly' and 'however'")
-- "model_answer": one example sentence or phrase showing a strong way to open or conclude this answer
-- "rubric": an object with four integer scores 0-4 each: { "task_coverage": 0-4, "grammar": 0-4, "vocabulary": 0-4, "fluency": 0-4 }
-
-Return ONLY valid JSON. No score, no band, no percentage outside the rubric object.`;
+  const prompt = await getPrompt('toefl_interview_b2_formative', { QUESTION: question });
 
   const userId = (await currentUserId()) ?? undefined;
   const result = await callGemini(

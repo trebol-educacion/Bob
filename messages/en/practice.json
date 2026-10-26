@@ -53,6 +53,43 @@
     "picture": {
       "title": "Picture",
       "subtitle": "Describe what you see and keep the story going."
+    },
+    "presentation": {
+      "title": "Presentation",
+      "subtitle": "Prepare a topic and speak for about a minute, like in a Cambridge long turn."
+    }
+  },
+  "topicSelect": {
+    "heading": "What do you want to talk about?",
+    "subtitle": "Pick a topic, or let Bob surprise you.",
+    "surprise": {
+      "title": "Surprise me",
+      "subtitle": "Bob picks a random chat."
+    },
+    "back": "Back",
+    "loading": "Loading topics...",
+    "loadError": "We couldn't load the topics. You can still let Bob surprise you.",
+    "retry": "Try again",
+    "areas": {
+      "personal_life": "Personal life and lifestyle",
+      "education_work": "Education, work and future",
+      "leisure_travel": "Leisure, travel and culture",
+      "society_science": "Society, environment and science"
+    },
+    "topics": {
+      "routine_hobbies": "Routine and hobbies",
+      "social_relationships": "Social relationships",
+      "food_health": "Food and health",
+      "shopping_consumption": "Shopping and consumption",
+      "studies_learning": "Studies and learning",
+      "work_world": "The world of work",
+      "future_plans": "Future plans",
+      "travel_tourism": "Travel and tourism",
+      "entertainment_art": "Entertainment and art",
+      "media_communication": "Media and communication",
+      "technology_innovation": "Technology and innovation",
+      "environment_nature": "Environment and nature",
+      "community_city": "Community and city"
     }
   },
   "errors": {
@@ -73,7 +110,11 @@
       "participation": "Speaking",
       "fluency": "Fluency",
       "independence": "Independence",
-      "comprehension": "Depth"
-    }
+      "comprehension": "Depth",
+      "pronunciation": "Pronunciation",
+      "grammar": "Grammar",
+      "vocabulary": "Vocabulary"
+    },
+    "notRated": "Not rated"
   }
 }

@@ -14,6 +14,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Trash2,
+  Presentation,
 } from 'lucide-react';
 import { ListenAndPointIcon } from '@/components/icons/ModeIcons';
 import { LookAndAnswerIcon, WhatsThisIcon, PersonalQuestionsIcon } from '@/components/icons/StartersIcons';
@@ -51,6 +52,7 @@ const MODE_ICON: Record<NonNullable<SessionMode>, React.ElementType> = {
   practice_conversation: MessagesSquare,
   practice_situation: MessageSquare,
   practice_picture: ImageIcon,
+  practice_presentation: Presentation,
   cambridge_starters_part1: ListenAndPointIcon,
   cambridge_starters_part2: LookAndAnswerIcon,
   cambridge_starters_part3: WhatsThisIcon,

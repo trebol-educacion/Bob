@@ -16,6 +16,7 @@ export interface PracticeSessionViewProps {
   organization: Organization | null;
   cefrActiveLevel: CefrLevel | null;
   skillLevels: SkillLevelMap | null;
+  topicSlug?: string | null;
   resume?: PracticeResumeInput;
   onSessionCreated: (sessionId: string) => void;
   onSessionFinished: () => void;
@@ -29,6 +30,7 @@ export function PracticeSessionView({
   organization,
   cefrActiveLevel,
   skillLevels,
+  topicSlug,
   resume,
   onSessionCreated,
   onSessionFinished,
@@ -36,7 +38,7 @@ export function PracticeSessionView({
   onExit,
 }: PracticeSessionViewProps) {
   const t = useTranslations('practice');
-  const boot = usePracticeBoot({ mode, cefrActiveLevel, skillLevels, resume });
+  const boot = usePracticeBoot({ mode, cefrActiveLevel, skillLevels, topicSlug, resume });
 
   if (boot.phase === 'error') {
     return (

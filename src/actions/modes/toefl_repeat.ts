@@ -10,6 +10,7 @@ import { readSessionMessages } from '@/lib/persist-activity';
 import { fail, ok, type ActionResult } from '@/lib/result';
 import { callGemini } from '@/lib/gemini-client';
 import { parseModelJson } from '@/lib/llm/parse-model-json';
+import { getPrompt } from '@/lib/prompts/db-prompts';
 
 const REPEAT_LEVEL = 'b1';
 const REPEAT_PART = 'toefl_listen_repeat';
@@ -52,21 +53,7 @@ export interface RepetitionOutcome {
 }
 
 async function evaluateRepetition(originalText: string, audioBase64: string, mimeType: string): Promise<RepetitionObjectiveFeedback | null> {
-  const prompt = `You are evaluating a Listen & Repeat exercise.
-
-Target sentence: "${originalText}"
-
-Listen to the audio and transcribe what the student said. Then compare word by word.
-
-Return ONLY a JSON object with these fields:
-- "kind": always "repetition_objective"
-- "exact_repetition": boolean, true only if every word matches exactly (case-insensitive)
-- "missing_words": array of words from the target sentence that were omitted
-- "extra_words": array of words the student said that are not in the target sentence
-- "transcribed_text": what the student actually said (verbatim transcription)
-- "original_text": "${originalText}"
-
-Return ONLY valid JSON. No score, no pronunciation rating, no subjective assessment.`;
+  const prompt = await getPrompt('toefl_listen_repeat_b1_objective', { TARGET_SENTENCE: originalText });
 
   const userId = (await currentUserId()) ?? undefined;
   const result = await callGemini(

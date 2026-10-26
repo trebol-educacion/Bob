@@ -1,15 +1,12 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import {
-  chatConversationAction,
-  chatTextConversationAction,
-  suggestStudentAnswerAction,
-  generateSpeechAction,
-} from '@/actions/gemini';
+import { suggestStudentAnswerAction, generateSpeechAction } from '@/actions/gemini';
 import type { ChatMessage } from '@/actions/gemini';
 import { pcmToWavBase64, blobToBase64 } from '@/lib/audio';
 import { recordPracticeTurnAction } from '@/actions/practice/turn';
+import { practiceChatAudioAction, practiceChatTextAction } from '@/actions/practice/chat';
+import type { PracticeTurnCriteria } from '@/lib/grading/practice-criteria';
 import { generatePracticeImageAction } from '@/actions/practice/image';
 import { isHintAvailable, markAssistedTurn } from '@/lib/practice/scaffolding';
 import { AUDIO_GENERATION_TIMEOUT_MS, playAudioSafely, withTimeout } from './audioPlayback';
@@ -198,12 +195,18 @@ export function usePracticeTurn(args: UsePracticeTurnArgs): UsePracticeTurnRetur
     setVisibleTexts((prev) => ({ ...prev, [index]: !prev[index] }));
   };
 
-  const recordExchange = async (userText: string, botText: string, turnScore: number | null, hasAudio: boolean): Promise<boolean> => {
+  const recordExchange = async (
+    userText: string,
+    botText: string,
+    turnScore: number | null,
+    hasAudio: boolean,
+    criteria: PracticeTurnCriteria | null
+  ): Promise<boolean> => {
     const usage = markAssistedTurn({
       hintUsed: pendingHintRef.current,
       modelAnswerUsed: pendingModelAnswerUsedRef.current,
     });
-    const signal: PracticeTurnSignal = { hasAudio, hintUsed: usage.hintUsed, modelAnswerUsed: usage.modelAnswerUsed, turnScore };
+    const signal: PracticeTurnSignal = { hasAudio, hintUsed: usage.hintUsed, modelAnswerUsed: usage.modelAnswerUsed, turnScore, criteria };
 
     const recorded = await recordPracticeTurnAction({
       sessionId,
@@ -238,8 +241,8 @@ export function usePracticeTurn(args: UsePracticeTurnArgs): UsePracticeTurnRetur
     setPendingTurn({ text });
     const slowTimer = setTimeout(() => setIsSlow(true), SLOW_TURN_MS);
     try {
-      const result = await chatTextConversationAction(text, messages, seed.topic, level);
-      const persisted = await recordExchange(text, result.ai_response, result.evaluation.score, false);
+      const result = await practiceChatTextAction(text, messages, seed.topic, level, mode);
+      const persisted = await recordExchange(text, result.ai_response, result.evaluation.score, false, result.criteria);
       if (!persisted) {
         setErrorMessage('persistError');
         setLastFailedAction({ kind: 'text', text });
@@ -267,8 +270,14 @@ export function usePracticeTurn(args: UsePracticeTurnArgs): UsePracticeTurnRetur
     try {
       const base64Audio = await blobToBase64(blob);
       const mimeType = (blob.type || 'audio/webm').split(';')[0];
-      const result = await chatConversationAction(base64Audio, mimeType, messages, seed.topic, level);
-      const persisted = await recordExchange(result.evaluation.transcribed_text, result.ai_response, result.evaluation.score, true);
+      const result = await practiceChatAudioAction(base64Audio, mimeType, messages, seed.topic, level, mode);
+      const persisted = await recordExchange(
+        result.evaluation.transcribed_text,
+        result.ai_response,
+        result.evaluation.score,
+        true,
+        result.criteria
+      );
       if (!persisted) {
         setErrorMessage('persistError');
         setLastFailedAction({ kind: 'audio', blob });

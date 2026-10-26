@@ -1,15 +1,18 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { HomeView } from './HomeView';
 import { PracticeModeSelectView } from './PracticeModeSelectView';
 import { PracticeSessionView } from './PracticeSessionView';
+import { PracticeTopicSelectContainer } from '@/components/practice/free/PracticeTopicSelectContainer';
 import type { PracticeResumeInput } from '@/hooks/practice/usePracticeBoot';
 import type { AppState } from '@/lib/routing';
 import type { Organization } from '@/lib/organization';
 import type { CefrLevel } from '@/lib/types/practice';
 import type { PracticeActivityMode } from '@/lib/practice/types';
 import type { SkillLevelMap } from '@/lib/types/skills';
+
+const TOPIC_MODES: readonly PracticeActivityMode[] = ['conversation', 'presentation'];
 
 export interface PracticeHomeFlowProps {
   appState: AppState;
@@ -19,7 +22,8 @@ export interface PracticeHomeFlowProps {
   onSelectExam: () => void;
   onSelectPractice: () => void;
   practiceMode: PracticeActivityMode;
-  onSelectPracticeMode: (mode: PracticeActivityMode) => void;
+  practiceTopicSlug: string | null;
+  onSelectPracticeMode: (mode: PracticeActivityMode, topicSlug: string | null) => void;
   onExitPractice: () => void;
   resume?: PracticeResumeInput;
   onSessionCreated: (sessionId: string) => void;
@@ -38,6 +42,7 @@ export function PracticeHomeFlow({
   onSelectExam,
   onSelectPractice,
   practiceMode,
+  practiceTopicSlug,
   onSelectPracticeMode,
   onExitPractice,
   resume,
@@ -45,15 +50,32 @@ export function PracticeHomeFlow({
   onSessionFinished,
   onPracticeAgain,
 }: PracticeHomeFlowProps) {
+  const [topicMode, setTopicMode] = useState<PracticeActivityMode | null>(null);
+
   if (appState === 'practice-mode-select') {
-    return <PracticeModeSelectView onSelectMode={onSelectPracticeMode} />;
+    if (topicMode) {
+      return (
+        <PracticeTopicSelectContainer
+          skillLevels={skillLevels}
+          cefrActiveLevel={cefrActiveLevel}
+          onSelectTopic={(slug) => onSelectPracticeMode(topicMode, slug)}
+          onBack={() => setTopicMode(null)}
+        />
+      );
+    }
+    return (
+      <PracticeModeSelectView
+        onSelectMode={(mode) => (TOPIC_MODES.includes(mode) ? setTopicMode(mode) : onSelectPracticeMode(mode, null))}
+      />
+    );
   }
 
   if (appState === 'practice-session') {
     return (
       <PracticeSessionView
-        key={`${practiceMode}:${resume?.sessionId ?? 'new'}`}
+        key={`${practiceMode}:${practiceTopicSlug ?? 'random'}:${resume?.sessionId ?? 'new'}`}
         mode={practiceMode}
+        topicSlug={practiceTopicSlug}
         resume={resume}
         onSessionCreated={onSessionCreated}
         onSessionFinished={onSessionFinished}

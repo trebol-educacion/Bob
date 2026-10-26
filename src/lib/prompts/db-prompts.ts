@@ -2,11 +2,13 @@ import { createSupabaseServer } from '@/lib/supabase/server'
 import type { BobDbClient } from '@/lib/supabase/admin'
 import { FALLBACK_PROMPTS as BASE_FALLBACK_PROMPTS } from './fallback-prompts'
 import { PRACTICE_FALLBACK_PROMPTS } from './fallback-prompts-practice'
+import { TOEFL_FALLBACK_PROMPTS } from './fallback-prompts-toefl'
 import { createPromptCache } from './prompt-cache'
 
 export const FALLBACK_PROMPTS: Record<string, string> = {
   ...BASE_FALLBACK_PROMPTS,
   ...PRACTICE_FALLBACK_PROMPTS,
+  ...TOEFL_FALLBACK_PROMPTS,
 }
 
 async function fetchPromptTemplate(client: BobDbClient, key: string): Promise<string | null> {

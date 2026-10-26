@@ -46,6 +46,7 @@ export default function App() {
   const [mode, setMode] = useState<PracticeMode>(null);
   const [topic, setTopic] = useState('');
   const [practiceMode, setPracticeMode] = useState<PracticeActivityMode>('conversation');
+  const [practiceTopicSlug, setPracticeTopicSlug] = useState<string | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   useUsageHeartbeat(mode);
@@ -113,9 +114,10 @@ export default function App() {
     setAppState('practice-mode-select');
   }, [clearActiveSession]);
 
-  const onSelectPracticeMode = useCallback((selected: PracticeActivityMode) => {
+  const onSelectPracticeMode = useCallback((selected: PracticeActivityMode, topicSlug: string | null) => {
     clearActiveSession();
     setPracticeMode(selected);
+    setPracticeTopicSlug(topicSlug);
     setAppState('practice-session');
   }, [clearActiveSession]);
 
@@ -217,6 +219,7 @@ export default function App() {
       onSelectExam={onSelectExam}
       onSelectPractice={onSelectPractice}
       practiceMode={practiceMode}
+      practiceTopicSlug={practiceTopicSlug}
       onSelectPracticeMode={onSelectPracticeMode}
       handleSkillSelect={assessment.handleSkillSelect}
       handleModeSelect={handleModeSelect}
