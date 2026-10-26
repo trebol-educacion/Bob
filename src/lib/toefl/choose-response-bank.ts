@@ -1,14 +1,19 @@
 import type { ToeflChooseResponsePlan } from '@/lib/bank-plans/toefl-choose-response';
+import { resolveListeningAudioUrl } from '@/components/practice/group-exercise/listening-audio-url';
 import type { ClosedItem } from '@/lib/types/practice';
 
 export const CHOOSE_RESPONSE_PART = 'listen_choose_response';
 
 const QUESTION = 'Choose the best response.';
 
+function toPlayableUrl(audioUrl: string): string {
+  return audioUrl.startsWith('/') ? resolveListeningAudioUrl(audioUrl) : audioUrl;
+}
+
 /**
  * @param plan - stored Listen and Choose a Response set
  * @param groupId - bank group the set came from
- * @returns closed items with stable ids and the audio URL of each utterance
+ * @returns closed items with stable ids and the playable audio URL of each utterance
  */
 export function toClosedItems(plan: ToeflChooseResponsePlan, groupId: string): ClosedItem[] {
   return plan.items.map((item, index) => ({
@@ -17,7 +22,7 @@ export function toClosedItems(plan: ToeflChooseResponsePlan, groupId: string): C
     exam_part: CHOOSE_RESPONSE_PART,
     cefr_level: 'b1',
     variant_id: `${groupId}-q${index + 1}`,
-    stimulus_audio_url: item.audio_url,
+    stimulus_audio_url: toPlayableUrl(item.audio_url),
     stimulus_text: null,
     stimulus_image_url: null,
     question: QUESTION,
