@@ -51,7 +51,6 @@ export function ListenChooseResponsePractice({
     void submit({
       mode: MODE,
       bankGroupId,
-      items,
       entries: items.map((item, index) => ({
         id: item.variant_id,
         selected: results[index]?.selected ?? '',

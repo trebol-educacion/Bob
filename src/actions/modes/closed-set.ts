@@ -3,7 +3,9 @@
 import { completeActivity } from '@/lib/session/complete';
 import { bankStamp, loadPlan } from '@/lib/item-bank/plan-bank';
 import { ToeflChooseResponsePlanSchema } from '@/lib/bank-plans/toefl-choose-response';
+import { ToeflBuildSentencePlanSchema } from '@/lib/bank-plans/toefl-build-sentence';
 import { keyEntriesFromBank, toClosedItems } from '@/lib/toefl/choose-response-bank';
+import { sentenceEntriesFromBank, toBuildSentenceItems } from '@/lib/toefl/build-sentence-bank';
 import {
   CLOSED_ANSWER_KIND,
   CLOSED_PLAN_KIND,
@@ -25,7 +27,6 @@ const BANK_PART: Record<ClosedSetMode, string> = {
 export interface ClosedSetSubmission {
   mode: ClosedSetMode;
   sessionId?: string;
-  items: unknown[];
   bankGroupId?: string;
   entries: ClosedEntry[];
 }
@@ -40,26 +41,30 @@ interface TrustedSubmission {
   entries: ClosedEntry[];
 }
 
-/**
- * @param input - submission from the client
- * @returns items and entries keyed against the bank, or null when the set cannot be verified
- */
-async function trustedSubmission(input: ClosedSetSubmission): Promise<TrustedSubmission | null> {
-  if (input.mode !== 'toefl_listen_choose_response') return { items: input.items, entries: input.entries };
-  if (!input.bankGroupId) return null;
-  const plan = await loadPlan(input.bankGroupId, ToeflChooseResponsePlanSchema);
-  if (!plan.ok) return null;
-  const items = toClosedItems(plan.data, input.bankGroupId);
-  return { items, entries: keyEntriesFromBank(items, input.entries) };
-}
+type BankGrader = (groupId: string, entries: ClosedEntry[]) => Promise<TrustedSubmission | null>;
+
+const BANK_GRADERS: Record<ClosedSetMode, BankGrader> = {
+  toefl_listen_choose_response: async (groupId, entries) => {
+    const plan = await loadPlan(groupId, ToeflChooseResponsePlanSchema);
+    if (!plan.ok) return null;
+    const items = toClosedItems(plan.data, groupId);
+    return { items, entries: keyEntriesFromBank(items, entries) };
+  },
+  toefl_writing_build_sentence: async (groupId, entries) => {
+    const plan = await loadPlan(groupId, ToeflBuildSentencePlanSchema);
+    if (!plan.ok) return null;
+    const items = toBuildSentenceItems(plan.data, groupId);
+    return { items, entries: sentenceEntriesFromBank(items, entries) };
+  },
+};
 
 /**
- * @param input - mode, items shown and the answers given
+ * @param input - mode, bank group and the answers given
  * @returns graded results; the session is created here, on the first turn, and closed with its 0-10 grade
  */
 export async function submitClosedSetAction(input: ClosedSetSubmission): Promise<ClosedSetOutcome | { error: string }> {
   if (!CLOSED_SET_MODES.includes(input.mode) || input.entries.length === 0) return { error: 'invalid_submission' };
-  const trusted = await trustedSubmission(input);
+  const trusted = input.bankGroupId ? await BANK_GRADERS[input.mode](input.bankGroupId, input.entries) : null;
   if (!trusted) return { error: 'invalid_submission' };
   const results = scoreClosedEntries(trusted.entries);
   const completed = await completeActivity({

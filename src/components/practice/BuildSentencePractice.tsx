@@ -110,7 +110,6 @@ export function BuildSentencePractice({
     void submit({
       mode: 'toefl_writing_build_sentence',
       bankGroupId,
-      items,
       entries: items.map((item, index) => ({
         id: item.id,
         selected: results[index]?.ordered_tokens.join(' ') ?? '',
