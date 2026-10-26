@@ -3,6 +3,8 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const VALID_CEFR_BANDS = ["pre_a1", "a1", "a2", "b1", "b2"] as const;
 const VALID_CONFIDENCE = ["low", "medium", "high"] as const;
+const DEFAULT_TEXT_MODEL = "gemini-3-flash-preview";
+const TEXT_MODEL = Deno.env.get("GEMINI_TEXT_MODEL")?.trim() || DEFAULT_TEXT_MODEL;
 
 type CefrBand = typeof VALID_CEFR_BANDS[number];
 type Confidence = typeof VALID_CONFIDENCE[number];
@@ -202,7 +204,7 @@ async function processSpeaking(
     },
   ];
 
-  const rawText = await callGeminiRaw(geminiKey, "gemini-2.5-flash", contents, responseSchema);
+  const rawText = await callGeminiRaw(geminiKey, TEXT_MODEL, contents, responseSchema);
   if (!rawText) throw new Error("Empty response from Gemini");
 
   const parsed = JSON.parse(rawText) as SpeakingEvalResult;
@@ -300,7 +302,7 @@ async function processWriting(
     { role: "user", parts: [{ text: promptText }] },
   ];
 
-  const rawText = await callGeminiRaw(geminiKey, "gemini-2.5-flash", contents, responseSchema);
+  const rawText = await callGeminiRaw(geminiKey, TEXT_MODEL, contents, responseSchema);
   if (!rawText) throw new Error("Empty response from Gemini");
 
   const parsed = JSON.parse(rawText) as WritingEvalResult;
