@@ -64,5 +64,8 @@
   "criterionPronunciation": "Pronunciation",
   "criterionFluency": "Fluency",
   "criterionGrammar": "Grammar",
-  "criterionVocabulary": "Vocabulary"
+  "criterionVocabulary": "Vocabulary",
+  "testEvaluating": "Evaluating",
+  "testFailed": "We couldn't evaluate your last test. It doesn't count. Take it again.",
+  "testNone": "No test yet"
 }

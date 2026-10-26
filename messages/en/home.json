@@ -19,7 +19,11 @@
   },
   "assessmentInvite": {
     "pendingTitle": "Bob is evaluating your test",
-    "pendingBody": "This can take a few minutes. You can keep practicing with your current level while you wait."
+    "pendingBody": "This can take a few minutes. You can keep practicing with your current level while you wait.",
+    "failedTitle": "We couldn't evaluate your test",
+    "failedBody": "Something went wrong on our side, so this test doesn't count towards your level. You can take it again.",
+    "failedBodyCooldown": "Something went wrong on our side, so this test doesn't count towards your level. You can take it again when the button below is available.",
+    "failedRetry": "Take the test again"
   },
   "confirmLeave": {
     "title": "Leave the assessment?",

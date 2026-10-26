@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { parseModelJson } from "../../../src/lib/llm/parse-model-json.ts";
 
 const VALID_CEFR_BANDS = ["pre_a1", "a1", "a2", "b1", "b2"] as const;
 const VALID_CONFIDENCE = ["low", "medium", "high"] as const;
@@ -119,7 +120,7 @@ async function processWriting(
   const rawText = await callGeminiRaw(geminiKey, TEXT_MODEL, contents, responseSchema);
   if (!rawText) throw new Error("Empty response from Gemini");
 
-  const parsed = JSON.parse(rawText) as WritingEvalResult;
+  const parsed = parseModelJson(rawText) as WritingEvalResult;
 
   if (!VALID_CEFR_BANDS.includes(parsed.cefr_band) || !VALID_CONFIDENCE.includes(parsed.confidence)) {
     throw new Error(`Invalid band/confidence: ${parsed.cefr_band} / ${parsed.confidence}`);
