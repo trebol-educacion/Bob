@@ -24,6 +24,7 @@ import {
 import { useOrganization } from '@/hooks/useOrganization';
 import { SkillPath, type SkillPathSkill } from './SkillPath';
 import { ProgressOverview, type OverviewSkill } from './ProgressOverview';
+import { SpeakingEvolution } from './SpeakingEvolution';
 import { ChallengeAttemptsList } from './challenge/ChallengeAttemptsList';
 
 interface Props {
@@ -304,6 +305,27 @@ export function StudentStatsPanel({ onBack, onTakeAssessment, onChangeLevel, onL
             goldBadges={derived.goldBadges}
             levelsCompleted={levelsCompleted}
             skills={overviewSkills}
+          />
+        )}
+
+        {hasData && stats && (
+          <SpeakingEvolution
+            series={stats.speaking_series}
+            criteria={stats.speaking_criteria}
+            labels={{
+              title: t('evolutionTitle'),
+              subtitle: t('evolutionSubtitle'),
+              empty: t('evolutionEmpty'),
+              needMore: t('evolutionNeedMore'),
+              byCriterion: t('evolutionByCriterion'),
+              chartLabel: t('evolutionChartLabel'),
+              criteria: {
+                pronunciation: t('criterionPronunciation'),
+                fluency: t('criterionFluency'),
+                grammar: t('criterionGrammar'),
+                vocabulary: t('criterionVocabulary'),
+              },
+            }}
           />
         )}
 

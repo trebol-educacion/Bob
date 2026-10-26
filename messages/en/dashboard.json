@@ -54,5 +54,15 @@
   "overviewBySkill": "Progress by skill",
   "overviewStars": "Stars earned",
   "overviewLevels": "Levels completed",
-  "overviewNoData": "Practise a little to see your activity here."
+  "overviewNoData": "Practise a little to see your activity here.",
+  "evolutionTitle": "Your speaking evolution",
+  "evolutionSubtitle": "Grade of each speaking attempt, from 0 to 10",
+  "evolutionEmpty": "Complete a speaking activity to see your evolution here.",
+  "evolutionNeedMore": "Complete at least 3 attempts to see your curve.",
+  "evolutionByCriterion": "Average by criterion",
+  "evolutionChartLabel": "Line chart of your speaking grades over time",
+  "criterionPronunciation": "Pronunciation",
+  "criterionFluency": "Fluency",
+  "criterionGrammar": "Grammar",
+  "criterionVocabulary": "Vocabulary"
 }
