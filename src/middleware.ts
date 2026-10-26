@@ -1,10 +1,11 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { isServiceAuthRoute } from '@/lib/auth/service-auth-routes'
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  if (pathname.startsWith('/api/challenge/pregenerate')) {
+  if (isServiceAuthRoute(pathname)) {
     return NextResponse.next({ request })
   }
 
