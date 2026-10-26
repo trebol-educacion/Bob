@@ -6,7 +6,13 @@ import { createSupabaseBrowser } from '@/lib/supabase/browser-client';
 import { resolveEnabledModes } from '@/lib/modes';
 import { hasFreePracticeCards } from '@/lib/free-practice';
 import { detectSustainedImprovementAction } from '@/actions/skills';
-import { getPendingAssessmentsAction, type PendingAssessmentsMap } from '@/actions/assessment';
+import {
+  getAssessmentQueueStatusAction,
+  type AssessmentQueueStatus,
+  type FailedAssessmentsMap,
+  type PendingAssessmentsMap,
+} from '@/actions/assessment';
+import { emptyAssessmentQueueStatus } from '@/lib/assessment/queue-status';
 import { loadOrganizationData } from '@/lib/organization/load-organization';
 import { mapSkillLevelRows, type RawSkillLevelRow } from '@/lib/organization/skill-levels';
 import { computeEnabledModes } from '@/lib/organization/enabled-modes';
@@ -34,6 +40,7 @@ interface OrganizationContextValue {
   freeTrackAvailable: boolean;
   assessmentCooldownDays: number;
   pendingAssessments: PendingAssessmentsMap;
+  failedAssessments: FailedAssessmentsMap;
   sustainedImprovementDetected: boolean | null;
   checkSustainedImprovement: () => void;
   cefrActiveLevel: CefrLevel | null;
@@ -60,7 +67,8 @@ const OrganizationContext = createContext<OrganizationContextValue>({
   freeTrackAvailable: false,
   setTrack: () => {},
   assessmentCooldownDays: 7,
-  pendingAssessments: { speaking: null, listening: null, reading: null, writing: null },
+  pendingAssessments: emptyAssessmentQueueStatus().pending,
+  failedAssessments: emptyAssessmentQueueStatus().failed,
   sustainedImprovementDetected: null,
   checkSustainedImprovement: () => {},
   cefrActiveLevel: null,
@@ -87,9 +95,7 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
   const [accessDenialReason, setAccessDenialReason] = useState<BobAccessDenialReason | null>(null);
   const [skillLevels, setSkillLevels] = useState<SkillLevelMap | null>(null);
   const [assessmentCooldownDays, setAssessmentCooldownDays] = useState<number>(7);
-  const [pendingAssessments, setPendingAssessments] = useState<PendingAssessmentsMap>({
-    speaking: null, listening: null, reading: null, writing: null,
-  });
+  const [assessmentQueueStatus, setAssessmentQueueStatus] = useState<AssessmentQueueStatus>(emptyAssessmentQueueStatus);
   const [track, setTrack] = useState<PracticeTrack>('official');
   const [selectedSkill, setSelectedSkillState] = useState<Skill | null>(() => {
     if (typeof window !== 'undefined') {
@@ -156,7 +162,7 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
         setAllDynamicCards(bundle.allDynamicCards);
         setEnabledModes(bundle.enabledModes);
         setAvailableModes(bundle.availableModes);
-        void getPendingAssessmentsAction().then(setPendingAssessments);
+        void getAssessmentQueueStatusAction().then(setAssessmentQueueStatus);
       } catch (err) {
         console.error('[OrganizationContext] Unexpected error loading org data:', err);
       } finally {
@@ -176,7 +182,7 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
       if (!userId || disposed) return;
 
       const refreshAll = () => {
-        void getPendingAssessmentsAction().then(setPendingAssessments);
+        void getAssessmentQueueStatusAction().then(setAssessmentQueueStatus);
         void (async () => {
           const { data: rows } = await supabase
             .from('skill_levels')
@@ -254,8 +260,7 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
   }, [cachedUserId]);
 
   const refreshPendingAssessments = useCallback(async () => {
-    const data = await getPendingAssessmentsAction();
-    setPendingAssessments(data);
+    setAssessmentQueueStatus(await getAssessmentQueueStatusAction());
   }, []);
 
   const checkSustainedImprovement = useCallback(() => {
@@ -307,7 +312,8 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
       setTrack,
       freeTrackAvailable,
       assessmentCooldownDays,
-      pendingAssessments,
+      pendingAssessments: assessmentQueueStatus.pending,
+      failedAssessments: assessmentQueueStatus.failed,
       sustainedImprovementDetected,
       checkSustainedImprovement,
       cefrActiveLevel,

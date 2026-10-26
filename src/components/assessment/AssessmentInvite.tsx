@@ -7,6 +7,7 @@ import { ArrowLeft, Headphones, Mic2, BookOpen, PenLine, Hourglass } from 'lucid
 import { useOrganization } from '@/hooks/useOrganization';
 import { resolveEffectiveLevel } from '@/lib/levels/effective-level';
 import { resolveLevelPolicy } from '@/lib/levels/level-policy';
+import { AssessmentFailedNotice } from './AssessmentFailedNotice';
 import type { Skill } from '@/lib/types/skills';
 import type { CefrLevel } from '@/lib/types/practice';
 
@@ -91,7 +92,9 @@ const SKILL_LABEL: Record<Skill, string> = {
 
 /** Invitation screen shown when a student has no level (or is re-evaluating) for a skill. */
 export function AssessmentInvite({ skill, onStartAssessment, onPickLevel, onBack }: Props) {
-  const { skillLevels, assessmentCooldownDays, pendingAssessments, cefrActiveLevel, cefrLevelLocked } = useOrganization();
+  const {
+    skillLevels, assessmentCooldownDays, pendingAssessments, failedAssessments, cefrActiveLevel, cefrLevelLocked,
+  } = useOrganization();
   const t = useTranslations('home.assessmentInvite');
   const tPlacement = useTranslations('placement');
 
@@ -100,6 +103,7 @@ export function AssessmentInvite({ skill, onStartAssessment, onPickLevel, onBack
     skillLevels, cefrActiveLevel, skill, pendingAssessments, levelPolicy,
   );
   const allowManualSelection = !locked || levelPolicy.allowManualSelection;
+  const assessmentFailed = Boolean(failedAssessments[skill]);
 
   const existingLevel = skillLevels?.[skill];
   const hasExistingLevel = Boolean(existingLevel?.cefr_level);
@@ -177,6 +181,8 @@ export function AssessmentInvite({ skill, onStartAssessment, onPickLevel, onBack
               </div>
             ) : (
               <>
+                {assessmentFailed && <AssessmentFailedNotice title={t('failedTitle')} body={t('failedBody')} />}
+
                 <motion.button
                   onClick={cooldownActive ? undefined : onStartAssessment}
                   disabled={cooldownActive}
@@ -193,7 +199,7 @@ export function AssessmentInvite({ skill, onStartAssessment, onPickLevel, onBack
                     ? daysRemaining > 14 && cooldownInfo.availableAt
                       ? `Available on ${cooldownInfo.availableAt.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`
                       : `Available in ${daysRemaining} day${daysRemaining !== 1 ? 's' : ''}`
-                    : tPlacement('startButton')}
+                    : assessmentFailed ? t('failedRetry') : tPlacement('startButton')}
                 </motion.button>
 
                 {allowManualSelection && (

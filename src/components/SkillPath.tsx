@@ -16,6 +16,7 @@ import {
   Star,
   Trophy,
 } from 'lucide-react';
+import { SkillTestStatus } from './skill-path/SkillTestStatus';
 
 type SkillKey = 'speaking' | 'reading' | 'listening' | 'writing';
 
@@ -36,6 +37,7 @@ export interface SkillPathSkill {
   sessions: number;
   lastTest: string | null;
   pending: boolean;
+  failed: boolean;
   history?: Array<{ level: string; avg10: number; activities: Array<{ label: string; score10: number | null; when: string }> }>;
 }
 
@@ -348,22 +350,7 @@ export function SkillPath({
               />
             </div>
             <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1.5">
-              {skill.pending ? (
-                <span className="flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wider" style={{ color: p.c }}>
-                  <span className="inline-block w-2 h-2 rounded-full animate-pulse" style={{ background: p.c }} />
-                  Evaluating
-                </span>
-              ) : skill.lastTest ? (
-                <span
-                  className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider"
-                  style={{ background: p.soft, color: p.c }}
-                >
-                  <ClipboardList size={10} />
-                  {skill.lastTest}
-                </span>
-              ) : (
-                <span className="text-[10px] font-bold uppercase tracking-wider text-trebol-text/35">No test yet</span>
-              )}
+              <SkillTestStatus pending={skill.pending} failed={skill.failed} lastTest={skill.lastTest} color={p.c} soft={p.soft} />
 
               <div className="flex items-center gap-3 text-[11px] font-bold ml-auto">
                 {onChangeLevel && pickableLevels && (

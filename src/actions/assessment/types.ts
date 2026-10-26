@@ -40,4 +40,10 @@ export type SubmitWritingResult =
 
 export type PendingAssessmentEntry = { assessment_id: string; started_at: string | null } | null;
 export type PendingAssessmentsMap = Record<Skill, PendingAssessmentEntry>;
+export type FailedAssessmentEntry = { assessment_id: string } | null;
+export type FailedAssessmentsMap = Record<Skill, FailedAssessmentEntry>;
+export interface AssessmentQueueStatus {
+  pending: PendingAssessmentsMap;
+  failed: FailedAssessmentsMap;
+}
 

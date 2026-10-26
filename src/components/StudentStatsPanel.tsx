@@ -48,7 +48,7 @@ const SKILL_LABEL_KEY: Record<Skill, string> = {
 
 export function StudentStatsPanel({ onBack, onTakeAssessment, onChangeLevel, onLevelUp, onOpenChallenge }: Props) {
   const t = useTranslations('dashboard');
-  const { skillLevels, pendingAssessments } = useOrganization();
+  const { skillLevels, pendingAssessments, failedAssessments } = useOrganization();
   const [stats, setStats] = useState<StudentStatsResult | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -113,10 +113,11 @@ export function StudentStatsPanel({ onBack, onTakeAssessment, onChangeLevel, onL
         sessions: stat.sessions,
         lastTest: la ? `${la.cefr_band.replace('_', ' ')} · ${relativeTime(la.occurred_at)}` : null,
         pending: !!pendingAssessments[skill],
+        failed: !!failedAssessments[skill],
         history,
       };
     });
-  }, [derived, stats, skillLevels, pendingAssessments, t]);
+  }, [derived, stats, skillLevels, pendingAssessments, failedAssessments, t]);
 
   const pickableLevels = useMemo(
     () => PICKABLE_LEVELS.map((value) => ({ value, label: LEVEL_LABEL[value] })),
