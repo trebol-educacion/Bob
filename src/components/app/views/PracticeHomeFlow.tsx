@@ -12,6 +12,8 @@ import type { CefrLevel } from '@/lib/types/practice';
 import type { PracticeActivityMode } from '@/lib/practice/types';
 import type { SkillLevelMap } from '@/lib/types/skills';
 
+const TOPIC_MODES: readonly PracticeActivityMode[] = ['conversation', 'presentation'];
+
 export interface PracticeHomeFlowProps {
   appState: AppState;
   organization: Organization | null;
@@ -48,22 +50,22 @@ export function PracticeHomeFlow({
   onSessionFinished,
   onPracticeAgain,
 }: PracticeHomeFlowProps) {
-  const [choosingTopic, setChoosingTopic] = useState(false);
+  const [topicMode, setTopicMode] = useState<PracticeActivityMode | null>(null);
 
   if (appState === 'practice-mode-select') {
-    if (choosingTopic) {
+    if (topicMode) {
       return (
         <PracticeTopicSelectContainer
           skillLevels={skillLevels}
           cefrActiveLevel={cefrActiveLevel}
-          onSelectTopic={(slug) => onSelectPracticeMode('conversation', slug)}
-          onBack={() => setChoosingTopic(false)}
+          onSelectTopic={(slug) => onSelectPracticeMode(topicMode, slug)}
+          onBack={() => setTopicMode(null)}
         />
       );
     }
     return (
       <PracticeModeSelectView
-        onSelectMode={(mode) => (mode === 'conversation' ? setChoosingTopic(true) : onSelectPracticeMode(mode, null))}
+        onSelectMode={(mode) => (TOPIC_MODES.includes(mode) ? setTopicMode(mode) : onSelectPracticeMode(mode, null))}
       />
     );
   }

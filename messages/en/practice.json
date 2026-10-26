@@ -53,6 +53,10 @@
     "picture": {
       "title": "Picture",
       "subtitle": "Describe what you see and keep the story going."
+    },
+    "presentation": {
+      "title": "Presentation",
+      "subtitle": "Prepare a topic and speak for about a minute, like in a Cambridge long turn."
     }
   },
   "topicSelect": {
@@ -106,7 +110,11 @@
       "participation": "Speaking",
       "fluency": "Fluency",
       "independence": "Independence",
-      "comprehension": "Depth"
-    }
+      "comprehension": "Depth",
+      "pronunciation": "Pronunciation",
+      "grammar": "Grammar",
+      "vocabulary": "Vocabulary"
+    },
+    "notRated": "Not rated"
   }
 }

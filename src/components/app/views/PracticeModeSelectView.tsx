@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { useTranslations } from 'next-intl';
-import { MessageCircle, Compass, Image as ImageIcon } from 'lucide-react';
+import { MessageCircle, Compass, Image as ImageIcon, Presentation } from 'lucide-react';
 import { BobHeading } from '@/components/choice/BobHeading';
 import { ChoiceCard, type ChoiceCardTheme } from '@/components/choice/ChoiceCard';
 import type { PracticeActivityMode } from '@/lib/practice/types';
@@ -38,6 +38,13 @@ const MODE_THEMES: ModeTheme[] = [
     bgColor: 'bg-purple-50',
     borderColor: 'border-purple-100',
   },
+  {
+    mode: 'presentation',
+    icon: Presentation,
+    color: 'text-amber-600',
+    bgColor: 'bg-amber-50',
+    borderColor: 'border-amber-100',
+  },
 ];
 
 /** @param props PracticeModeSelectViewProps */
@@ -48,7 +55,7 @@ export function PracticeModeSelectView({ onSelectMode }: PracticeModeSelectViewP
     <div className="w-full flex-1 flex flex-col items-center justify-center py-10 px-4">
       <BobHeading size="md" className="max-w-2xl" title={t('heading')} subtitle={t('subtitle')} />
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 w-full max-w-3xl">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 w-full max-w-5xl">
         {MODE_THEMES.map((theme, index) => (
           <ChoiceCard
             key={theme.mode}

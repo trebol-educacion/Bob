@@ -1,6 +1,7 @@
 import type { TurnMessage } from '@/lib/session/lifecycle';
 import type { ChatMessage } from '@/actions/gemini/types';
 import type { PracticeTurnSignal } from '@/lib/grading/practice-rubric';
+import { readTurnCriteria } from '@/lib/grading/practice-criteria';
 import type { PracticeRubricDetail } from './types';
 
 export const PRACTICE_KIND = {
@@ -102,7 +103,9 @@ function kindOf(message: StoredPracticeMessage): unknown {
 
 function toSignal(json: Record<string, unknown> | null | undefined): PracticeTurnSignal {
   const score = json?.turnScore;
+  const criteria = readTurnCriteria(json?.criteria);
   return {
+    ...(criteria ? { criteria } : {}),
     hasAudio: json?.hasAudio === true,
     hintUsed: json?.hintUsed === true,
     modelAnswerUsed: json?.modelAnswerUsed === true,
@@ -110,17 +113,33 @@ function toSignal(json: Record<string, unknown> | null | undefined): PracticeTur
   };
 }
 
+function numberOr(value: unknown, fallback: number): number {
+  return typeof value === 'number' ? value : fallback;
+}
+
+function toDetail(raw: Record<string, unknown>): PracticeRubricDetail {
+  if ('grammar' in raw && 'vocabulary' in raw) {
+    return {
+      pronunciation: typeof raw.pronunciation === 'number' ? raw.pronunciation : null,
+      fluency: numberOr(raw.fluency, 0),
+      grammar: numberOr(raw.grammar, 0),
+      vocabulary: numberOr(raw.vocabulary, 0),
+    };
+  }
+  return {
+    participation: numberOr(raw.participation, 0),
+    fluency: numberOr(raw.fluency, 0),
+    independence: numberOr(raw.independence, 0),
+    comprehension: numberOr(raw.comprehension, 0),
+  };
+}
+
 function toResult(json: Record<string, unknown>): PracticeResultPayload | null {
-  const detail = json.rubric_detail as Partial<PracticeRubricDetail> | undefined;
-  if (typeof json.score_10 !== 'number' || !detail) return null;
+  const detail = json.rubric_detail;
+  if (typeof json.score_10 !== 'number' || typeof detail !== 'object' || detail === null) return null;
   return {
     score: json.score_10,
-    detail: {
-      participation: detail.participation ?? 0,
-      fluency: detail.fluency ?? 0,
-      independence: detail.independence ?? 0,
-      comprehension: detail.comprehension ?? 0,
-    },
+    detail: toDetail(detail as Record<string, unknown>),
     feedback: typeof json.feedback === 'string' ? json.feedback : '',
   };
 }

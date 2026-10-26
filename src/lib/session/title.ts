@@ -77,6 +77,7 @@ const FULL_TITLES: Record<string, string> = {
   practice_conversation: 'Practice · Conversation',
   practice_situation: 'Practice · Situation',
   practice_picture: 'Practice · Picture',
+  practice_presentation: 'Practice · Presentation',
 };
 
 const PART_PATTERN = /(?:_part|_p)(\d+)(?:_|$)/;

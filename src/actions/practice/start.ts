@@ -10,6 +10,8 @@ import type { PracticeActivityMode, PracticeSeed } from '@/lib/practice/types';
 import type { CefrLevel } from '@/lib/types/practice';
 import type { SkillLevelMap } from '@/lib/types/skills';
 
+const TOPIC_MODES: readonly PracticeActivityMode[] = ['conversation', 'presentation'];
+
 export interface PreparePracticeInput {
   mode: PracticeActivityMode;
   skillLevels: SkillLevelMap | null;
@@ -27,14 +29,14 @@ export interface PreparedPractice {
  * @param input.mode - practice activity chosen by the student
  * @param input.skillLevels - per-skill levels of the student
  * @param input.cefrActiveLevel - level fixed by the tenant, when locked
- * @param input.topicSlug - topic chosen by the student; only conversation accepts it, absent keeps the random seed
+ * @param input.topicSlug - topic chosen by the student; only conversation and presentation accept it, absent keeps the random seed
  * @returns effective level and the only seed of the run; creates no session and calls no LLM
  */
 export async function preparePracticeAction(input: PreparePracticeInput): Promise<ActionResult<PreparedPractice>> {
   if (!(input.mode in MODE_PROMPT_KEY)) return fail('invalid_mode');
   const level = resolvePracticeLevel(input.skillLevels, input.cefrActiveLevel);
   if (!input.topicSlug) return ok({ mode: input.mode, level, seed: pickPracticeSeed(input.mode) });
-  if (input.mode !== 'conversation') return fail('invalid_topic');
+  if (!TOPIC_MODES.includes(input.mode)) return fail('invalid_topic');
 
   const topics = await fetchPracticeTopics(level, input.topicSlug);
   if (!topics) return fail('topics_unavailable', true);

@@ -1,6 +1,6 @@
 import type { CefrLevel } from '@/lib/types/practice';
 
-export type PracticeActivityMode = 'conversation' | 'situation' | 'picture';
+export type PracticeActivityMode = 'conversation' | 'situation' | 'picture' | 'presentation';
 
 export interface PracticeSeed {
   angle: string;
@@ -9,11 +9,28 @@ export interface PracticeSeed {
   topic: string;
 }
 
-export interface PracticeRubricDetail {
+export interface PracticeLegacyRubricDetail {
   participation: number;
   fluency: number;
   independence: number;
   comprehension: number;
+}
+
+export interface PracticeCriteriaRubricDetail {
+  pronunciation: number | null;
+  fluency: number;
+  grammar: number;
+  vocabulary: number;
+}
+
+export type PracticeRubricDetail = PracticeLegacyRubricDetail | PracticeCriteriaRubricDetail;
+
+/**
+ * @param detail - rubric detail stored with a practice session
+ * @returns true when it carries the four-criteria format
+ */
+export function isCriteriaDetail(detail: PracticeRubricDetail): detail is PracticeCriteriaRubricDetail {
+  return 'grammar' in detail && 'vocabulary' in detail;
 }
 
 export interface PracticeSession {

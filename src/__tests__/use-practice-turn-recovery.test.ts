@@ -3,10 +3,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { act, renderHook, waitFor } from '@testing-library/react';
 
 vi.mock('@/actions/gemini', () => ({
-  chatConversationAction: vi.fn(),
-  chatTextConversationAction: vi.fn(),
   suggestStudentAnswerAction: vi.fn(),
   generateSpeechAction: vi.fn(),
+}));
+
+vi.mock('@/actions/practice/chat', () => ({
+  practiceChatAudioAction: vi.fn(),
+  practiceChatTextAction: vi.fn(),
 }));
 
 vi.mock('@/actions/practice/turn', () => ({
@@ -25,7 +28,8 @@ vi.mock('@/lib/audio', async (importOriginal) => {
   };
 });
 
-import { chatConversationAction, chatTextConversationAction, generateSpeechAction } from '@/actions/gemini';
+import { generateSpeechAction } from '@/actions/gemini';
+import { practiceChatAudioAction, practiceChatTextAction } from '@/actions/practice/chat';
 import { usePracticeTurn } from '@/hooks/practice/usePracticeTurn';
 
 const SEED = { angle: 'a', character: 'a friend', tone: 'warm', topic: 'a warm chat' };
@@ -52,7 +56,7 @@ describe('usePracticeTurn · recuperacion visible del turno', () => {
   it('al soltar el micro aparece de inmediato la burbuja de procesando y el indicador de que Bob esta pensando', async () => {
     let resolveChat: (v: ChatResult) => void = () => {};
     (generateSpeechAction as ReturnType<typeof vi.fn>).mockResolvedValue({ data: '', mimeType: 'audio/L16;rate=24000' });
-    (chatConversationAction as ReturnType<typeof vi.fn>).mockImplementation(
+    (practiceChatAudioAction as ReturnType<typeof vi.fn>).mockImplementation(
       () => new Promise((resolve) => { resolveChat = resolve; })
     );
 
@@ -81,7 +85,7 @@ describe('usePracticeTurn · recuperacion visible del turno', () => {
   it('el microfono queda bloqueado mientras hay un turno en curso: una segunda llamada no dispara una segunda peticion', async () => {
     let resolveChat: (v: ChatResult) => void = () => {};
     (generateSpeechAction as ReturnType<typeof vi.fn>).mockResolvedValue({ data: '', mimeType: 'audio/L16;rate=24000' });
-    (chatConversationAction as ReturnType<typeof vi.fn>).mockImplementation(
+    (practiceChatAudioAction as ReturnType<typeof vi.fn>).mockImplementation(
       () => new Promise((resolve) => { resolveChat = resolve; })
     );
 
@@ -96,7 +100,7 @@ describe('usePracticeTurn · recuperacion visible del turno', () => {
       await result.current.handleSendAudio(new Blob(['audio-2'], { type: 'audio/webm' }));
     });
 
-    await waitFor(() => expect(chatConversationAction).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(practiceChatAudioAction).toHaveBeenCalledTimes(1));
 
     resolveChat({
       ai_response: 'Nice one!',
@@ -110,7 +114,7 @@ describe('usePracticeTurn · recuperacion visible del turno', () => {
     try {
       let resolveChat: (v: ChatResult) => void = () => {};
       (generateSpeechAction as ReturnType<typeof vi.fn>).mockResolvedValue({ data: '', mimeType: 'audio/L16;rate=24000' });
-      (chatTextConversationAction as ReturnType<typeof vi.fn>).mockImplementation(
+      (practiceChatTextAction as ReturnType<typeof vi.fn>).mockImplementation(
         () => new Promise((resolve) => { resolveChat = resolve; })
       );
 
@@ -148,7 +152,7 @@ describe('usePracticeTurn · recuperacion visible del turno', () => {
 
   it('fallo al enviar: el error sale en linea con reintento y el reintento reenvia el mismo turno sin perderlo', async () => {
     (generateSpeechAction as ReturnType<typeof vi.fn>).mockResolvedValue({ data: '', mimeType: 'audio/L16;rate=24000' });
-    (chatTextConversationAction as ReturnType<typeof vi.fn>)
+    (practiceChatTextAction as ReturnType<typeof vi.fn>)
       .mockRejectedValueOnce(new Error('network down'))
       .mockResolvedValueOnce({
         ai_response: 'Nice one!',
@@ -174,7 +178,7 @@ describe('usePracticeTurn · recuperacion visible del turno', () => {
 
     await waitFor(() => expect(result.current.errorMessage).toBeNull());
     await waitFor(() => expect(result.current.messages).toHaveLength(3));
-    expect(chatTextConversationAction).toHaveBeenCalledTimes(2);
+    expect(practiceChatTextAction).toHaveBeenCalledTimes(2);
     expect(result.current.canRetry).toBe(false);
   });
 

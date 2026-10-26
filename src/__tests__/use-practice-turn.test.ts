@@ -3,10 +3,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { act, renderHook, waitFor } from '@testing-library/react';
 
 vi.mock('@/actions/gemini', () => ({
-  chatConversationAction: vi.fn(),
-  chatTextConversationAction: vi.fn(),
   suggestStudentAnswerAction: vi.fn(),
   generateSpeechAction: vi.fn(),
+}));
+
+vi.mock('@/actions/practice/chat', () => ({
+  practiceChatAudioAction: vi.fn(),
+  practiceChatTextAction: vi.fn(),
 }));
 
 vi.mock('@/actions/practice/turn', () => ({
@@ -17,7 +20,8 @@ vi.mock('@/actions/practice/image', () => ({
   generatePracticeImageAction: vi.fn().mockResolvedValue({ ok: false, imageUrl: null, prompt: null }),
 }));
 
-import { chatTextConversationAction, generateSpeechAction, suggestStudentAnswerAction } from '@/actions/gemini';
+import { generateSpeechAction, suggestStudentAnswerAction } from '@/actions/gemini';
+import { practiceChatTextAction } from '@/actions/practice/chat';
 import { generatePracticeImageAction } from '@/actions/practice/image';
 import { recordPracticeTurnAction } from '@/actions/practice/turn';
 import { usePracticeTurn } from '@/hooks/practice/usePracticeTurn';
@@ -77,7 +81,7 @@ describe('usePracticeTurn', () => {
 
   it('un turno de texto registra la señal de rubrica y persiste con await antes de mostrarse', async () => {
     (generateSpeechAction as ReturnType<typeof vi.fn>).mockResolvedValue({ data: '', mimeType: 'audio/L16;rate=24000' });
-    (chatTextConversationAction as ReturnType<typeof vi.fn>).mockResolvedValue({
+    (practiceChatTextAction as ReturnType<typeof vi.fn>).mockResolvedValue({
       evaluation: { score: 80, feedback: 'good', transcribed_text: 'hi' },
       ai_response: 'Nice to meet you!',
     });
@@ -107,7 +111,7 @@ describe('usePracticeTurn', () => {
 
   it('primer turno sin sesion: la persistencia la crea y avisa con onSessionCreated, el siguiente turno la reutiliza', async () => {
     (generateSpeechAction as ReturnType<typeof vi.fn>).mockResolvedValue({ data: '', mimeType: 'audio/L16;rate=24000' });
-    (chatTextConversationAction as ReturnType<typeof vi.fn>).mockResolvedValue({
+    (practiceChatTextAction as ReturnType<typeof vi.fn>).mockResolvedValue({
       evaluation: { score: 80, feedback: 'good', transcribed_text: 'hi' },
       ai_response: 'Nice!',
     });
@@ -142,7 +146,7 @@ describe('usePracticeTurn', () => {
 
   it('si la persistencia falla el turno no se muestra, sale el error con reintento y no se pierden las ayudas usadas', async () => {
     (generateSpeechAction as ReturnType<typeof vi.fn>).mockResolvedValue({ data: '', mimeType: 'audio/L16;rate=24000' });
-    (chatTextConversationAction as ReturnType<typeof vi.fn>).mockResolvedValue({
+    (practiceChatTextAction as ReturnType<typeof vi.fn>).mockResolvedValue({
       evaluation: { score: 80, feedback: 'good', transcribed_text: 'hi' },
       ai_response: 'Nice!',
     });
@@ -166,7 +170,7 @@ describe('usePracticeTurn', () => {
   it('Show me an answer: pide una respuesta modelo ya interpretada, nunca JSON crudo, y marca el turno como asistido', async () => {
     (generateSpeechAction as ReturnType<typeof vi.fn>).mockResolvedValue({ data: '', mimeType: 'audio/L16;rate=24000' });
     (suggestStudentAnswerAction as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, answer: "You're very welcome!" });
-    (chatTextConversationAction as ReturnType<typeof vi.fn>).mockResolvedValue({
+    (practiceChatTextAction as ReturnType<typeof vi.fn>).mockResolvedValue({
       evaluation: { score: 90, feedback: 'good', transcribed_text: "You're very welcome!" },
       ai_response: 'Glad to hear it!',
     });
@@ -195,7 +199,7 @@ describe('usePracticeTurn', () => {
     vi.useFakeTimers();
     try {
       (generateSpeechAction as ReturnType<typeof vi.fn>).mockResolvedValue({ data: 'AAAA', mimeType: 'audio/L16;rate=24000' });
-      (chatTextConversationAction as ReturnType<typeof vi.fn>).mockResolvedValue({
+      (practiceChatTextAction as ReturnType<typeof vi.fn>).mockResolvedValue({
         evaluation: { score: 80, feedback: 'good', transcribed_text: 'hi' },
         ai_response: 'Nice to meet you!',
       });
@@ -244,7 +248,7 @@ describe('usePracticeTurn', () => {
     vi.useFakeTimers();
     try {
       (generateSpeechAction as ReturnType<typeof vi.fn>).mockResolvedValue({ data: 'AAAA', mimeType: 'audio/L16;rate=24000' });
-      (chatTextConversationAction as ReturnType<typeof vi.fn>).mockResolvedValue({
+      (practiceChatTextAction as ReturnType<typeof vi.fn>).mockResolvedValue({
         evaluation: { score: 80, feedback: 'good', transcribed_text: 'hi' },
         ai_response: 'Sure, go on.',
       });

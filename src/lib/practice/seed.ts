@@ -6,6 +6,7 @@ export interface PracticeSeedPools {
   tones: string[];
   situationTopics: string[];
   pictureTopics: string[];
+  presentationTopics: string[];
 }
 
 export const DEFAULT_PRACTICE_SEED_POOLS: PracticeSeedPools = {
@@ -41,6 +42,14 @@ export const DEFAULT_PRACTICE_SEED_POOLS: PracticeSeedPools = {
     'a beach on a sunny day',
     'an airport departure hall',
   ],
+  presentationTopics: [
+    'your favourite way to spend a free weekend',
+    'a place you would like to visit and why',
+    'a person who has inspired you',
+    'a hobby you enjoy and how you started it',
+    'how technology helps people learn',
+    'a tradition from your family or country',
+  ],
 };
 
 /**
@@ -65,7 +74,9 @@ export function pickPracticeSeed(
       ? pick(pools.situationTopics)
       : mode === 'picture'
         ? pick(pools.pictureTopics)
-        : `a ${tone} chat with ${character}, with ${angle}`;
+        : mode === 'presentation'
+          ? pick(pools.presentationTopics)
+          : `a ${tone} chat with ${character}, with ${angle}`;
 
   return { angle, character, tone, topic };
 }

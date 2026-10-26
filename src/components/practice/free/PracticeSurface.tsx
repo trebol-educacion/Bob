@@ -97,7 +97,11 @@ export function PracticeSurface({
           fluency: t('finished.criteria.fluency'),
           independence: t('finished.criteria.independence'),
           comprehension: t('finished.criteria.comprehension'),
+          pronunciation: t('finished.criteria.pronunciation'),
+          grammar: t('finished.criteria.grammar'),
+          vocabulary: t('finished.criteria.vocabulary'),
         },
+        notRated: t('finished.notRated'),
       }}
       onRestart={onRestart}
       onExit={onExit}
