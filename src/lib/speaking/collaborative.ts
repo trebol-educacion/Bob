@@ -5,6 +5,8 @@ import { getPrompt } from '@/lib/prompts/db-prompts';
 import { finishSession, openSession, recordTurn, type TurnMessage } from '@/lib/session/lifecycle';
 import { fail, ok, type ActionResult } from '@/lib/result';
 import { getOrCreateCachedContent } from '@/lib/cache';
+import type { CacheKey } from '@/lib/cache-keys';
+import type { BobDbClient } from '@/lib/supabase/admin';
 import { parseJsonResult } from '@/lib/llm/parse-json-result';
 import { callGemini, safeParseFallback } from '@/lib/gemini-client';
 import { toExaminerFeedback } from './examiner-score';
@@ -20,6 +22,7 @@ export interface CollaborativeConfig {
   mode: string;
   promptPrefix: string;
   scenarioCacheKey: string;
+  scenarioPoolSize?: number;
   scenarioFallback: Part3Scenario;
   examLabel: string;
   logTag: string;
@@ -106,13 +109,63 @@ function partnerTurnPrompt(config: CollaborativeConfig, history: Part3ChatMessag
   });
 }
 
-export async function generateCollaborativeScenario(config: CollaborativeConfig): Promise<Part3Scenario> {
+/**
+ * @param scenario Part3Scenario
+ * @returns whether the value has the stored scenario shape, regardless of the parsing schema
+ */
+export function isStoredScenario(scenario: unknown): boolean {
+  return Part3ScenarioSchema.safeParse(scenario).success;
+}
+
+export const COLLABORATIVE_SCENARIO_POOL_SIZE = 6;
+
+export interface CollaborativeScenarioOptions {
+  variant?: number;
+  client?: BobDbClient;
+}
+
+/**
+ * @param config CollaborativeConfig
+ * @param random () => number
+ * @returns variant index within the config scenario pool
+ */
+export function pickScenarioVariant(config: CollaborativeConfig, random: () => number = Math.random): number {
+  return Math.floor(random() * (config.scenarioPoolSize ?? COLLABORATIVE_SCENARIO_POOL_SIZE));
+}
+
+/**
+ * @param config CollaborativeConfig
+ * @param variant number
+ * @returns cache key for that scenario variant
+ */
+export function collaborativeScenarioKey(config: CollaborativeConfig, variant: number): CacheKey {
+  return { kind: 'plan', promptKey: config.scenarioCacheKey, inputs: { variant } };
+}
+
+/**
+ * @param config CollaborativeConfig
+ * @returns every scenario variant index for the config
+ */
+export function scenarioVariants(config: CollaborativeConfig): number[] {
+  const size = config.scenarioPoolSize ?? COLLABORATIVE_SCENARIO_POOL_SIZE;
+  return Array.from({ length: size }, (_, index) => index);
+}
+
+/**
+ * @param config CollaborativeConfig
+ * @param options CollaborativeScenarioOptions
+ * @returns cached or freshly generated scenario, or an error object
+ */
+export async function loadCollaborativeScenario(
+  config: CollaborativeConfig,
+  options: CollaborativeScenarioOptions = {},
+): Promise<Part3Scenario | { error: string }> {
   const generationKey = `${config.promptPrefix}_generation`;
   const scenarioSchema = config.scenarioSchema ?? Part3ScenarioSchema;
-  const cached = await getOrCreateCachedContent<Part3Scenario>(
-    { kind: 'plan', promptKey: config.scenarioCacheKey, inputs: {} },
+  return getOrCreateCachedContent<Part3Scenario>(
+    collaborativeScenarioKey(config, options.variant ?? pickScenarioVariant(config)),
     async () => {
-      const promptText = await getPrompt(generationKey);
+      const promptText = await getPrompt(generationKey, undefined, options.client);
       const result = await callGemini(
         { promptKey: generationKey, model: MODELS.FLASH_LITE_PREVIEW },
         (ai) => ai.models.generateContent({
@@ -124,8 +177,15 @@ export async function generateCollaborativeScenario(config: CollaborativeConfig)
 
       return parseJsonResult<Part3Scenario>(result, scenarioSchema, 'generatePart3ScenarioAction');
     },
-    { storeAs: 'json', validate: (scenario) => scenarioSchema.safeParse(scenario).success }
+    { storeAs: 'json', validate: isStoredScenario, client: options.client }
   );
+}
+
+export async function generateCollaborativeScenario(
+  config: CollaborativeConfig,
+  options: CollaborativeScenarioOptions = {},
+): Promise<Part3Scenario> {
+  const cached = await loadCollaborativeScenario(config, options);
 
   if ('error' in cached) {
     console.error(JSON.stringify({ event: 'generatePart3ScenarioAction_cache', error: cached.error }));
