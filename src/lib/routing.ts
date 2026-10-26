@@ -18,6 +18,7 @@ import { PETDiscussionPractice } from '@/components/PETDiscussionPractice';
 import { ToeflListenRepeatPractice } from '@/components/ToeflListenRepeatPractice';
 import { ToeflInterviewPractice } from '@/components/ToeflInterviewPractice';
 import { ListenChooseResponsePractice } from '@/components/practice/ListenChooseResponsePractice';
+import { OfficialListeningPractice } from '@/components/practice/toefl-listening/OfficialListeningPractice';
 import { BuildSentencePractice } from '@/components/practice/BuildSentencePractice';
 import { EmailWritingPractice } from '@/components/practice/EmailWritingPractice';
 import { AcademicWritingPractice } from '@/components/practice/AcademicWritingPractice';
@@ -163,6 +164,18 @@ export const EXAM_PART_COMPONENT_MAP: Record<ModeKey, RouteEntry> = {
   toefl_listen_choose_response: {
     appState: 'exam-practicing',
     render: (p) => React.createElement(ListenChooseResponsePractice, { ...p }),
+  },
+  toefl_listening_conversation: {
+    appState: 'exam-practicing',
+    render: (p) => React.createElement(OfficialListeningPractice, { key: ylInstanceKey(p), part: 'toefl_listening_conversation', ...p }),
+  },
+  toefl_listening_announcement: {
+    appState: 'exam-practicing',
+    render: (p) => React.createElement(OfficialListeningPractice, { key: ylInstanceKey(p), part: 'toefl_listening_announcement', ...p }),
+  },
+  toefl_listening_academic_talk: {
+    appState: 'exam-practicing',
+    render: (p) => React.createElement(OfficialListeningPractice, { key: ylInstanceKey(p), part: 'toefl_listening_academic_talk', ...p }),
   },
   toefl_writing_build_sentence: {
     appState: 'exam-practicing',

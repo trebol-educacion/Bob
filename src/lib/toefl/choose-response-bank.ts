@@ -6,10 +6,6 @@ export const CHOOSE_RESPONSE_PART = 'listen_choose_response';
 
 const QUESTION = 'Choose the best response.';
 
-function toPlayableUrl(audioUrl: string): string {
-  return audioUrl.startsWith('/') ? resolveListeningAudioUrl(audioUrl) : audioUrl;
-}
-
 /**
  * @param plan - stored Listen and Choose a Response set
  * @param groupId - bank group the set came from
@@ -22,7 +18,7 @@ export function toClosedItems(plan: ToeflChooseResponsePlan, groupId: string): C
     exam_part: CHOOSE_RESPONSE_PART,
     cefr_level: 'b1',
     variant_id: `${groupId}-q${index + 1}`,
-    stimulus_audio_url: toPlayableUrl(item.audio_url),
+    stimulus_audio_url: resolveListeningAudioUrl(item.audio_url),
     stimulus_text: null,
     stimulus_image_url: null,
     question: QUESTION,
