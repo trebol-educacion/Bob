@@ -181,7 +181,7 @@ export function AssessmentInvite({ skill, onStartAssessment, onPickLevel, onBack
               </div>
             ) : (
               <>
-                {assessmentFailed && <AssessmentFailedNotice title={t('failedTitle')} body={t('failedBody')} />}
+                {assessmentFailed && <AssessmentFailedNotice title={t('failedTitle')} body={t(cooldownActive ? 'failedBodyCooldown' : 'failedBody')} />}
 
                 <motion.button
                   onClick={cooldownActive ? undefined : onStartAssessment}
