@@ -17,8 +17,19 @@ const storedItem = (key: string) => ({
   audio_url: '/toefl/choose-response/q.mp3',
 });
 const storedPlan = { items: ['A', 'C', 'B', 'D', 'A', 'B', 'C', 'D'].map(storedItem) };
+const storedSentence = (sentence: string, id: number) => ({
+  id,
+  structure: 'subject verb object',
+  tokens: sentence.replace('.', '').split(' '),
+  correct_sentence: sentence,
+  explanation: 'Word order.',
+});
+const storedSentencePlan = {
+  items: Array.from({ length: TOEFL_BUILD_ITEMS }, (_, index) => storedSentence(`She reads the book number ${index + 1}.`, index + 1)),
+};
 
 import { submitClosedSetAction } from '@/actions/modes/closed-set';
+import { TOEFL_BUILD_ITEMS } from '@/lib/bank-plans/toefl-build-sentence';
 import { buildClosedEvaluation, restoreClosedSet, scoreClosedEntries } from '@/lib/toefl/closed-set';
 
 beforeEach(() => {
@@ -72,7 +83,6 @@ describe('submitClosedSetAction', () => {
     const outcome = await submitClosedSetAction({
       mode: 'toefl_listen_choose_response',
       bankGroupId: 'g1',
-      items: [],
       entries: [
         { id: 'g1-q1', selected: 'A', expected: 'A', match: 'key' },
         { id: 'g1-q2', selected: 'C', expected: 'C', match: 'key' },
@@ -85,11 +95,10 @@ describe('submitClosedSetAction', () => {
     expect(outcome).toMatchObject({ sessionId: 's1' });
   });
 
-  it('ignores answer keys and items forged by the client', async () => {
+  it('ignores answer keys forged by the client and persists the stored items', async () => {
     const outcome = await submitClosedSetAction({
       mode: 'toefl_listen_choose_response',
       bankGroupId: 'g1',
-      items: [{ id: 'forged' }],
       entries: [{ id: 'g1-q1', selected: 'D', expected: 'D', match: 'key' }],
     });
     const call = completeMock.mock.calls[0][0];
@@ -101,40 +110,54 @@ describe('submitClosedSetAction', () => {
 
   it('rejects a Choose a Response submission whose bank set cannot be loaded', async () => {
     expect(
-      await submitClosedSetAction({ mode: 'toefl_listen_choose_response', items: [], entries: [{ id: 'x', selected: 'A', expected: 'A', match: 'key' }] }),
+      await submitClosedSetAction({ mode: 'toefl_listen_choose_response', entries: [{ id: 'x', selected: 'A', expected: 'A', match: 'key' }] }),
     ).toEqual({ error: 'invalid_submission' });
     loadPlanMock.mockResolvedValue({ ok: false, code: 'no_content' });
     expect(
       await submitClosedSetAction({
         mode: 'toefl_listen_choose_response',
         bankGroupId: 'gone',
-        items: [],
-        entries: [{ id: 'x', selected: 'A', expected: 'A', match: 'key' }],
+          entries: [{ id: 'x', selected: 'A', expected: 'A', match: 'key' }],
       }),
     ).toEqual({ error: 'invalid_submission' });
     expect(completeMock).not.toHaveBeenCalled();
   });
 
-  it('keeps grading Build a Sentence from the submitted entries', async () => {
-    await submitClosedSetAction({
+  it('grades Build a Sentence against the stored sentences, ignoring forged targets', async () => {
+    loadPlanMock.mockResolvedValue({ ok: true, data: storedSentencePlan });
+    const outcome = await submitClosedSetAction({
       mode: 'toefl_writing_build_sentence',
-      items: [],
-      entries: [{ id: 'x', selected: 'I like it.', expected: 'i like it', match: 'sentence' }],
+      bankGroupId: 'b1',
+      entries: [
+        { id: 'b1-1', selected: 'she reads the book number 1', expected: 'anything', match: 'sentence' },
+        { id: 'b1-2', selected: 'book the reads she', expected: 'book the reads she', match: 'sentence' },
+      ],
     });
-    expect(loadPlanMock).not.toHaveBeenCalled();
-    expect(completeMock.mock.calls[0][0].evaluation).toMatchObject({ score: 1, score_max: 1 });
+    expect(loadPlanMock).toHaveBeenCalledWith('b1', expect.anything());
+    const call = completeMock.mock.calls[0][0];
+    expect(call.evaluation).toMatchObject({ score: 1, score_max: TOEFL_BUILD_ITEMS });
+    expect(call.plan.items[1]).toMatchObject({ id: 'b1-2', target_sentence: 'She reads the book number 2.' });
+    expect(outcome).toMatchObject({ results: expect.arrayContaining([expect.objectContaining({ id: 'b1-2', correct: false })]) });
+  });
+
+  it('rejects a Build a Sentence submission without a bank set', async () => {
+    expect(
+      await submitClosedSetAction({ mode: 'toefl_writing_build_sentence', entries: [{ id: 'x', selected: 'a', expected: 'a', match: 'sentence' }] }),
+    ).toEqual({ error: 'invalid_submission' });
+    expect(completeMock).not.toHaveBeenCalled();
   });
 
   it('rejects unknown modes and empty submissions without touching the session', async () => {
-    expect(await submitClosedSetAction({ mode: 'other' as never, items: [], entries: [] })).toEqual({ error: 'invalid_submission' });
+    expect(await submitClosedSetAction({ mode: 'other' as never, entries: [] })).toEqual({ error: 'invalid_submission' });
     expect(completeMock).not.toHaveBeenCalled();
   });
 
   it('surfaces lifecycle failures', async () => {
     completeMock.mockResolvedValue({ ok: false, code: 'persist_failed', retryable: true });
+    loadPlanMock.mockResolvedValue({ ok: true, data: storedSentencePlan });
     const outcome = await submitClosedSetAction({
       mode: 'toefl_writing_build_sentence',
-      items: [],
+      bankGroupId: 'b1',
       entries: [{ id: 'x', selected: 'a', expected: 'a', match: 'sentence' }],
     });
     expect(outcome).toEqual({ error: 'persist_failed' });

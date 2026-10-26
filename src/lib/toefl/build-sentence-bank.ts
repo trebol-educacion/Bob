@@ -1,4 +1,5 @@
 import type { ToeflBuildSentencePlan } from '@/lib/bank-plans/toefl-build-sentence';
+import type { ClosedEntry } from '@/lib/toefl/closed-set';
 
 export interface BuildSentenceBankItem {
   id: string;
@@ -20,5 +21,20 @@ export function toBuildSentenceItems(plan: ToeflBuildSentencePlan, groupId: stri
     prompt: PROMPT,
     tokens: item.tokens,
     target_sentence: item.correct_sentence,
+  }));
+}
+
+/**
+ * @param items - build-a-sentence items rebuilt from the stored plan
+ * @param entries - answers sent by the client
+ * @returns one entry per stored item, matched against the stored sentence
+ */
+export function sentenceEntriesFromBank(items: BuildSentenceBankItem[], entries: ClosedEntry[]): ClosedEntry[] {
+  const selectedById = new Map(entries.map((entry) => [entry.id, entry.selected]));
+  return items.map((item) => ({
+    id: item.id,
+    selected: selectedById.get(item.id) ?? '',
+    expected: item.target_sentence,
+    match: 'sentence',
   }));
 }

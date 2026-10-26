@@ -109,7 +109,7 @@ describe('T8.5 closed comprehension flow: stimulus, answer, deterministic evalua
     }));
     expect(scoreClosedEntries(entries).filter((result) => result.correct)).toHaveLength(7);
 
-    const outcome = await submitClosedSetAction({ mode: 'toefl_listen_choose_response', items, bankGroupId: 'g1', entries });
+    const outcome = await submitClosedSetAction({ mode: 'toefl_listen_choose_response', bankGroupId: 'g1', entries });
     expect(outcome).toMatchObject({ sessionId: 's1' });
     const saved = completeMock.mock.calls[0][0];
     expect(saved.evaluation).toMatchObject({ kind: 'closed_set_evaluation', score: 7, score_max: 8 });
