@@ -9,17 +9,6 @@ const TEXT_MODEL = Deno.env.get("GEMINI_TEXT_MODEL")?.trim() || DEFAULT_TEXT_MOD
 type CefrBand = typeof VALID_CEFR_BANDS[number];
 type Confidence = typeof VALID_CONFIDENCE[number];
 
-interface SpeakingEvalResult {
-  cefr_band: CefrBand;
-  confidence: Confidence;
-  feedback: {
-    kind: string;
-    highlights: string[];
-    suggestions: string[];
-    overall_message: string;
-  };
-}
-
 interface WritingEvalResult {
   cefr_band: CefrBand;
   confidence: Confidence;
@@ -29,24 +18,6 @@ interface WritingEvalResult {
     improvements: string[];
     next_step: string;
   };
-}
-
-function confidenceToNumeric(c: Confidence): number {
-  if (c === "low") return 0.3;
-  if (c === "medium") return 0.65;
-  return 0.9;
-}
-
-function buildSpeakingEvalKey(currentLevel: string, isYl: boolean): string {
-  if (isYl) {
-    return currentLevel === "pre_a1"
-      ? "cefr_assessment_speaking_yl_pre_a1_evaluation"
-      : "cefr_assessment_speaking_yl_a1_evaluation";
-  }
-  const higherRange = currentLevel === "b1" || currentLevel === "b2";
-  return higherRange
-    ? "cefr_assessment_speaking_b1_b2_evaluation"
-    : "cefr_assessment_speaking_a1_a2_evaluation";
 }
 
 function buildWritingEvalKey(currentLevel: string): string {
@@ -107,167 +78,10 @@ async function callGeminiRaw(
   return json.candidates?.[0]?.content?.parts?.[0]?.text ?? null;
 }
 
-async function resolveCooldownUntil(
-  supabase: ReturnType<typeof createClient>,
-  userId: string,
-): Promise<string> {
-  const { data: profile } = await supabase
-    .schema("public").from("profiles")
-    .select("organization_id")
-    .eq("id", userId)
-    .maybeSingle();
-
-  let cooldownDays = 7;
-  if (profile?.organization_id) {
-    const { data: org } = await supabase
-      .schema("public").from("organizations")
-      .select("assessment_cooldown_days")
-      .eq("id", profile.organization_id)
-      .maybeSingle();
-    cooldownDays = org?.assessment_cooldown_days ?? 7;
-  }
-
-  return new Date(Date.now() + cooldownDays * 24 * 60 * 60 * 1000).toISOString();
-}
-
-async function processSpeaking(
-  supabase: ReturnType<typeof createClient>,
-  geminiKey: string,
-  queueId: string,
-  userId: string,
-  assessmentId: string,
-  sessionId: string,
-  payload: Record<string, unknown>
-): Promise<void> {
-  const currentLevel = (payload.current_level as string) ?? "a2";
-  const isYl = (payload.is_yl as boolean) ?? false;
-
-  const { data: audioMessages } = await supabase
-    .from("messages")
-    .select("content_json, content_text")
-    .eq("session_id", sessionId)
-    .eq("role", "user")
-    .filter("content_json->>assessment_id", "eq", assessmentId)
-    .order("created_at", { ascending: true });
-
-  const rows = (audioMessages ?? []) as Array<{
-    content_json: Record<string, unknown>;
-    content_text: string | null;
-  }>;
-
-  const transcripts = rows
-    .map((r, i) => `Turn ${i + 1}: ${r.content_text ?? (r.content_json.transcript as string | undefined) ?? "[no transcript]"}`)
-    .join("\n");
-
-  const evalKey = buildSpeakingEvalKey(currentLevel, isYl);
-  const promptText = await fetchPrompt(supabase, evalKey, { TRANSCRIPTS: transcripts });
-  if (!promptText) {
-    throw new Error(`Prompt not found: ${evalKey}`);
-  }
-
-  const audioParts = rows
-    .map((r) => {
-      const cj = r.content_json;
-      if (cj.audio_base64 && cj.mime_type) {
-        return { inlineData: { data: cj.audio_base64 as string, mimeType: cj.mime_type as string } };
-      }
-      return null;
-    })
-    .filter(Boolean);
-
-  const responseSchema = {
-    type: "object",
-    properties: {
-      cefr_band: { type: "string" },
-      confidence: { type: "string" },
-      feedback: {
-        type: "object",
-        properties: {
-          kind: { type: "string" },
-          highlights: { type: "array", items: { type: "string" } },
-          suggestions: { type: "array", items: { type: "string" } },
-          overall_message: { type: "string" },
-        },
-        required: ["kind", "highlights", "suggestions", "overall_message"],
-      },
-    },
-    required: ["cefr_band", "confidence", "feedback"],
-  };
-
-  const contents = [
-    {
-      role: "user",
-      parts: [
-        ...audioParts,
-        { text: promptText },
-      ],
-    },
-  ];
-
-  const rawText = await callGeminiRaw(geminiKey, TEXT_MODEL, contents, responseSchema);
-  if (!rawText) throw new Error("Empty response from Gemini");
-
-  const parsed = JSON.parse(rawText) as SpeakingEvalResult;
-
-  if (!VALID_CEFR_BANDS.includes(parsed.cefr_band) || !VALID_CONFIDENCE.includes(parsed.confidence)) {
-    throw new Error(`Invalid band/confidence: ${parsed.cefr_band} / ${parsed.confidence}`);
-  }
-
-  const confidenceNumeric = confidenceToNumeric(parsed.confidence);
-
-  try {
-    await supabase.schema("public").rpc("set_config", {
-      setting: "bob.assessment_id",
-      value: assessmentId,
-      is_local: true,
-    });
-  } catch { /* non-critical, trigger uses NULL */ }
-
-  await supabase.from("skill_levels").upsert({
-    user_id: userId,
-    skill: "speaking",
-    cefr_level: parsed.cefr_band,
-    origin: "assessment",
-    confidence: confidenceNumeric,
-    last_assessment_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  }, { onConflict: "user_id,skill" });
-
-  const cooldownUntil = await resolveCooldownUntil(supabase, userId);
-
-  await supabase
-    .from("messages")
-    .update({
-      content_json: {
-        assessment_id: assessmentId,
-        status: "done",
-        cefr_band: parsed.cefr_band,
-        confidence: parsed.confidence,
-        feedback: parsed.feedback,
-        cooldown_until: cooldownUntil,
-      },
-    })
-    .eq("session_id", sessionId)
-    .filter("content_json->>assessment_id", "eq", assessmentId)
-    .filter("content_json->>status", "eq", "pending");
-
-  await supabase
-    .from("assessment_queue")
-    .update({
-      status: "done",
-      result: { cefr_band: parsed.cefr_band, confidence: parsed.confidence, feedback: parsed.feedback },
-      completed_at: new Date().toISOString(),
-    })
-    .eq("id", queueId);
-}
-
 async function processWriting(
   supabase: ReturnType<typeof createClient>,
   geminiKey: string,
   queueId: string,
-  userId: string,
-  assessmentId: string,
-  sessionId: string,
   payload: Record<string, unknown>
 ): Promise<void> {
   const currentLevel = (payload.current_level as string) ?? "a1";
@@ -311,58 +125,14 @@ async function processWriting(
     throw new Error(`Invalid band/confidence: ${parsed.cefr_band} / ${parsed.confidence}`);
   }
 
-  const confidenceNumeric = confidenceToNumeric(parsed.confidence);
-
-  try {
-    await supabase.schema("public").rpc("set_config", {
-      setting: "bob.assessment_id",
-      value: assessmentId,
-      is_local: true,
-    });
-  } catch { /* non-critical, trigger uses NULL */ }
-
-  await supabase.from("skill_levels").upsert({
-    user_id: userId,
-    skill: "writing",
-    cefr_level: parsed.cefr_band,
-    origin: "assessment",
-    confidence: confidenceNumeric,
-    last_assessment_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  }, { onConflict: "user_id,skill" });
-
-  const cooldownUntil = await resolveCooldownUntil(supabase, userId);
-
-  await supabase
-    .from("messages")
-    .update({
-      content_json: {
-        assessment_id: assessmentId,
-        status: "done",
-        cefr_band: parsed.cefr_band,
-        confidence: parsed.confidence,
-        bullets_covered: parsed.bullets_covered,
-        feedback: parsed.feedback,
-        cooldown_until: cooldownUntil,
-      },
-    })
-    .eq("session_id", sessionId)
-    .filter("content_json->>assessment_id", "eq", assessmentId)
-    .filter("content_json->>status", "eq", "pending");
-
-  await supabase
-    .from("assessment_queue")
-    .update({
-      status: "done",
-      result: {
-        cefr_band: parsed.cefr_band,
-        confidence: parsed.confidence,
-        bullets_covered: parsed.bullets_covered,
-        feedback: parsed.feedback,
-      },
-      completed_at: new Date().toISOString(),
-    })
-    .eq("id", queueId);
+  const { error } = await supabase.rpc("apply_assessment_result", {
+    p_queue_id: queueId,
+    p_cefr_band: parsed.cefr_band,
+    p_confidence: parsed.confidence,
+    p_feedback: parsed.feedback,
+    p_extra: { bullets_covered: parsed.bullets_covered },
+  });
+  if (error) throw new Error(error.message);
 }
 
 Deno.serve(async (req: Request) => {
@@ -436,6 +206,14 @@ Deno.serve(async (req: Request) => {
     });
   }
 
+  if (row.skill === "speaking") {
+    await supabase.rpc("fail_assessment", { p_queue_id: queueId, p_error: "speaking_evaluated_in_app" });
+    return new Response(JSON.stringify({ ok: true, queue_id: queueId, skipped: true }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
   await supabase
     .from("assessment_queue")
     .update({ status: "processing", started_at: new Date().toISOString() })
@@ -455,19 +233,10 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    if (row.skill === "speaking") {
-      await processSpeaking(
-        supabase, geminiKey, row.id, row.user_id,
-        row.assessment_id, row.session_id, row.payload
-      );
-    } else if (row.skill === "writing") {
-      await processWriting(
-        supabase, geminiKey, row.id, row.user_id,
-        row.assessment_id, row.session_id, row.payload
-      );
-    } else {
+    if (row.skill !== "writing") {
       throw new Error(`Unsupported skill for LLM evaluation: ${row.skill}`);
     }
+    await processWriting(supabase, geminiKey, row.id, row.payload);
 
     return new Response(JSON.stringify({ ok: true, queue_id: queueId }), {
       status: 200,
@@ -477,23 +246,7 @@ Deno.serve(async (req: Request) => {
     const message = err instanceof Error ? err.message : String(err);
     console.error(JSON.stringify({ event: "eval_worker_error", queue_id: queueId, error: message }));
 
-    await supabase
-      .from("assessment_queue")
-      .update({ status: "failed", error: message, completed_at: new Date().toISOString() })
-      .eq("id", queueId);
-
-    await supabase
-      .from("messages")
-      .update({
-        content_json: {
-          assessment_id: row.assessment_id,
-          status: "failed",
-          error: message,
-        },
-      })
-      .eq("session_id", row.session_id)
-      .filter("content_json->>assessment_id", "eq", row.assessment_id)
-      .filter("content_json->>status", "eq", "pending");
+    await supabase.rpc("fail_assessment", { p_queue_id: queueId, p_error: message });
 
     return new Response(JSON.stringify({ ok: false, error: message, queue_id: queueId }), {
       status: 500,
